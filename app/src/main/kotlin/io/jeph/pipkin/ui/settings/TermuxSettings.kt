@@ -1,11 +1,15 @@
 package io.jeph.pipkin.ui.settings
 
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -13,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,11 +36,28 @@ import io.jeph.pipkin.termux.TermuxInstallationStatus
 @Composable
 internal fun TermuxSettings() {
     val context = LocalContext.current
+    val activity = LocalActivity.current
     var installationStatus by remember(context) { mutableStateOf(TermuxInstallationStatus.NOT_INSTALLED) }
     var launchError by remember(context) { mutableStateOf<Int?>(null) }
+    var permissionGranted by remember(context) { mutableStateOf(false) }
+    var permissionDenied by rememberSaveable { mutableStateOf(false) }
+    var permissionNeedsSettings by rememberSaveable { mutableStateOf(false) }
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        permissionGranted = granted
+        permissionDenied = !granted
+        permissionNeedsSettings = !granted &&
+            activity?.shouldShowRequestPermissionRationale(TermuxUtils.RUN_COMMAND_PERMISSION) == false
+    }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         installationStatus = TermuxUtils.getTermuxInstallationStatus(context)
+        permissionGranted = TermuxUtils.hasRunCommandPermission(context)
+        if (permissionGranted || installationStatus != TermuxInstallationStatus.SUPPORTED) {
+            permissionDenied = false
+            permissionNeedsSettings = false
+        } else if (permissionDenied) {
+            permissionNeedsSettings = activity?.shouldShowRequestPermissionRationale(TermuxUtils.RUN_COMMAND_PERMISSION) == false
+        }
         launchError = null
     }
 
@@ -101,6 +123,68 @@ internal fun TermuxSettings() {
                     }
                 }) {
                     Text(stringResource(R.string.termux_open))
+                }
+            }
+            if (supported) {
+                HorizontalDivider()
+                Text(
+                    text = stringResource(R.string.termux_run_command_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.semantics { heading() },
+                )
+                Text(
+                    text = stringResource(
+                        if (permissionGranted) R.string.termux_run_command_granted else R.string.termux_run_command_required,
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (permissionGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                )
+                Text(
+                    text = stringResource(R.string.termux_run_command_description),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                if (permissionGranted) {
+                    Text(
+                        text = stringResource(R.string.termux_run_command_scope),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else {
+                    if (permissionDenied) {
+                        Text(
+                            text = stringResource(R.string.termux_run_command_denied),
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+                        )
+                    }
+                    Button(onClick = {
+                        launchError = null
+                        installationStatus = TermuxUtils.getTermuxInstallationStatus(context)
+                        permissionGranted = TermuxUtils.hasRunCommandPermission(context)
+                        if (installationStatus == TermuxInstallationStatus.SUPPORTED && !permissionGranted) {
+                            if (permissionNeedsSettings) {
+                                if (!TermuxUtils.openRunCommandPermissionSettings(context)) {
+                                    launchError = R.string.termux_run_command_settings_error
+                                }
+                            } else {
+                                permissionLauncher.launch(TermuxUtils.RUN_COMMAND_PERMISSION)
+                            }
+                        }
+                    }) {
+                        Text(stringResource(
+                            if (permissionNeedsSettings) R.string.termux_run_command_settings else R.string.termux_run_command_allow,
+                        ))
+                    }
+                    if (!permissionNeedsSettings) {
+                        TextButton(onClick = {
+                            launchError = null
+                            if (!TermuxUtils.openRunCommandPermissionSettings(context)) {
+                                launchError = R.string.termux_run_command_settings_error
+                            }
+                        }) {
+                            Text(stringResource(R.string.termux_run_command_settings))
+                        }
+                    }
                 }
             }
             launchError?.let { message ->

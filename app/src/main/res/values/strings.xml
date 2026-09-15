@@ -14,4 +14,13 @@
     <string name="termux_unsupported">Unsupported installation</string>
     <string name="termux_unsupported_description">Pipkin requires stable Termux 0.118.0 or newer from F-Droid or the official GitHub releases. Google Play and unrecognized builds are not supported. Get the latest stable version from F-Droid, or update from the same supported source you already use.</string>
     <string name="termux_switch_source_warning">Back up your Termux files before switching installation sources. Different sources use different signing keys, so switching may require uninstalling Termux and its add-ons. Uninstalling deletes Termux data. Do not mix add-ons from different sources.</string>
+    <string name="termux_run_command_title">Run commands permission</string>
+    <string name="termux_run_command_granted">Granted</string>
+    <string name="termux_run_command_required">Not granted</string>
+    <string name="termux_run_command_description">This Android permission allows Pipkin to execute commands in Termux, including reading, changing, or deleting files accessible to Termux.</string>
+    <string name="termux_run_command_scope">This confirms the Android permission only. The separate allow-external-apps setting in Termux has not been checked.</string>
+    <string name="termux_run_command_denied">Permission was not granted. If Android no longer shows the prompt, open Pipkin app settings and enable the Termux permission under Permissions. It may be listed under Additional permissions.</string>
+    <string name="termux_run_command_allow">Allow run commands</string>
+    <string name="termux_run_command_settings">Open app settings</string>
+    <string name="termux_run_command_settings_error">Could not open app settings. Open Android Settings, find Pipkin under Apps, and allow the Termux permission under Permissions.</string>
 </resources>

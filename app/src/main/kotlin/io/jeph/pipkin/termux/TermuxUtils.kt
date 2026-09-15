@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.Settings
 import androidx.core.net.toUri
 import java.security.MessageDigest
 
@@ -14,6 +15,8 @@ internal enum class TermuxInstallationStatus {
 }
 
 internal object TermuxUtils {
+    const val RUN_COMMAND_PERMISSION = "com.termux.permission.RUN_COMMAND"
+
     private const val PACKAGE_NAME = "com.termux"
     private const val INSTALL_URL = "https://f-droid.org/packages/com.termux/"
     private const val MINOR_VERSION_MIN = 118
@@ -47,6 +50,12 @@ internal object TermuxUtils {
             TermuxInstallationStatus.UNSUPPORTED
         }
     }
+
+    fun hasRunCommandPermission(context: Context): Boolean =
+        context.checkSelfPermission(RUN_COMMAND_PERMISSION) == PackageManager.PERMISSION_GRANTED
+
+    fun openRunCommandPermissionSettings(context: Context): Boolean =
+        launch(context, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
 
     fun openTermux(context: Context): Boolean =
         launch(context, context.packageManager.getLaunchIntentForPackage(PACKAGE_NAME))
