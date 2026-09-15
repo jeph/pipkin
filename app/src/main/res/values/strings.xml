@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">pipkin</string>
+    <string name="app_name" translatable="false">Pipkin</string>
     <string name="settings_title">Settings</string>
     <string name="termux_title" translatable="false">Termux</string>
     <string name="termux_installed">Supported installation</string>
