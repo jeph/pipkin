@@ -14,17 +14,17 @@ import androidx.compose.ui.Modifier
 import io.jeph.pipkin.ui.settings.SettingsScreen
 
 class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            MaterialTheme(
-                colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme(),
-            ) {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    SettingsScreen()
-                }
-            }
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    enableEdgeToEdge()
+    setContent {
+      MaterialTheme(
+        colorScheme = if (isSystemInDarkTheme()) darkColorScheme() else lightColorScheme(),
+      ) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+          SettingsScreen()
         }
+      }
     }
+  }
 }

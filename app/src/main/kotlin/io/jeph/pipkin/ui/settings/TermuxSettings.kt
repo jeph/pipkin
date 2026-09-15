@@ -1,6 +1,7 @@
 package io.jeph.pipkin.ui.settings
 
 import android.content.ActivityNotFoundException
+import android.content.Context
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,185 +32,215 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import io.jeph.pipkin.R
-import io.jeph.pipkin.termux.TermuxUtils
 import io.jeph.pipkin.termux.TermuxInstallationStatus
+import io.jeph.pipkin.termux.TermuxUtils
 
 @Composable
 internal fun TermuxSettings() {
-    val context = LocalContext.current
-    val activity = LocalActivity.current
-    var installationStatus by remember(context) { mutableStateOf(TermuxInstallationStatus.NOT_INSTALLED) }
-    var launchError by remember(context) { mutableStateOf<Int?>(null) }
-    var permissionGranted by remember(context) { mutableStateOf(false) }
-    var permissionDenied by rememberSaveable { mutableStateOf(false) }
-    var permissionNeedsSettings by rememberSaveable { mutableStateOf(false) }
-    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        permissionGranted = granted
-        permissionDenied = !granted
-        permissionNeedsSettings = !granted &&
-            activity?.shouldShowRequestPermissionRationale(TermuxUtils.RUN_COMMAND_PERMISSION) == false
+  val context = LocalContext.current
+  var installationStatus by remember(context) { mutableStateOf(TermuxInstallationStatus.NOT_INSTALLED) }
+  LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+    installationStatus = TermuxUtils.getTermuxInstallationStatus(context)
+  }
+  Card(modifier = Modifier.fillMaxWidth()) {
+    Column(
+      modifier = Modifier.padding(20.dp),
+      verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+      Text(
+        text = stringResource(R.string.termux_title),
+        style = MaterialTheme.typography.titleLarge,
+        modifier = Modifier.semantics { heading() },
+      )
+      TermuxInstallationContent(installationStatus)
+      TermuxInstallationActions(installationStatus) { installationStatus = it }
+      if (installationStatus == TermuxInstallationStatus.SUPPORTED) {
+        HorizontalDivider()
+        TermuxPermissionSettings { installationStatus = it }
+      }
     }
+  }
+}
 
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        installationStatus = TermuxUtils.getTermuxInstallationStatus(context)
-        permissionGranted = TermuxUtils.hasRunCommandPermission(context)
-        if (permissionGranted || installationStatus != TermuxInstallationStatus.SUPPORTED) {
-            permissionDenied = false
-            permissionNeedsSettings = false
-        } else if (permissionDenied) {
-            permissionNeedsSettings = activity?.shouldShowRequestPermissionRationale(TermuxUtils.RUN_COMMAND_PERMISSION) == false
-        }
+@Composable
+private fun TermuxInstallationContent(status: TermuxInstallationStatus) {
+  val statusLabel = when (status) {
+    TermuxInstallationStatus.NOT_INSTALLED -> R.string.termux_not_installed
+    TermuxInstallationStatus.SUPPORTED -> R.string.termux_installed
+    TermuxInstallationStatus.UNSUPPORTED -> R.string.termux_unsupported
+  }
+  val description = when (status) {
+    TermuxInstallationStatus.NOT_INSTALLED -> R.string.termux_install_description
+    TermuxInstallationStatus.SUPPORTED -> R.string.termux_installed_description
+    TermuxInstallationStatus.UNSUPPORTED -> R.string.termux_unsupported_description
+  }
+  val statusColor = if (status == TermuxInstallationStatus.UNSUPPORTED) {
+    MaterialTheme.colorScheme.error
+  } else {
+    MaterialTheme.colorScheme.primary
+  }
+  Text(
+    text = stringResource(statusLabel),
+    style = MaterialTheme.typography.labelLarge,
+    color = statusColor,
+    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+  )
+  Text(text = stringResource(description), style = MaterialTheme.typography.bodyLarge)
+  if (status == TermuxInstallationStatus.UNSUPPORTED) {
+    Text(
+      text = stringResource(R.string.termux_switch_source_warning),
+      style = MaterialTheme.typography.bodyMedium,
+    )
+  }
+}
+
+@Composable
+private fun TermuxInstallationActions(
+  status: TermuxInstallationStatus,
+  onStatusChanged: (TermuxInstallationStatus) -> Unit,
+) {
+  val context = LocalContext.current
+  var launchError by remember(context) { mutableStateOf<Int?>(null) }
+  LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { launchError = null }
+  Button(onClick = {
+    launchError = null
+    val currentStatus = TermuxUtils.getTermuxInstallationStatus(context)
+    onStatusChanged(currentStatus)
+    val openInstalled = currentStatus == TermuxInstallationStatus.SUPPORTED
+    try {
+      if (openInstalled) {
+        TermuxUtils.openTermux(context)
+      } else {
+        TermuxUtils.openTermuxInstallationPage(context)
+      }
+    } catch (_: ActivityNotFoundException) {
+      launchError = if (openInstalled) R.string.termux_open_error else R.string.termux_install_error
+    } catch (_: SecurityException) {
+      launchError = R.string.activity_launch_blocked
+    }
+  }) {
+    val label = if (status == TermuxInstallationStatus.SUPPORTED) R.string.termux_open else R.string.termux_install
+    Text(stringResource(label))
+  }
+  if (status == TermuxInstallationStatus.UNSUPPORTED) {
+    TextButton(onClick = {
+      launchError = null
+      try {
+        TermuxUtils.openTermux(context)
+      } catch (_: ActivityNotFoundException) {
+        launchError = R.string.termux_open_error
+      } catch (_: SecurityException) {
+        launchError = R.string.activity_launch_blocked
+      }
+    }) {
+      Text(stringResource(R.string.termux_open))
+    }
+  }
+  LaunchError(launchError)
+}
+
+@Composable
+private fun TermuxPermissionSettings(onStatusChanged: (TermuxInstallationStatus) -> Unit) {
+  val context = LocalContext.current
+  val activity = LocalActivity.current
+  var launchError by remember(context) { mutableStateOf<Int?>(null) }
+  var permissionGranted by remember(context) { mutableStateOf(false) }
+  var permissionDenied by rememberSaveable { mutableStateOf(false) }
+  var permissionNeedsSettings by rememberSaveable { mutableStateOf(false) }
+  val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+    permissionGranted = granted
+    permissionDenied = !granted
+    permissionNeedsSettings = !granted &&
+      activity?.shouldShowRequestPermissionRationale(TermuxUtils.RUN_COMMAND_PERMISSION) == false
+  }
+  LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+    permissionGranted = TermuxUtils.hasRunCommandPermission(context)
+    if (permissionGranted) {
+      permissionDenied = false
+      permissionNeedsSettings = false
+    } else if (permissionDenied) {
+      permissionNeedsSettings =
+        activity?.shouldShowRequestPermissionRationale(TermuxUtils.RUN_COMMAND_PERMISSION) == false
+    }
+    launchError = null
+  }
+  TermuxPermissionContent(permissionGranted, permissionDenied)
+  if (!permissionGranted) {
+    TermuxPermissionActions(
+      needsSettings = permissionNeedsSettings,
+      onRequest = {
         launchError = null
-    }
-
-    val supported = installationStatus == TermuxInstallationStatus.SUPPORTED
-    val installed = installationStatus != TermuxInstallationStatus.NOT_INSTALLED
-    val statusLabel = when (installationStatus) {
-        TermuxInstallationStatus.NOT_INSTALLED -> R.string.termux_not_installed
-        TermuxInstallationStatus.SUPPORTED -> R.string.termux_installed
-        TermuxInstallationStatus.UNSUPPORTED -> R.string.termux_unsupported
-    }
-    val description = when (installationStatus) {
-        TermuxInstallationStatus.NOT_INSTALLED -> R.string.termux_install_description
-        TermuxInstallationStatus.SUPPORTED -> R.string.termux_installed_description
-        TermuxInstallationStatus.UNSUPPORTED -> R.string.termux_unsupported_description
-    }
-
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            Text(
-                text = stringResource(R.string.termux_title),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.semantics { heading() },
-            )
-            Text(
-                text = stringResource(statusLabel),
-                style = MaterialTheme.typography.labelLarge,
-                color = if (installed && !supported) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-            )
-            Text(
-                text = stringResource(description),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            if (installed && !supported) {
-                Text(
-                    text = stringResource(R.string.termux_switch_source_warning),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            Button(onClick = {
-                launchError = null
-                installationStatus = TermuxUtils.getTermuxInstallationStatus(context)
-                val openInstalled = installationStatus == TermuxInstallationStatus.SUPPORTED
-                try {
-                    if (openInstalled) {
-                        TermuxUtils.openTermux(context)
-                    } else {
-                        TermuxUtils.openTermuxInstallationPage(context)
-                    }
-                } catch (_: ActivityNotFoundException) {
-                    launchError = if (openInstalled) R.string.termux_open_error else R.string.termux_install_error
-                } catch (_: SecurityException) {
-                    launchError = R.string.activity_launch_blocked
-                }
-            }) {
-                Text(stringResource(if (supported) R.string.termux_open else R.string.termux_install))
-            }
-            if (installed && !supported) {
-                TextButton(onClick = {
-                    launchError = null
-                    try {
-                        TermuxUtils.openTermux(context)
-                    } catch (_: ActivityNotFoundException) {
-                        launchError = R.string.termux_open_error
-                    } catch (_: SecurityException) {
-                        launchError = R.string.activity_launch_blocked
-                    }
-                }) {
-                    Text(stringResource(R.string.termux_open))
-                }
-            }
-            if (supported) {
-                HorizontalDivider()
-                Text(
-                    text = stringResource(R.string.termux_run_command_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.semantics { heading() },
-                )
-                Text(
-                    text = stringResource(
-                        if (permissionGranted) R.string.termux_run_command_granted else R.string.termux_run_command_required,
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = if (permissionGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                )
-                Text(
-                    text = stringResource(R.string.termux_run_command_description),
-                    style = MaterialTheme.typography.bodyLarge,
-                )
-                if (permissionGranted) {
-                    Text(
-                        text = stringResource(R.string.termux_run_command_scope),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                } else {
-                    if (permissionDenied) {
-                        Text(
-                            text = stringResource(R.string.termux_run_command_denied),
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                        )
-                    }
-                    Button(onClick = {
-                        launchError = null
-                        installationStatus = TermuxUtils.getTermuxInstallationStatus(context)
-                        permissionGranted = TermuxUtils.hasRunCommandPermission(context)
-                        if (installationStatus == TermuxInstallationStatus.SUPPORTED && !permissionGranted) {
-                            if (permissionNeedsSettings) {
-                                try {
-                                    TermuxUtils.openRunCommandPermissionSettings(context)
-                                } catch (_: ActivityNotFoundException) {
-                                    launchError = R.string.termux_run_command_settings_error
-                                } catch (_: SecurityException) {
-                                    launchError = R.string.activity_launch_blocked
-                                }
-                            } else {
-                                permissionLauncher.launch(TermuxUtils.RUN_COMMAND_PERMISSION)
-                            }
-                        }
-                    }) {
-                        Text(stringResource(
-                            if (permissionNeedsSettings) R.string.termux_run_command_settings else R.string.termux_run_command_allow,
-                        ))
-                    }
-                    if (!permissionNeedsSettings) {
-                        TextButton(onClick = {
-                            launchError = null
-                            try {
-                                TermuxUtils.openRunCommandPermissionSettings(context)
-                            } catch (_: ActivityNotFoundException) {
-                                launchError = R.string.termux_run_command_settings_error
-                            } catch (_: SecurityException) {
-                                launchError = R.string.activity_launch_blocked
-                            }
-                        }) {
-                            Text(stringResource(R.string.termux_run_command_settings))
-                        }
-                    }
-                }
-            }
-            launchError?.let { message ->
-                Text(
-                    text = stringResource(message),
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
-                )
-            }
+        val status = TermuxUtils.getTermuxInstallationStatus(context)
+        onStatusChanged(status)
+        permissionGranted = TermuxUtils.hasRunCommandPermission(context)
+        if (status == TermuxInstallationStatus.SUPPORTED && !permissionGranted) {
+          if (permissionNeedsSettings) {
+            launchError = openRunCommandSettings(context)
+          } else {
+            permissionLauncher.launch(TermuxUtils.RUN_COMMAND_PERMISSION)
+          }
         }
-    }
+      },
+      onOpenSettings = { launchError = openRunCommandSettings(context) },
+    )
+  }
+  LaunchError(launchError)
+}
+
+@Composable
+private fun TermuxPermissionContent(granted: Boolean, denied: Boolean) {
+  val label = if (granted) R.string.termux_run_command_granted else R.string.termux_run_command_required
+  val statusColor = if (granted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+  Text(
+    text = stringResource(R.string.termux_run_command_title),
+    style = MaterialTheme.typography.titleMedium,
+    modifier = Modifier.semantics { heading() },
+  )
+  Text(
+    text = stringResource(label),
+    style = MaterialTheme.typography.labelLarge,
+    color = statusColor,
+    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+  )
+  Text(
+    text = stringResource(R.string.termux_run_command_description),
+    style = MaterialTheme.typography.bodyLarge,
+  )
+  if (granted) {
+    Text(
+      text = stringResource(R.string.termux_run_command_scope),
+      style = MaterialTheme.typography.bodyMedium,
+    )
+  } else if (denied) {
+    LaunchError(R.string.termux_run_command_denied)
+  }
+}
+
+@Composable
+private fun TermuxPermissionActions(needsSettings: Boolean, onRequest: () -> Unit, onOpenSettings: () -> Unit) {
+  val label = if (needsSettings) R.string.termux_run_command_settings else R.string.termux_run_command_allow
+  Button(onClick = onRequest) { Text(stringResource(label)) }
+  if (!needsSettings) {
+    TextButton(onClick = onOpenSettings) { Text(stringResource(R.string.termux_run_command_settings)) }
+  }
+}
+
+@Composable
+private fun LaunchError(message: Int?) {
+  message?.let {
+    Text(
+      text = stringResource(it),
+      color = MaterialTheme.colorScheme.error,
+      modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+    )
+  }
+}
+
+private fun openRunCommandSettings(context: Context): Int? = try {
+  TermuxUtils.openRunCommandPermissionSettings(context)
+  null
+} catch (_: ActivityNotFoundException) {
+  R.string.termux_run_command_settings_error
+} catch (_: SecurityException) {
+  R.string.activity_launch_blocked
 }

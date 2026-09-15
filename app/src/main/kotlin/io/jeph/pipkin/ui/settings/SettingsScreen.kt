@@ -19,16 +19,16 @@ import io.jeph.pipkin.R
 
 @Composable
 internal fun SettingsScreen() {
-    Column(
-        modifier = Modifier.fillMaxSize().safeDrawingPadding()
-            .verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.settings_title),
-            style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.semantics { heading() },
-        )
-        TermuxSettings()
-    }
+  Column(
+    modifier = Modifier.fillMaxSize().safeDrawingPadding()
+      .verticalScroll(rememberScrollState()).padding(24.dp),
+    verticalArrangement = Arrangement.spacedBy(24.dp),
+  ) {
+    Text(
+      text = stringResource(R.string.settings_title),
+      style = MaterialTheme.typography.headlineLarge,
+      modifier = Modifier.semantics { heading() },
+    )
+    TermuxSettings()
+  }
 }

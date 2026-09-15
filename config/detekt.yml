@@ -1,0 +1,10 @@
+naming:
+  FunctionNaming:
+    ignoreAnnotated: ['Composable']
+
+# ktlint owns line wrapping and whitespace. Do not add detekt's ktlint ruleset.
+style:
+  MaxLineLength:
+    active: false
+  NewLineAtEndOfFile:
+    active: false
