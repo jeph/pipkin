@@ -54,24 +54,15 @@ internal object TermuxUtils {
     fun hasRunCommandPermission(context: Context): Boolean =
         context.checkSelfPermission(RUN_COMMAND_PERMISSION) == PackageManager.PERMISSION_GRANTED
 
-    fun openRunCommandPermissionSettings(context: Context): Boolean =
-        launch(context, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
+    fun openRunCommandPermissionSettings(context: Context) =
+        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri()))
 
-    fun openTermux(context: Context): Boolean =
-        launch(context, context.packageManager.getLaunchIntentForPackage(PACKAGE_NAME))
-
-    fun openTermuxInstallationPage(context: Context): Boolean =
-        launch(context, Intent(Intent.ACTION_VIEW, INSTALL_URL.toUri()))
-
-    private fun launch(context: Context, intent: Intent?): Boolean {
-        if (intent == null) return false
-        return try {
-            context.startActivity(intent)
-            true
-        } catch (_: ActivityNotFoundException) {
-            false
-        } catch (_: SecurityException) {
-            false
-        }
+    fun openTermux(context: Context) {
+        val intent = context.packageManager.getLaunchIntentForPackage(PACKAGE_NAME)
+            ?: throw ActivityNotFoundException("Termux has no launchable activity")
+        context.startActivity(intent)
     }
+
+    fun openTermuxInstallationPage(context: Context) =
+        context.startActivity(Intent(Intent.ACTION_VIEW, INSTALL_URL.toUri()))
 }

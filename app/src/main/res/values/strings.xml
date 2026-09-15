@@ -23,4 +23,5 @@
     <string name="termux_run_command_allow">Allow run commands</string>
     <string name="termux_run_command_settings">Open app settings</string>
     <string name="termux_run_command_settings_error">Could not open app settings. Open Android Settings, find Pipkin under Apps, and allow the Termux permission under Permissions.</string>
+    <string name="activity_launch_blocked">Android blocked opening this screen. Check your device or work profile restrictions.</string>
 </resources>

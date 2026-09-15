@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.settings
 
+import android.content.ActivityNotFoundException
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -104,13 +105,16 @@ internal fun TermuxSettings() {
                 launchError = null
                 installationStatus = TermuxUtils.getTermuxInstallationStatus(context)
                 val openInstalled = installationStatus == TermuxInstallationStatus.SUPPORTED
-                val opened = if (openInstalled) {
-                    TermuxUtils.openTermux(context)
-                } else {
-                    TermuxUtils.openTermuxInstallationPage(context)
-                }
-                if (!opened) {
+                try {
+                    if (openInstalled) {
+                        TermuxUtils.openTermux(context)
+                    } else {
+                        TermuxUtils.openTermuxInstallationPage(context)
+                    }
+                } catch (_: ActivityNotFoundException) {
                     launchError = if (openInstalled) R.string.termux_open_error else R.string.termux_install_error
+                } catch (_: SecurityException) {
+                    launchError = R.string.activity_launch_blocked
                 }
             }) {
                 Text(stringResource(if (supported) R.string.termux_open else R.string.termux_install))
@@ -118,8 +122,12 @@ internal fun TermuxSettings() {
             if (installed && !supported) {
                 TextButton(onClick = {
                     launchError = null
-                    if (!TermuxUtils.openTermux(context)) {
+                    try {
+                        TermuxUtils.openTermux(context)
+                    } catch (_: ActivityNotFoundException) {
                         launchError = R.string.termux_open_error
+                    } catch (_: SecurityException) {
+                        launchError = R.string.activity_launch_blocked
                     }
                 }) {
                     Text(stringResource(R.string.termux_open))
@@ -163,8 +171,12 @@ internal fun TermuxSettings() {
                         permissionGranted = TermuxUtils.hasRunCommandPermission(context)
                         if (installationStatus == TermuxInstallationStatus.SUPPORTED && !permissionGranted) {
                             if (permissionNeedsSettings) {
-                                if (!TermuxUtils.openRunCommandPermissionSettings(context)) {
+                                try {
+                                    TermuxUtils.openRunCommandPermissionSettings(context)
+                                } catch (_: ActivityNotFoundException) {
                                     launchError = R.string.termux_run_command_settings_error
+                                } catch (_: SecurityException) {
+                                    launchError = R.string.activity_launch_blocked
                                 }
                             } else {
                                 permissionLauncher.launch(TermuxUtils.RUN_COMMAND_PERMISSION)
@@ -178,8 +190,12 @@ internal fun TermuxSettings() {
                     if (!permissionNeedsSettings) {
                         TextButton(onClick = {
                             launchError = null
-                            if (!TermuxUtils.openRunCommandPermissionSettings(context)) {
+                            try {
+                                TermuxUtils.openRunCommandPermissionSettings(context)
+                            } catch (_: ActivityNotFoundException) {
                                 launchError = R.string.termux_run_command_settings_error
+                            } catch (_: SecurityException) {
+                                launchError = R.string.activity_launch_blocked
                             }
                         }) {
                             Text(stringResource(R.string.termux_run_command_settings))
