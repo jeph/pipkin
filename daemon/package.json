@@ -1,0 +1,31 @@
+{
+  "name": "pipkin-daemon",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "scripts": {
+    "build": "esbuild src/daemon.ts --bundle --platform=node --format=esm --target=node22 --minify --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --external:bufferutil --external:utf-8-validate --define:process.env.WS_NO_BUFFER_UTIL=\"'1'\" --define:process.env.WS_NO_UTF_8_VALIDATE=\"'1'\" --log-level=warning",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm run test"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@types/node": "^22.19.0",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.11.0",
+    "selfsigned": "^5.5.0",
+    "typescript": "^6.0.0",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^5.0.1"
+  },
+  "dependencies": {
+    "json-rpc-2.0": "^1.8.1",
+    "ws": "^8.21.3"
+  }
+}

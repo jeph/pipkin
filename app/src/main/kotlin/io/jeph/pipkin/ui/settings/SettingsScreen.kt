@@ -30,5 +30,6 @@ internal fun SettingsScreen() {
       modifier = Modifier.semantics { heading() },
     )
     TermuxSettings()
+    AgentSettings()
   }
 }

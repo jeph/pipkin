@@ -24,4 +24,39 @@
     <string name="termux_run_command_settings">Open app settings</string>
     <string name="termux_run_command_settings_error">Could not open app settings. Open Android Settings, find Pipkin under Apps, and allow the Termux permission under Permissions.</string>
     <string name="activity_launch_blocked">Android blocked opening this screen. Check your device or work profile restrictions.</string>
+
+    <string name="agent_title">Agent supervisor</string>
+    <string name="agent_status_unavailable">Unavailable</string>
+    <string name="agent_status_consent">Needs permission</string>
+    <string name="agent_status_disconnected">Disconnected</string>
+    <string name="agent_status_launching">Starting supervisor in Termux…</string>
+    <string name="agent_status_connecting">Connecting…</string>
+    <string name="agent_status_preparing">Installing Pi 0.85.1 in Termux…</string>
+    <string name="agent_status_connected">Connected · Pi %1$s · port %2$d</string>
+    <string name="agent_consent">Allow background agent</string>
+    <string name="agent_consent_title">Run the agent in Termux</string>
+    <string name="agent_consent_body">Pipkin starts a supervisor process inside Termux that runs the coding agent under Termux\'s identity, with Termux\'s file and network access. It keeps running after you leave Pipkin and stops after 15 minutes without a connected app or a running session. Stop it any time from this screen.</string>
+    <string name="agent_consent_accept">Allow</string>
+    <string name="agent_consent_cancel">Not now</string>
+    <string name="agent_connect">Connect</string>
+    <string name="agent_disconnect">Disconnect</string>
+    <string name="agent_shutdown">Stop supervisor</string>
+    <string name="agent_repair">Re-pair</string>
+    <string name="agent_copy">Copy</string>
+    <string name="agent_sessions">Sessions</string>
+    <string name="agent_session_start">Start session</string>
+    <string name="agent_session_stop">Stop</string>
+    <string name="agent_session_working">Working</string>
+    <string name="agent_session_idle">Idle</string>
+    <string name="agent_session_exited">Exited (%1$s)</string>
+    <string name="agent_session_row" translatable="false">%1$s · pid %2$d · %3$s</string>
+    <string name="agent_background_hint">For long runs with the screen off, enable Termux\'s wake lock from its notification and exclude Termux from battery optimization. Pipkin holds a wake lock only while a session is working.</string>
+    <plurals name="agent_uncertain">
+        <item quantity="one">%1$d request has an unconfirmed outcome; it was not retried.</item>
+        <item quantity="other">%1$d requests have unconfirmed outcomes; they were not retried.</item>
+    </plurals>
+    <string name="agent_notification_channel">Agent activity</string>
+    <string name="agent_notification_title">Pipkin agent is working</string>
+    <string name="agent_notification_text">Running in Termux. Progress continues if you leave the app.</string>
+    <string name="agent_notification_stop">Stop</string>
 </resources>
