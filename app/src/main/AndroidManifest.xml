@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
     <queries>
         <package android:name="com.termux" />
@@ -20,7 +21,8 @@
         android:theme="@style/Theme.Pipkin">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -33,10 +35,10 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-started on-device coding agent session running in Termux; keeps the connection alive to stream progress and offer Stop." />
+                android:value="User-started on-device coding agent sessions running in Termux; keeps Pipkin's connection to Pi alive and offers Stop." />
         </service>
         <receiver
-            android:name=".termux.TermuxResultReceiver"
+            android:name=".host.HostResultReceiver"
             android:exported="false" />
     </application>
 </manifest>

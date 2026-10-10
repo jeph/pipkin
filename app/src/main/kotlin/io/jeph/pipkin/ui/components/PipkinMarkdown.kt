@@ -1,0 +1,116 @@
+package io.jeph.pipkin.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.mikepenz.markdown.compose.components.markdownComponents
+import com.mikepenz.markdown.compose.elements.MarkdownCodeBlock
+import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
+import com.mikepenz.markdown.m3.Markdown
+import com.mikepenz.markdown.m3.markdownColor
+import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.markdownDimens
+import com.mikepenz.markdown.model.markdownPadding
+import io.jeph.pipkin.ui.theme.PipkinTokens
+import io.jeph.pipkin.ui.theme.pipkinColors
+
+/** Assistant markdown styled to Paseo's message tokens: 15/21sp body, bordered horizontally scrolling code. */
+@Composable
+fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
+  val colors = pipkinColors
+  val body =
+    TextStyle(
+      color = colors.foreground,
+      fontSize = PipkinTokens.FontSize.content,
+      lineHeight = PipkinTokens.LineHeight.markdown,
+    )
+  val code =
+    TextStyle(
+      color = colors.foreground,
+      fontFamily = FontFamily.Monospace,
+      fontSize = PipkinTokens.FontSize.code,
+      lineHeight = PipkinTokens.LineHeight.code,
+    )
+  val codeBlock: @Composable (String, String?, TextStyle) -> Unit = { text, _, style -> CodeBlock(text, style) }
+  SelectionContainer(modifier = modifier) {
+    Markdown(
+      content = markdown,
+      modifier = Modifier.fillMaxWidth(),
+      colors =
+        markdownColor(
+          text = colors.foreground,
+          codeBackground = colors.surface2,
+          inlineCodeBackground = colors.surface2,
+          dividerColor = colors.border,
+          tableBackground = colors.surface1,
+        ),
+      typography =
+        markdownTypography(
+          h1 = body.copy(fontSize = PipkinTokens.FontSize.xxl, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
+          h2 = body.copy(fontSize = PipkinTokens.FontSize.xl, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
+          h3 = body.copy(fontSize = PipkinTokens.FontSize.lg, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+          h4 = body.copy(fontWeight = FontWeight.SemiBold),
+          h5 = body.copy(fontWeight = FontWeight.SemiBold),
+          h6 = body.copy(fontWeight = FontWeight.SemiBold),
+          text = body,
+          code = code,
+          inlineCode = code.copy(lineHeight = PipkinTokens.LineHeight.markdown),
+          quote = body.copy(color = colors.foregroundMuted),
+          paragraph = body,
+          ordered = body,
+          bullet = body,
+          list = body,
+          textLink = TextLinkStyles(
+            style = SpanStyle(color = colors.accent, textDecoration = TextDecoration.Underline),
+          ),
+          table = body,
+          alertTitle = body.copy(fontWeight = FontWeight.SemiBold),
+        ),
+      padding = markdownPadding(block = PipkinTokens.Spacing.s6, codeBlock = PaddingValues(0.dp)),
+      dimens = markdownDimens(codeBackgroundCornerSize = PipkinTokens.Radius.md),
+      components =
+        markdownComponents(
+          codeFence = { MarkdownCodeFence(it.content, it.node, style = it.typography.code, block = codeBlock) },
+          codeBlock = { MarkdownCodeBlock(it.content, it.node, style = it.typography.code, block = codeBlock) },
+        ),
+    )
+  }
+}
+
+@Composable
+private fun CodeBlock(text: String, style: TextStyle) {
+  val colors = pipkinColors
+  val shape = RoundedCornerShape(PipkinTokens.Radius.md)
+  Box(
+    modifier =
+      Modifier
+        .fillMaxWidth()
+        .padding(vertical = PipkinTokens.Spacing.s6)
+        .clip(shape)
+        .background(colors.surface2)
+        .border(1.dp, colors.border, shape)
+        .horizontalScroll(rememberScrollState())
+        .padding(PipkinTokens.Spacing.s12),
+  ) {
+    Text(text = text, style = style)
+  }
+}

@@ -1,0 +1,4 @@
+/** Appended to Pi's system prompt for every chat Pipkin starts. */
+export function systemAppend(configDir: string): string {
+  return `You are running inside Pipkin, an Android app that drives Pi through Termux. Shell commands run in Termux; install packages with \`pkg install\`. Pi's configuration directory is ${configDir} (settings.json, models.json, auth.json, AGENTS.md, skills/, extensions/, prompts/, sessions/). When the user asks to change Pi's configuration, read Pi's docs first, edit those files, then tell the user to tap "Reload agent" in Pipkin's chat menu to apply the change. That directory is on Android shared storage, which cannot execute files: run scripts through an interpreter (\`bash script.sh\`, \`node script.mjs\`), never \`./script\`. The user's shared storage (Download, DCIM, Documents) is at ~/storage/shared.`;
+}

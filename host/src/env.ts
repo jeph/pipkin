@@ -1,0 +1,59 @@
+import type * as PiModule from "@earendil-works/pi-coding-agent";
+import { readFile } from "node:fs/promises";
+import os from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
+
+export const PI_PACKAGE = "@earendil-works/pi-coding-agent";
+
+export type PiSdk = typeof PiModule;
+
+/** Values the Termux bootstrap exports before exec'ing node. */
+export interface HostEnv {
+  token: string;
+  /** `$HOME/.local/share/pipkin`: Pipkin-managed state, including the pinned Pi install. */
+  root: string;
+  /** `PI_CODING_AGENT_DIR` on shared storage. */
+  configDir: string;
+  home: string;
+}
+
+/** A failure with a machine-readable code, reported as `pipkin_result` `ok:false`. */
+export class HostError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export function piPackageDir(root: string): string {
+  return join(root, "pi", "node_modules", PI_PACKAGE);
+}
+
+/** The installed Pi version, or null when Pipkin has not installed Pi yet. */
+export async function installedPiVersion(root: string): Promise<string | null> {
+  try {
+    const manifest = JSON.parse(await readFile(join(piPackageDir(root), "package.json"), "utf8")) as unknown;
+    if (manifest !== null && typeof manifest === "object" && "version" in manifest && typeof manifest.version === "string") {
+      return manifest.version;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** The Pi SDK is never bundled: it is loaded from the pinned install so host.mjs stays small. */
+export async function loadPi(root: string): Promise<PiSdk> {
+  return (await import(pathToFileURL(join(piPackageDir(root), "dist", "index.js")).href)) as PiSdk;
+}
+
+export function readHostEnv(): HostEnv | undefined {
+  const token = process.env.PIPKIN_TOKEN;
+  const root = process.env.PIPKIN_ROOT;
+  const configDir = process.env.PI_CODING_AGENT_DIR;
+  if (!token || !root || !configDir) return undefined;
+  return { token, root, configDir, home: process.env.HOME ?? os.homedir() };
+}

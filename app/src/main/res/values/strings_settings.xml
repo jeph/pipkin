@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="settings_copy">Copy</string>
+    <string name="settings_section_accounts">Accounts</string>
+    <string name="settings_section_agent">Agent</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_termux">Termux</string>
+    <string name="settings_section_about">About</string>
+
+    <string name="settings_claude">Claude</string>
+    <string name="settings_claude_subtitle">Pro / Max subscription</string>
+    <string name="settings_openai">OpenAI</string>
+    <string name="settings_openai_subtitle">Codex subscription</string>
+    <string name="settings_sign_in">Sign in</string>
+    <string name="settings_signed_in">Signed in</string>
+    <string name="settings_sign_out">Sign out</string>
+    <string name="settings_account_options">Account options</string>
+    <string name="settings_add_provider">Add OpenAI-compatible API</string>
+
+    <string name="settings_reload_agents">Reload all agents</string>
+    <string name="settings_reload_agents_done">Idle agents reloaded</string>
+    <string name="settings_config_folder">Config folder</string>
+    <string name="settings_config_folder_unknown">Known once Termux connects</string>
+
+    <string name="settings_theme">Theme</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_theme_system">System</string>
+
+    <string name="settings_termux">Termux</string>
+    <string name="settings_termux_not_installed">Not installed</string>
+    <string name="settings_pi_version">Pi %1$s</string>
+    <string name="settings_pi_missing">Pi not installed</string>
+    <string name="settings_run_setup">Run setup again</string>
+    <string name="settings_reinstall_pi">Reinstall Pi runtime</string>
+    <string name="settings_reinstall_running">Installing Pi %1$s…</string>
+    <string name="settings_reinstall_done">Pi %1$s is installed</string>
+
+    <string name="settings_version">Version</string>
+
+    <string name="login_title_claude">Sign in to Claude</string>
+    <string name="login_title_openai">Sign in to OpenAI</string>
+    <string name="login_starting">Starting sign-in…</string>
+    <string name="login_browser">Finish signing in with your browser</string>
+    <string name="login_open_again">Open again</string>
+    <string name="login_no_browser">No app on this phone can open the sign-in link.</string>
+    <string name="login_device_code">Enter this code on the sign-in page</string>
+    <string name="login_open_uri">Open %1$s</string>
+    <string name="login_copy_code">Copy code</string>
+    <string name="login_continue">Continue</string>
+    <string name="login_manual_code_helper">Paste the code or the full redirect URL if the browser didn\'t return automatically.</string>
+    <string name="login_signed_in">Signed in</string>
+    <string name="login_failed">Sign-in failed.</string>
+    <string name="login_try_again">Try again</string>
+
+    <string name="provider_title_new">Add OpenAI-compatible API</string>
+    <string name="provider_id">Provider ID</string>
+    <string name="provider_id_hint">e.g. codex-lb</string>
+    <string name="provider_id_invalid">Use lowercase letters, digits and dashes (up to 40), starting with a letter or digit.</string>
+    <string name="provider_base_url">Base URL</string>
+    <string name="provider_base_url_hint">https://host/v1</string>
+    <string name="provider_api_key">API key</string>
+    <string name="provider_api_key_keep">Leave empty to keep the current key</string>
+    <string name="provider_show_key">Show</string>
+    <string name="provider_hide_key">Hide</string>
+    <string name="provider_api_type">API type</string>
+    <string name="provider_api_completions">Chat Completions</string>
+    <string name="provider_api_responses">Responses</string>
+    <string name="provider_images">Models accept images</string>
+    <string name="provider_models">Models</string>
+    <string name="provider_fetch_models">Fetch models</string>
+    <string name="provider_add_model">Add model ID</string>
+    <string name="provider_save">Save</string>
+    <string name="provider_remove">Remove provider</string>
+    <string name="provider_remove_title">Remove %1$s?</string>
+    <string name="provider_remove_text">Pi forgets this provider, its models and its API key.</string>
+    <string name="provider_cancel">Cancel</string>
+    <string name="provider_failed">The Termux helper failed.</string>
+</resources>

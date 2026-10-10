@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="768" android:viewportHeight="768">
+<!-- Launcher icon is drawn once per launcher refresh; the long glyph path keeps its exact shape. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" android:width="108dp" android:height="108dp" android:viewportWidth="768" android:viewportHeight="768" tools:ignore="VectorPath">
     <group android:translateX="128" android:translateY="122">
         <path android:pathData="M344 245H403A12 12 0 0 1 403 269H344Z" android:fillColor="#BD5132" />
         <path android:pathData="M188 355L174 397M298 355L312 397" android:fillColor="@android:color/transparent" android:strokeColor="#BD5132" android:strokeWidth="24" android:strokeLineCap="round" />

@@ -13,13 +13,14 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.util.Log
 import io.jeph.pipkin.MainActivity
-import io.jeph.pipkin.PipkinApplication
 import io.jeph.pipkin.R
+import io.jeph.pipkin.appGraph
 
 /**
- * Foreground service plus partial wake lock held only while a Pi generation is working. The
- * daemon in Termux owns the work; this keeps Pipkin's socket alive to stream it and offer Stop.
+ * User-started on-device coding agent sessions running in Termux; keeps Pipkin's connection to Pi
+ * alive and offers Stop. Foreground service plus partial wake lock, held only while active.
  */
 class AgentService : Service() {
   private val handler = Handler(Looper.getMainLooper())
@@ -53,10 +54,8 @@ class AgentService : Service() {
         renew.run()
       }
 
-      ACTION_STOP -> {
-        (application as PipkinApplication).coordinator.stopAll()
-        release()
-      }
+      // Chats settle after the abort; KeepAlive then releases the service.
+      ACTION_STOP -> appGraph.registry.abortAll()
 
       else -> release()
     }
@@ -95,6 +94,7 @@ class AgentService : Service() {
     const val ACTION_BUSY = "io.jeph.pipkin.action.BUSY"
     const val ACTION_IDLE = "io.jeph.pipkin.action.IDLE"
     const val ACTION_STOP = "io.jeph.pipkin.action.STOP"
+    private const val TAG = "Pipkin"
     private const val CHANNEL = "agent"
     private const val NOTIFICATION_ID = 1
     private const val WAKE_TAG = "Pipkin:Agent"
@@ -103,15 +103,22 @@ class AgentService : Service() {
 
     private fun intent(context: Context, action: String) = Intent(context, AgentService::class.java).setAction(action)
 
-    /** Busy → foreground with wake lock; idle → release and stop. Safe from any thread. */
-    fun update(context: Context, busy: Boolean) {
-      if (busy) {
-        context.startForegroundService(
-          intent(context, ACTION_BUSY),
-        )
+    /**
+     * Active → foreground with wake lock; inactive → release and stop. Safe from any thread.
+     * Returns false when Android refused the start (`ForegroundServiceStartNotAllowedException`
+     * on API 31+, or a background start limit); work continues without the service, but Pipkin
+     * may be killed in the background.
+     */
+    fun update(context: Context, active: Boolean): Boolean = try {
+      if (active) {
+        context.startForegroundService(intent(context, ACTION_BUSY))
       } else {
         context.startService(intent(context, ACTION_IDLE))
       }
+      true
+    } catch (error: IllegalStateException) {
+      Log.w(TAG, "AgentService.update($active) refused", error)
+      false
     }
   }
 }

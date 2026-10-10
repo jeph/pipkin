@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Header and actions sheet -->
+    <string name="chat_new_chat">New chat</string>
+    <string name="chat_toggle_sidebar">Agents</string>
+    <string name="chat_actions">Chat actions</string>
+    <string name="chat_action_rename">Rename</string>
+    <string name="chat_action_reload">Reload agent</string>
+    <string name="chat_action_copy_path">Copy session path</string>
+    <string name="chat_action_delete">Delete chat</string>
+    <string name="chat_rename_title">Rename chat</string>
+    <string name="chat_rename_hint">Chat name</string>
+    <string name="chat_save">Save</string>
+    <string name="chat_cancel">Cancel</string>
+    <string name="chat_reload_confirm_title">Stop and reload?</string>
+    <string name="chat_reload_confirm_text">Pi is working. Reloading stops the current run.</string>
+    <string name="chat_reload_confirm">Stop and reload</string>
+    <string name="chat_delete_confirm_title">Delete this chat?</string>
+    <string name="chat_delete_confirm_text">Its session file is deleted from Pi\'s sessions folder.</string>
+    <string name="chat_delete">Delete</string>
+
+    <!-- Stream -->
+    <string name="chat_starting">Starting…</string>
+    <string name="chat_installing">Installing Pi…</string>
+    <string name="chat_retry">Retry</string>
+    <string name="chat_copy_command">Copy command &amp; open Termux</string>
+    <string name="chat_setup_hint">Tap “Termux needs attention” in the Agents list to finish setup.</string>
+    <string name="chat_exit_code">Agent stopped (exit %1$d)</string>
+    <string name="chat_agent_stopped">Agent stopped</string>
+    <string name="chat_show_details">Show details</string>
+    <string name="chat_hide_details">Hide details</string>
+    <string name="chat_restart">Restart</string>
+    <string name="chat_empty">Message Pi to start</string>
+    <string name="chat_no_model">No model available</string>
+    <string name="chat_sign_in">Sign in</string>
+    <string name="chat_scroll_to_bottom">Scroll to bottom</string>
+    <string name="chat_image">Attached image</string>
+    <string name="chat_copy_reply">Copy reply</string>
+    <string name="chat_duration_minutes">%1$dm %2$ds</string>
+    <string name="chat_duration_seconds">%1$ds</string>
+
+    <!-- Tool calls -->
+    <string name="chat_thinking">Thinking</string>
+    <string name="chat_tool_shell">Shell</string>
+    <string name="chat_tool_read">Read</string>
+    <string name="chat_tool_write">Write</string>
+    <string name="chat_tool_edit">Edit</string>
+    <string name="chat_arguments">Arguments</string>
+    <string name="chat_output">Output</string>
+    <string name="chat_no_output">No output</string>
+    <string name="chat_running">Running…</string>
+
+    <!-- Composer -->
+    <string name="chat_placeholder">Message Pi…</string>
+    <string name="chat_attach">Attach</string>
+    <string name="chat_attach_photos">Photos</string>
+    <string name="chat_attach_files">Files</string>
+    <string name="chat_images_text_only">Text-only model</string>
+    <string name="chat_remove_attachment">Remove attachment</string>
+    <string name="chat_image_failed">Couldn\'t read that image</string>
+    <string name="chat_file_failed">Couldn\'t read that file</string>
+    <string name="chat_files_too_large">Files can add up to 10 MB per message</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_stop">Stop</string>
+    <string name="chat_queued">Queued: %1$s</string>
+    <string name="chat_clear">Clear</string>
+    <string name="chat_model">Model</string>
+    <string name="chat_no_model_chip">No model</string>
+
+    <!-- Extension dialogs -->
+    <string name="chat_choose">Choose an option</string>
+    <string name="chat_confirm_title">Confirm</string>
+    <string name="chat_input_title">Pi needs input</string>
+    <string name="chat_ok">OK</string>
+    <string name="chat_yes">Yes</string>
+    <string name="chat_no">No</string>
+</resources>

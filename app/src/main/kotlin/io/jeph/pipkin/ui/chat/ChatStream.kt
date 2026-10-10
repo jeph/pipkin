@@ -1,0 +1,242 @@
+package io.jeph.pipkin.ui.chat
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import io.jeph.pipkin.R
+import io.jeph.pipkin.agent.AgentProcess
+import io.jeph.pipkin.agent.AgentProcessState
+import io.jeph.pipkin.agent.TimelineItem
+import io.jeph.pipkin.agent.TimelineState
+import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.theme.PipkinTokens
+import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
+
+/** Scrolls past the end of the last item; the list clamps it to the bottom. */
+private const val FOLLOW_OFFSET = 1_000_000
+private const val BANNER_KEY = "pipkin:banner"
+
+/**
+ * The chat stream: process banner, timeline items, the empty state and Paseo's scroll-to-bottom button.
+ * Follows new output while the user is near the bottom; dragging away stops following.
+ */
+@Composable
+internal fun ChatStream(
+  process: AgentProcess,
+  timeline: TimelineState,
+  processState: AgentProcessState,
+  onOpenTool: (key: String) -> Unit,
+  onOpenSettings: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  val listState = remember(process) { LazyListState() }
+  val follow = remember(process) { mutableStateOf(true) }
+  val scope = rememberCoroutineScope()
+  val banner = processState.takeIf {
+    it is AgentProcessState.Starting || it is AgentProcessState.Installing || it is AgentProcessState.Failed
+  }
+  val count = timeline.items.size + if (banner != null) 1 else 0
+  val threshold = with(LocalDensity.current) { 120.dp.roundToPx() }
+  AutoFollow(listState, follow, timeline.items, count, threshold)
+  val showScrollButton by remember(listState, threshold) {
+    derivedStateOf { listState.distanceFromBottom() > threshold }
+  }
+  Box(modifier = modifier.fillMaxSize()) {
+    StreamList(listState, timeline.items, banner, process, onOpenTool)
+    if (timeline.items.isEmpty() && processState == AgentProcessState.Ready) {
+      EmptyState(noModel = timeline.model == null, onOpenSettings, Modifier.align(Alignment.Center))
+    }
+    ScrollToBottomButton(
+      visible = showScrollButton,
+      onClick = {
+        follow.value = true
+        scope.launch { if (count > 0) listState.scrollToItem(count - 1, FOLLOW_OFFSET) }
+      },
+      modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = PipkinTokens.Spacing.s16),
+    )
+  }
+}
+
+/** A drag stops following; following resumes when scrolling settles near the bottom. */
+@Composable
+private fun AutoFollow(
+  listState: LazyListState,
+  follow: MutableState<Boolean>,
+  items: List<TimelineItem>,
+  count: Int,
+  threshold: Int,
+) {
+  LaunchedEffect(listState) {
+    listState.interactionSource.interactions.collect { if (it is DragInteraction.Start) follow.value = false }
+  }
+  LaunchedEffect(listState, threshold) {
+    snapshotFlow { listState.isScrollInProgress }
+      .filter { !it }
+      .collect { follow.value = listState.distanceFromBottom() <= threshold }
+  }
+  LaunchedEffect(items, count) {
+    if (follow.value && count > 0 && !listState.isScrollInProgress) listState.scrollToItem(count - 1, FOLLOW_OFFSET)
+  }
+}
+
+@Composable
+private fun StreamList(
+  listState: LazyListState,
+  items: List<TimelineItem>,
+  banner: AgentProcessState?,
+  process: AgentProcess,
+  onOpenTool: (key: String) -> Unit,
+) {
+  val replies = remember(items) { replyTexts(items) }
+  LazyColumn(
+    state = listState,
+    modifier = Modifier.fillMaxSize(),
+    contentPadding = PaddingValues(
+      start = PipkinTokens.Spacing.s16,
+      end = PipkinTokens.Spacing.s16,
+      bottom = PipkinTokens.Spacing.s16,
+    ),
+    horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    if (banner != null) {
+      item(key = BANNER_KEY, contentType = BANNER_KEY) {
+        StatusBanner(banner, onRetry = process::restart, Modifier.contentWidth().padding(top = PipkinTokens.Spacing.s8))
+      }
+    }
+    itemsIndexed(items, key = { _, item -> item.key }, contentType = { _, item -> item::class }) { index, item ->
+      StreamItem(
+        item = item,
+        replyText = replies[item.key],
+        onOpenTool = onOpenTool,
+        onRestart = process::restart,
+        modifier = Modifier.contentWidth().padding(top = gapBefore(items.getOrNull(index - 1), item)),
+      )
+    }
+  }
+}
+
+@Composable
+private fun StreamItem(
+  item: TimelineItem,
+  replyText: String?,
+  onOpenTool: (key: String) -> Unit,
+  onRestart: () -> Unit,
+  modifier: Modifier,
+) {
+  when (item) {
+    is TimelineItem.User -> UserMessage(item, modifier)
+    is TimelineItem.AssistantText -> AssistantMessage(item, modifier)
+    is TimelineItem.Thinking -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
+    is TimelineItem.ToolCall -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
+    is TimelineItem.Error -> ErrorRow(item.message, modifier)
+    is TimelineItem.Notice -> NoticeRow(item.text, modifier)
+    is TimelineItem.TurnFooter -> TurnFooterRow(item, replyText, modifier)
+    is TimelineItem.ExitBanner -> ExitBannerCard(item, onRestart, modifier)
+  }
+}
+
+/** "Message Pi to start", or a way to Settings when Pi has no model to use. */
+@Composable
+private fun EmptyState(noModel: Boolean, onOpenSettings: () -> Unit, modifier: Modifier) {
+  Column(
+    modifier = modifier.padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s48),
+    horizontalAlignment = Alignment.CenterHorizontally,
+    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
+  ) {
+    Text(
+      text = stringResource(if (noModel) R.string.chat_no_model else R.string.chat_empty),
+      color = pipkinColors.foregroundMuted,
+      fontSize = PipkinTokens.FontSize.base,
+    )
+    if (noModel) Button(onClick = onOpenSettings) { Text(text = stringResource(R.string.chat_sign_in)) }
+  }
+}
+
+@Composable
+private fun ScrollToBottomButton(visible: Boolean, onClick: () -> Unit, modifier: Modifier) {
+  AnimatedVisibility(visible = visible, modifier = modifier, enter = fadeIn(), exit = fadeOut()) {
+    Box(
+      modifier = Modifier.size(48.dp).clip(CircleShape).background(pipkinColors.surface2).clickable(onClick = onClick),
+      contentAlignment = Alignment.Center,
+    ) {
+      LucideIcon(
+        icon = R.drawable.ic_lucide_chevron_down,
+        contentDescription = stringResource(R.string.chat_scroll_to_bottom),
+        size = 24.dp,
+      )
+    }
+  }
+}
+
+/** Pixels between the end of the last item and the bottom of the viewport; MAX_VALUE while it is off screen. */
+private fun LazyListState.distanceFromBottom(): Int {
+  val info = layoutInfo
+  val last = info.visibleItemsInfo.lastOrNull() ?: return 0
+  if (last.index < info.totalItemsCount - 1) return Int.MAX_VALUE
+  return (last.offset + last.size - (info.viewportEndOffset - info.afterContentPadding)).coerceAtLeast(0)
+}
+
+/** Paseo's rhythm: 4dp inside a run of user messages or tool rows, 16dp around user-message groups. */
+private fun gapBefore(previous: TimelineItem?, item: TimelineItem): Dp = when {
+  previous == null -> PipkinTokens.Spacing.s16
+  previous is TimelineItem.User && item is TimelineItem.User -> PipkinTokens.Spacing.s4
+  previous is TimelineItem.User || item is TimelineItem.User -> PipkinTokens.Spacing.s16
+  else -> PipkinTokens.Spacing.s4
+}
+
+/** Each settled turn footer's last assistant text, for its copy button. */
+private fun replyTexts(items: List<TimelineItem>): Map<String, String> {
+  val replies = HashMap<String, String>()
+  var last: String? = null
+  for (item in items) {
+    when (item) {
+      is TimelineItem.AssistantText -> last = item.markdown
+
+      is TimelineItem.TurnFooter -> {
+        last?.let { replies[item.key] = it }
+        last = null
+      }
+
+      else -> Unit
+    }
+  }
+  return replies
+}
+
+private fun Modifier.contentWidth(): Modifier = widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth()

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="onboarding_title">Set up Pipkin</string>
+    <string name="onboarding_status_done">Done</string>
+    <string name="onboarding_status_failed">Needs attention</string>
+    <string name="onboarding_recommended">Recommended</string>
+    <string name="onboarding_open_settings">Open settings</string>
+    <string name="onboarding_retry">Retry</string>
+    <string name="onboarding_no_activity">No app on this device can open that.</string>
+
+    <string name="onboarding_termux_title">Termux from F-Droid</string>
+    <string name="onboarding_termux_missing">Pipkin runs Pi inside Termux.</string>
+    <string name="onboarding_termux_install">Install Termux from F-Droid</string>
+    <string name="onboarding_termux_play">Termux from Google Play can\'t run Pipkin. Uninstall it, then install the F-Droid build (this deletes Termux\'s files).</string>
+    <string name="onboarding_termux_unsupported">This Termux build isn\'t supported. Uninstall it, then install the F-Droid build (this deletes Termux\'s files).</string>
+    <string name="onboarding_termux_uninstall">Uninstall</string>
+    <string name="onboarding_termux_open_fdroid">Open F-Droid</string>
+    <string name="onboarding_termux_too_old">Pipkin needs Termux 0.118 or newer.</string>
+    <string name="onboarding_termux_update">Update Termux from F-Droid</string>
+    <string name="onboarding_termux_ready">Termux %1$s is installed.</string>
+
+    <string name="onboarding_notifications_title">Notifications</string>
+    <string name="onboarding_notifications_body">Shows when Pi is working in the background and lets you stop it.</string>
+    <string name="onboarding_notifications_allow">Allow notifications</string>
+    <string name="onboarding_notifications_done">Notifications are on.</string>
+
+    <string name="onboarding_run_command_title">Allow Pipkin to run commands in Termux</string>
+    <string name="onboarding_run_command_body">Pipkin starts Pi through Termux.</string>
+    <string name="onboarding_run_command_needs_termux">Install Termux first.</string>
+    <string name="onboarding_run_command_blocked">Android won\'t ask again. In settings, open Permissions and allow \"Run commands in Termux environment\".</string>
+    <string name="onboarding_run_command_allow">Allow</string>
+    <string name="onboarding_run_command_done">Pipkin can run commands in Termux.</string>
+
+    <string name="onboarding_setup_title">Set up Termux</string>
+    <string name="onboarding_setup_body">In Termux, long-press, tap Paste, then press Enter. Allow storage access when Android asks. Termux brings you back here when it\'s done.</string>
+    <string name="onboarding_setup_action">Copy command &amp; open Termux</string>
+    <string name="onboarding_setup_done">Termux is ready for Pipkin.</string>
+    <string name="onboarding_copy_command">Copy command</string>
+
+    <string name="onboarding_install_title">Install Pi</string>
+    <string name="onboarding_install_body">Pipkin installs Pi %1$s in Termux. This takes a few minutes.</string>
+    <string name="onboarding_install_running">Installing Pi %1$s…</string>
+    <string name="onboarding_install_done">Pi %1$s is installed.</string>
+    <string name="onboarding_install_failed">Installing Pi failed.</string>
+    <string name="onboarding_install_action">Install Pi</string>
+
+    <string name="onboarding_signin_title">Sign in</string>
+    <string name="onboarding_signin_body">Choose how Pi reaches a model. You can add more in Settings later.</string>
+    <string name="onboarding_signin_needs_pi">Available once Pi is installed.</string>
+    <string name="onboarding_signin_claude">Claude</string>
+    <string name="onboarding_signin_openai">OpenAI</string>
+    <string name="onboarding_signin_api">OpenAI-compatible API</string>
+    <string name="onboarding_signed_in">Signed in</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_skip">Skip for now</string>
+</resources>

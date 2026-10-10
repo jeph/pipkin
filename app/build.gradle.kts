@@ -5,52 +5,52 @@ plugins {
   id("dev.detekt")
 }
 
-val daemonDir = rootProject.layout.projectDirectory.dir("daemon")
+val hostDir = rootProject.layout.projectDirectory.dir("host")
 
-/** esbuild bundle of the daemon; AGP picks the output directory and wires the dependency. */
-abstract class DaemonBundle : Exec() {
+/** esbuild bundle of the Termux host; AGP picks the output directory and wires the dependency. */
+abstract class HostBundle : Exec() {
   @get:OutputDirectory
   abstract val outputDir: DirectoryProperty
 
   override fun exec() {
-    args("--outfile=${outputDir.get().asFile.resolve("pipkin-daemon.mjs")}")
+    environment("OUT", outputDir.get().asFile.absolutePath)
     super.exec()
   }
 }
 
-// The Termux supervisor is a TypeScript package; its bundle ships as an APK asset.
-val daemonInstall by tasks.registering(Exec::class) {
-  description = "Installs the daemon's pinned toolchain."
-  workingDir = daemonDir.asFile
-  inputs.files(daemonDir.file("package.json"), daemonDir.file("package-lock.json"))
-  outputs.file(daemonDir.file("node_modules/.package-lock.json"))
-  commandLine("npm", "ci", "--no-audit", "--no-fund", "--loglevel=error")
+// The Termux-side host is a TypeScript package; its bundle ships as an APK asset.
+val hostInstall by tasks.registering(Exec::class) {
+  description = "Installs the host package's pinned toolchain."
+  workingDir = hostDir.asFile
+  inputs.files(hostDir.file("package.json"), hostDir.file("pnpm-lock.yaml"), hostDir.file("pnpm-workspace.yaml"))
+  outputs.file(hostDir.file("node_modules/.modules.yaml"))
+  commandLine("pnpm", "install", "--frozen-lockfile")
 }
 
-val daemonBuild by tasks.registering(DaemonBundle::class) {
-  description = "Bundles the Termux supervisor daemon into an APK asset."
-  dependsOn(daemonInstall)
-  workingDir = daemonDir.asFile
-  inputs.dir(daemonDir.dir("src"))
-  inputs.files(daemonDir.file("package.json"), daemonDir.file("package-lock.json"), daemonDir.file("tsconfig.json"))
-  commandLine("npm", "run", "build", "--")
+val hostBuild by tasks.registering(HostBundle::class) {
+  description = "Bundles the Termux host into the pipkin-host.mjs APK asset."
+  dependsOn(hostInstall)
+  workingDir = hostDir.asFile
+  inputs.dir(hostDir.dir("src"))
+  inputs.files(hostDir.file("package.json"), hostDir.file("pnpm-lock.yaml"), hostDir.file("tsconfig.json"))
+  commandLine("pnpm", "run", "build")
 }
 
-val daemonCheck by tasks.registering(Exec::class) {
-  description = "Typechecks, lints and tests the Termux supervisor daemon."
-  dependsOn(daemonInstall)
-  workingDir = daemonDir.asFile
-  inputs.dir(daemonDir.dir("src"))
-  inputs.dir(daemonDir.dir("test"))
+val hostCheck by tasks.registering(Exec::class) {
+  description = "Typechecks, lints and tests the Termux host."
+  dependsOn(hostInstall)
+  workingDir = hostDir.asFile
+  inputs.dir(hostDir.dir("src"))
+  inputs.dir(hostDir.dir("test"))
   inputs.files(
-    daemonDir.file("package.json"),
-    daemonDir.file("package-lock.json"),
-    daemonDir.file("tsconfig.json"),
-    daemonDir.file("eslint.config.js"),
-    daemonDir.file("vitest.config.ts"),
+    hostDir.file("package.json"),
+    hostDir.file("pnpm-lock.yaml"),
+    hostDir.file("tsconfig.json"),
+    hostDir.file(".oxlintrc.json"),
+    hostDir.file("vitest.config.ts"),
   )
   outputs.upToDateWhen { false }
-  commandLine("npm", "run", "check")
+  commandLine("pnpm", "run", "check")
 }
 
 android {
@@ -77,7 +77,7 @@ android {
 
 androidComponents {
   onVariants { variant ->
-    variant.sources.assets?.addGeneratedSourceDirectory(daemonBuild, DaemonBundle::outputDir)
+    variant.sources.assets?.addGeneratedSourceDirectory(hostBuild, HostBundle::outputDir)
   }
 }
 
@@ -97,19 +97,18 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
 }
 
 tasks.named("check") {
-  dependsOn("detektMain", "detektTest", daemonCheck)
+  dependsOn("detektMain", "detektTest", hostCheck)
 }
 
 dependencies {
   implementation(platform("androidx.compose:compose-bom:2026.09.00"))
   implementation("androidx.activity:activity-compose:1.13.0")
   implementation("androidx.compose.material3:material3")
-  implementation("androidx.core:core-ktx:1.19.0")
+  implementation("androidx.core:core-ktx:1.19.1")
   implementation("androidx.lifecycle:lifecycle-process:2.11.0")
   implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+  implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.45.0")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-  implementation("com.squareup.okhttp3:okhttp:5.5.0")
-  implementation("com.squareup.okhttp3:okhttp-tls:5.5.0")
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.json:json:20260814")
 }
