@@ -125,10 +125,17 @@ internal fun Composer(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
       ) {
-        AttachButton(controller, model)
-        ModelChip(model, onOpenModelSheet)
-        if (supportsThinking(model)) ThinkingChip(thinkingLevel, onOpenThinkingSheet)
-        Spacer(modifier = Modifier.weight(1f))
+        // The left group takes what the trailing buttons leave, and inside it the model chip is
+        // measured last, so on a narrow screen the model name is cut before send is pushed off.
+        Row(
+          modifier = Modifier.weight(1f),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+        ) {
+          AttachButton(controller, model)
+          ModelChip(model, onOpenModelSheet, Modifier.weight(1f, fill = false))
+          if (supportsThinking(model)) ThinkingChip(thinkingLevel, onOpenThinkingSheet)
+        }
         trailingControls()
         val action = when {
           controller.sending -> PrimaryAction.Sending

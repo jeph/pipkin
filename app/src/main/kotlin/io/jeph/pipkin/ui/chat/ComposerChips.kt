@@ -22,10 +22,10 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import org.json.JSONObject
 
-/** The current model's name; opens the model picker. */
+/** The current model's name, ellipsized when [modifier] gives it less room; opens the model picker. */
 @Composable
-internal fun ModelChip(model: JSONObject?, onClick: () -> Unit) {
-  ToolbarChip(onClick, onClickLabel = stringResource(R.string.chat_model)) {
+internal fun ModelChip(model: JSONObject?, onClick: () -> Unit, modifier: Modifier = Modifier) {
+  ToolbarChip(onClick, onClickLabel = stringResource(R.string.chat_model), modifier) {
     Text(
       text = modelLabel(model) ?: stringResource(R.string.chat_no_model_chip),
       modifier = Modifier.widthIn(max = 180.dp),
@@ -59,10 +59,15 @@ internal fun ThinkingChip(thinkingLevel: String?, onClick: () -> Unit) {
 
 /** A 28dp pill in the composer toolbar. */
 @Composable
-private fun ToolbarChip(onClick: () -> Unit, onClickLabel: String, content: @Composable RowScope.() -> Unit) {
+private fun ToolbarChip(
+  onClick: () -> Unit,
+  onClickLabel: String,
+  modifier: Modifier = Modifier,
+  content: @Composable RowScope.() -> Unit,
+) {
   Row(
     modifier =
-      Modifier
+      modifier
         .heightIn(min = 28.dp)
         .clip(RoundedCornerShape(PipkinTokens.Radius.xxl))
         .clickable(onClickLabel = onClickLabel, onClick = onClick)
