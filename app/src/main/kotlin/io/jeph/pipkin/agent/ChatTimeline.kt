@@ -37,6 +37,10 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private val items = mutableListOf<TimelineItem>()
   private var footer: TurnFooter? = null
   private var live: LiveMessage? = null
+
+  /** The raw JSON of each streaming tool call's arguments so far, by item key. */
+  private val streamingArgs = HashMap<String, StringBuilder>()
+
   private var messageSeq = 0
   private var itemSeq = 0
   private var retryNoticeKey: String? = null
@@ -55,6 +59,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
     synchronized(lock) {
       items.clear()
       live = null
+      streamingArgs.clear()
       // A seed follows a new connection or session, so no compaction is running any more.
       compacting = false
       for (index in 0 until messages.length()) {
@@ -205,7 +210,16 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       "toolcall_start" ->
         upsert(key, { pendingTool(key, update.optString("id"), update.optString("toolName")) }) { it }
 
+      "toolcall_delta" -> {
+        val json = streamingArgs.getOrPut(key, ::StringBuilder).append(update.optString("delta"))
+        val args = parsePartialJsonObject(json.toString()) ?: return
+        val index = items.indexOfLast { it.key == key }
+        val tool = items.getOrNull(index) as? ToolCall ?: return
+        items[index] = tool.copy(args = args)
+      }
+
       "toolcall_end" -> {
+        streamingArgs.remove(key)
         val call = update.optJSONObject("toolCall") ?: return
         upsert(key, { pendingTool(key, call.optString("id"), call.optString("name")) }) {
           it.copy(args = call.optJSONObject("arguments"))
@@ -219,6 +233,8 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       "user", "assistant", "bashExecution" -> {
         val prefix = live?.takeIf { it.role == role }?.key ?: nextMessageKey()
         live = null
+        // An aborted message ends without toolcall_end for the call it was streaming.
+        if (role == "assistant") streamingArgs.clear()
         replaceMessage(prefix, messageItems(message, prefix, settled = role == "bashExecution", clock))
       }
 

@@ -15,6 +15,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -39,7 +41,10 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Details of a thinking block or tool call; [item] is a [TimelineItem.Thinking] or [TimelineItem.ToolCall]. */
+/**
+ * Details of a thinking block or tool call; [item] is a [TimelineItem.Thinking] or [TimelineItem.ToolCall].
+ * Opened while it still streams, the sheet follows its end like the chat does until the user drags away.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ToolCallSheet(item: TimelineItem, onDismiss: () -> Unit) {
@@ -48,6 +53,10 @@ internal fun ToolCallSheet(item: TimelineItem, onDismiss: () -> Unit) {
     is TimelineItem.Thinking -> toolPresentation(item)
     else -> return
   }
+  val scrollState = rememberScrollState()
+  // A finished item only grows while its first layout lands, which must not scroll it to the end.
+  val streamingAtOpen = remember { presentation.running }
+  if (streamingAtOpen) AutoFollow(scrollState, remember { mutableStateOf(true) })
   PipkinSheet(onDismissRequest = onDismiss) {
     SheetTitle(presentation)
     SelectionContainer {
@@ -55,7 +64,7 @@ internal fun ToolCallSheet(item: TimelineItem, onDismiss: () -> Unit) {
         modifier =
           Modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(horizontal = PipkinTokens.Spacing.s16),
         verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
       ) {

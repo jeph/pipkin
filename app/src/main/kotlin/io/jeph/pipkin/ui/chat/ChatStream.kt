@@ -7,7 +7,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,14 +24,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,18 +49,11 @@ import io.jeph.pipkin.agent.TimelineState
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 
 /** Scrolls past the end of the last item; the list clamps it to the bottom. */
 private const val FOLLOW_OFFSET = 1_000_000
 private const val BANNER_KEY = "pipkin:banner"
-
-/** How far above the bottom a settled scroll still counts as at the bottom. */
-private val FOLLOW_TOLERANCE = 4.dp
 
 private val EMPTY_STATE_ICON_SIZE = 72.dp
 
@@ -111,43 +101,22 @@ internal fun ChatStream(
   }
 }
 
-/**
- * Pins the end of the stream to the bottom of the viewport while following. It reacts to layout,
- * not to timeline changes, because markdown parses off the main thread: a message grows frames
- * after its text arrives. A drag stops following, and only a user scroll that settles at the
- * bottom resumes it, so a reader above the bottom is never moved.
- */
+/** [AutoFollow] for the stream, which jumps to its last item while that is too far off screen to measure. */
 @Composable
 private fun AutoFollow(listState: LazyListState, follow: MutableState<Boolean>) {
-  val tolerance = with(LocalDensity.current) { FOLLOW_TOLERANCE.roundToPx() }
-  LaunchedEffect(listState) {
-    listState.interactionSource.interactions.collect { if (it is DragInteraction.Start) follow.value = false }
-  }
-  LaunchedEffect(listState, tolerance) {
-    // Only turns following on: the pinning's own scrolls also settle, and content that grew
-    // meanwhile must not read as the user leaving the bottom.
-    snapshotFlow { listState.isScrollInProgress }
-      .filter { !it }
-      .collect { if (!follow.value && listState.distanceFromBottom() <= tolerance) follow.value = true }
-  }
-  LaunchedEffect(listState) {
-    snapshotFlow { follow.value to listState.distanceFromBottom() }
-      .collect { (following, distance) -> if (following && distance != 0) pin(listState, distance) }
-  }
-}
-
-/** Scrolls the end into view; a user drag that takes over the list cancels only this scroll. */
-private suspend fun pin(listState: LazyListState, distance: Int) {
-  try {
-    if (distance == Int.MAX_VALUE) {
-      listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1, FOLLOW_OFFSET)
-    } else {
-      listState.scrollBy(distance.toFloat())
-    }
-  } catch (_: CancellationException) {
-    // A higher-priority scroll owns the list; rethrow only if this effect itself was cancelled.
-    currentCoroutineContext().ensureActive()
-  }
+  AutoFollow(
+    state = listState,
+    interactionSource = listState.interactionSource,
+    follow = follow,
+    distanceFromBottom = { listState.distanceFromBottom() },
+    scrollDown = { distance ->
+      if (distance == Int.MAX_VALUE) {
+        listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1, FOLLOW_OFFSET)
+      } else {
+        listState.scrollBy(distance.toFloat())
+      }
+    },
+  )
 }
 
 @Composable

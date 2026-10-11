@@ -140,6 +140,22 @@ class ChatTimelineTest {
   }
 
   @Test
+  fun toolArgumentsGrowWithTheirDeltasUntilToolcallEnd() {
+    apply("""{"type":"message_start","message":{"role":"assistant","content":[]}}""")
+    update("""{"type":"toolcall_start","contentIndex":0,"id":"c2","toolName":"write"}""")
+    update("""{"type":"toolcall_delta","contentIndex":0,"delta":"{\"path\":\"a.py\",\"content\":\"de"}""")
+    assertEquals("de", (items[0] as ToolCall).args?.getString("content"))
+    update("""{"type":"toolcall_delta","contentIndex":0,"delta":"f f():\\n"}""")
+    val streamed = (items[0] as ToolCall).args
+    assertEquals("a.py", streamed?.getString("path"))
+    assertEquals("def f():\n", streamed?.getString("content"))
+
+    val call = """{"type":"toolCall","id":"c2","name":"write","arguments":{"path":"a.py","content":"done"}}"""
+    update("""{"type":"toolcall_end","contentIndex":0,"toolCall":$call}""")
+    assertEquals("done", (items[0] as ToolCall).args?.getString("content"))
+  }
+
+  @Test
   fun queueUpdateCombinesSteeringAndFollowUp() {
     apply("""{"type":"queue_update","steering":["now"],"followUp":["later","after"]}""")
     assertEquals(listOf("now", "later", "after"), timeline.state.value.queue)
