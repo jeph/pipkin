@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,9 +33,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
@@ -49,12 +52,18 @@ import io.jeph.pipkin.agent.TimelineState
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
 
 /** Scrolls past the end of the last item; the list clamps it to the bottom. */
 private const val FOLLOW_OFFSET = 1_000_000
 private const val BANNER_KEY = "pipkin:banner"
+
+/** How far above the bottom a settled scroll still counts as at the bottom. */
+private val FOLLOW_TOLERANCE = 4.dp
 
 private val EMPTY_STATE_ICON_SIZE = 72.dp
 
@@ -63,26 +72,26 @@ private const val LAUNCHER_MASK_SCALE = 1.5f
 
 /**
  * The chat stream: process banner, timeline items, the empty state and Paseo's scroll-to-bottom button.
- * Follows new output while the user is near the bottom; dragging away stops following.
+ * Keeps the end in view while the user is at the bottom; dragging away stops following.
  */
 @Composable
 internal fun ChatStream(
   process: AgentProcess,
   timeline: TimelineState,
   processState: AgentProcessState,
+  follow: MutableState<Boolean>,
   onOpenTool: (key: String) -> Unit,
   onOpenSettings: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val listState = remember(process) { LazyListState() }
-  val follow = remember(process) { mutableStateOf(true) }
   val scope = rememberCoroutineScope()
   val banner = processState.takeIf {
     it is AgentProcessState.Starting || it is AgentProcessState.Installing || it is AgentProcessState.Failed
   }
   val count = timeline.items.size + if (banner != null) 1 else 0
   val threshold = with(LocalDensity.current) { 120.dp.roundToPx() }
-  AutoFollow(listState, follow, timeline.items, count, threshold)
+  AutoFollow(listState, follow)
   val showScrollButton by remember(listState, threshold) {
     derivedStateOf { listState.distanceFromBottom() > threshold }
   }
@@ -102,25 +111,42 @@ internal fun ChatStream(
   }
 }
 
-/** A drag stops following; following resumes when scrolling settles near the bottom. */
+/**
+ * Pins the end of the stream to the bottom of the viewport while following. It reacts to layout,
+ * not to timeline changes, because markdown parses off the main thread: a message grows frames
+ * after its text arrives. A drag stops following, and only a user scroll that settles at the
+ * bottom resumes it, so a reader above the bottom is never moved.
+ */
 @Composable
-private fun AutoFollow(
-  listState: LazyListState,
-  follow: MutableState<Boolean>,
-  items: List<TimelineItem>,
-  count: Int,
-  threshold: Int,
-) {
+private fun AutoFollow(listState: LazyListState, follow: MutableState<Boolean>) {
+  val tolerance = with(LocalDensity.current) { FOLLOW_TOLERANCE.roundToPx() }
   LaunchedEffect(listState) {
     listState.interactionSource.interactions.collect { if (it is DragInteraction.Start) follow.value = false }
   }
-  LaunchedEffect(listState, threshold) {
+  LaunchedEffect(listState, tolerance) {
+    // Only turns following on: the pinning's own scrolls also settle, and content that grew
+    // meanwhile must not read as the user leaving the bottom.
     snapshotFlow { listState.isScrollInProgress }
       .filter { !it }
-      .collect { follow.value = listState.distanceFromBottom() <= threshold }
+      .collect { if (!follow.value && listState.distanceFromBottom() <= tolerance) follow.value = true }
   }
-  LaunchedEffect(items, count) {
-    if (follow.value && count > 0 && !listState.isScrollInProgress) listState.scrollToItem(count - 1, FOLLOW_OFFSET)
+  LaunchedEffect(listState) {
+    snapshotFlow { follow.value to listState.distanceFromBottom() }
+      .collect { (following, distance) -> if (following && distance != 0) pin(listState, distance) }
+  }
+}
+
+/** Scrolls the end into view; a user drag that takes over the list cancels only this scroll. */
+private suspend fun pin(listState: LazyListState, distance: Int) {
+  try {
+    if (distance == Int.MAX_VALUE) {
+      listState.scrollToItem(listState.layoutInfo.totalItemsCount - 1, FOLLOW_OFFSET)
+    } else {
+      listState.scrollBy(distance.toFloat())
+    }
+  } catch (_: CancellationException) {
+    // A higher-priority scroll owns the list; rethrow only if this effect itself was cancelled.
+    currentCoroutineContext().ensureActive()
   }
 }
 
@@ -133,9 +159,15 @@ private fun StreamList(
   onOpenTool: (key: String) -> Unit,
 ) {
   val replies = remember(items) { replyTexts(items) }
+  val anchor = remember(listState) { BottomAnchor(listState) }
   LazyColumn(
     state = listState,
-    modifier = Modifier.fillMaxSize(),
+    modifier = Modifier
+      .layout { measurable, constraints ->
+        anchor.onHeight(constraints.maxHeight)
+        val placeable = measurable.measure(constraints)
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+      }.fillMaxSize(),
     contentPadding = PaddingValues(
       start = PipkinTokens.Spacing.s16,
       end = PipkinTokens.Spacing.s16,
@@ -157,6 +189,33 @@ private fun StreamList(
         modifier = Modifier.contentWidth().padding(top = gapBefore(items.getOrNull(index - 1), item)),
       )
     }
+  }
+}
+
+/**
+ * Keeps what sits at the bottom of the viewport in place when the list's height changes, as when
+ * the keyboard opens or the composer grows: the keyboard never covers what the user was reading,
+ * and the top of the list scrolls up under the header instead. It runs before the list measures,
+ * so the shift lands in the same frame as the resize; at the bottom it also keeps following.
+ */
+private class BottomAnchor(private val listState: LazyListState) {
+  private var height = UNMEASURED
+
+  fun onHeight(newHeight: Int) {
+    val shrink = if (height == UNMEASURED) 0 else height - newHeight
+    height = newHeight
+    if (shrink == 0) return
+    // Read without observing: the scroll position is not an input to this layout step.
+    Snapshot.withoutReadObservation {
+      listState.requestScrollToItem(
+        listState.firstVisibleItemIndex,
+        listState.firstVisibleItemScrollOffset + shrink,
+      )
+    }
+  }
+
+  private companion object {
+    const val UNMEASURED = -1
   }
 }
 

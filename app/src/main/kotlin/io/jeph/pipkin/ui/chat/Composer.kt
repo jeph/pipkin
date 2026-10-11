@@ -48,6 +48,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -87,6 +89,14 @@ internal fun Composer(
   trailingControls: @Composable RowScope.() -> Unit = {},
 ) {
   val colors = pipkinColors
+  val keyboard = LocalSoftwareKeyboardController.current
+  val focus = LocalFocusManager.current
+  val send = {
+    if (controller.send()) {
+      keyboard?.hide()
+      focus.clearFocus()
+    }
+  }
   val shape = RoundedCornerShape(PipkinTokens.Radius.xxl)
   Box(
     modifier =
@@ -126,7 +136,7 @@ internal fun Composer(
           busy -> PrimaryAction.Stop
           else -> PrimaryAction.Idle
         }
-        PrimaryButton(action, onSend = controller::send, onStop = controller::abort)
+        PrimaryButton(action, onSend = send, onStop = controller::abort)
       }
     }
   }

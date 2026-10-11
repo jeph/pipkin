@@ -51,6 +51,9 @@ internal class ChatController(
   var sending by mutableStateOf(false)
     private set
 
+  /** Whether the stream keeps its end in view. Sending turns it back on. */
+  val follow = mutableStateOf(true)
+
   val canSend: Boolean get() = draft.text.isNotBlank() || attachments.isNotEmpty()
 
   fun setDraftText(text: String) {
@@ -59,20 +62,22 @@ internal class ChatController(
 
   /**
    * Sends the draft; Pi steers a working run with it. Files are first copied into Termux and listed
-   * by path, since Pi's `prompt` only carries images. A failed send puts the draft back.
+   * by path, since Pi's `prompt` only carries images. A failed send puts the draft back. Returns
+   * false when nothing was sent.
    */
-  fun send() {
-    if (sending || !canSend) return
+  fun send(): Boolean {
+    if (sending || !canSend) return false
     val picked = attachments.toList()
     // Picking checks the limit, but a failed send puts its files back beside any picked meanwhile.
     if (picked.filterIsInstance<Attachment.File>().sumOf { it.bytes.size.toLong() } > ChatFiles.MAX_TOTAL_BYTES) {
       show(R.string.chat_files_too_large)
-      return
+      return false
     }
     val sentDraft = draft
     draft = TextFieldValue()
     attachments.clear()
     sending = true
+    follow.value = true
     scope.launch {
       val failure = try {
         val files = picked.filterIsInstance<Attachment.File>().map { it.name to it.bytes }
@@ -102,6 +107,7 @@ internal class ChatController(
         show(failure)
       }
     }
+    return true
   }
 
   /** [text] followed by the saved files' paths, `~`-relative like the rest of the app shows them. */

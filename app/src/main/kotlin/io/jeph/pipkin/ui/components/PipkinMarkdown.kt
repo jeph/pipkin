@@ -28,8 +28,10 @@ import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.markdownDimens
 import com.mikepenz.markdown.model.markdownPadding
+import com.mikepenz.markdown.model.rememberMarkdownState
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -37,23 +39,18 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 @Composable
 fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
   val colors = pipkinColors
-  val body =
-    TextStyle(
-      color = colors.foreground,
-      fontSize = PipkinTokens.FontSize.content,
-      lineHeight = PipkinTokens.LineHeight.markdown,
-    )
-  val code =
-    TextStyle(
-      color = colors.foreground,
-      fontFamily = FontFamily.Monospace,
-      fontSize = PipkinTokens.FontSize.code,
-      lineHeight = PipkinTokens.LineHeight.code,
-    )
+  val body = TextStyle(
+    color = colors.foreground,
+    fontSize = PipkinTokens.FontSize.content,
+    lineHeight = PipkinTokens.LineHeight.markdown,
+  )
   val codeBlock: @Composable (String, String?, TextStyle) -> Unit = { text, _, style -> CodeBlock(text, style) }
+  // Parsing runs off the main thread; without retaining, each streamed delta would show the empty
+  // loading box until the new parse lands, collapsing and re-growing the message.
+  val state = rememberMarkdownState(markdown, retainState = true)
   SelectionContainer(modifier = modifier) {
     Markdown(
-      content = markdown,
+      markdownState = state,
       modifier = Modifier.fillMaxWidth(),
       colors =
         markdownColor(
@@ -63,28 +60,7 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
           dividerColor = colors.border,
           tableBackground = colors.surface1,
         ),
-      typography =
-        markdownTypography(
-          h1 = body.copy(fontSize = PipkinTokens.FontSize.xxl, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
-          h2 = body.copy(fontSize = PipkinTokens.FontSize.xl, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
-          h3 = body.copy(fontSize = PipkinTokens.FontSize.lg, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
-          h4 = body.copy(fontWeight = FontWeight.SemiBold),
-          h5 = body.copy(fontWeight = FontWeight.SemiBold),
-          h6 = body.copy(fontWeight = FontWeight.SemiBold),
-          text = body,
-          code = code,
-          inlineCode = code.copy(lineHeight = PipkinTokens.LineHeight.markdown),
-          quote = body.copy(color = colors.foregroundMuted),
-          paragraph = body,
-          ordered = body,
-          bullet = body,
-          list = body,
-          textLink = TextLinkStyles(
-            style = SpanStyle(color = colors.accent, textDecoration = TextDecoration.Underline),
-          ),
-          table = body,
-          alertTitle = body.copy(fontWeight = FontWeight.SemiBold),
-        ),
+      typography = typography(body),
       padding = markdownPadding(block = PipkinTokens.Spacing.s6, codeBlock = PaddingValues(0.dp)),
       dimens = markdownDimens(codeBackgroundCornerSize = PipkinTokens.Radius.md),
       components =
@@ -94,6 +70,36 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
         ),
     )
   }
+}
+
+@Composable
+private fun typography(body: TextStyle): MarkdownTypography {
+  val colors = pipkinColors
+  val code = TextStyle(
+    color = colors.foreground,
+    fontFamily = FontFamily.Monospace,
+    fontSize = PipkinTokens.FontSize.code,
+    lineHeight = PipkinTokens.LineHeight.code,
+  )
+  return markdownTypography(
+    h1 = body.copy(fontSize = PipkinTokens.FontSize.xxl, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
+    h2 = body.copy(fontSize = PipkinTokens.FontSize.xl, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
+    h3 = body.copy(fontSize = PipkinTokens.FontSize.lg, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
+    h4 = body.copy(fontWeight = FontWeight.SemiBold),
+    h5 = body.copy(fontWeight = FontWeight.SemiBold),
+    h6 = body.copy(fontWeight = FontWeight.SemiBold),
+    text = body,
+    code = code,
+    inlineCode = code.copy(lineHeight = PipkinTokens.LineHeight.markdown),
+    quote = body.copy(color = colors.foregroundMuted),
+    paragraph = body,
+    ordered = body,
+    bullet = body,
+    list = body,
+    textLink = TextLinkStyles(style = SpanStyle(color = colors.accent, textDecoration = TextDecoration.Underline)),
+    table = body,
+    alertTitle = body.copy(fontWeight = FontWeight.SemiBold),
+  )
 }
 
 @Composable

@@ -100,6 +100,7 @@ private fun ChatContent(
         process = process,
         timeline = timeline,
         processState = processState,
+        follow = controller.follow,
         onOpenTool = { onSheet(ChatSheet.Tool(it)) },
         onOpenSettings = onOpenSettings,
       )
