@@ -13,15 +13,15 @@
     <string name="chat_save">Save</string>
     <string name="chat_cancel">Cancel</string>
     <string name="chat_reload_confirm_title">Stop and reload?</string>
-    <string name="chat_reload_confirm_text">Pi is working. Reloading stops the current run.</string>
+    <string name="chat_reload_confirm_text">Pipkin is working. Reloading stops the current run.</string>
     <string name="chat_reload_confirm">Stop and reload</string>
     <string name="chat_delete_confirm_title">Delete this chat?</string>
-    <string name="chat_delete_confirm_text">Its session file is deleted from Pi\'s sessions folder.</string>
+    <string name="chat_delete_confirm_text">Its session file is deleted from Pipkin\'s sessions folder.</string>
     <string name="chat_delete">Delete</string>
 
     <!-- Stream -->
     <string name="chat_starting">Starting…</string>
-    <string name="chat_installing">Installing Pi…</string>
+    <string name="chat_installing">Installing the Pipkin agent…</string>
     <string name="chat_retry">Retry</string>
     <string name="chat_copy_command">Copy command &amp; open Termux</string>
     <string name="chat_setup_hint">Tap “Termux needs attention” in the Agents list to finish setup.</string>
@@ -30,7 +30,7 @@
     <string name="chat_show_details">Show details</string>
     <string name="chat_hide_details">Hide details</string>
     <string name="chat_restart">Restart</string>
-    <string name="chat_empty">Message Pi to start</string>
+    <string name="chat_empty">Message Pipkin to start</string>
     <string name="chat_no_model">No model available</string>
     <string name="chat_sign_in">Sign in</string>
     <string name="chat_scroll_to_bottom">Scroll to bottom</string>
@@ -51,7 +51,7 @@
     <string name="chat_running">Running…</string>
 
     <!-- Composer -->
-    <string name="chat_placeholder">Message Pi…</string>
+    <string name="chat_placeholder">Message Pipkin…</string>
     <string name="chat_attach">Attach</string>
     <string name="chat_attach_photos">Photos</string>
     <string name="chat_attach_files">Files</string>
@@ -70,7 +70,7 @@
     <!-- Extension dialogs -->
     <string name="chat_choose">Choose an option</string>
     <string name="chat_confirm_title">Confirm</string>
-    <string name="chat_input_title">Pi needs input</string>
+    <string name="chat_input_title">Pipkin needs input</string>
     <string name="chat_ok">OK</string>
     <string name="chat_yes">Yes</string>
     <string name="chat_no">No</string>

@@ -30,7 +30,7 @@ async function piEntry(root: string): Promise<string> {
   const manifest = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as unknown;
   const bin = isObject(manifest) ? manifest.bin : undefined;
   const entry = typeof bin === "string" ? bin : isObject(bin) ? bin.pi : undefined;
-  if (typeof entry !== "string") throw new Error("Pi package.json has no bin.pi");
+  if (typeof entry !== "string") throw new Error("Agent package.json has no bin.pi");
   return join(dir, entry);
 }
 
@@ -50,7 +50,7 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const expectedVersion = stringParam(ctx.params, "expectedVersion");
   const installed = await installedPiVersion(ctx.env.root);
   if (installed !== expectedVersion) {
-    const found = installed === null ? "Pi is not installed" : `Pi ${installed} is installed`;
+    const found = installed === null ? "The agent is not installed" : `Agent ${installed} is installed`;
     fail(ctx, "pi_version", `${found}; Pipkin needs ${expectedVersion}`);
     return;
   }

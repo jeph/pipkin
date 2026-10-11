@@ -41,9 +41,9 @@ internal class RpcClient(
         throw RpcError(command, NOT_RUNNING, error)
       }
       val response = withTimeoutOrNull(timeoutMillis) { reply.await() }
-        ?: throw RpcError(command, "Pi did not answer $command in time.")
+        ?: throw RpcError(command, "The agent did not answer $command in time.")
       if (!response.optBoolean("success")) {
-        throw RpcError(command, response.optString("error").ifEmpty { "Pi rejected $command." })
+        throw RpcError(command, response.optString("error").ifEmpty { "The agent rejected $command." })
       }
       return response.optJSONObject("data") ?: JSONObject()
     } finally {

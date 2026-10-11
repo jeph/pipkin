@@ -32,7 +32,7 @@ describe("modes backed by the Pi SDK", () => {
     const data = result.data as { builtin: { id: string; configured: boolean }[]; custom: unknown[]; modelsError?: string };
     expect(data.builtin.map((entry) => entry.id)).toEqual(["anthropic", "openai-codex"]);
     expect(data.custom).toEqual([
-      { id: "codex-lb", baseUrl: provider.baseUrl, api: provider.api, models: ["m1", "m2"], images: true },
+      { id: "codex-lb", baseUrl: provider.baseUrl, api: provider.api, apiKey: "k", models: ["m1", "m2"], images: true },
     ]);
     expect(data.modelsError).toBeUndefined();
   });

@@ -171,11 +171,6 @@ private fun ApiKeyField(form: ProviderForm) {
       value = form.apiKey,
       onValueChange = { form.apiKey = it },
       modifier = Modifier.fillMaxWidth(),
-      placeholder = if (form.editing) {
-        { Text(stringResource(R.string.provider_api_key_keep)) }
-      } else {
-        null
-      },
       trailingIcon = {
         TextButton(onClick = { visible = !visible }) {
           Text(stringResource(if (visible) R.string.provider_hide_key else R.string.provider_show_key))

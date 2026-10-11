@@ -12,7 +12,7 @@
     <string name="shell_settings">Settings</string>
     <string name="shell_session_actions">Chat actions</string>
     <string name="shell_session_untitled">New chat</string>
-    <string name="shell_termux_status">Termux · Pi %1$s</string>
+    <string name="shell_termux_status">Termux · Agent %1$s</string>
     <string name="shell_termux_status_unknown">Termux</string>
     <string name="shell_termux_attention">Termux needs attention</string>
     <string name="shell_time_now">now</string>

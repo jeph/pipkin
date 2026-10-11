@@ -14,8 +14,8 @@ import java.io.IOException
 internal data class ModelChoice(val id: String, val checked: Boolean)
 
 /**
- * Editable state of the provider editor. When [editing], the id is fixed and an empty API key
- * keeps the stored one. Host errors land in [idError], [fetchError] or [formError].
+ * Editable state of the provider editor. When [editing], the id is fixed and the stored key is
+ * filled in. Host errors land in [idError], [fetchError] or [formError].
  */
 @Stable
 internal class ProviderForm(val editing: Boolean, initialId: String) {
@@ -41,13 +41,14 @@ internal class ProviderForm(val editing: Boolean, initialId: String) {
   val idValid: Boolean get() = ID_PATTERN.matches(id)
   val canFetch: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && !fetching
   val canSave: Boolean
-    get() = idValid && baseUrl.isNotBlank() && (editing || apiKey.isNotBlank()) && models.any { it.checked } && !saving
+    get() = idValid && baseUrl.isNotBlank() && apiKey.isNotBlank() && models.any { it.checked } && !saving
 
   /** Fills the form from the stored provider once; later status updates do not overwrite edits. */
   fun prefill(provider: CustomProvider) {
     if (prefilled) return
     prefilled = true
     baseUrl = provider.baseUrl
+    apiKey = provider.apiKey
     api = provider.api.takeIf { it == ProviderConfig.API_RESPONSES } ?: ProviderConfig.API_COMPLETIONS
     images = provider.images
     models.clear()

@@ -3,6 +3,7 @@ package io.jeph.pipkin.ui.chat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.DragInteraction
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -34,6 +36,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -51,6 +55,11 @@ import kotlinx.coroutines.launch
 /** Scrolls past the end of the last item; the list clamps it to the bottom. */
 private const val FOLLOW_OFFSET = 1_000_000
 private const val BANNER_KEY = "pipkin:banner"
+
+private val EMPTY_STATE_ICON_SIZE = 72.dp
+
+/** An adaptive icon's 108dp layer over the 72dp a launcher shows. */
+private const val LAUNCHER_MASK_SCALE = 1.5f
 
 /**
  * The chat stream: process banner, timeline items, the empty state and Paseo's scroll-to-bottom button.
@@ -171,7 +180,7 @@ private fun StreamItem(
   }
 }
 
-/** "Message Pi to start", or a way to Settings when Pi has no model to use. */
+/** Pipkin's mark over "Message Pipkin to start", or a way to Settings when there is no model to use. */
 @Composable
 private fun EmptyState(noModel: Boolean, onOpenSettings: () -> Unit, modifier: Modifier) {
   Column(
@@ -179,6 +188,21 @@ private fun EmptyState(noModel: Boolean, onOpenSettings: () -> Unit, modifier: M
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
+    // The launcher icon as on the home screen: its multi-colour mark on the cream background. A
+    // launcher shows the middle 72dp of the 108dp foreground, so draw it 1.5x larger and clip.
+    Box(
+      modifier = Modifier
+        .size(EMPTY_STATE_ICON_SIZE)
+        .clip(CircleShape)
+        .background(colorResource(R.color.ic_launcher_background)),
+      contentAlignment = Alignment.Center,
+    ) {
+      Image(
+        painter = painterResource(R.drawable.ic_launcher_foreground),
+        contentDescription = null,
+        modifier = Modifier.requiredSize(EMPTY_STATE_ICON_SIZE * LAUNCHER_MASK_SCALE),
+      )
+    }
     Text(
       text = stringResource(if (noModel) R.string.chat_no_model else R.string.chat_empty),
       color = pipkinColors.foregroundMuted,

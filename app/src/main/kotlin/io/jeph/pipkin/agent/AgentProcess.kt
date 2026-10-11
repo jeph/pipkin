@@ -260,7 +260,7 @@ internal class AgentProcess(
     } catch (rejected: HostRejected) {
       stateFlow.value = AgentProcessState.Failed(rejected.error, code = rejected.code)
     } catch (error: JSONException) {
-      stateFlow.value = AgentProcessState.Failed(error.message ?: "Installing Pi failed.")
+      stateFlow.value = AgentProcessState.Failed(error.message ?: "Installing the Pipkin agent failed.")
     }
     return false
   }

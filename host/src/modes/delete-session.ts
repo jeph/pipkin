@@ -21,7 +21,7 @@ export async function deleteSession(ctx: ModeContext): Promise<JsonObject> {
   const target = await resolveExisting(path);
   const inside = relative(base, target);
   if (inside === "" || inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
-    throw new HostError("outside_sessions", "That file is not inside Pi's sessions folder");
+    throw new HostError("outside_sessions", "That file is not inside Pipkin's sessions folder");
   }
   await unlink(target);
   return {};

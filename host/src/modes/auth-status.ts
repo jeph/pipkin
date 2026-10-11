@@ -30,6 +30,8 @@ export async function authStatus(ctx: ModeContext): Promise<JsonObject> {
         id,
         baseUrl: provider.baseUrl,
         api: provider.api,
+        // The editor shows and reuses the stored key, so editing never asks for it again.
+        apiKey: typeof provider.apiKey === "string" ? provider.apiKey : "",
         models: models.flatMap((model) => (isObject(model) && typeof model.id === "string" ? [model.id] : [])),
         // Lets the provider editor keep image input when re-saving; provider_save sets it on every model.
         images: models.some((model) => isObject(model) && Array.isArray(model.input) && model.input.includes("image")),

@@ -31,12 +31,12 @@
 
     <string name="settings_termux">Termux</string>
     <string name="settings_termux_not_installed">Not installed</string>
-    <string name="settings_pi_version">Pi %1$s</string>
-    <string name="settings_pi_missing">Pi not installed</string>
+    <string name="settings_pi_version">Agent %1$s</string>
+    <string name="settings_pi_missing">Agent not installed</string>
     <string name="settings_run_setup">Run setup again</string>
-    <string name="settings_reinstall_pi">Reinstall Pi runtime</string>
-    <string name="settings_reinstall_running">Installing Pi %1$s…</string>
-    <string name="settings_reinstall_done">Pi %1$s is installed</string>
+    <string name="settings_reinstall_pi">Reinstall the Pipkin agent</string>
+    <string name="settings_reinstall_running">Installing the Pipkin agent %1$s…</string>
+    <string name="settings_reinstall_done">The Pipkin agent %1$s is installed</string>
 
     <string name="settings_version">Version</string>
 
@@ -62,7 +62,6 @@
     <string name="provider_base_url">Base URL</string>
     <string name="provider_base_url_hint">https://host/v1</string>
     <string name="provider_api_key">API key</string>
-    <string name="provider_api_key_keep">Leave empty to keep the current key</string>
     <string name="provider_show_key">Show</string>
     <string name="provider_hide_key">Hide</string>
     <string name="provider_api_type">API type</string>
@@ -75,7 +74,7 @@
     <string name="provider_save">Save</string>
     <string name="provider_remove">Remove provider</string>
     <string name="provider_remove_title">Remove %1$s?</string>
-    <string name="provider_remove_text">Pi forgets this provider, its models and its API key.</string>
+    <string name="provider_remove_text">Pipkin forgets this provider, its models and its API key.</string>
     <string name="provider_cancel">Cancel</string>
     <string name="provider_failed">The Termux helper failed.</string>
 </resources>

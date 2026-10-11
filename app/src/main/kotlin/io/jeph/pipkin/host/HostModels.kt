@@ -54,6 +54,7 @@ internal data class CustomProvider(
   val id: String,
   val baseUrl: String,
   val api: String,
+  val apiKey: String,
   val models: List<String>,
   val images: Boolean,
 )
@@ -81,6 +82,7 @@ internal data class AuthStatus(
           id = it.getString("id"),
           baseUrl = it.optString("baseUrl"),
           api = it.optString("api"),
+          apiKey = it.optString("apiKey"),
           models = it.optJSONArray("models").strings(),
           images = it.optBoolean("images"),
         )
@@ -90,7 +92,7 @@ internal data class AuthStatus(
   }
 }
 
-/** `provider_save` params. An empty [apiKey] keeps the provider's current key. */
+/** `provider_save` params. */
 internal data class ProviderConfig(
   val id: String,
   val baseUrl: String,

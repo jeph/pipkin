@@ -25,7 +25,7 @@ class AgentRegistryTest {
 
     override suspend fun abort() {
       aborts += 1
-      if (abortFails) throw RpcError("abort", "Pi did not answer abort in time.")
+      if (abortFails) throw RpcError("abort", "The agent did not answer abort in time.")
       busy.value = false
     }
 
