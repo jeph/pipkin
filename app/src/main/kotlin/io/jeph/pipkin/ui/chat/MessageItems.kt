@@ -205,7 +205,6 @@ internal fun NoticeRow(text: String, modifier: Modifier = Modifier) {
 @Composable
 internal fun TurnFooterRow(item: TimelineItem.TurnFooter, replyText: String?, modifier: Modifier = Modifier) {
   val colors = pipkinColors
-  val copy = rememberCopyText()
   Row(
     modifier = modifier.fillMaxWidth().heightIn(min = 28.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -218,10 +217,9 @@ internal fun TurnFooterRow(item: TimelineItem.TurnFooter, replyText: String?, mo
     } else {
       Text(text = durationText(duration), color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
       if (replyText != null) {
-        IconButton28(
-          icon = R.drawable.ic_lucide_copy,
+        CopyButton(
+          text = replyText,
           contentDescription = stringResource(R.string.chat_copy_reply),
-          onClick = { copy(replyText) },
           tint = colors.foregroundMuted,
           iconSize = PipkinTokens.IconSize.sm,
         )

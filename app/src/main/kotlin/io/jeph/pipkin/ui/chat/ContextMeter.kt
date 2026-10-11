@@ -1,9 +1,12 @@
 package io.jeph.pipkin.ui.chat
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +31,8 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -50,12 +56,16 @@ import kotlin.math.roundToInt
 
 /**
  * Paseo's context window meter: a ring that fills as the context does, next to the send button.
- * A tap opens a tooltip with the percentage, the token counts and the session cost.
+ * A tap opens a tooltip with the percentage, the token counts and the session cost; the chat closes it
+ * on any press (see [closeContextDetailsOnPress]), and so does back.
  */
 @Composable
-internal fun ContextMeter(usage: ContextUsage?) {
+internal fun ContextMeter(usage: ContextUsage?, open: Boolean, onOpenChange: (Boolean) -> Unit) {
   val percent = usage?.percent?.roundToInt()
-  var open by remember { mutableStateOf(false) }
+  // The chat closes the tooltip on the press that starts a tap on the meter, before the click lands;
+  // that click must then leave it closed rather than open it again.
+  var pressedWhileOpen by remember { mutableStateOf(false) }
+  val currentOpen by rememberUpdatedState(open)
   val description =
     if (percent == null) {
       stringResource(R.string.context_window_a11y_no_data)
@@ -67,22 +77,39 @@ internal fun ContextMeter(usage: ContextUsage?) {
       Modifier
         .size(28.dp)
         .clip(CircleShape)
-        .clickable(role = Role.Button, onClickLabel = stringResource(R.string.context_window_title)) { open = !open }
+        .pointerInput(Unit) {
+          awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            pressedWhileOpen = currentOpen
+          }
+        }
+        .clickable(role = Role.Button, onClickLabel = stringResource(R.string.context_window_title)) {
+          if (pressedWhileOpen) pressedWhileOpen = false else onOpenChange(!open)
+        }
         .semantics { contentDescription = description },
     contentAlignment = Alignment.Center,
   ) {
     ContextRing(usage?.percent)
     if (open) {
+      BackHandler { onOpenChange(false) }
       val gap = with(LocalDensity.current) { PipkinTokens.Spacing.s8.roundToPx() }
+      // Not focusable, so the keyboard stays up; the chat closes it on outside presses instead of the popup.
       Popup(
         popupPositionProvider = remember(gap) { AboveAnchor(gap) },
-        onDismissRequest = { open = false },
-        // Focusable, so a tap outside (the meter included) only closes the tooltip rather than also landing.
-        properties = PopupProperties(focusable = true),
+        onDismissRequest = { onOpenChange(false) },
+        properties = PopupProperties(focusable = false, dismissOnClickOutside = false),
       ) {
         ContextDetails(usage, percent)
       }
     }
+  }
+}
+
+/** Closes the context tooltip on any press inside this element, whatever handles the press. */
+internal fun Modifier.closeContextDetailsOnPress(controller: ChatController): Modifier = pointerInput(controller) {
+  awaitEachGesture {
+    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
+    controller.contextDetailsOpen = false
   }
 }
 

@@ -50,6 +50,9 @@ internal class ChatController(
   /** Whether the composer's text field has focus; the slash menu only shows while it does. */
   var composerFocused by mutableStateOf(false)
 
+  /** Whether the context meter's tooltip shows; any press in the chat closes it. */
+  var contextDetailsOpen by mutableStateOf(false)
+
   val slash = SlashMenu(this)
 
   val builtins = BuiltinCommands(this, navigator)

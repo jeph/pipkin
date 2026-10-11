@@ -36,6 +36,7 @@
     <string name="chat_scroll_to_bottom">Scroll to bottom</string>
     <string name="chat_image">Attached image</string>
     <string name="chat_copy_reply">Copy reply</string>
+    <string name="chat_copied">Copied</string>
     <string name="chat_duration_minutes">%1$dm %2$ds</string>
     <string name="chat_duration_seconds">%1$ds</string>
 

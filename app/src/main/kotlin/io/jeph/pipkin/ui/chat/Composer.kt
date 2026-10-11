@@ -139,7 +139,7 @@ internal fun Composer(
           if (supportsThinking(model)) ThinkingChip(thinkingLevel, onOpenThinkingSheet)
         }
         val contextUsage by controller.process.contextUsage.collectAsStateWithLifecycle()
-        ContextMeter(contextUsage)
+        ContextMeter(contextUsage, controller.contextDetailsOpen) { controller.contextDetailsOpen = it }
         trailingControls()
         val action = when {
           controller.sending -> PrimaryAction.Sending

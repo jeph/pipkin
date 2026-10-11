@@ -1,6 +1,9 @@
 package io.jeph.pipkin.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,6 +24,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -110,9 +115,24 @@ private fun ChatContent(
   val timeline by process.timeline.state.collectAsStateWithLifecycle()
   val processState by process.state.collectAsStateWithLifecycle()
   val busy by process.busy.collectAsStateWithLifecycle()
-  Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    ChatHeader(process, onToggleSidebar, onActions = { onSheet(ChatSheet.Actions) })
-    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+  val keyboard = LocalSoftwareKeyboardController.current
+  val focus = LocalFocusManager.current
+  val dismissKeyboard = remember(keyboard, focus) {
+    {
+      keyboard?.hide()
+      focus.clearFocus()
+    }
+  }
+  Column(
+    modifier = modifier.fillMaxSize().background(pipkinColors.surface0).closeContextDetailsOnPress(controller),
+  ) {
+    ChatHeader(
+      process,
+      onToggleSidebar,
+      onActions = { onSheet(ChatSheet.Actions) },
+      Modifier.onUnhandledTap(dismissKeyboard),
+    )
+    Box(modifier = Modifier.weight(1f).fillMaxWidth().onUnhandledTap(dismissKeyboard)) {
       ChatStream(
         process = process,
         timeline = timeline,
@@ -163,7 +183,7 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
 
 /** Session name (or the first message) over the project path, with `~` for the Termux home. */
 @Composable
-private fun ChatHeader(process: AgentProcess, onToggleSidebar: () -> Unit, onActions: () -> Unit) {
+private fun ChatHeader(process: AgentProcess, onToggleSidebar: () -> Unit, onActions: () -> Unit, modifier: Modifier) {
   val graph = LocalContext.current.appGraph
   val sessionName by process.sessionName.collectAsStateWithLifecycle()
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
@@ -173,6 +193,7 @@ private fun ChatHeader(process: AgentProcess, onToggleSidebar: () -> Unit, onAct
   HeaderBar(
     title = sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),
     subtitle = hello?.home?.let { tildePath(process.cwd, it) } ?: process.cwd,
+    modifier = modifier,
     leading = { MenuButton(onToggleSidebar) },
     trailing = {
       IconButton28(
@@ -182,6 +203,17 @@ private fun ChatHeader(process: AgentProcess, onToggleSidebar: () -> Unit, onAct
       )
     },
   )
+}
+
+/**
+ * Runs [onTap] for a tap nothing inside handled: buttons consume the release, and scrolls and text
+ * selection consume the gesture, so those keep their own behavior.
+ */
+private fun Modifier.onUnhandledTap(onTap: () -> Unit): Modifier = pointerInput(onTap) {
+  awaitEachGesture {
+    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
+    if (waitForUpOrCancellation(PointerEventPass.Final) != null) onTap()
+  }
 }
 
 @Composable
