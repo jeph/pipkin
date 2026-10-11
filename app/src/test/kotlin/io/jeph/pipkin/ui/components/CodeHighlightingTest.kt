@@ -5,28 +5,37 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
-import dev.snipme.highlights.model.SyntaxLanguage
+import io.jeph.pipkin.syntax.CaptureSpan
+import io.jeph.pipkin.syntax.Grammar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CodeHighlightingTest {
   @Test
-  fun fenceNamesAndAliasesPickTheLanguage() {
-    assertEquals(SyntaxLanguage.KOTLIN, syntaxLanguage("Kotlin"))
-    assertEquals(SyntaxLanguage.KOTLIN, syntaxLanguage("kt"))
-    assertEquals(SyntaxLanguage.SHELL, syntaxLanguage("bash"))
-    assertEquals(SyntaxLanguage.TYPESCRIPT, syntaxLanguage("tsx title=\"App.tsx\""))
-    assertEquals(SyntaxLanguage.DEFAULT, syntaxLanguage("json"))
+  fun fenceNamesAndAliasesPickTheGrammar() {
+    assertEquals(Grammar.KOTLIN, Grammar.forName("Kotlin"))
+    assertEquals(Grammar.KOTLIN, Grammar.forName("kt"))
+    assertEquals(Grammar.BASH, Grammar.forName("sh"))
+    assertEquals(Grammar.TSX, Grammar.forName("tsx title=\"App.tsx\""))
+    assertEquals(Grammar.XML, Grammar.forName("xml"))
   }
 
   @Test
-  fun unknownAndGenericFencesStayPlain() {
-    assertNull(syntaxLanguage("yaml"))
-    assertNull(syntaxLanguage("text"))
-    assertNull(syntaxLanguage("default"))
-    assertNull(syntaxLanguage(""))
+  fun unknownFencesStayPlain() {
+    assertNull(Grammar.forName("yaml"))
+    assertNull(Grammar.forName("text"))
+    assertNull(Grammar.forName(""))
+  }
+
+  @Test
+  fun aCaptureTakesItsNearestNamedAncestorsToken() {
+    assertEquals(Token.Function, tokenFor("function.method.builtin"))
+    assertEquals(Token.Constant, tokenFor("tag.attribute"))
+    assertEquals(Token.Tag, tokenFor("tag.builtin"))
+    assertEquals(Token.Constant, tokenFor("string.special.key"))
+    assertNull(tokenFor("_function"))
+    assertNull(tokenFor("spell"))
   }
 
   @Test
@@ -55,20 +64,30 @@ class CodeHighlightingTest {
   }
 
   @Test
-  fun everyGrowingPrefixColoursStringsAndCommentsWhereTheyAre() {
-    val code = "fun greet() {\n    // Says hello.\n    println(\"Hello\")\n}"
-    // Streaming re-highlights each longer prefix; every pass must place its spans on that pass's text.
-    for (end in 1..code.length) {
-      val text = code.substring(0, end)
-      val spans = highlightCode(text, SyntaxLanguage.KOTLIN, dark = true).spanStyles.map {
-        text.substring(it.start, it.end) to it.item.color
-      }
-      if (end == code.length) {
-        assertTrue(spans.contains("\"Hello\"" to Color(0xFFA5D6FF)))
-        assertTrue(spans.contains("// Says hello." to Color(0xFF8B949E)))
-        assertTrue(spans.contains("fun" to Color(0xFFFF7B72)))
-      }
-    }
+  fun innerCapturesRepaintTheirPartOfAnOuterOne() {
+    // `${x}` inside a template string: the substitution goes plain, its `${` keyword-coloured.
+    val text = "`a \${x}`"
+    val spans =
+      listOf(CaptureSpan(0, 8, STRING), CaptureSpan(3, 7, PLAIN), CaptureSpan(3, 5, KEYWORD), CaptureSpan(5, 6, HELPER))
+    val colors = mapOf(STRING to Color.Blue, PLAIN to Color.Unspecified, KEYWORD to Color.Red)
+
+    val painted = paint(text, spans) { colors[it] }
+
+    assertEquals(
+      listOf(
+        AnnotatedString.Range(SpanStyle(color = Color.Blue), 0, 3),
+        AnnotatedString.Range(SpanStyle(color = Color.Red), 3, 5),
+        AnnotatedString.Range(SpanStyle(color = Color.Blue), 7, 8),
+      ),
+      painted.spanStyles,
+    )
+  }
+
+  @Test
+  fun spansPastAShorterTextAreClipped() {
+    val painted = paint("ab", listOf(CaptureSpan(1, 5, STRING))) { Color.Blue }
+
+    assertEquals(listOf(AnnotatedString.Range(SpanStyle(color = Color.Blue), 1, 2)), painted.spanStyles)
   }
 
   @Test
@@ -93,5 +112,12 @@ class CodeHighlightingTest {
     assertEquals(AnnotatedString("var y"), withPlainTail(highlighted, "var y"))
     assertEquals(AnnotatedString("val"), withPlainTail(highlighted, "val"))
     assertEquals(AnnotatedString("val"), withPlainTail(null, "val"))
+  }
+
+  private companion object {
+    const val STRING = 0
+    const val PLAIN = 1
+    const val KEYWORD = 2
+    const val HELPER = 3
   }
 }

@@ -9,34 +9,42 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import dev.snipme.highlights.Highlights
-import dev.snipme.highlights.model.BoldHighlight
-import dev.snipme.highlights.model.ColorHighlight
-import dev.snipme.highlights.model.SyntaxLanguage
-import dev.snipme.highlights.model.SyntaxTheme
+import io.jeph.pipkin.syntax.CaptureSpan
+import io.jeph.pipkin.syntax.Grammar
+import io.jeph.pipkin.syntax.SyntaxSession
+import io.jeph.pipkin.syntax.loadGrammar
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.withContext
 
 /**
- * [code] coloured for [language] (a fence name or file extension), or plain when Highlights doesn't know
- * it. Highlighting runs off the main thread, one pass at a time with the latest text, and while a streamed
- * block grows the colours already computed stay on its start instead of flashing back to plain.
+ * [code] coloured for [language] (a fence name or file extension), or plain when no grammar knows it.
+ * Highlighting runs off the main thread, one pass at a time with the latest text, reparsing only what
+ * changed; while a streamed block grows, the colours already computed stay on its start instead of
+ * flashing back to plain.
  */
 @Composable
 internal fun rememberHighlightedCode(code: String, language: String?): AnnotatedString {
-  val syntax = language?.let(::syntaxLanguage) ?: return AnnotatedString(code)
-  val dark = pipkinColors.isDark
+  val grammar = language?.let(Grammar::forName) ?: return AnnotatedString(code)
+  val palette = if (pipkinColors.isDark) DarkPalette else LightPalette
+  val assets = LocalContext.current.assets
   val latestCode by rememberUpdatedState(code)
-  var highlighted by remember(syntax, dark) { mutableStateOf<AnnotatedString?>(null) }
-  LaunchedEffect(syntax, dark) {
-    snapshotFlow { latestCode }.conflate().collect { text ->
-      highlighted = withContext(Dispatchers.Default) { highlightCode(text, syntax, dark) }
+  var highlighted by remember(grammar, palette) { mutableStateOf<AnnotatedString?>(null) }
+  LaunchedEffect(grammar, palette) {
+    val loaded = withContext(Dispatchers.Default) { loadGrammar(grammar, assets) }
+    val colors = loaded.captureNames.map { name -> tokenFor(name)?.let(palette::getValue) }
+    // Cancelling waits for a running parse to return, so the session is never closed under one.
+    SyntaxSession(loaded).use { session ->
+      snapshotFlow { latestCode }.conflate().collect { text ->
+        highlighted = withContext(Dispatchers.Default) {
+          paint(text, session.captures(text) { colors[it] != null }, colors::get)
+        }
+      }
     }
   }
   return withPlainTail(highlighted, code)
@@ -49,17 +57,7 @@ internal fun withPlainTail(highlighted: AnnotatedString?, code: String): Annotat
   else -> highlighted + AnnotatedString(code.substring(highlighted.length))
 }
 
-/**
- * The Highlights language for a fence's info string, by name or common alias. JSON gets the generic
- * analyzer, which colours its strings, numbers and literals well; other unknown languages stay plain,
- * since the generic analyzer marks every language's keywords and would colour prose and logs.
- */
-internal fun syntaxLanguage(fence: String): SyntaxLanguage? {
-  val name = fence.trim().substringBefore(' ').lowercase()
-  return ALIASES[name] ?: SyntaxLanguage.getByName(name)?.takeUnless { it == SyntaxLanguage.DEFAULT }
-}
-
-/** The extension of [path]'s file name, which [syntaxLanguage] reads like a fence name; null without one. */
+/** The extension of [path]'s file name, which [Grammar.forName] reads like a fence name; null without one. */
 internal fun fileLanguage(path: String): String? =
   path.substringAfterLast('/').substringAfterLast('.', "").ifEmpty { null }
 
@@ -77,81 +75,108 @@ internal fun AnnotatedString.splitLines(): List<AnnotatedString> {
 
 private val LINE_BREAK = Regex("\r\n|\r|\n")
 
+/** How Pipkin colours a highlight capture. [Plain] takes the text's own colour, even inside a coloured capture. */
+internal enum class Token { Plain, Keyword, String, Constant, Comment, Function, Type, Tag }
+
 /**
- * [code] with Highlights' colours for [syntax]. Each call analyzes the whole text: Highlights' incremental
- * mode (setCode on a reused instance) reports ranges shifted past the text as it grows.
+ * The token a capture name colours as: its own entry, else its parent's (`function.method.builtin`, then
+ * `function.method`, then `function`). Null for captures that colour nothing, such as `@_name` helpers.
  */
-internal fun highlightCode(code: String, syntax: SyntaxLanguage, dark: Boolean): AnnotatedString =
-  buildAnnotatedString {
-    append(code)
-    val highlights = Highlights.Builder(code = code, language = syntax, theme = if (dark) DarkTheme else LightTheme)
-    for (highlight in highlights.build().getHighlights()) {
-      val style = when (highlight) {
-        is ColorHighlight -> SpanStyle(color = Color(highlight.rgb).copy(alpha = 1f))
-        is BoldHighlight -> SpanStyle(fontWeight = FontWeight.Bold)
-      }
-      // Kept inside the text: a range past the end would throw and take the app down with it.
-      val start = highlight.location.start.coerceIn(0, code.length)
-      val end = highlight.location.end.coerceIn(start, code.length)
-      if (end > start) addStyle(style, start, end)
+internal fun tokenFor(capture: String): Token? {
+  var name = capture
+  while (true) {
+    TOKENS[name]?.let { return it }
+    if ('.' !in name) return null
+    name = name.substringBeforeLast('.')
+  }
+}
+
+/**
+ * [text] coloured by [spans], outermost first as [io.jeph.pipkin.syntax.captureSpans] gives them, so an
+ * inner capture repaints its part of an outer one. [colorOf] gives a capture's colour: null leaves what is
+ * under it, [Color.Unspecified] makes it plain.
+ */
+internal fun paint(text: String, spans: List<CaptureSpan>, colorOf: (capture: Int) -> Color?): AnnotatedString {
+  val colors = arrayOfNulls<Color>(text.length)
+  for (span in spans) {
+    val color = colorOf(span.capture) ?: continue
+    // Kept inside the text: a range past the end would throw and take the app down with it.
+    colors.fill(color, span.start.coerceIn(0, text.length), span.end.coerceIn(0, text.length))
+  }
+  return buildAnnotatedString {
+    append(text)
+    var start = 0
+    while (start < text.length) {
+      val color = colors[start]
+      var end = start + 1
+      while (end < text.length && colors[end] == color) end++
+      if (color != null && color != Color.Unspecified) addStyle(SpanStyle(color = color), start, end)
+      start = end
     }
   }
+}
 
-private val ALIASES = mapOf(
-  "json" to SyntaxLanguage.DEFAULT,
-  "jsonc" to SyntaxLanguage.DEFAULT,
-  "kt" to SyntaxLanguage.KOTLIN,
-  "kts" to SyntaxLanguage.KOTLIN,
-  "js" to SyntaxLanguage.JAVASCRIPT,
-  "jsx" to SyntaxLanguage.JAVASCRIPT,
-  "mjs" to SyntaxLanguage.JAVASCRIPT,
-  "cjs" to SyntaxLanguage.JAVASCRIPT,
-  "ts" to SyntaxLanguage.TYPESCRIPT,
-  "tsx" to SyntaxLanguage.TYPESCRIPT,
-  "mts" to SyntaxLanguage.TYPESCRIPT,
-  "py" to SyntaxLanguage.PYTHON,
-  "python3" to SyntaxLanguage.PYTHON,
-  "sh" to SyntaxLanguage.SHELL,
-  "bash" to SyntaxLanguage.SHELL,
-  "zsh" to SyntaxLanguage.SHELL,
-  "console" to SyntaxLanguage.SHELL,
-  "h" to SyntaxLanguage.C,
-  "c++" to SyntaxLanguage.CPP,
-  "cc" to SyntaxLanguage.CPP,
-  "cxx" to SyntaxLanguage.CPP,
-  "hpp" to SyntaxLanguage.CPP,
-  "cs" to SyntaxLanguage.CSHARP,
-  "c#" to SyntaxLanguage.CSHARP,
-  "rs" to SyntaxLanguage.RUST,
-  "rb" to SyntaxLanguage.RUBY,
-  "golang" to SyntaxLanguage.GO,
-  "pl" to SyntaxLanguage.PERL,
-  "coffee" to SyntaxLanguage.COFFEESCRIPT,
+private val TOKENS = mapOf(
+  "comment" to Token.Comment,
+  "string" to Token.String,
+  "character" to Token.String,
+  "string.escape" to Token.Constant,
+  "string.special" to Token.Constant,
+  "character.special" to Token.Constant,
+  "escape" to Token.Constant,
+  "keyword" to Token.Keyword,
+  "conditional" to Token.Keyword,
+  "repeat" to Token.Keyword,
+  "include" to Token.Keyword,
+  "exception" to Token.Keyword,
+  "operator" to Token.Keyword,
+  "preproc" to Token.Keyword,
+  "punctuation.special" to Token.Keyword,
+  "number" to Token.Constant,
+  "identifier.constant" to Token.Constant,
+  "float" to Token.Constant,
+  "boolean" to Token.Constant,
+  "constant" to Token.Constant,
+  "attribute" to Token.Constant,
+  "tag.attribute" to Token.Constant,
+  "variable.builtin" to Token.Constant,
+  "function" to Token.Function,
+  "method" to Token.Function,
+  "constructor" to Token.Function,
+  "type" to Token.Type,
+  "module" to Token.Type,
+  "namespace" to Token.Type,
+  "tag" to Token.Tag,
+  "tag.delimiter" to Token.Plain,
+  "variable" to Token.Plain,
+  "property" to Token.Plain,
+  "field" to Token.Plain,
+  "label" to Token.Plain,
+  "punctuation" to Token.Plain,
+  "delimiter" to Token.Plain,
+  "embedded" to Token.Plain,
+  "none" to Token.Plain,
 )
 
-/** Paseo's syntax palette (GitHub's), mapped onto Highlights' token kinds. */
-private val DarkTheme = SyntaxTheme(
-  key = "paseo-dark",
-  code = 0xC9D1D9,
-  keyword = 0xFF7B72,
-  string = 0xA5D6FF,
-  literal = 0x79C0FF,
-  comment = 0x8B949E,
-  metadata = 0xD2A8FF,
-  multilineComment = 0x8B949E,
-  punctuation = 0xC9D1D9,
-  mark = 0xC9D1D9,
+/** Paseo's syntax palette (GitHub's Primer), by token. */
+private val DarkPalette = mapOf(
+  Token.Plain to Color.Unspecified,
+  Token.Keyword to Color(0xFFFF7B72),
+  Token.String to Color(0xFFA5D6FF),
+  Token.Constant to Color(0xFF79C0FF),
+  Token.Comment to Color(0xFF8B949E),
+  Token.Function to Color(0xFFD2A8FF),
+  Token.Type to Color(0xFFFFA657),
+  Token.Tag to Color(0xFF7EE787),
 )
 
-private val LightTheme = SyntaxTheme(
-  key = "paseo-light",
-  code = 0x24292F,
-  keyword = 0xCF222E,
-  string = 0x0A3069,
-  literal = 0x0550AE,
-  comment = 0x6E7781,
-  metadata = 0x8250DF,
-  multilineComment = 0x6E7781,
-  punctuation = 0x24292F,
-  mark = 0x24292F,
+private val LightPalette = mapOf(
+  Token.Plain to Color.Unspecified,
+  Token.Keyword to Color(0xFFCF222E),
+  Token.String to Color(0xFF0A3069),
+  Token.Constant to Color(0xFF0550AE),
+  Token.Comment to Color(0xFF6E7781),
+  Token.Function to Color(0xFF8250DF),
+  Token.Type to Color(0xFF953800),
+  Token.Tag to Color(0xFF116329),
 )
