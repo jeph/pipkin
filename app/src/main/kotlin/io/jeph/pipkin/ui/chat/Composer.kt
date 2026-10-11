@@ -60,6 +60,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
@@ -75,8 +76,8 @@ private enum class PrimaryAction { Send, Stop, Idle, Sending }
 private const val MAX_PICKED_IMAGES = 6
 
 /**
- * Paseo's composer: attachment tray, growing text field and a toolbar with attach, model chip,
- * [trailingControls] (reserved for voice input) and the primary send/stop button.
+ * Paseo's composer: attachment tray, growing text field and a toolbar with attach, model chip, the
+ * context meter, [trailingControls] (reserved for voice input) and the primary send/stop button.
  */
 @Composable
 internal fun Composer(
@@ -137,6 +138,8 @@ internal fun Composer(
           ModelChip(model, onOpenModelSheet, Modifier.weight(1f, fill = false))
           if (supportsThinking(model)) ThinkingChip(thinkingLevel, onOpenThinkingSheet)
         }
+        val contextUsage by controller.process.contextUsage.collectAsStateWithLifecycle()
+        ContextMeter(contextUsage)
         trailingControls()
         val action = when {
           controller.sending -> PrimaryAction.Sending

@@ -125,4 +125,13 @@
     <string name="chat_ok">OK</string>
     <string name="chat_yes">Yes</string>
     <string name="chat_no">No</string>
+
+    <!-- Context window meter -->
+    <string name="context_window_title">Context window</string>
+    <string name="context_window_used">%1$d%% used</string>
+    <string name="context_window_tokens">%1$s / %2$s tokens</string>
+    <string name="context_window_session_cost">Session cost %1$s</string>
+    <string name="context_window_no_data">No context data</string>
+    <string name="context_window_a11y">Context window %1$d%% used</string>
+    <string name="context_window_a11y_no_data">Context window: No context data</string>
 </resources>

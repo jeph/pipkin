@@ -11,6 +11,8 @@ import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.consumeEach
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -90,6 +92,8 @@ internal class AgentProcess(
   private val stateFlow = MutableStateFlow<AgentProcessState>(AgentProcessState.Starting)
   private val sessionFileState = MutableStateFlow(sessionPath)
   private val sessionNameState = MutableStateFlow<String?>(null)
+  private val contextUsageState = MutableStateFlow<ContextUsage?>(null)
+  private val contextUsageRequests = Channel<Unit>(Channel.CONFLATED)
 
   @Volatile
   private var connection: Connection? = null
@@ -104,12 +108,25 @@ internal class AgentProcess(
   /** `get_state.sessionName`, kept current by `set_session_name` and `session_info_changed`. */
   val sessionName: StateFlow<String?> = sessionNameState.asStateFlow()
 
+  /** How full the context window is, from `get_session_stats`; null until Pi first answered. */
+  val contextUsage: StateFlow<ContextUsage?> = contextUsageState.asStateFlow()
+
   /** The timeline's run state while Pi is up; false once it exited or failed. */
   override val busy: StateFlow<Boolean> = combine(timeline.state, stateFlow) { timelineState, processState ->
     timelineState.busy && processState == AgentProcessState.Ready
   }.stateIn(processScope, SharingStarted.Eagerly, false)
 
   init {
+    // One reader, conflated: a burst of turn ends costs one get_session_stats, and answers never land out of order.
+    processScope.launch {
+      contextUsageRequests.consumeEach {
+        try {
+          contextUsageState.value = ContextUsage.from(call("get_session_stats"))
+        } catch (_: RpcError) {
+          // Pi stopped or is restarting; the meter keeps its last reading until the next refresh.
+        }
+      }
+    }
     // Last in construction: an immediate dispatcher starts connecting inline.
     startJob = processScope.launch { connect() }
   }
@@ -168,6 +185,8 @@ internal class AgentProcess(
     timeline.setModel(model)
     // Pi clamps the thinking level to what the new model supports.
     syncState()
+    // The new model has its own context window.
+    refreshContextUsage()
   }
 
   suspend fun availableThinkingLevels(): List<String> =
@@ -213,6 +232,7 @@ internal class AgentProcess(
   suspend fun reloadSession() {
     applyState(call("get_state"))
     timeline.seed(getMessages())
+    refreshContextUsage()
     onSessionChanged()
   }
 
@@ -246,6 +266,7 @@ internal class AgentProcess(
       applyState(current.rpc.call("get_state"))
       timeline.seed(current.rpc.call("get_messages").optJSONArray("messages") ?: JSONArray())
       stateFlow.value = AgentProcessState.Ready
+      refreshContextUsage()
       null
     } catch (error: RpcError) {
       current.close()
@@ -312,7 +333,13 @@ internal class AgentProcess(
   private fun onEvent(event: JSONObject) {
     timeline.apply(event)
     when (event.optString("type")) {
-      "agent_settled" -> onSessionChanged()
+      // Each turn adds a response and tool results to the context; compaction shrinks it.
+      "turn_end", "compaction_end" -> refreshContextUsage()
+
+      "agent_settled" -> {
+        refreshContextUsage()
+        onSessionChanged()
+      }
 
       "session_info_changed" -> {
         sessionNameState.value = event.opt("name") as? String
@@ -321,6 +348,10 @@ internal class AgentProcess(
 
       "thinking_level_changed" -> timeline.setThinkingLevel(event.opt("level") as? String)
     }
+  }
+
+  private fun refreshContextUsage() {
+    contextUsageRequests.trySend(Unit)
   }
 
   private fun applyState(data: JSONObject) {

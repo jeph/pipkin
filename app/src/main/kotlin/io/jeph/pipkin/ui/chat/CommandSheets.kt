@@ -58,11 +58,14 @@ internal fun SessionInfoSheet(stats: JSONObject, name: String?, home: String?, o
       val cost = stats.optDouble("cost", 0.0)
       if (cost > 0) {
         SectionTitle(R.string.session_cost)
-        InfoRow(R.string.session_total, String.format(Locale.US, "$%.3f", cost))
+        InfoRow(R.string.session_total, formatCost(cost))
       }
     }
   }
 }
+
+/** A session's spend in USD, to a tenth of a cent. */
+internal fun formatCost(usd: Double): String = String.format(Locale.US, "$%.3f", usd)
 
 /** Input counts the whole prompt, cached or not, like Pi's terminal UI. */
 @Composable
