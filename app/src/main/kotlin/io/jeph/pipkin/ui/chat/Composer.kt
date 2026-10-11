@@ -49,17 +49,16 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.IconButton28
@@ -120,7 +119,8 @@ internal fun Composer(
       if (controller.attachments.isNotEmpty()) {
         AttachmentTray(controller.attachments, onRemove = { controller.attachments.remove(it) })
       }
-      ComposerField(controller, onRan = hideKeyboard)
+      // Weighted, so the tray and toolbar are measured first and long drafts scroll instead of pushing them off.
+      ComposerField(controller, onRan = hideKeyboard, Modifier.weight(1f, fill = false))
       Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s12))
       Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -250,18 +250,26 @@ private fun BoxScope.RemoveBadge(onRemove: () -> Unit) {
   }
 }
 
-/** The draft field; it reports focus for the slash menu and lets the menu take its keys. */
+/**
+ * The draft field; it reports focus for the slash menu and lets the menu take its keys. It grows to half
+ * the height the chat has left, so the stream keeps the other half, then scrolls.
+ */
 @Composable
-private fun ComposerField(controller: ChatController, onRan: () -> Unit) {
+private fun ComposerField(controller: ChatController, onRan: () -> Unit, modifier: Modifier) {
   val colors = pipkinColors
-  val maxHeight = max(160.dp, LocalWindowInfo.current.containerDpSize.height * 0.5f)
   val style = TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.content)
   BasicTextField(
     value = controller.draft,
     onValueChange = { controller.slash.onDraftChange(it, onRan) },
-    modifier = Modifier
+    modifier = modifier
       .fillMaxWidth()
-      .heightIn(min = 30.dp, max = maxHeight)
+      .layout { measurable, constraints ->
+        // As a weighted child, maxHeight is what the composer has after its tray and toolbar.
+        val cap = if (constraints.hasBoundedHeight) constraints.maxHeight / 2 else constraints.maxHeight
+        val placeable = measurable.measure(constraints.copy(maxHeight = cap.coerceAtLeast(constraints.minHeight)))
+        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+      }
+      .heightIn(min = 30.dp)
       .onFocusChanged { controller.composerFocused = it.isFocused }
       .onPreviewKeyEvent { controller.slash.onKey(it, onRan) },
     textStyle = style,
