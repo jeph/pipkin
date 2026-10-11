@@ -89,19 +89,21 @@ internal fun Composer(
   trailingControls: @Composable RowScope.() -> Unit = {},
 ) {
   val colors = pipkinColors
-  val send = rememberSend(controller)
+  val keyboard = LocalSoftwareKeyboardController.current
+  val focus = LocalFocusManager.current
+  val send = {
+    if (controller.send()) {
+      keyboard?.hide()
+      focus.clearFocus()
+    }
+  }
   val shape = RoundedCornerShape(PipkinTokens.Radius.xxl)
   Box(
     modifier =
       modifier
         .fillMaxWidth()
         .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-        .padding(
-          start = PipkinTokens.Spacing.s16,
-          top = PipkinTokens.Spacing.s4,
-          end = PipkinTokens.Spacing.s16,
-          bottom = PipkinTokens.Spacing.s16,
-        ),
+        .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s16),
     contentAlignment = Alignment.TopCenter,
   ) {
     // Not clipped: the attachment remove buttons overhang their thumbnails.
@@ -143,19 +145,6 @@ internal fun Composer(
         }
         PrimaryButton(action, onSend = send, onStop = controller::abort)
       }
-    }
-  }
-}
-
-/** Sends the draft and, when it went out, hides the keyboard. */
-@Composable
-private fun rememberSend(controller: ChatController): () -> Unit {
-  val keyboard = LocalSoftwareKeyboardController.current
-  val focus = LocalFocusManager.current
-  return {
-    if (controller.send()) {
-      keyboard?.hide()
-      focus.clearFocus()
     }
   }
 }
