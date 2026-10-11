@@ -36,4 +36,8 @@
     <string name="shell_browse_empty">No folders here</string>
     <string name="shell_browse_add">Add as workspace</string>
     <string name="shell_browse_added">Already a workspace</string>
+    <string name="shell_browse_search">Search folders or enter a path</string>
+    <string name="shell_browse_searching">Searching…</string>
+    <string name="shell_browse_no_matches">No matching folders</string>
+    <string name="shell_browse_added_badge">Added</string>
 </resources>

@@ -1,20 +1,13 @@
 package io.jeph.pipkin.ui.chat
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
@@ -27,17 +20,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
+import io.jeph.pipkin.ui.components.SearchField
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.Spinner
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -68,7 +59,7 @@ internal fun ModelSheet(controller: ChatController, model: JSONObject?, initialQ
     }
   }
   PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = PICKER_MAX_HEIGHT) {
-    SearchField(query, onQueryChange = { query = it })
+    SearchField(query, onQueryChange = { query = it }, placeholder = stringResource(R.string.chat_model_search))
     ModelList(scoped, query.trim(), model, Modifier.weight(1f, fill = false)) { selected ->
       controller.setModel(selected.optString("provider"), selected.optString("id"))
       onDismiss()
@@ -109,47 +100,6 @@ internal fun ThinkingSheet(
       }
     }
   }
-}
-
-@Composable
-private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
-  val colors = pipkinColors
-  BasicTextField(
-    value = query,
-    onValueChange = onQueryChange,
-    modifier = Modifier.fillMaxWidth().padding(
-      horizontal = PipkinTokens.Spacing.s16,
-      vertical = PipkinTokens.Spacing.s4,
-    ),
-    textStyle = TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base),
-    cursorBrush = SolidColor(colors.accent),
-    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-    singleLine = true,
-    decorationBox = { field ->
-      Row(
-        modifier =
-          Modifier
-            .fillMaxWidth()
-            .heightIn(min = 40.dp)
-            .background(colors.surface2, RoundedCornerShape(PipkinTokens.Radius.lg))
-            .padding(horizontal = PipkinTokens.Spacing.s12),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
-      ) {
-        LucideIcon(icon = R.drawable.ic_lucide_search, contentDescription = null, tint = colors.foregroundMuted)
-        Box(modifier = Modifier.weight(1f)) {
-          if (query.isEmpty()) {
-            Text(
-              text = stringResource(R.string.chat_model_search),
-              color = colors.foregroundMuted,
-              fontSize = PipkinTokens.FontSize.base,
-            )
-          }
-          field()
-        }
-      }
-    },
-  )
 }
 
 /** Models matching [query], grouped by provider under a muted label; the current model is checked. */

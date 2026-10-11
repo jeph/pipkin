@@ -1,7 +1,7 @@
 import { chmod, mkdir, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import type { JsonObject } from "../src/framing.js";
+import { encodeLine, type JsonObject } from "../src/framing.js";
 import { type Dirs, type HostRun, makeDirs, removeDirs, startHost } from "./harness.js";
 
 describe("browse mode", () => {
@@ -34,6 +34,17 @@ describe("browse mode", () => {
     for (;;) {
       const message = await run.next();
       if (message === undefined || (message.type === "pipkin_listing" && message.id === id)) return message;
+    }
+  }
+
+  /** The paths a `pipkin_search` for [query] answers with. */
+  async function search(query: string): Promise<unknown> {
+    const id = ++nextId;
+    run.send({ type: "pipkin_search", id, query });
+    for (;;) {
+      const message = await run.next();
+      if (message === undefined) return undefined;
+      if (message.type === "pipkin_search_results" && message.id === id) return message.paths;
     }
   }
 
@@ -100,6 +111,60 @@ describe("browse mode", () => {
     expect(await list(path.join(dirs.home, "notes.txt"))).toMatchObject({ dirs: [], error: "This isn't a folder." });
     expect(await list("relative/path")).toMatchObject({ parent: null, dirs: [], error: "Paths start with / or ~." });
     expect(await list("~")).toMatchObject({ path: dirs.home });
+  });
+
+  it("searches home and shared storage by folder name, best match first, skipping hidden and build folders", async () => {
+    for (const folder of [
+      ["alpha", "projector"],
+      ["alpha", "node_modules", "proj-dep"],
+      [".config", "proj-hidden"],
+    ]) {
+      await mkdir(path.join(dirs.home, ...folder), { recursive: true });
+    }
+    await mkdir(path.join(shared, "Documents", "proj-notes"));
+    expect(await search("proj")).toEqual([
+      path.join(dirs.home, "project10"),
+      path.join(dirs.home, "Project2"),
+      path.join(dirs.home, "alpha", "projector"),
+      path.join(shared, "Documents", "proj-notes"),
+    ]);
+    expect(await search("   ")).toEqual([]);
+  });
+
+  it("anchors ~ and absolute paths at the folder they name, and searches nowhere else", async () => {
+    await mkdir(path.join(dirs.home, "alpha", "deep", "alpine"), { recursive: true });
+    // Read as plain text, `~/alpha/al` would match this through its letters.
+    await mkdir(path.join(shared, "Documents", "alpha-al"));
+    expect(await search("~/alpha/al")).toEqual([path.join(dirs.home, "alpha", "deep", "alpine")]);
+    expect(await search("~")).toEqual(["alpha", "project10", "Project2", "storage"].map((name) => path.join(dirs.home, name)));
+    expect(await search(`${shared}/`)).toEqual([path.join(shared, "Documents")]);
+  });
+
+  it("names a folder found through a link by its real path, once", async () => {
+    await symlink(path.join(dirs.home, "alpha"), path.join(dirs.home, "alpha-link"));
+    expect(await search("alpha")).toEqual([path.join(dirs.home, "alpha")]);
+  });
+
+  it("drops a search overtaken by a newer one without answering it", async () => {
+    // One write, so the host reads both before the first search's filesystem calls return.
+    run.socket.write(
+      encodeLine({ type: "pipkin_search", id: 1001, query: "proj" }) +
+        encodeLine({ type: "pipkin_search", id: 1002, query: "alpha" }),
+    );
+    const answered: JsonObject[] = [];
+    const readUntil = async (done: (message: JsonObject) => boolean): Promise<void> => {
+      for (;;) {
+        const message = await run.next();
+        if (message === undefined) return;
+        if (message.type === "pipkin_search_results") answered.push(message);
+        if (done(message)) return;
+      }
+    };
+    await readUntil((message) => message.id === 1002);
+    // The round trip for a listing gives a late answer to the first search time to show up.
+    run.send({ type: "pipkin_list", id: 1003, path: "~" });
+    await readUntil((message) => message.type === "pipkin_listing");
+    expect(answered).toEqual([{ type: "pipkin_search_results", id: 1002, paths: [path.join(dirs.home, "alpha")] }]);
   });
 
   it("exits once the app hangs up", async () => {

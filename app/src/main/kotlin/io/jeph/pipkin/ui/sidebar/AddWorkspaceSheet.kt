@@ -23,4 +23,4 @@ internal fun AddWorkspaceSheet(
   }
 }
 
-private const val SHEET_HEIGHT_FRACTION = 0.8f
+private const val SHEET_HEIGHT_FRACTION = 0.9f

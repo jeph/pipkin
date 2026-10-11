@@ -1,5 +1,6 @@
 import { opendir, readdir, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { SEARCH_LIMIT, type SearchRoot, searchFolders } from "../folder-search.js";
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 
@@ -79,9 +80,11 @@ async function openableParent(parent: string): Promise<string | null> {
   }
 }
 
+type Place = { kind: "home" | "shared" | "volume"; path: string; name?: string };
+
 /** Termux home, phone storage (through `termux-setup-storage`'s link) and any other mounted volume. */
-async function places(home: string): Promise<JsonObject[]> {
-  const found: JsonObject[] = [{ kind: "home", path: home }];
+async function places(home: string): Promise<Place[]> {
+  const found: Place[] = [{ kind: "home", path: home }];
   try {
     found.push({ kind: "shared", path: await realpath(join(home, "storage", "shared")) });
   } catch {
@@ -98,20 +101,39 @@ async function places(home: string): Promise<JsonObject[]> {
   return found;
 }
 
+/** [query]'s matches in every place, spelled like listings so a folder can't become two workspaces. */
+async function search(query: string, found: Place[], home: string, cancelled: () => boolean): Promise<string[] | undefined> {
+  const roots: SearchRoot[] = found.map((place) => ({ path: place.path, aliases: place.kind === "home" ? ["~"] : [] }));
+  const paths = await searchFolders(query, roots, cancelled);
+  if (paths === undefined) return undefined;
+  const canonicalPaths = await Promise.all(paths.map((path) => canonical(path, home)));
+  return [...new Set(canonicalPaths)].slice(0, SEARCH_LIMIT);
+}
+
 /**
  * Long-lived folder listing for the app's folder browser: sends `pipkin_places` once, then answers
- * each `pipkin_list` with a `pipkin_listing` until the app hangs up. Listing failures are part of the
- * listing, so the browser can show them in place.
+ * each `pipkin_list` with a `pipkin_listing` and each `pipkin_search` with `pipkin_search_results`
+ * until the app hangs up. Listing failures are part of the listing, so the browser can show them in
+ * place. A search still running when the next arrives stops without answering.
  */
 export async function browse(ctx: ModeContext): Promise<JsonObject> {
   const home = ctx.env.home;
-  ctx.conn.send({ type: "pipkin_places", places: await places(home) });
+  const found = await places(home);
+  ctx.conn.send({ type: "pipkin_places", places: found });
+  let latestSearch: number | undefined;
   ctx.conn.listen((message) => {
-    if (message.type !== "pipkin_list" || typeof message.id !== "number" || typeof message.path !== "string") return;
-    const { id, path } = message;
-    void listing(path, home).then((result) => {
-      ctx.conn.send({ type: "pipkin_listing", id, ...result });
-    });
+    const { id } = message;
+    if (typeof id !== "number") return;
+    if (message.type === "pipkin_list" && typeof message.path === "string") {
+      void listing(message.path, home).then((result) => {
+        ctx.conn.send({ type: "pipkin_listing", id, ...result });
+      });
+    } else if (message.type === "pipkin_search" && typeof message.query === "string") {
+      latestSearch = id;
+      void search(message.query, found, home, () => latestSearch !== id).then((paths) => {
+        if (paths !== undefined && latestSearch === id) ctx.conn.send({ type: "pipkin_search_results", id, paths });
+      });
+    }
   });
   if (!ctx.signal.aborted) {
     await new Promise<void>((done) => {
