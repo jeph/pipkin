@@ -1,19 +1,11 @@
 package io.jeph.pipkin.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
@@ -44,8 +36,9 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
     fontSize = PipkinTokens.FontSize.content,
     lineHeight = PipkinTokens.LineHeight.markdown,
   )
-  val codeBlock: @Composable (String, String?, TextStyle) -> Unit = { text, language, style ->
-    CodeBlock(text, language, style)
+  // CodeText is Pipkin's one code style, so the library's code typography is ignored here.
+  val codeBlock: @Composable (String, String?, TextStyle) -> Unit = { text, language, _ ->
+    CodeBox(modifier = Modifier.padding(vertical = PipkinTokens.Spacing.s6)) { CodeText(text, language) }
   }
   // Parsing runs off the main thread; without retaining, each streamed delta would show the empty
   // loading box until the new parse lands, collapsing and re-growing the message.
@@ -102,24 +95,4 @@ private fun typography(body: TextStyle): MarkdownTypography {
     table = body,
     alertTitle = body.copy(fontWeight = FontWeight.SemiBold),
   )
-}
-
-/** A bordered, horizontally scrolling code block, coloured for its fence language. */
-@Composable
-private fun CodeBlock(text: String, language: String?, style: TextStyle) {
-  val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.md)
-  Box(
-    modifier =
-      Modifier
-        .fillMaxWidth()
-        .padding(vertical = PipkinTokens.Spacing.s6)
-        .clip(shape)
-        .background(colors.surface2)
-        .border(1.dp, colors.border, shape)
-        .horizontalScroll(rememberScrollState())
-        .padding(PipkinTokens.Spacing.s12),
-  ) {
-    Text(text = rememberHighlightedCode(text, language), style = style)
-  }
 }

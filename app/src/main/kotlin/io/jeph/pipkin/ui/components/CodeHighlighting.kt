@@ -24,9 +24,9 @@ import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.withContext
 
 /**
- * [code] coloured for the fence's [language], or plain when Highlights doesn't know it. Highlighting runs
- * off the main thread, one pass at a time with the latest text, and while a streamed block grows the
- * colours already computed stay on its start instead of flashing back to plain.
+ * [code] coloured for [language] (a fence name or file extension), or plain when Highlights doesn't know
+ * it. Highlighting runs off the main thread, one pass at a time with the latest text, and while a streamed
+ * block grows the colours already computed stay on its start instead of flashing back to plain.
  */
 @Composable
 internal fun rememberHighlightedCode(code: String, language: String?): AnnotatedString {
@@ -58,6 +58,24 @@ internal fun syntaxLanguage(fence: String): SyntaxLanguage? {
   val name = fence.trim().substringBefore(' ').lowercase()
   return ALIASES[name] ?: SyntaxLanguage.getByName(name)?.takeUnless { it == SyntaxLanguage.DEFAULT }
 }
+
+/** The extension of [path]'s file name, which [syntaxLanguage] reads like a fence name; null without one. */
+internal fun fileLanguage(path: String): String? =
+  path.substringAfterLast('/').substringAfterLast('.', "").ifEmpty { null }
+
+/** Each line of this text with its styles, split at `\n`, `\r\n` or `\r` like [String.lines]. */
+internal fun AnnotatedString.splitLines(): List<AnnotatedString> {
+  val lines = mutableListOf<AnnotatedString>()
+  var start = 0
+  for (lineBreak in LINE_BREAK.findAll(text)) {
+    lines += subSequence(start, lineBreak.range.first)
+    start = lineBreak.range.last + 1
+  }
+  lines += subSequence(start, length)
+  return lines
+}
+
+private val LINE_BREAK = Regex("\r\n|\r|\n")
 
 /**
  * [code] with Highlights' colours for [syntax]. Each call analyzes the whole text: Highlights' incremental

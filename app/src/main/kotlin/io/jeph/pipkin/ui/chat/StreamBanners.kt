@@ -28,6 +28,8 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.termux.TermuxSetup
+import io.jeph.pipkin.ui.components.CodeBox
+import io.jeph.pipkin.ui.components.CodeText
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.Spinner
 import io.jeph.pipkin.ui.theme.PipkinTokens

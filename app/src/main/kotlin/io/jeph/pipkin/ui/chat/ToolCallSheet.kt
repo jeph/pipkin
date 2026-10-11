@@ -1,18 +1,14 @@
 package io.jeph.pipkin.ui.chat
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -21,20 +17,23 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.ToolStatus
+import io.jeph.pipkin.ui.components.CodeBox
+import io.jeph.pipkin.ui.components.CodeText
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinMarkdown
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.fileLanguage
+import io.jeph.pipkin.ui.components.rememberHighlightedCode
+import io.jeph.pipkin.ui.components.splitLines
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import org.json.JSONArray
@@ -107,33 +106,35 @@ private fun SheetTitle(presentation: ToolPresentation) {
 @Composable
 private fun ToolDetails(item: TimelineItem.ToolCall) {
   val args = item.args
+  val language = args?.stringOrNull("path")?.let(::fileLanguage)
   when (item.toolName) {
     "bash" -> {
       CodeBox {
-        CodeText("$ ${args?.stringOrNull("command").orEmpty()}")
+        val command = rememberHighlightedCode(args?.stringOrNull("command").orEmpty(), "sh")
+        CodeText(AnnotatedString("$ ") + command)
         item.output?.takeIf { it.isNotEmpty() }?.let {
-          CodeText(it, if (item.isError) pipkinColors.destructive else pipkinColors.foreground)
+          CodeText(it, color = if (item.isError) pipkinColors.destructive else pipkinColors.foreground)
         }
       }
       if (item.output == null && item.status != ToolStatus.Done) RunningLine()
     }
 
     "edit" -> {
-      EditDiff(editPairs(args))
-      Output(item, codeBox = false)
+      EditDiff(editPairs(args), language)
+      Output(item)
     }
 
     "write" -> {
-      args?.stringOrNull("content")?.let { CodeBox { CodeText(it) } }
-      Output(item, codeBox = false)
+      args?.stringOrNull("content")?.let { CodeBox { CodeText(it, language) } }
+      Output(item)
     }
 
-    "read" -> Output(item, codeBox = true)
+    "read" -> Output(item, codeBox = true, language = language)
 
     else -> {
       if (args != null && args.length() > 0) {
         Label(stringResource(R.string.chat_arguments))
-        CodeBox { CodeText(args.toString(2)) }
+        CodeBox { CodeText(args.toString(2), "json") }
       }
       Label(stringResource(R.string.chat_output))
       Output(item, codeBox = true)
@@ -141,16 +142,17 @@ private fun ToolDetails(item: TimelineItem.ToolCall) {
   }
 }
 
-/** The tool's result text; errors are always shown, in destructive. */
+/** The tool's result text, in a [CodeBox] coloured for [language] when [codeBox]; errors stay plain destructive. */
 @Composable
-private fun Output(item: TimelineItem.ToolCall, codeBox: Boolean) {
+private fun Output(item: TimelineItem.ToolCall, codeBox: Boolean = false, language: String? = null) {
   val colors = pipkinColors
   val output = item.output
   when {
     output == null -> if (item.status != ToolStatus.Done) RunningLine()
     item.isError -> Text(text = output, color = colors.destructive, fontSize = PipkinTokens.FontSize.base)
-    codeBox -> CodeBox { CodeText(output.ifEmpty { stringResource(R.string.chat_no_output) }) }
-    else -> Text(text = output, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.base)
+    !codeBox -> Text(text = output, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.base)
+    output.isEmpty() -> CodeBox { CodeText(stringResource(R.string.chat_no_output)) }
+    else -> CodeBox { CodeText(output, language) }
   }
 }
 
@@ -174,9 +176,12 @@ private fun Label(text: String) {
   Text(text = text, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm)
 }
 
-/** Removed lines on a destructive tint, added lines on an accent tint, one block per replacement. */
+/**
+ * Removed lines on a destructive tint, added lines on an accent tint, one block per replacement. Each side
+ * is coloured for [language] as a whole, so strings and comments spanning lines keep their colour.
+ */
 @Composable
-private fun EditDiff(edits: List<Pair<String, String>>) {
+private fun EditDiff(edits: List<Pair<String, String>>, language: String?) {
   if (edits.isEmpty()) return
   val colors = pipkinColors
   CodeBox(radius = PipkinTokens.Radius.base, padding = 0.dp) {
@@ -189,53 +194,20 @@ private fun EditDiff(edits: List<Pair<String, String>>) {
             color = colors.border,
           )
         }
-        oldText.lines().forEach { DiffLine("- $it", colors.destructive.copy(alpha = 0.16f)) }
-        newText.lines().forEach { DiffLine("+ $it", colors.accent.copy(alpha = 0.16f)) }
+        val removed = rememberHighlightedCode(oldText, language)
+        val added = rememberHighlightedCode(newText, language)
+        removed.splitLines().forEach { DiffLine("- ", it, colors.destructive.copy(alpha = 0.16f)) }
+        added.splitLines().forEach { DiffLine("+ ", it, colors.accent.copy(alpha = 0.16f)) }
       }
     }
   }
 }
 
 @Composable
-private fun DiffLine(text: String, tint: Color) {
+private fun DiffLine(marker: String, line: AnnotatedString, tint: Color) {
   Row(modifier = Modifier.fillMaxWidth().background(tint).padding(horizontal = PipkinTokens.Spacing.s12)) {
-    CodeText(text)
+    CodeText(AnnotatedString(marker) + line)
   }
-}
-
-/** Paseo's code surface: surface2, 1dp border, monospace, scrolls sideways instead of wrapping. */
-@Composable
-internal fun CodeBox(
-  modifier: Modifier = Modifier,
-  radius: Dp = PipkinTokens.Radius.md,
-  padding: Dp = PipkinTokens.Spacing.s12,
-  content: @Composable ColumnScope.() -> Unit,
-) {
-  val colors = pipkinColors
-  val shape = RoundedCornerShape(radius)
-  Column(
-    modifier =
-      modifier
-        .fillMaxWidth()
-        .clip(shape)
-        .background(colors.surface2)
-        .border(1.dp, colors.border, shape)
-        .horizontalScroll(rememberScrollState())
-        .padding(padding),
-    content = content,
-  )
-}
-
-@Composable
-internal fun CodeText(text: String, color: Color = pipkinColors.foreground) {
-  Text(
-    text = text,
-    color = color,
-    fontFamily = FontFamily.Monospace,
-    fontSize = PipkinTokens.FontSize.code,
-    lineHeight = PipkinTokens.LineHeight.code,
-    softWrap = false,
-  )
 }
 
 /**

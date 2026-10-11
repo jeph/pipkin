@@ -30,6 +30,31 @@ class CodeHighlightingTest {
   }
 
   @Test
+  fun aFilesExtensionPicksItsLanguage() {
+    assertEquals("kt", fileLanguage("app/src/Main.kt"))
+    assertEquals("ts", fileLanguage("/home/u/.config/app/index.d.ts"))
+    assertNull(fileLanguage("/home/u/.config/Makefile"))
+    assertNull(fileLanguage("notes."))
+  }
+
+  @Test
+  fun splitLinesKeepsEachSpanOnItsLine() {
+    val red = SpanStyle(color = Color.Red)
+    val text = buildAnnotatedString {
+      append("a ")
+      withStyle(red) { append("\"b\r\nc\"") }
+      append("\rd\n")
+    }
+
+    val lines = text.splitLines()
+
+    assertEquals(listOf("a \"b", "c\"", "d", ""), lines.map { it.text })
+    assertEquals(listOf(AnnotatedString.Range(red, 2, 4)), lines[0].spanStyles)
+    assertEquals(listOf(AnnotatedString.Range(red, 0, 2)), lines[1].spanStyles)
+    assertEquals(emptyList<AnnotatedString.Range<SpanStyle>>(), lines[2].spanStyles)
+  }
+
+  @Test
   fun everyGrowingPrefixColoursStringsAndCommentsWhereTheyAre() {
     val code = "fun greet() {\n    // Says hello.\n    println(\"Hello\")\n}"
     // Streaming re-highlights each longer prefix; every pass must place its spans on that pass's text.
