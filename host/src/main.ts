@@ -5,16 +5,19 @@ import { isObject, type JsonObject } from "./framing.js";
 import type { ModeContext } from "./mode.js";
 import { authStatus } from "./modes/auth-status.js";
 import { browse } from "./modes/browse.js";
+import { defaultModel } from "./modes/default-model.js";
 import { deleteSession } from "./modes/delete-session.js";
 import { ensure } from "./modes/ensure.js";
 import { login } from "./modes/login.js";
 import { logout } from "./modes/logout.js";
+import { modelDefaults } from "./modes/model-defaults.js";
 import { providerModels } from "./modes/provider-models.js";
 import { providerRemove } from "./modes/provider-remove.js";
 import { providerSave } from "./modes/provider-save.js";
 import { rpc } from "./modes/rpc.js";
 import { saveAttachments } from "./modes/save-attachments.js";
 import { sessions } from "./modes/sessions.js";
+import { subscriptionSave } from "./modes/subscription-save.js";
 
 const PROTOCOL = 1;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -108,10 +111,16 @@ async function main(): Promise<void> {
       return respond(ctx, logout);
     case "provider_models":
       return respond(ctx, providerModels);
+    case "model_defaults":
+      return respond(ctx, modelDefaults);
     case "provider_save":
       return respond(ctx, providerSave);
     case "provider_remove":
       return respond(ctx, providerRemove);
+    case "subscription_save":
+      return respond(ctx, subscriptionSave);
+    case "default_model":
+      return respond(ctx, defaultModel);
     default:
       conn.send({ type: "pipkin_result", ok: false, error: `Unknown mode ${mode}`, code: "unknown_mode" });
       conn.finish();

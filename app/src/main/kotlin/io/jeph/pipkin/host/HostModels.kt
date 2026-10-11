@@ -46,17 +46,29 @@ internal data class SessionInfo(
   }
 }
 
-/** A provider Pi ships: `anthropic` or `openai-codex`. [type] is the configured credential type, if any. */
-internal data class BuiltinProvider(val id: String, val name: String, val configured: Boolean, val type: String?)
+/**
+ * A provider Pi ships: `anthropic` or `openai-codex`. [type] is the configured credential type, if
+ * any. [models] are every model Pi offers for it with `models.json` overrides applied; [extraIds]
+ * are the ones `models.json` adds. [enabled] lists the ids settings.json `enabledModels` shows,
+ * or is null when that list is empty and every model shows.
+ */
+internal data class BuiltinProvider(
+  val id: String,
+  val name: String,
+  val configured: Boolean,
+  val type: String?,
+  val models: List<ModelConfig> = emptyList(),
+  val extraIds: List<String> = emptyList(),
+  val enabled: List<String>? = null,
+)
 
-/** An entry of `models.json` `providers`. [images] is true when any of its models accepts image input. */
+/** An entry of `models.json` `providers`, with the model fields Pipkin edits. */
 internal data class CustomProvider(
   val id: String,
   val baseUrl: String,
   val api: String,
   val apiKey: String,
-  val models: List<String>,
-  val images: Boolean,
+  val models: List<ModelConfig>,
 )
 
 internal data class AuthStatus(
@@ -64,6 +76,10 @@ internal data class AuthStatus(
   val custom: List<CustomProvider>,
   /** Set when `models.json` exists but could not be loaded. */
   val modelsError: String?,
+  /** Set when settings.json exists but could not be loaded. */
+  val settingsError: String? = null,
+  /** `provider/id` of every model `enabledModels` shows; null when every model shows. */
+  val scope: Set<String>? = null,
 ) {
   val anyConfigured: Boolean get() = custom.isNotEmpty() || builtin.any { it.configured }
 
@@ -75,6 +91,9 @@ internal data class AuthStatus(
           name = it.optString("name", it.getString("id")),
           configured = it.optBoolean("configured"),
           type = it.opt("type") as? String,
+          models = it.optJSONArray("models").objects().map(ModelConfig::from),
+          extraIds = it.optJSONArray("extraIds").strings(),
+          enabled = it.optJSONArray("enabled")?.strings(),
         )
       },
       custom = json.optJSONArray("custom").objects().map {
@@ -83,11 +102,12 @@ internal data class AuthStatus(
           baseUrl = it.optString("baseUrl"),
           api = it.optString("api"),
           apiKey = it.optString("apiKey"),
-          models = it.optJSONArray("models").strings(),
-          images = it.optBoolean("images"),
+          models = it.optJSONArray("models").objects().map(ModelConfig::from),
         )
       },
       modelsError = json.opt("modelsError") as? String,
+      settingsError = json.opt("settingsError") as? String,
+      scope = json.optJSONArray("scope")?.strings()?.toSet(),
     )
   }
 }
@@ -98,16 +118,14 @@ internal data class ProviderConfig(
   val baseUrl: String,
   val api: String,
   val apiKey: String,
-  val images: Boolean,
-  val models: List<String>,
+  val models: List<ModelConfig>,
 ) {
   fun toJson(): JSONObject = JSONObject()
     .put("id", id)
     .put("baseUrl", baseUrl)
     .put("api", api)
     .put("apiKey", apiKey)
-    .put("images", images)
-    .put("models", JSONArray(models))
+    .put("models", JSONArray(models.map(ModelConfig::toJson)))
 
   companion object {
     const val API_COMPLETIONS = "openai-completions"

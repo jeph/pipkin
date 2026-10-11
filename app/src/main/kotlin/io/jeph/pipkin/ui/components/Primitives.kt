@@ -238,7 +238,8 @@ fun StatusDot(color: Color, modifier: Modifier = Modifier) {
 
 /**
  * A modal bottom sheet. With [heightFraction] the sheet is that share of the window tall whatever its
- * content, and [content] can fill the space with weights.
+ * content, and [content] can fill the space with weights. With [maxHeightFraction] the sheet wraps its
+ * content up to that share; give the scrolling part `weight(1f, fill = false)` so it scrolls there.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -247,9 +248,15 @@ fun PipkinSheet(
   modifier: Modifier = Modifier,
   sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
   heightFraction: Float? = null,
+  maxHeightFraction: Float? = null,
   content: @Composable ColumnScope.() -> Unit,
 ) {
   val windowHeight = LocalWindowInfo.current.containerSize.height
+  val sizing = when {
+    heightFraction != null -> Modifier.sheetHeight(heightFraction, windowHeight, fill = true)
+    maxHeightFraction != null -> Modifier.sheetHeight(maxHeightFraction, windowHeight, fill = false)
+    else -> Modifier
+  }
   ModalBottomSheet(
     onDismissRequest = onDismissRequest,
     modifier = modifier,
@@ -259,7 +266,7 @@ fun PipkinSheet(
   ) {
     Column(
       modifier = Modifier
-        .then(if (heightFraction != null) Modifier.sheetHeight(heightFraction, windowHeight) else Modifier)
+        .then(sizing)
         .navigationBarsPadding()
         .padding(bottom = PipkinTokens.Spacing.s16),
       content = content,
@@ -268,14 +275,17 @@ fun PipkinSheet(
 }
 
 /**
- * Sizes the sheet's content so the whole sheet is [fraction] of the window. Sizing the sheet itself
- * would also shrink the space Material positions it in, pinning it to the top of the screen. The
- * sheet spans the window, so the drag handle and insets above the content take
- * `windowHeight - maxHeight`.
+ * Sizes the sheet's content so the whole sheet is [fraction] of the window, or at most that when not
+ * [fill]. Sizing the sheet itself would also shrink the space Material positions it in, pinning it to
+ * the top of the screen. The sheet spans the window, so the drag handle and insets above the content
+ * take `windowHeight - maxHeight`.
  */
-private fun Modifier.sheetHeight(fraction: Float, windowHeight: Int): Modifier = layout { measurable, constraints ->
-  val height = (constraints.maxHeight - windowHeight * (1 - fraction)).roundToInt()
-    .coerceIn(constraints.minHeight, constraints.maxHeight)
-  val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
-  layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-}
+private fun Modifier.sheetHeight(fraction: Float, windowHeight: Int, fill: Boolean): Modifier =
+  layout { measurable, constraints ->
+    val height = (constraints.maxHeight - windowHeight * (1 - fraction)).roundToInt()
+      .coerceIn(constraints.minHeight, constraints.maxHeight)
+    val placeable = measurable.measure(
+      constraints.copy(minHeight = if (fill) height else constraints.minHeight, maxHeight = height),
+    )
+    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+  }

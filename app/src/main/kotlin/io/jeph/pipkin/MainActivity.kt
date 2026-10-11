@@ -31,8 +31,15 @@ import io.jeph.pipkin.ui.Destination
 import io.jeph.pipkin.ui.MainScreen
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.onboarding.OnboardingScreen
+import io.jeph.pipkin.ui.settings.AddModelsScreen
+import io.jeph.pipkin.ui.settings.AddProviderScreen
+import io.jeph.pipkin.ui.settings.ModelEditorScreen
+import io.jeph.pipkin.ui.settings.ProviderDrafts
 import io.jeph.pipkin.ui.settings.ProviderEditorScreen
+import io.jeph.pipkin.ui.settings.ProvidersScreen
 import io.jeph.pipkin.ui.settings.SettingsScreen
+import io.jeph.pipkin.ui.settings.SubscriptionScreen
+import io.jeph.pipkin.ui.settings.ownsDraft
 import io.jeph.pipkin.ui.theme.PipkinTheme
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -64,7 +71,9 @@ private fun PipkinApp(graph: AppGraph) {
   val actions = remember(graph) { ShellActions(graph) }
   val stack by navigator.stack.collectAsStateWithLifecycle()
   val holder = rememberSaveableStateHolder()
+  val drafts = remember { ProviderDrafts() }
   ForgetPopped(stack, holder)
+  LaunchedEffect(stack) { if (stack.none(::ownsDraft)) drafts.release() }
   BackHandler(enabled = stack.size > 1) { navigator.pop() }
   AnimatedContent(
     targetState = stack,
@@ -74,27 +83,67 @@ private fun PipkinApp(graph: AppGraph) {
   ) { shown ->
     val top = shown.last()
     holder.SaveableStateProvider(AppNavigator.key(top)) {
-      when (top) {
-        Destination.Main -> MainScreen(
-          actions = actions,
-          onOpenSettings = { navigator.push(Destination.Settings) },
-          onOpenOnboarding = { navigator.push(Destination.Onboarding) },
-        )
-
-        Destination.Settings -> SettingsScreen(
-          onBack = { navigator.pop() },
-          onOpenOnboarding = { navigator.push(Destination.Onboarding) },
-          onEditProvider = { navigator.push(Destination.ProviderEditor(it)) },
-        )
-
-        is Destination.ProviderEditor -> ProviderEditorScreen(id = top.id, onBack = { navigator.pop() })
-
-        Destination.Onboarding -> OnboardingScreen(
-          onFinished = { navigator.replaceAll(Destination.Main) },
-          onAddProvider = { navigator.push(Destination.ProviderEditor(null)) },
-        )
-      }
+      Screen(shown, navigator, actions, drafts)
     }
+  }
+}
+
+/** The top of [shown]; model sub-pages edit the draft of the subscription or provider page below. */
+@Composable
+private fun Screen(shown: List<Destination>, navigator: AppNavigator, actions: ShellActions, drafts: ProviderDrafts) {
+  when (val top = shown.last()) {
+    Destination.Main -> MainScreen(
+      actions = actions,
+      onOpenSettings = { navigator.push(Destination.Settings) },
+      onOpenOnboarding = { navigator.push(Destination.Onboarding) },
+    )
+
+    Destination.Settings -> SettingsScreen(
+      onBack = { navigator.pop() },
+      onOpenOnboarding = { navigator.push(Destination.Onboarding) },
+      onOpenProviders = { navigator.push(Destination.Providers) },
+    )
+
+    Destination.Providers -> ProvidersScreen(
+      onBack = { navigator.pop() },
+      onAdd = { navigator.push(Destination.AddProvider) },
+      onOpenSubscription = { navigator.push(Destination.Subscription(it)) },
+      onEditProvider = { navigator.push(Destination.ProviderEditor(it)) },
+    )
+
+    Destination.AddProvider -> AddProviderScreen(
+      onBack = { navigator.pop() },
+      onAddCompatible = { navigator.push(Destination.ProviderEditor(null)) },
+      onAdded = { navigator.popTo(Destination.Providers) },
+    )
+
+    is Destination.Subscription -> SubscriptionScreen(
+      form = remember { drafts.subscription(top.id) },
+      onBack = { navigator.pop() },
+      onAddModels = { navigator.push(Destination.AddModels) },
+      onOpenModel = { navigator.push(Destination.ModelEditor(it)) },
+    )
+
+    is Destination.ProviderEditor -> ProviderEditorScreen(
+      form = remember { drafts.provider(top.id) },
+      onBack = { navigator.pop() },
+      onDone = { navigator.popTo(Destination.Providers) },
+      onAddModels = { navigator.push(Destination.AddModels) },
+      onOpenModel = { navigator.push(Destination.ModelEditor(it)) },
+    )
+
+    Destination.AddModels -> AddModelsScreen(draft = remember { drafts.owner(shown) }, onBack = { navigator.pop() })
+
+    is Destination.ModelEditor -> ModelEditorScreen(
+      draft = remember { drafts.owner(shown) },
+      modelId = top.modelId,
+      onBack = { navigator.pop() },
+    )
+
+    Destination.Onboarding -> OnboardingScreen(
+      onFinished = { navigator.replaceAll(Destination.Main) },
+      onAddProvider = { navigator.push(Destination.ProviderEditor(null)) },
+    )
   }
 }
 

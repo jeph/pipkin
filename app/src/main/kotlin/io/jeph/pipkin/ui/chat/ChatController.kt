@@ -119,9 +119,22 @@ internal class ChatController(
 
   fun rename(name: String) = launchRpc { process.setSessionName(name.trim()) }
 
-  fun setModel(provider: String, modelId: String) = launchRpc { process.setModel(provider, modelId) }
+  /** Switches this chat's model and makes it the one new chats start with. */
+  fun setModel(provider: String, modelId: String) = launchRpc {
+    process.setModel(provider, modelId)
+    saveDefault { graph.modelDefaults.saveModel(provider, modelId, context.getString(R.string.provider_failed)) }
+  }
 
-  fun setThinkingLevel(level: String) = launchRpc { process.setThinkingLevel(level) }
+  /** Switches this chat's thinking level and makes it the one new chats start with. */
+  fun setThinkingLevel(level: String) = launchRpc {
+    process.setThinkingLevel(level)
+    saveDefault { graph.modelDefaults.saveThinkingLevel(level, context.getString(R.string.provider_failed)) }
+  }
+
+  /** Saves on the app scope, so closing the chat right after picking still keeps the pick. */
+  private fun saveDefault(save: suspend () -> String?) {
+    graph.scope.launch { save()?.let(::show) }
+  }
 
   fun respondUi(id: String, answer: UiAnswer) {
     scope.launch { process.respondUi(id, answer) }

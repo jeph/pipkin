@@ -3,7 +3,7 @@
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
     <string name="settings_copy">Copy</string>
-    <string name="settings_section_accounts">Accounts</string>
+    <string name="settings_section_providers">Models</string>
     <string name="settings_section_agent">Agent</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_termux">Termux</string>
@@ -16,8 +16,13 @@
     <string name="settings_sign_in">Sign in</string>
     <string name="settings_signed_in">Signed in</string>
     <string name="settings_sign_out">Sign out</string>
-    <string name="settings_account_options">Account options</string>
-    <string name="settings_add_provider">Add OpenAI-compatible API</string>
+
+    <string name="providers_title">Providers</string>
+    <string name="providers_empty">No providers yet. Add one to start chatting.</string>
+    <string name="providers_add">Add a provider</string>
+    <string name="providers_compatible">OpenAI-compatible API</string>
+    <string name="providers_compatible_subtitle">Any endpoint that takes an API key</string>
+    <string name="providers_added">Added</string>
 
     <string name="settings_reload_agents">Reload all agents</string>
     <string name="settings_reload_agents_done">Idle agents reloaded</string>
@@ -57,7 +62,7 @@
 
     <string name="provider_title_new">Add OpenAI-compatible API</string>
     <string name="provider_id">Provider ID</string>
-    <string name="provider_id_hint">e.g. codex-lb</string>
+    <string name="provider_id_hint">e.g. deepinfra</string>
     <string name="provider_id_invalid">Use lowercase letters, digits and dashes (up to 40), starting with a letter or digit.</string>
     <string name="provider_base_url">Base URL</string>
     <string name="provider_base_url_hint">https://host/v1</string>
@@ -67,10 +72,55 @@
     <string name="provider_api_type">API type</string>
     <string name="provider_api_completions">Chat Completions</string>
     <string name="provider_api_responses">Responses</string>
-    <string name="provider_images">Models accept images</string>
+    <string name="provider_check">Check connection</string>
+    <plurals name="provider_connected">
+        <item quantity="one">Connected · %1$d model available</item>
+        <item quantity="other">Connected · %1$d models available</item>
+    </plurals>
+    <string name="provider_check_needed">Check the connection to add models.</string>
     <string name="provider_models">Models</string>
-    <string name="provider_fetch_models">Fetch models</string>
-    <string name="provider_add_model">Add model ID</string>
+    <string name="provider_add_models">Add models</string>
+    <string name="provider_models_empty">No models yet.</string>
+    <string name="provider_model_invalid">Fix this model\'s settings</string>
+    <string name="provider_discard_title">Discard changes?</string>
+    <string name="provider_discard_text">Your changes aren\'t saved.</string>
+    <string name="provider_discard">Discard</string>
+    <string name="provider_keep_editing">Keep editing</string>
+
+    <string name="models_available">Available models</string>
+    <string name="models_none">The endpoint didn\'t list any models.</string>
+    <string name="models_custom">Custom models</string>
+    <string name="models_custom_hint">Model ID</string>
+    <string name="models_custom_add">Add model</string>
+    <string name="models_done">Done</string>
+
+    <string name="model_name">Display name</string>
+    <string name="model_images">Accepts images</string>
+    <string name="model_thinking">Supports thinking</string>
+    <string name="model_levels">Thinking levels</string>
+    <string name="model_level_off">Off</string>
+    <string name="model_level_minimal">Minimal</string>
+    <string name="model_level_low">Low</string>
+    <string name="model_level_medium">Medium</string>
+    <string name="model_level_high">High</string>
+    <string name="model_level_xhigh">XHigh</string>
+    <string name="model_level_max">Max</string>
+    <string name="model_context">Context window (tokens)</string>
+    <string name="model_max_tokens">Max output tokens</string>
+    <string name="model_count_invalid">Enter a whole number above 0.</string>
+    <string name="model_cost">Cost per million tokens (USD)</string>
+    <string name="model_cost_input">Input</string>
+    <string name="model_cost_output">Output</string>
+    <string name="model_cost_cache_read">Cache read</string>
+    <string name="model_cost_cache_write">Cache write</string>
+    <string name="model_cost_hint">Optional. Cache prices default to 0.</string>
+    <string name="model_cost_invalid">Enter input and output prices, all 0 or more.</string>
+    <string name="model_remove">Remove model</string>
+    <string name="model_summary_thinking">Thinking</string>
+    <string name="model_summary_images">Images</string>
+    <string name="model_summary_context">%1$s context</string>
+
+    <string name="subscription_models_empty">No models selected. Add models to use this subscription.</string>
     <string name="provider_save">Save</string>
     <string name="provider_remove">Remove provider</string>
     <string name="provider_remove_title">Remove %1$s?</string>

@@ -10,6 +10,7 @@ import { encodeLine, isObject, LineSplitter, type JsonObject } from "../src/fram
 export const PI_VERSION = "1.1.0";
 const FAKE_PI = path.join(import.meta.dirname, "fixtures/fake-pi.mjs");
 const REAL_PI = path.join(import.meta.dirname, "../node_modules/@earendil-works/pi-coding-agent");
+const PROVIDER_CREDENTIAL = /_(API_KEY|TOKEN)$|^(AWS|GOOGLE|AZURE)_/;
 
 export interface Dirs {
   base: string;
@@ -113,7 +114,8 @@ export async function startHost(
 
   const child = spawn(process.execPath, [inject("hostBundle"), mode, String(address.port)], {
     env: {
-      ...process.env,
+      // Provider credentials in the developer's environment would change which models Pi offers.
+      ...Object.fromEntries(Object.entries(process.env).filter(([key]) => !PROVIDER_CREDENTIAL.test(key))),
       PIPKIN_TOKEN: token,
       PIPKIN_ROOT: dirs.root,
       PI_CODING_AGENT_DIR: dirs.configDir,

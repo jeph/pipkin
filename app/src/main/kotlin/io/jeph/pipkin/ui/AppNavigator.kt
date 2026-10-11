@@ -11,8 +11,23 @@ sealed interface Destination {
 
   data object Settings : Destination
 
+  /** The list of added providers. */
+  data object Providers : Destination
+
+  /** Picks which kind of provider to add. */
+  data object AddProvider : Destination
+
+  /** A subscription Pipkin signs in to (`anthropic` or `openai-codex`). */
+  data class Subscription(val id: String) : Destination
+
   /** [id] null adds a provider; otherwise edits the custom provider with that id. */
   data class ProviderEditor(val id: String?) : Destination
+
+  /** Adds models to the draft of the nearest subscription or provider page below it. */
+  data object AddModels : Destination
+
+  /** One model of the draft of the nearest subscription or provider page below it. */
+  data class ModelEditor(val modelId: String) : Destination
 
   data object Onboarding : Destination
 }
@@ -35,6 +50,13 @@ class AppNavigator(initial: List<Destination>) {
     return true
   }
 
+  /** Pops back to the topmost [d]; pops one screen when [d] is not on the stack. */
+  fun popTo(d: Destination) {
+    val current = stackState.value
+    val index = current.lastIndexOf(d)
+    if (index < 0) pop() else stackState.value = current.take(index + 1)
+  }
+
   fun replaceAll(d: Destination) {
     stackState.value = listOf(d)
   }
@@ -51,13 +73,23 @@ class AppNavigator(initial: List<Destination>) {
       Destination.Main -> MAIN
       Destination.Settings -> SETTINGS
       Destination.Onboarding -> ONBOARDING
+      Destination.Providers -> PROVIDERS
+      Destination.AddProvider -> ADD_PROVIDER
+      is Destination.Subscription -> SUBSCRIPTION + d.id
       is Destination.ProviderEditor -> PROVIDER + d.id.orEmpty()
+      Destination.AddModels -> ADD_MODELS
+      is Destination.ModelEditor -> MODEL + d.modelId
     }
 
     private fun destination(key: String): Destination? = when {
       key == MAIN -> Destination.Main
       key == SETTINGS -> Destination.Settings
       key == ONBOARDING -> Destination.Onboarding
+      key == PROVIDERS -> Destination.Providers
+      key == ADD_PROVIDER -> Destination.AddProvider
+      key == ADD_MODELS -> Destination.AddModels
+      key.startsWith(MODEL) -> Destination.ModelEditor(key.removePrefix(MODEL))
+      key.startsWith(SUBSCRIPTION) -> Destination.Subscription(key.removePrefix(SUBSCRIPTION))
       key.startsWith(PROVIDER) -> Destination.ProviderEditor(key.removePrefix(PROVIDER).ifEmpty { null })
       else -> null
     }
@@ -66,5 +98,10 @@ class AppNavigator(initial: List<Destination>) {
     private const val SETTINGS = "settings"
     private const val ONBOARDING = "onboarding"
     private const val PROVIDER = "provider:"
+    private const val PROVIDERS = "providers"
+    private const val ADD_PROVIDER = "add-provider"
+    private const val SUBSCRIPTION = "subscription:"
+    private const val ADD_MODELS = "add-models"
+    private const val MODEL = "model:"
   }
 }

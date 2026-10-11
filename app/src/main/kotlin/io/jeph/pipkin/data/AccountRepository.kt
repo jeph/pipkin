@@ -6,6 +6,7 @@ import io.jeph.pipkin.host.AuthStatus
 import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.LoginUi
+import io.jeph.pipkin.host.ModelConfig
 import io.jeph.pipkin.host.ProviderConfig
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -64,11 +65,19 @@ internal class AccountRepository(
     changed()
   }
 
-  /** Sorted model ids the endpoint lists; nothing is saved. */
-  suspend fun providerModels(baseUrl: String, apiKey: String): List<String> = hostClient.providerModels(baseUrl, apiKey)
+  /** The endpoint's models with detected settings; nothing is saved. Succeeding also proves the key works. */
+  suspend fun providerModels(baseUrl: String, apiKey: String, api: String): List<ModelConfig> =
+    hostClient.providerModels(baseUrl, apiKey, api)
+
+  suspend fun modelDefaults(ids: List<String>, api: String): List<ModelConfig> = hostClient.modelDefaults(ids, api)
 
   suspend fun saveProvider(provider: ProviderConfig) {
     hostClient.providerSave(provider)
+    changed()
+  }
+
+  suspend fun saveSubscription(providerId: String, enabled: List<String>, models: List<ModelConfig>) {
+    hostClient.subscriptionSave(providerId, enabled, models)
     changed()
   }
 

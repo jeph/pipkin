@@ -1,30 +1,16 @@
 package io.jeph.pipkin.ui.settings
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,56 +22,72 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.ProviderConfig
-import io.jeph.pipkin.ui.components.HeaderBar
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
-/** Adds ([id] null) or edits an OpenAI-compatible provider in Pi's `models.json`. */
+/**
+ * Adds or edits an OpenAI-compatible provider: connection details, a connection check that unlocks
+ * adding models, and the added models. Nothing reaches `models.json` until Save; [onDone] runs after
+ * a save or removal, [onBack] leaves (asking first when there are unsaved edits).
+ */
 @Composable
-internal fun ProviderEditorScreen(id: String?, onBack: () -> Unit) {
+internal fun ProviderEditorScreen(
+  form: ProviderForm,
+  onBack: () -> Unit,
+  onDone: () -> Unit,
+  onAddModels: () -> Unit,
+  onOpenModel: (modelId: String) -> Unit,
+) {
   val accounts = LocalContext.current.appGraph.accountRepository
-  val form = remember(id) { ProviderForm(editing = id != null, initialId = id.orEmpty()) }
-  val status by accounts.status.collectAsStateWithLifecycle()
   val scope = rememberCoroutineScope()
   val failed = stringResource(R.string.provider_failed)
   var confirmRemove by remember { mutableStateOf(false) }
-  LaunchedEffect(id) {
-    if (id != null && accounts.status.value == null) accounts.refresh()
+  var confirmDiscard by remember { mutableStateOf(false) }
+  val leave = { if (form.dirty) confirmDiscard = true else onBack() }
+  // Reads Pi's files afresh, so changes made outside Pipkin (for example by the agent) show here.
+  LaunchedEffect(form) {
+    if (!form.editing || form.prefilled) return@LaunchedEffect
+    accounts.refresh()
+    accounts.status.value?.custom?.firstOrNull { it.id == form.id }?.let(form::prefill)
   }
-  LaunchedEffect(status) {
-    status?.custom?.firstOrNull { it.id == id }?.let(form::prefill)
+  // A saved provider's connection is checked on opening, so models can be added straight away.
+  LaunchedEffect(form.prefilled) {
+    if (form.prefilled && form.check == ConnectionCheck.Idle && form.canCheck) form.checkConnection(accounts, failed)
   }
-  Column(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    HeaderBar(
-      title = id ?: stringResource(R.string.provider_title_new),
-      leading = {
-        IconButton28(
-          icon = R.drawable.ic_lucide_chevron_left,
-          contentDescription = stringResource(R.string.settings_back),
-          onClick = onBack,
-        )
-      },
+  BackHandler(enabled = form.dirty) { confirmDiscard = true }
+  SettingsPage(
+    title = if (form.editing) form.id else stringResource(R.string.provider_title_new),
+    onBack = leave,
+  ) {
+    IdAndUrlFields(form = form)
+    ApiKeyField(form = form)
+    ApiTypeField(form = form)
+    ConnectionCheckRow(form = form, onCheck = { scope.launch { form.checkConnection(accounts, failed) } })
+    ModelsSection(
+      draft = form,
+      emptyText = stringResource(
+        if (form.connected) R.string.provider_models_empty else R.string.provider_check_needed,
+      ),
+      onAddModels = onAddModels,
+      onOpenModel = onOpenModel,
     )
-    ProviderFormContent(
+    ProviderActions(
       form = form,
-      onFetch = { scope.launch { form.fetchModels(accounts, failed) } },
-      onSave = { scope.launch { if (form.save(accounts, failed)) onBack() } },
+      onSave = { scope.launch { if (form.save(accounts, failed)) onDone() } },
       onRemove = { confirmRemove = true },
     )
   }
@@ -94,41 +96,20 @@ internal fun ProviderEditorScreen(id: String?, onBack: () -> Unit) {
       id = form.id,
       onConfirm = {
         confirmRemove = false
-        scope.launch { if (form.remove(accounts, failed)) onBack() }
+        scope.launch { if (form.removeProvider(accounts, failed)) onDone() }
       },
       onDismiss = { confirmRemove = false },
     )
   }
-}
-
-@Composable
-private fun ProviderFormContent(form: ProviderForm, onFetch: () -> Unit, onSave: () -> Unit, onRemove: () -> Unit) {
-  Column(
-    modifier =
-      Modifier
-        .fillMaxSize()
-        .verticalScroll(rememberScrollState())
-        .imePadding()
-        .navigationBarsPadding()
-        .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s24),
-    horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    Column(
-      modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth(),
-      verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s16),
-    ) {
-      IdAndUrlFields(form = form)
-      ApiKeyField(form = form)
-      ApiOptions(form = form)
-      ModelsEditor(form = form, onFetch = onFetch)
-      ProviderActions(form = form, onSave = onSave, onRemove = onRemove)
-    }
+  if (confirmDiscard) {
+    DiscardDialog(
+      onDiscard = {
+        confirmDiscard = false
+        onBack()
+      },
+      onDismiss = { confirmDiscard = false },
+    )
   }
-}
-
-@Composable
-private fun FieldLabel(text: String, modifier: Modifier = Modifier) {
-  Text(text = text, modifier = modifier, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm)
 }
 
 @Composable
@@ -184,7 +165,7 @@ private fun ApiKeyField(form: ProviderForm) {
 }
 
 @Composable
-private fun ApiOptions(form: ProviderForm) {
+private fun ApiTypeField(form: ProviderForm) {
   val colors = pipkinColors
   Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
     FieldLabel(stringResource(R.string.provider_api_type))
@@ -194,97 +175,46 @@ private fun ApiOptions(form: ProviderForm) {
       onSelect = { form.api = it },
     ) { api, isSelected ->
       Text(
-        text =
-          stringResource(
-            if (api ==
-              ProviderConfig.API_RESPONSES
-            ) {
-              R.string.provider_api_responses
-            } else {
-              R.string.provider_api_completions
-            },
-          ),
+        text = stringResource(
+          if (api ==
+            ProviderConfig.API_RESPONSES
+          ) {
+            R.string.provider_api_responses
+          } else {
+            R.string.provider_api_completions
+          },
+        ),
         color = if (isSelected) colors.foreground else colors.foregroundMuted,
         fontSize = PipkinTokens.FontSize.base,
       )
     }
   }
-  Row(
-    modifier =
-      Modifier
-        .fillMaxWidth()
-        .toggleable(value = form.images, role = Role.Switch, onValueChange = { form.images = it }),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text(
-      text = stringResource(R.string.provider_images),
-      modifier = Modifier.weight(1f),
-      color = colors.foreground,
-      fontSize = PipkinTokens.FontSize.base,
-    )
-    Switch(checked = form.images, onCheckedChange = null)
-  }
 }
 
 @Composable
-private fun ModelsEditor(form: ProviderForm, onFetch: () -> Unit) {
-  Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      FieldLabel(text = stringResource(R.string.provider_models), modifier = Modifier.weight(1f))
-      OutlinedButton(onClick = onFetch, enabled = form.canFetch) {
-        if (form.fetching) Spinner() else Text(stringResource(R.string.provider_fetch_models))
-      }
-    }
-    form.fetchError?.let { SettingsCaption(text = it, color = pipkinColors.destructive) }
-    if (form.models.isNotEmpty()) ModelList(form = form)
-    Row(
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
-    ) {
-      OutlinedTextField(
-        value = form.manualModel,
-        onValueChange = { form.manualModel = it },
-        modifier = Modifier.weight(1f),
-        placeholder = { Text(stringResource(R.string.provider_add_model)) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { form.addManualModel() }),
-        singleLine = true,
-      )
-      IconButton28(
-        icon = R.drawable.ic_lucide_plus,
-        contentDescription = stringResource(R.string.provider_add_model),
-        onClick = form::addManualModel,
-        enabled = form.manualModel.isNotBlank(),
-      )
-    }
-  }
-}
-
-@Composable
-private fun ModelList(form: ProviderForm) {
+private fun ConnectionCheckRow(form: ProviderForm, onCheck: () -> Unit) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.lg)
-  Column(
-    modifier = Modifier.fillMaxWidth().clip(shape).background(colors.surface1).border(1.dp, colors.border, shape),
-  ) {
-    form.models.forEachIndexed { index, model ->
-      Row(
-        modifier =
-          Modifier
-            .fillMaxWidth()
-            .heightIn(min = 44.dp)
-            .toggleable(value = model.checked, role = Role.Checkbox, onValueChange = { form.setChecked(index, it) })
-            .padding(horizontal = PipkinTokens.Spacing.s8),
+  val check = form.check
+  Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
+    OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth(), enabled = form.canCheck) {
+      if (check is ConnectionCheck.Checking) Spinner() else Text(stringResource(R.string.provider_check))
+    }
+    when (check) {
+      is ConnectionCheck.Ok -> Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
       ) {
-        Checkbox(checked = model.checked, onCheckedChange = null)
+        StatusDot(color = colors.dotSuccess)
         Text(
-          text = model.id,
-          modifier = Modifier.padding(start = PipkinTokens.Spacing.s8),
-          color = colors.foreground,
-          fontSize = PipkinTokens.FontSize.base,
+          text = pluralStringResource(R.plurals.provider_connected, check.models.size, check.models.size),
+          color = colors.foregroundMuted,
+          fontSize = PipkinTokens.FontSize.sm,
         )
       }
+
+      is ConnectionCheck.Failed -> SettingsCaption(text = check.message, color = colors.destructive)
+
+      ConnectionCheck.Idle, is ConnectionCheck.Checking -> Unit
     }
   }
 }

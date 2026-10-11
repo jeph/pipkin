@@ -8,103 +8,136 @@ import androidx.compose.runtime.setValue
 import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.host.CustomProvider
 import io.jeph.pipkin.host.HostRejected
+import io.jeph.pipkin.host.ModelConfig
 import io.jeph.pipkin.host.ProviderConfig
 import java.io.IOException
 
-internal data class ModelChoice(val id: String, val checked: Boolean)
+/** The endpoint details a connection check covers; changing any of them makes the check stale. */
+internal data class Connection(val baseUrl: String, val apiKey: String, val api: String)
+
+/** Result of listing the endpoint's models with the key, which proves it is reachable and accepts the key. */
+internal sealed interface ConnectionCheck {
+  data object Idle : ConnectionCheck
+
+  data class Checking(val connection: Connection) : ConnectionCheck
+
+  data class Ok(val connection: Connection, val models: List<ModelConfig>) : ConnectionCheck
+
+  data class Failed(val connection: Connection, val message: String) : ConnectionCheck
+}
 
 /**
- * Editable state of the provider editor. When [editing], the id is fixed and the stored key is
- * filled in. Host errors land in [idError], [fetchError] or [formError].
+ * Draft of an OpenAI-compatible provider, shared by the provider, add-models and model pages until
+ * it is saved. When [editing], the id is fixed. Host errors land in [idError] or [formError].
  */
 @Stable
-internal class ProviderForm(val editing: Boolean, initialId: String) {
+internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraft {
   var id by mutableStateOf(initialId)
   var baseUrl by mutableStateOf("")
   var apiKey by mutableStateOf("")
-  var api by mutableStateOf(ProviderConfig.API_COMPLETIONS)
-  var images by mutableStateOf(false)
-  val models = mutableStateListOf<ModelChoice>()
-  var manualModel by mutableStateOf("")
-  var fetching by mutableStateOf(false)
-    private set
+  override var api by mutableStateOf(ProviderConfig.API_COMPLETIONS)
+  private val models = mutableStateListOf<ModelForm>()
   var saving by mutableStateOf(false)
     private set
   var idError by mutableStateOf<String?>(null)
     private set
-  var fetchError by mutableStateOf<String?>(null)
-    private set
   var formError by mutableStateOf<String?>(null)
     private set
-  private var prefilled = false
+  var prefilled by mutableStateOf(false)
+    private set
+  private var lastCheck by mutableStateOf<ConnectionCheck>(ConnectionCheck.Idle)
+  private var baseline = snapshot()
+
+  private val connection: Connection get() = Connection(baseUrl.trim(), apiKey.trim(), api)
+
+  /** The last check, or [ConnectionCheck.Idle] once the URL, key or API type changed after it. */
+  val check: ConnectionCheck
+    get() = when (val last = lastCheck) {
+      ConnectionCheck.Idle -> last
+      is ConnectionCheck.Checking -> last.takeIf { it.connection == connection }
+      is ConnectionCheck.Ok -> last.takeIf { it.connection == connection }
+      is ConnectionCheck.Failed -> last.takeIf { it.connection == connection }
+    } ?: ConnectionCheck.Idle
+
+  val connected: Boolean get() = check is ConnectionCheck.Ok
+
+  /** What the endpoint listed in the current check. */
+  val fetched: List<ModelConfig> get() = (check as? ConnectionCheck.Ok)?.models.orEmpty()
 
   val idValid: Boolean get() = ID_PATTERN.matches(id)
-  val canFetch: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && !fetching
+  val canCheck: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && check !is ConnectionCheck.Checking
   val canSave: Boolean
-    get() = idValid && baseUrl.isNotBlank() && apiKey.isNotBlank() && models.any { it.checked } && !saving
+    get() =
+      idValid && baseUrl.isNotBlank() && apiKey.isNotBlank() && models.isNotEmpty() && models.all { it.valid } &&
+        !saving
+  val dirty: Boolean get() = snapshot() != baseline
 
-  /** Fills the form from the stored provider once; later status updates do not overwrite edits. */
+  /** Fills the draft from the stored provider once; later status updates do not overwrite edits. */
   fun prefill(provider: CustomProvider) {
     if (prefilled) return
     prefilled = true
     baseUrl = provider.baseUrl
     apiKey = provider.apiKey
     api = provider.api.takeIf { it == ProviderConfig.API_RESPONSES } ?: ProviderConfig.API_COMPLETIONS
-    images = provider.images
     models.clear()
-    models.addAll(provider.models.map { ModelChoice(it, checked = true) })
+    models.addAll(provider.models.map(::ModelForm))
+    baseline = snapshot()
   }
 
-  fun setChecked(index: Int, checked: Boolean) {
-    models[index] = models[index].copy(checked = checked)
-  }
-
-  fun addManualModel() {
-    val model = manualModel.trim()
-    if (model.isEmpty()) return
-    val index = models.indexOfFirst { it.id == model }
-    if (index >= 0) setChecked(index, true) else models.add(ModelChoice(model, checked = true))
-    manualModel = ""
-  }
-
-  suspend fun fetchModels(accounts: AccountRepository, fallbackError: String) {
-    fetching = true
-    fetchError = null
+  suspend fun checkConnection(accounts: AccountRepository, fallbackError: String) {
+    val target = connection
+    val checking = ConnectionCheck.Checking(target)
+    lastCheck = checking
+    var result: ConnectionCheck = ConnectionCheck.Idle
     try {
-      addFetched(accounts.providerModels(baseUrl.trim(), apiKey.trim()))
+      result = ConnectionCheck.Ok(target, accounts.providerModels(target.baseUrl, target.apiKey, target.api))
     } catch (rejected: HostRejected) {
-      fetchError = rejected.error
+      result = ConnectionCheck.Failed(target, rejected.error)
     } catch (failure: IOException) {
-      fetchError = failure.message ?: fallbackError
+      result = ConnectionCheck.Failed(target, failure.message ?: fallbackError)
     } finally {
-      fetching = false
+      // Cancelled with its screen, the check goes back to idle rather than staying "checking";
+      // a check superseded by a newer one leaves that one's state alone.
+      if (lastCheck === checking) lastCheck = result
     }
   }
 
+  override val canAddModels: Boolean get() = connected
+  override val available: List<ModelConfig> get() = fetched
+  override val added: List<ModelForm> get() = models
+  override val custom = CustomModelInput()
+
+  override fun isAdded(modelId: String): Boolean = model(modelId) != null
+
+  override fun model(modelId: String): ModelForm? = models.firstOrNull { it.id == modelId }
+
+  override fun toggle(config: ModelConfig) {
+    if (isAdded(config.id)) remove(config.id) else models.add(ModelForm(config))
+  }
+
+  override fun remove(modelId: String) {
+    models.removeAll { it.id == modelId }
+  }
+
+  override suspend fun addCustom(lookup: suspend (String) -> ModelConfig, fallbackError: String) {
+    custom.add(lookup, fallbackError, exists = ::isAdded) { models.add(ModelForm(it)) }
+  }
+
   /** True once `models.json` holds the provider. */
-  suspend fun save(accounts: AccountRepository, fallbackError: String): Boolean = submit(fallbackError) {
-    accounts.saveProvider(
-      ProviderConfig(
-        id = id,
-        baseUrl = baseUrl.trim(),
-        api = api,
-        apiKey = apiKey.trim(),
-        images = images,
-        models = models.filter { it.checked }.map { it.id },
-      ),
-    )
+  suspend fun save(accounts: AccountRepository, fallbackError: String): Boolean {
+    val configs = models.mapNotNull { it.toConfig() }
+    if (configs.size != models.size) return false
+    return submit(fallbackError) {
+      accounts.saveProvider(ProviderConfig(id, baseUrl.trim(), api, apiKey.trim(), configs))
+      baseline = snapshot()
+    }
   }
 
   /** True once the provider is gone from `models.json`. */
-  suspend fun remove(accounts: AccountRepository, fallbackError: String): Boolean =
+  suspend fun removeProvider(accounts: AccountRepository, fallbackError: String): Boolean =
     submit(fallbackError) { accounts.removeProvider(id) }
 
-  /** The first fetch checks everything; later fetches only add new ids unchecked so earlier choices stand. */
-  private fun addFetched(ids: List<String>) {
-    val checkNew = models.isEmpty()
-    val known = models.mapTo(HashSet()) { it.id }
-    ids.filterNot(known::contains).forEach { models.add(ModelChoice(it, checked = checkNew)) }
-  }
+  private fun snapshot(): List<Any?> = listOf(id, baseUrl, apiKey, api, models.map { it.snapshot() })
 
   private suspend fun submit(fallbackError: String, change: suspend () -> Unit): Boolean {
     saving = true

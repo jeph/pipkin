@@ -38,6 +38,8 @@ private sealed interface ChatSheet {
 
   data object Model : ChatSheet
 
+  data object Thinking : ChatSheet
+
   data object Rename : ChatSheet
 
   data object ConfirmReload : ChatSheet
@@ -112,6 +114,7 @@ private fun ChatContent(
       thinkingLevel = timeline.thinkingLevel,
       busy = busy,
       onOpenModelSheet = { onSheet(ChatSheet.Model) },
+      onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
     )
   }
 }
@@ -198,7 +201,9 @@ private fun ChatSheets(
       onDismiss = dismiss,
     )
 
-    ChatSheet.Model -> ModelSheet(controller, timeline.model, timeline.thinkingLevel, onDismiss = dismiss)
+    ChatSheet.Model -> ModelSheet(controller, timeline.model, onDismiss = dismiss)
+
+    ChatSheet.Thinking -> ThinkingSheet(controller, timeline.model, timeline.thinkingLevel, onDismiss = dismiss)
 
     is ChatSheet.Tool -> {
       val item = timeline.items.firstOrNull { it.key == sheet.key }

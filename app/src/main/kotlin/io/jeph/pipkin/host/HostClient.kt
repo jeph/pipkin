@@ -90,17 +90,43 @@ internal class HostClient(context: Context) {
     call("logout", JSONObject().put("providerId", providerId))
   }
 
-  /** Sorted model ids from `<baseUrl>/models`. */
-  suspend fun providerModels(baseUrl: String, apiKey: String): List<String> =
-    call("provider_models", JSONObject().put("baseUrl", baseUrl).put("apiKey", apiKey))
-      .optJSONArray("models").strings()
+  /** The endpoint's models, each prefilled from its own metadata and then Pi's catalogue. */
+  suspend fun providerModels(baseUrl: String, apiKey: String, api: String): List<ModelConfig> =
+    call("provider_models", JSONObject().put("baseUrl", baseUrl).put("apiKey", apiKey).put("api", api))
+      .optJSONArray("models").objects().map(ModelConfig::from)
+
+  /** Pi's catalogue settings for [ids], in order; an unknown id comes back with only its id. */
+  suspend fun modelDefaults(ids: List<String>, api: String): List<ModelConfig> =
+    call("model_defaults", JSONObject().put("ids", JSONArray(ids)).put("api", api))
+      .optJSONArray("models").objects().map(ModelConfig::from)
 
   suspend fun providerSave(provider: ProviderConfig) {
     call("provider_save", provider.toJson())
   }
 
+  /** Writes a subscription's model settings (`modelOverrides`, extra models) and which of its models show. */
+  suspend fun subscriptionSave(providerId: String, enabled: List<String>, models: List<ModelConfig>) {
+    call(
+      "subscription_save",
+      JSONObject()
+        .put("providerId", providerId)
+        .put("enabled", JSONArray(enabled))
+        .put("models", JSONArray(models.map(ModelConfig::toJson))),
+    )
+  }
+
   suspend fun providerRemove(id: String) {
     call("provider_remove", JSONObject().put("id", id))
+  }
+
+  /** Makes new Pi sessions start with this model while it stays available and in scope. */
+  suspend fun setDefaultModel(provider: String, modelId: String) {
+    call("default_model", JSONObject().put("provider", provider).put("modelId", modelId))
+  }
+
+  /** Makes new Pi sessions start with this thinking level, clamped to their model. */
+  suspend fun setDefaultThinkingLevel(level: String) {
+    call("default_model", JSONObject().put("thinkingLevel", level))
   }
 
   /** Writes [files] (name to bytes) into a new folder in Termux; returns their absolute paths in order. */

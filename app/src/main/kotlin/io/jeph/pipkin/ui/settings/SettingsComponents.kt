@@ -40,22 +40,24 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** Paseo settings section: a 12sp muted title over a bordered surface1 card. */
+/** Paseo settings section: an optional 12sp muted title over a bordered surface1 card. */
 @Composable
 internal fun SettingsSection(
-  title: String,
+  title: String?,
   modifier: Modifier = Modifier,
   content: @Composable ColumnScope.() -> Unit,
 ) {
   val colors = pipkinColors
   val shape = RoundedCornerShape(PipkinTokens.Radius.lg)
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
-    Text(
-      text = title,
-      modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s4),
-      color = colors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.sm,
-    )
+    if (title != null) {
+      Text(
+        text = title,
+        modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s4),
+        color = colors.foregroundMuted,
+        fontSize = PipkinTokens.FontSize.sm,
+      )
+    }
     Column(
       modifier =
         Modifier

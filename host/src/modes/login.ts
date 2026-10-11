@@ -3,8 +3,9 @@ import { HostError, loadPi } from "../env.js";
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { stringParam } from "../params.js";
-import { createRuntime } from "../runtime.js";
-import { BUILTIN_PROVIDERS } from "./auth-status.js";
+import { BUILTIN_PROVIDERS, createRuntime } from "../runtime.js";
+import { keepProviderInScope, scopeResolver, scopeUniverse } from "../scope.js";
+import { openSettingsIfValid, saveEnabledModels } from "../settings.js";
 
 type AuthInteraction = Parameters<ModelRuntime["login"]>[2];
 type AuthPrompt = Parameters<AuthInteraction["prompt"]>[0];
@@ -89,6 +90,13 @@ export async function login(ctx: ModeContext): Promise<JsonObject> {
     await runtime.login(providerId, "oauth", bridge(ctx), { getDeviceId: () => settings.getOrCreateDeviceId() });
   } finally {
     await settings.flush();
+  }
+  // A scope written before sign-in may match none of this subscription's models; they must show now.
+  const scope = openSettingsIfValid(ctx, pi);
+  if (scope !== undefined && scope.enabledModels.length > 0) {
+    const resolve = scopeResolver(pi, await scopeUniverse(runtime, ctx.signal));
+    const patterns = await keepProviderInScope(scope.enabledModels, providerId, scope.defaultRef, resolve);
+    if (patterns !== undefined) await saveEnabledModels(scope, patterns);
   }
   return {};
 }

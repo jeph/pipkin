@@ -39,13 +39,11 @@ import io.jeph.pipkin.ui.theme.ThemeMode
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
-/** Paseo-style settings: accounts, agent, appearance, Termux and about cards under a back header. */
+/** Paseo-style settings: providers, agent, appearance, Termux and about cards under a back header. */
 @Composable
-internal fun SettingsScreen(onBack: () -> Unit, onOpenOnboarding: () -> Unit, onEditProvider: (id: String?) -> Unit) {
+internal fun SettingsScreen(onBack: () -> Unit, onOpenOnboarding: () -> Unit, onOpenProviders: () -> Unit) {
   val graph = LocalContext.current.appGraph
   val snackbar = remember { SnackbarHostState() }
-  var loginProvider by rememberSaveable { mutableStateOf<String?>(null) }
-  LaunchedEffect(Unit) { graph.accountRepository.refresh() }
   Box(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
     Column(modifier = Modifier.fillMaxSize()) {
       HeaderBar(
@@ -61,22 +59,19 @@ internal fun SettingsScreen(onBack: () -> Unit, onOpenOnboarding: () -> Unit, on
       SettingsContent(
         graph = graph,
         snackbar = snackbar,
-        onSignIn = { loginProvider = it },
-        onEditProvider = onEditProvider,
+        onOpenProviders = onOpenProviders,
         onOpenOnboarding = onOpenOnboarding,
       )
     }
     SnackbarHost(hostState = snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
   }
-  loginProvider?.let { LoginSheet(providerId = it, onDismiss = { loginProvider = null }) }
 }
 
 @Composable
 private fun SettingsContent(
   graph: AppGraph,
   snackbar: SnackbarHostState,
-  onSignIn: (providerId: String) -> Unit,
-  onEditProvider: (id: String?) -> Unit,
+  onOpenProviders: () -> Unit,
   onOpenOnboarding: () -> Unit,
 ) {
   Column(
@@ -92,16 +87,31 @@ private fun SettingsContent(
       modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth(),
       verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s24),
     ) {
-      AccountsSection(
-        accounts = graph.accountRepository,
-        snackbar = snackbar,
-        onSignIn = onSignIn,
-        onEditProvider = onEditProvider,
-      )
+      ProvidersSection(onOpenProviders = onOpenProviders)
       AgentSection(graph = graph, snackbar = snackbar)
       AppearanceSection(preferences = graph.preferences)
       TermuxSection(graph = graph, onOpenOnboarding = onOpenOnboarding)
       AboutSection()
+    }
+  }
+}
+
+/** One row into the providers page. */
+@Composable
+private fun ProvidersSection(onOpenProviders: () -> Unit) {
+  SettingsSection(title = stringResource(R.string.settings_section_providers)) {
+    SettingsRow(
+      title = stringResource(R.string.providers_title),
+      onClick = onOpenProviders,
+      leading = {
+        LucideIcon(icon = R.drawable.ic_lucide_plug, contentDescription = null, tint = pipkinColors.foregroundMuted)
+      },
+    ) {
+      LucideIcon(
+        icon = R.drawable.ic_lucide_chevron_right,
+        contentDescription = null,
+        tint = pipkinColors.foregroundMuted,
+      )
     }
   }
 }

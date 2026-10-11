@@ -1,13 +1,21 @@
 package io.jeph.pipkin.ui.chat
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -15,12 +23,19 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
+import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
@@ -29,74 +44,136 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import org.json.JSONObject
 
-private enum class ModelSheetSection { Model, Thinking }
+/** Both pickers wrap their content up to this share of the screen, then scroll inside. */
+private const val PICKER_MAX_HEIGHT = 0.8f
 
-/** Paseo's browser shows 4.5 rows of 44dp, so a cut-off row signals it scrolls, plus a 4dp top inset. */
-private val BrowserViewport = 44.dp * 4.5f + 4.dp
-
-/** Model and thinking-level picker for the composer's model chip. */
+/** The composer's model picker: a search field over the models grouped by provider. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ModelSheet(controller: ChatController, model: JSONObject?, thinkingLevel: String?, onDismiss: () -> Unit) {
-  var expanded by remember { mutableStateOf<ModelSheetSection?>(null) }
+internal fun ModelSheet(controller: ChatController, model: JSONObject?, onDismiss: () -> Unit) {
   var models by remember { mutableStateOf<List<JSONObject>?>(null) }
-  var levels by remember { mutableStateOf<List<String>>(emptyList()) }
+  var query by rememberSaveable { mutableStateOf("") }
+  val accounts = LocalContext.current.appGraph.accountRepository
+  val status by accounts.status.collectAsStateWithLifecycle()
+  val refreshError by accounts.refreshError.collectAsStateWithLifecycle()
   LaunchedEffect(controller) { models = controller.query { availableModels() }.orEmpty() }
+  LaunchedEffect(accounts) { accounts.refresh() }
+  // Pi's RPC lists every model with credentials; settings.json `enabledModels` picks the ones shown.
+  val scoped = remember(models, status, refreshError) {
+    val scope = status?.scope
+    when {
+      models == null || (status == null && refreshError == null) -> null
+      scope == null -> models
+      else -> models?.filter { "${it.optString("provider")}/${it.optString("id")}" in scope }
+    }
+  }
+  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = PICKER_MAX_HEIGHT) {
+    SearchField(query, onQueryChange = { query = it })
+    ModelList(scoped, query.trim(), model, Modifier.weight(1f, fill = false)) { selected ->
+      controller.setModel(selected.optString("provider"), selected.optString("id"))
+      onDismiss()
+    }
+  }
+}
+
+/** The composer's reasoning-effort picker: the levels Pi offers for the current model. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun ThinkingSheet(
+  controller: ChatController,
+  model: JSONObject?,
+  thinkingLevel: String?,
+  onDismiss: () -> Unit,
+) {
+  var levels by remember { mutableStateOf<List<String>?>(null) }
   // Pi clamps the available levels to the model, so they reload whenever it changes.
   LaunchedEffect(controller, model) { levels = controller.query { availableThinkingLevels() }.orEmpty() }
-  val toggle = { section: ModelSheetSection -> expanded = if (expanded == section) null else section }
-  PipkinSheet(onDismissRequest = onDismiss) {
-    SheetRow(
-      label = stringResource(R.string.chat_model),
-      value = modelLabel(model) ?: stringResource(R.string.chat_no_model_chip),
-      onClick = { toggle(ModelSheetSection.Model) },
-      trailing = { ExpandIcon() },
-    )
-    if (expanded == ModelSheetSection.Model) {
-      ModelBrowser(models, model) { selected ->
-        controller.setModel(selected.optString("provider"), selected.optString("id"))
-        expanded = null
-      }
+  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = PICKER_MAX_HEIGHT) {
+    SheetTitle(stringResource(R.string.chat_reasoning))
+    val shown = levels
+    if (shown == null) {
+      Loading()
+      return@PipkinSheet
     }
-    if (levels.isNotEmpty()) {
-      SheetRow(
-        label = stringResource(R.string.chat_thinking),
-        value = thinkingLevel?.let(::levelLabel),
-        onClick = { toggle(ModelSheetSection.Thinking) },
-        trailing = { ExpandIcon() },
-      )
-      if (expanded == ModelSheetSection.Thinking) {
-        levels.forEach { level ->
-          SheetRow(
-            label = levelLabel(level),
-            modifier = Modifier.padding(start = PipkinTokens.Spacing.s16),
-            onClick = {
-              controller.setThinkingLevel(level)
-              expanded = null
-            },
-            trailing = { if (level == thinkingLevel) CheckIcon() },
-          )
-        }
+    Column(modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+      shown.forEach { level ->
+        SheetRow(
+          // Pi's own level names, which are lowercase (`low`, `xhigh`).
+          label = level,
+          onClick = {
+            controller.setThinkingLevel(level)
+            onDismiss()
+          },
+          trailing = { if (level == thinkingLevel) CheckIcon() },
+        )
       }
     }
   }
 }
 
-/** Models grouped by provider, each group under a muted provider label; the current model is checked. */
 @Composable
-private fun ModelBrowser(models: List<JSONObject>?, current: JSONObject?, onSelect: (JSONObject) -> Unit) {
+private fun SearchField(query: String, onQueryChange: (String) -> Unit) {
+  val colors = pipkinColors
+  BasicTextField(
+    value = query,
+    onValueChange = onQueryChange,
+    modifier = Modifier.fillMaxWidth().padding(
+      horizontal = PipkinTokens.Spacing.s16,
+      vertical = PipkinTokens.Spacing.s4,
+    ),
+    textStyle = TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base),
+    cursorBrush = SolidColor(colors.accent),
+    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+    singleLine = true,
+    decorationBox = { field ->
+      Row(
+        modifier =
+          Modifier
+            .fillMaxWidth()
+            .heightIn(min = 40.dp)
+            .background(colors.surface2, RoundedCornerShape(PipkinTokens.Radius.lg))
+            .padding(horizontal = PipkinTokens.Spacing.s12),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+      ) {
+        LucideIcon(icon = R.drawable.ic_lucide_search, contentDescription = null, tint = colors.foregroundMuted)
+        Box(modifier = Modifier.weight(1f)) {
+          if (query.isEmpty()) {
+            Text(
+              text = stringResource(R.string.chat_model_search),
+              color = colors.foregroundMuted,
+              fontSize = PipkinTokens.FontSize.base,
+            )
+          }
+          field()
+        }
+      }
+    },
+  )
+}
+
+/** Models matching [query], grouped by provider under a muted label; the current model is checked. */
+@Composable
+private fun ModelList(
+  models: List<JSONObject>?,
+  query: String,
+  current: JSONObject?,
+  modifier: Modifier,
+  onSelect: (JSONObject) -> Unit,
+) {
   if (models == null) {
-    Box(modifier = Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.Center) { Spinner() }
+    Loading()
     return
   }
-  if (models.isEmpty()) {
-    SheetRow(label = stringResource(R.string.chat_no_model), labelColor = pipkinColors.foregroundMuted)
+  val groups = remember(models, query) {
+    models.filter { matches(it, query) }.groupBy { it.optString("provider") }.toList()
+  }
+  if (groups.isEmpty()) {
+    val empty = if (models.isEmpty()) R.string.chat_no_model else R.string.chat_model_search_empty
+    SheetRow(label = stringResource(empty), labelColor = pipkinColors.foregroundMuted)
     return
   }
-  val groups = remember(models) { models.groupBy { it.optString("provider") }.toList() }
-  LazyColumn(
-    modifier = Modifier.fillMaxWidth().heightIn(max = BrowserViewport).padding(top = PipkinTokens.Spacing.s4),
-  ) {
+  LazyColumn(modifier = modifier.fillMaxWidth().padding(top = PipkinTokens.Spacing.s4)) {
     groups.forEach { (provider, providerModels) ->
       item(key = "provider:$provider") { ProviderLabel(provider) }
       items(providerModels, key = { "model:$provider/${it.optString("id")}" }) { entry ->
@@ -110,6 +187,29 @@ private fun ModelBrowser(models: List<JSONObject>?, current: JSONObject?, onSele
   }
 }
 
+/** Case-insensitive match on the model's name, id or provider. */
+private fun matches(model: JSONObject, query: String): Boolean = query.isEmpty() ||
+  listOf(modelLabel(model).orEmpty(), model.optString("id"), model.optString("provider"))
+    .any { it.contains(query, ignoreCase = true) }
+
+@Composable
+private fun SheetTitle(text: String) {
+  Text(
+    text = text,
+    modifier = Modifier.fillMaxWidth().padding(
+      horizontal = PipkinTokens.Spacing.s16,
+      vertical = PipkinTokens.Spacing.s8,
+    ),
+    color = pipkinColors.foregroundMuted,
+    fontSize = PipkinTokens.FontSize.sm,
+  )
+}
+
+@Composable
+private fun Loading() {
+  Box(modifier = Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.Center) { Spinner() }
+}
+
 @Composable
 private fun ProviderLabel(provider: String) {
   Column(modifier = Modifier.fillMaxWidth().padding(PipkinTokens.Spacing.s16, PipkinTokens.Spacing.s8)) {
@@ -118,32 +218,6 @@ private fun ProviderLabel(provider: String) {
 }
 
 @Composable
-private fun ExpandIcon() {
-  LucideIcon(
-    icon = R.drawable.ic_lucide_chevron_down,
-    contentDescription = null,
-    size = PipkinTokens.IconSize.sm,
-    tint = pipkinColors.foregroundMuted,
-  )
-}
-
-@Composable
 private fun CheckIcon() {
   LucideIcon(icon = R.drawable.ic_lucide_check, contentDescription = null, tint = pipkinColors.accent)
 }
-
-/** Pi Model JSON's display name, falling back to its id; null without a model. */
-internal fun modelLabel(model: JSONObject?): String? =
-  model?.let { (it.opt("name") as? String)?.takeIf(String::isNotBlank) ?: it.optString("id") }
-
-/** True when the model's `input` includes `image`. */
-internal fun acceptsImages(model: JSONObject?): Boolean {
-  val input = model?.optJSONArray("input") ?: return false
-  return (0 until input.length()).any { input.optString(it) == "image" }
-}
-
-internal fun levelLabel(level: String): String = level.replaceFirstChar { it.uppercaseChar() }
-
-private fun isSameModel(model: JSONObject, current: JSONObject?): Boolean = current != null &&
-  model.optString("provider") == current.optString("provider") &&
-  model.optString("id") == current.optString("id")

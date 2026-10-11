@@ -66,6 +66,9 @@
     <string name="chat_clear">Clear</string>
     <string name="chat_model">Model</string>
     <string name="chat_no_model_chip">No model</string>
+    <string name="chat_model_search">Search models</string>
+    <string name="chat_model_search_empty">No matching models</string>
+    <string name="chat_reasoning">Reasoning effort</string>
 
     <!-- Extension dialogs -->
     <string name="chat_choose">Choose an option</string>

@@ -8,8 +8,10 @@ const SAVE = {
   baseUrl: "https://example.test/v1",
   api: "openai-responses",
   apiKey: "sk-test",
-  images: true,
-  models: ["gpt-a", "gpt-b"],
+  models: [
+    { id: "gpt-a", reasoning: true, input: ["text", "image"], contextWindow: 272_000 },
+    { id: "gpt-b", name: "GPT B", thinkingLevelMap: { off: null, low: "low" }, cost: { input: 1, output: 2, cacheRead: 0.1, cacheWrite: 0 } },
+  ],
 };
 
 describe("provider_save mode", () => {
@@ -26,26 +28,97 @@ describe("provider_save mode", () => {
     await removeDirs(dirs);
   });
 
+  async function saved(): Promise<unknown> {
+    return JSON.parse(await readFile(modelsPath, "utf8"));
+  }
+
   it("adds the provider and keeps other providers and keys", async () => {
     const other = { baseUrl: "http://localhost:11434/v1", api: "openai-completions", apiKey: "x", models: [{ id: "llama" }] };
     await writeFile(modelsPath, JSON.stringify({ extra: true, providers: { local: other } }));
     expect(await runMode("provider_save", dirs, SAVE)).toEqual({ type: "pipkin_result", ok: true, data: {} });
-    expect(JSON.parse(await readFile(modelsPath, "utf8"))).toEqual({
+    expect(await saved()).toEqual({
       extra: true,
       providers: {
         local: other,
+        "codex-lb": { baseUrl: SAVE.baseUrl, api: SAVE.api, apiKey: "sk-test", models: SAVE.models },
+      },
+    });
+  });
+
+  it("keeps settings Pipkin does not manage and drops cleared fields and models", async () => {
+    const tiers = [{ inputTokensAbove: 272_000, input: 10, output: 45, cacheRead: 1, cacheWrite: 0 }];
+    const existing = {
+      baseUrl: "https://old.test/v1",
+      api: "openai-completions",
+      apiKey: "sk-old",
+      headers: { "X-Provider": "1" },
+      compat: { supportsStrictMode: false },
+      models: [
+        {
+          id: "gpt-a",
+          name: "Old name",
+          reasoning: true,
+          contextWindow: 1000,
+          headers: { "X-Model": "y" },
+          compat: { supportsStrictMode: true },
+          samplingParams: { temperature: 0.2 },
+          cost: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, tiers },
+        },
+        { id: "gone", samplingParams: { top_p: 0.9 } },
+      ],
+    };
+    await writeFile(modelsPath, JSON.stringify({ providers: { "codex-lb": existing } }));
+    const models = [
+      { id: "gpt-a", reasoning: false, cost: { input: 3, output: 4, cacheRead: 0.1, cacheWrite: 0 } },
+      { id: "new", input: ["text", "image"] },
+    ];
+    expect(await runMode("provider_save", dirs, { ...SAVE, models })).toMatchObject({ ok: true });
+    expect(await saved()).toEqual({
+      providers: {
         "codex-lb": {
           baseUrl: SAVE.baseUrl,
           api: SAVE.api,
           apiKey: "sk-test",
+          headers: { "X-Provider": "1" },
+          compat: { supportsStrictMode: false },
           models: [
-            { id: "gpt-a", input: ["text", "image"] },
-            { id: "gpt-b", input: ["text", "image"] },
+            {
+              id: "gpt-a",
+              headers: { "X-Model": "y" },
+              compat: { supportsStrictMode: true },
+              samplingParams: { temperature: 0.2 },
+              reasoning: false,
+              cost: { input: 3, output: 4, cacheRead: 0.1, cacheWrite: 0, tiers },
+            },
+            { id: "new", input: ["text", "image"] },
           ],
         },
       },
     });
   });
+
+  it.each([
+    { name: 5 },
+    { reasoning: "yes" },
+    { thinkingLevelMap: { low: 1 } },
+    { thinkingLevelMap: { turbo: "turbo" } },
+    { input: ["audio"] },
+    { contextWindow: -1 },
+    { maxTokens: "big" },
+    { cost: { input: 1, output: 2 } },
+  ])("rejects the model field %j without writing", async (field) => {
+    await writeFile(modelsPath, "{}");
+    const result = await runMode("provider_save", dirs, { ...SAVE, models: [{ id: "gpt-a", ...field }] });
+    expect(result).toMatchObject({ ok: false, code: "bad_params" });
+    expect(await readFile(modelsPath, "utf8")).toBe("{}");
+  });
+
+  it.each([{ models: ["gpt-a"] }, { models: [{ id: "a" }, { id: "a" }] }, { models: undefined }])(
+    "rejects malformed models %j",
+    async (params) => {
+      expect(await runMode("provider_save", dirs, { ...SAVE, ...params })).toMatchObject({ ok: false, code: "bad_params" });
+    },
+  );
 
   it("rejects an empty API key without writing", async () => {
     expect(await runMode("provider_save", dirs, { ...SAVE, apiKey: "" })).toMatchObject({ ok: false, code: "bad_params" });
@@ -75,7 +148,6 @@ describe("provider_save mode", () => {
     await runMode("provider_save", dirs, SAVE);
     await runMode("provider_save", dirs, { ...SAVE, id: "second" });
     expect(await runMode("provider_remove", dirs, { id: "codex-lb" })).toMatchObject({ ok: true });
-    const saved = JSON.parse(await readFile(modelsPath, "utf8")) as { providers: Record<string, unknown> };
-    expect(Object.keys(saved.providers)).toEqual(["second"]);
+    expect(await saved()).toEqual({ providers: { second: expect.any(Object) } });
   });
 });

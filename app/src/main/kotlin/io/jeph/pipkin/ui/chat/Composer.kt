@@ -82,6 +82,7 @@ internal fun Composer(
   thinkingLevel: String?,
   busy: Boolean,
   onOpenModelSheet: () -> Unit,
+  onOpenThinkingSheet: () -> Unit,
   modifier: Modifier = Modifier,
   trailingControls: @Composable RowScope.() -> Unit = {},
 ) {
@@ -115,7 +116,8 @@ internal fun Composer(
         horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
       ) {
         AttachButton(controller, model)
-        ModelChip(model, thinkingLevel, onOpenModelSheet)
+        ModelChip(model, onOpenModelSheet)
+        if (supportsThinking(model)) ThinkingChip(thinkingLevel, onOpenThinkingSheet)
         Spacer(modifier = Modifier.weight(1f))
         trailingControls()
         val action = when {
@@ -291,33 +293,6 @@ private fun AttachButton(controller: ChatController, model: JSONObject?) {
         files.launch(arrayOf("*/*"))
       },
     )
-  }
-}
-
-@Composable
-private fun ModelChip(model: JSONObject?, thinkingLevel: String?, onClick: () -> Unit) {
-  val colors = pipkinColors
-  Column(
-    modifier =
-      Modifier
-        .heightIn(min = 28.dp)
-        .clip(RoundedCornerShape(PipkinTokens.Radius.xxl))
-        .clickable(onClick = onClick)
-        .padding(horizontal = PipkinTokens.Spacing.s8),
-    verticalArrangement = Arrangement.Center,
-  ) {
-    Text(
-      text = modelLabel(model) ?: stringResource(R.string.chat_no_model_chip),
-      modifier = Modifier.widthIn(max = 200.dp),
-      color = colors.foreground,
-      fontSize = PipkinTokens.FontSize.sm,
-      lineHeight = 14.sp,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-    )
-    if (thinkingLevel != null && thinkingLevel != "off") {
-      Text(text = levelLabel(thinkingLevel), color = colors.foregroundMuted, fontSize = 11.sp, lineHeight = 13.sp)
-    }
   }
 }
 
