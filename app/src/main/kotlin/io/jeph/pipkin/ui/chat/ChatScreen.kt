@@ -95,43 +95,28 @@ private fun ChatContent(
   val busy by process.busy.collectAsStateWithLifecycle()
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
     ChatHeader(process, onToggleSidebar, onActions = { onSheet(ChatSheet.Actions) })
-    // The stream runs under the queue and composer, so messages stay visible around the rounded
-    // input and below it; the stream pads its end by their height so the last message clears them.
-    BottomOverlayLayout(
-      modifier = Modifier.weight(1f).fillMaxWidth(),
-      overlay = {
-        Column {
-          if (timeline.queue.isNotEmpty()) {
-            QueueRows(
-              timeline.queue,
-              onClear = controller::clearQueue,
-              Modifier.padding(bottom = PipkinTokens.Spacing.s8),
-            )
-          }
-          Composer(
-            controller = controller,
-            model = timeline.model,
-            thinkingLevel = timeline.thinkingLevel,
-            busy = busy,
-            onOpenModelSheet = { onSheet(ChatSheet.Model) },
-            onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
-          )
-        }
-      },
-    ) { overlayHeight ->
-      Box(modifier = Modifier.fillMaxSize()) {
-        ChatStream(
-          process = process,
-          timeline = timeline,
-          processState = processState,
-          follow = controller.follow,
-          bottomPadding = overlayHeight,
-          onOpenTool = { onSheet(ChatSheet.Tool(it)) },
-          onOpenSettings = onOpenSettings,
-        )
-        ChatSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = overlayHeight))
-      }
+    Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+      ChatStream(
+        process = process,
+        timeline = timeline,
+        processState = processState,
+        follow = controller.follow,
+        onOpenTool = { onSheet(ChatSheet.Tool(it)) },
+        onOpenSettings = onOpenSettings,
+      )
+      ChatSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
+    if (timeline.queue.isNotEmpty()) {
+      QueueRows(timeline.queue, onClear = controller::clearQueue, Modifier.padding(bottom = PipkinTokens.Spacing.s8))
+    }
+    Composer(
+      controller = controller,
+      model = timeline.model,
+      thinkingLevel = timeline.thinkingLevel,
+      busy = busy,
+      onOpenModelSheet = { onSheet(ChatSheet.Model) },
+      onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
+    )
   }
 }
 
