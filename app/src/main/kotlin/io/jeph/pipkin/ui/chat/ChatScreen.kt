@@ -1,9 +1,6 @@
 package io.jeph.pipkin.ui.chat
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,8 +21,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -203,17 +198,6 @@ private fun ChatHeader(process: AgentProcess, onToggleSidebar: () -> Unit, onAct
       )
     },
   )
-}
-
-/**
- * Runs [onTap] for a tap nothing inside handled: buttons consume the release, and scrolls and text
- * selection consume the gesture, so those keep their own behavior.
- */
-private fun Modifier.onUnhandledTap(onTap: () -> Unit): Modifier = pointerInput(onTap) {
-  awaitEachGesture {
-    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
-    if (waitForUpOrCancellation(PointerEventPass.Final) != null) onTap()
-  }
 }
 
 @Composable
