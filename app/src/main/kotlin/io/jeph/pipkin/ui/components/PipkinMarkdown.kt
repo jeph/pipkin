@@ -44,7 +44,9 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
     fontSize = PipkinTokens.FontSize.content,
     lineHeight = PipkinTokens.LineHeight.markdown,
   )
-  val codeBlock: @Composable (String, String?, TextStyle) -> Unit = { text, _, style -> CodeBlock(text, style) }
+  val codeBlock: @Composable (String, String?, TextStyle) -> Unit = { text, language, style ->
+    CodeBlock(text, language, style)
+  }
   // Parsing runs off the main thread; without retaining, each streamed delta would show the empty
   // loading box until the new parse lands, collapsing and re-growing the message.
   val state = rememberMarkdownState(markdown, retainState = true)
@@ -102,8 +104,9 @@ private fun typography(body: TextStyle): MarkdownTypography {
   )
 }
 
+/** A bordered, horizontally scrolling code block, coloured for its fence language. */
 @Composable
-private fun CodeBlock(text: String, style: TextStyle) {
+private fun CodeBlock(text: String, language: String?, style: TextStyle) {
   val colors = pipkinColors
   val shape = RoundedCornerShape(PipkinTokens.Radius.md)
   Box(
@@ -117,6 +120,6 @@ private fun CodeBlock(text: String, style: TextStyle) {
         .horizontalScroll(rememberScrollState())
         .padding(PipkinTokens.Spacing.s12),
   ) {
-    Text(text = text, style = style)
+    Text(text = rememberHighlightedCode(text, language), style = style)
   }
 }
