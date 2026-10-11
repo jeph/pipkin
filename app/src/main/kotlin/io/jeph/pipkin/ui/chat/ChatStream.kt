@@ -80,6 +80,7 @@ internal fun ChatStream(
   timeline: TimelineState,
   processState: AgentProcessState,
   follow: MutableState<Boolean>,
+  bottomPadding: Dp,
   onOpenTool: (key: String) -> Unit,
   onOpenSettings: () -> Unit,
   modifier: Modifier = Modifier,
@@ -96,9 +97,13 @@ internal fun ChatStream(
     derivedStateOf { listState.distanceFromBottom() > threshold }
   }
   Box(modifier = modifier.fillMaxSize()) {
-    StreamList(listState, timeline.items, banner, process, onOpenTool)
+    StreamList(listState, timeline.items, banner, process, bottomPadding, onOpenTool)
     if (timeline.items.isEmpty() && processState == AgentProcessState.Ready) {
-      EmptyState(noModel = timeline.model == null, onOpenSettings, Modifier.align(Alignment.Center))
+      EmptyState(
+        noModel = timeline.model == null,
+        onOpenSettings,
+        Modifier.align(Alignment.Center).padding(bottom = bottomPadding),
+      )
     }
     ScrollToBottomButton(
       visible = showScrollButton,
@@ -106,7 +111,7 @@ internal fun ChatStream(
         follow.value = true
         scope.launch { if (count > 0) listState.scrollToItem(count - 1, FOLLOW_OFFSET) }
       },
-      modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = PipkinTokens.Spacing.s16),
+      modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = bottomPadding + PipkinTokens.Spacing.s16),
     )
   }
 }
@@ -156,6 +161,7 @@ private fun StreamList(
   items: List<TimelineItem>,
   banner: AgentProcessState?,
   process: AgentProcess,
+  bottomPadding: Dp,
   onOpenTool: (key: String) -> Unit,
 ) {
   val replies = remember(items) { replyTexts(items) }
@@ -164,14 +170,14 @@ private fun StreamList(
     state = listState,
     modifier = Modifier
       .layout { measurable, constraints ->
-        anchor.onHeight(constraints.maxHeight)
+        anchor.onHeight(constraints.maxHeight - bottomPadding.roundToPx())
         val placeable = measurable.measure(constraints)
         layout(placeable.width, placeable.height) { placeable.place(0, 0) }
       }.fillMaxSize(),
     contentPadding = PaddingValues(
       start = PipkinTokens.Spacing.s16,
       end = PipkinTokens.Spacing.s16,
-      bottom = PipkinTokens.Spacing.s16,
+      bottom = bottomPadding + PipkinTokens.Spacing.s16,
     ),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
@@ -193,14 +199,15 @@ private fun StreamList(
 }
 
 /**
- * Keeps what sits at the bottom of the viewport in place when the list's height changes, as when
- * the keyboard opens or the composer grows: the keyboard never covers what the user was reading,
- * and the top of the list scrolls up under the header instead. It runs before the list measures,
- * so the shift lands in the same frame as the resize; at the bottom it also keeps following.
+ * Keeps what sits at the bottom of the visible area in place when that area's height changes, as
+ * when the keyboard opens or the composer grows: the keyboard never covers what the user was
+ * reading, and the top of the list scrolls up under the header instead. It runs before the list
+ * measures, so the shift lands in the same frame as the resize; at the bottom it also keeps following.
  */
 private class BottomAnchor(private val listState: LazyListState) {
   private var height = UNMEASURED
 
+  /** [newHeight] is the list's height above the composer drawn over it. */
   fun onHeight(newHeight: Int) {
     val shrink = if (height == UNMEASURED) 0 else height - newHeight
     height = newHeight
