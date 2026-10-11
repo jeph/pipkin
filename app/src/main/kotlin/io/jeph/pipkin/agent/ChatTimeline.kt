@@ -42,6 +42,9 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private var retryNoticeKey: String? = null
   private var compactionNoticeKey: String? = null
   private var busy = false
+
+  /** Between `compaction_start` and `compaction_end`; a manual compaction runs outside any agent run. */
+  private var compacting = false
   private var queue = emptyList<String>()
   private var pendingUi: ExtensionUiRequest? = null
   private var model: JSONObject? = null
@@ -52,6 +55,8 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
     synchronized(lock) {
       items.clear()
       live = null
+      // A seed follows a new connection or session, so no compaction is running any more.
+      compacting = false
       for (index in 0 until messages.length()) {
         val message = messages.optJSONObject(index) ?: continue
         when (message.optString("role")) {
@@ -91,6 +96,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   fun showExit(code: Int?, stderr: String) {
     synchronized(lock) {
       finishRun()
+      compacting = false
       pendingUi = null
       items += ExitBanner("x${itemSeq++}", code, stderr)
       publish()
@@ -107,18 +113,39 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private fun dispatch(event: JSONObject) {
     when (event.optString("type")) {
       "agent_start" -> startRun()
+
       "agent_settled" -> finishRun()
+
       "message_start" -> event.optJSONObject("message")?.let(::messageStart)
+
       "message_update" -> event.optJSONObject("assistantMessageEvent")?.let(::messageUpdate)
+
       "message_end" -> event.optJSONObject("message")?.let(::messageEnd)
+
       "tool_execution_start", "tool_execution_update", "tool_execution_end" -> toolExecution(event)
+
       "queue_update" -> queue = event.optJSONArray("steering").strings() + event.optJSONArray("followUp").strings()
+
       "auto_retry_start" -> retryNoticeKey = showNotice(retryNoticeKey, "Retrying…")
+
       "auto_retry_end" -> clearRetryNotice()
-      "compaction_start" -> compactionNoticeKey = showNotice(compactionNoticeKey, "Compacting context…")
+
+      "compaction_start" -> {
+        compacting = true
+        compactionNoticeKey = showNotice(compactionNoticeKey, "Compacting context…")
+      }
+
       "compaction_end" -> compactionEnd(event)
+
       "thinking_level_changed" -> thinkingLevel = event.optStringOrNull("level")
+
       "extension_ui_request" -> extensionUi(event)
+
+      // Pi catches a failing extension command and still answers its prompt as handled, so this is the only report.
+      "extension_error" -> items += TimelineItem.Error(
+        "e${itemSeq++}",
+        "Extension \"${event.optString("extensionPath")}\" error: ${event.optString("error")}",
+      )
     }
   }
 
@@ -253,6 +280,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   }
 
   private fun compactionEnd(event: JSONObject) {
+    compacting = false
     val key = compactionNoticeKey ?: "n${itemSeq++}"
     compactionNoticeKey = null
     val replacement =
@@ -319,7 +347,8 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
 
   private fun publish() {
     val snapshot = footer?.let { items + it } ?: items.toList()
-    mutableState.value = TimelineState(snapshot, busy, queue, pendingUi, model, thinkingLevel)
+    // A manual compaction runs outside any agent run, but it is work Stop can end and keep-alive must cover.
+    mutableState.value = TimelineState(snapshot, busy || compacting, queue, pendingUi, model, thinkingLevel)
   }
 
   private data class LiveMessage(val key: String, val role: String)
@@ -347,15 +376,25 @@ private fun messageItems(
 
 private fun userItem(message: JSONObject, key: String, clock: () -> Long): User {
   val timestamp = message.optLong("timestamp", 0L).takeIf { it > 0 } ?: clock()
-  val blocks =
-    message.optJSONArray("content") ?: return User(key, message.optString("content"), emptyList(), timestamp)
+  val blocks = message.optJSONArray("content")
+    ?: return User(key, typedText(message.optString("content")), emptyList(), timestamp)
   val images =
     (0 until blocks.length()).mapNotNull { index ->
       blocks.optJSONObject(index)?.takeIf { it.optString("type") == "image" }?.let {
         ImagePart(it.optString("data"), it.optString("mimeType"))
       }
     }
-  return User(key, blocks.text(), images, timestamp)
+  return User(key, typedText(blocks.text()), images, timestamp)
+}
+
+/** Pi's expansion of `/skill:name args` (its `parseSkillBlock` format): the skill's file wrapped in a tag, then the args. */
+private val SKILL_BLOCK = Regex("""<skill name="([^"]+)" location="[^"]+">\n[\s\S]*?\n</skill>(?:\n\n([\s\S]+))?""")
+
+/** A user message as typed: an expanded skill shows as its `/skill:name args` command, like Pi's terminal UI. */
+internal fun typedText(text: String): String {
+  val match = SKILL_BLOCK.matchEntire(text) ?: return text
+  val args = match.groupValues[2].trim()
+  return "/skill:${match.groupValues[1]}" + if (args.isEmpty()) "" else " $args"
 }
 
 private fun assistantItems(message: JSONObject, prefix: String, settled: Boolean): List<TimelineItem> = buildList {

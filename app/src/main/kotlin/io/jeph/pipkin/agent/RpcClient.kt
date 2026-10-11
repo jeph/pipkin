@@ -27,8 +27,15 @@ internal class RpcClient(
   private val pending = ConcurrentHashMap<String, Pending>()
   private val closed = AtomicReference<Closed?>(null)
 
-  /** Sends `{type: command, id, ...params}` and returns the response's `data` (empty when absent). */
-  suspend fun call(command: String, params: JSONObject = JSONObject()): JSONObject {
+  /**
+   * Sends `{type: command, id, ...params}` and returns the response's `data` (empty when absent).
+   * A null [timeoutMillis] waits until Pi answers or the connection closes.
+   */
+  suspend fun call(
+    command: String,
+    params: JSONObject = JSONObject(),
+    timeoutMillis: Long? = this.timeoutMillis,
+  ): JSONObject {
     val id = "r${counter.incrementAndGet()}"
     val reply = CompletableDeferred<JSONObject>()
     pending[id] = Pending(command, reply)
@@ -40,8 +47,12 @@ internal class RpcClient(
       } catch (error: IOException) {
         throw RpcError(command, NOT_RUNNING, error)
       }
-      val response = withTimeoutOrNull(timeoutMillis) { reply.await() }
-        ?: throw RpcError(command, "The agent did not answer $command in time.")
+      val response = if (timeoutMillis == null) {
+        reply.await()
+      } else {
+        withTimeoutOrNull(timeoutMillis) { reply.await() }
+          ?: throw RpcError(command, "The agent did not answer $command in time.")
+      }
       if (!response.optBoolean("success")) {
         throw RpcError(command, response.optString("error").ifEmpty { "The agent rejected $command." })
       }

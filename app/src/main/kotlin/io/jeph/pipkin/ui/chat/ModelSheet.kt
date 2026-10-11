@@ -47,12 +47,12 @@ import org.json.JSONObject
 /** Both pickers wrap their content up to this share of the screen, then scroll inside. */
 private const val PICKER_MAX_HEIGHT = 0.8f
 
-/** The composer's model picker: a search field over the models grouped by provider. */
+/** The composer's model picker: a search field (starting at [initialQuery]) over the models grouped by provider. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ModelSheet(controller: ChatController, model: JSONObject?, onDismiss: () -> Unit) {
+internal fun ModelSheet(controller: ChatController, model: JSONObject?, initialQuery: String, onDismiss: () -> Unit) {
   var models by remember { mutableStateOf<List<JSONObject>?>(null) }
-  var query by rememberSaveable { mutableStateOf("") }
+  var query by rememberSaveable { mutableStateOf(initialQuery) }
   val accounts = LocalContext.current.appGraph.accountRepository
   val status by accounts.status.collectAsStateWithLifecycle()
   val refreshError by accounts.refreshError.collectAsStateWithLifecycle()

@@ -71,6 +71,23 @@ class ChatTimelineTest {
   }
 
   @Test
+  fun expandedSkillShowsAsTheTypedCommand() {
+    val block = "<skill name=\"haiku\" location=\"/sdcard/Pipkin/pi/skills/haiku/SKILL.md\">\nWrite one.\n</skill>"
+    val messages = JSONArray()
+      .put(JSONObject().put("role", "user").put("timestamp", 5).put("content", "$block\n\nthe sea\nat dawn"))
+      .put(JSONObject().put("role", "user").put("timestamp", 6).put("content", block))
+      .put(JSONObject().put("role", "user").put("timestamp", 7).put("content", "quote: $block"))
+    timeline.seed(messages)
+
+    assertEquals(
+      listOf("/skill:haiku the sea\nat dawn", "/skill:haiku", "quote: $block"),
+      items.map {
+        (it as User).text
+      },
+    )
+  }
+
+  @Test
   fun streamedBlocksKeepKeysThroughMessageEnd() = streamToolCallTurn()
 
   @Test
@@ -186,6 +203,33 @@ class ChatTimelineTest {
     timeline.showExit(1, "crash")
     assertFalse(timeline.state.value.busy)
     assertEquals(listOf(TurnFooter("t0", 1_000, 1_500), ExitBanner("x1", 1, "crash")), items)
+  }
+
+  @Test
+  fun compactionKeepsTheChatBusyUntilItEnds() {
+    apply("""{"type":"compaction_start","reason":"manual"}""")
+    assertTrue(timeline.state.value.busy)
+    apply("""{"type":"compaction_end","reason":"manual","aborted":false,"result":{"summary":"s"}}""")
+    assertFalse(timeline.state.value.busy)
+
+    apply("""{"type":"agent_start"}""")
+    apply("""{"type":"compaction_start","reason":"threshold"}""")
+    apply("""{"type":"compaction_end","reason":"threshold","aborted":true}""")
+    assertTrue(timeline.state.value.busy)
+    apply("""{"type":"agent_settled"}""")
+    assertFalse(timeline.state.value.busy)
+
+    apply("""{"type":"compaction_start","reason":"manual"}""")
+    timeline.showExit(1, "crash")
+    assertFalse(timeline.state.value.busy)
+  }
+
+  @Test
+  fun failingExtensionCommandShowsItsError() {
+    apply("""{"type":"extension_error","extensionPath":"command:boom","event":"command","error":"kaput"}""")
+
+    assertEquals(listOf(TimelineItem.Error("e0", "Extension \"command:boom\" error: kaput")), items)
+    assertFalse(timeline.state.value.busy)
   }
 
   private fun apply(json: String) = timeline.apply(JSONObject(json))

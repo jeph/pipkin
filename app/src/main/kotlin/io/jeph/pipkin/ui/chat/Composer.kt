@@ -45,7 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -91,12 +93,11 @@ internal fun Composer(
   val colors = pipkinColors
   val keyboard = LocalSoftwareKeyboardController.current
   val focus = LocalFocusManager.current
-  val send = {
-    if (controller.send()) {
-      keyboard?.hide()
-      focus.clearFocus()
-    }
+  val hideKeyboard = {
+    keyboard?.hide()
+    focus.clearFocus()
   }
+  val send = { if (controller.send()) hideKeyboard() }
   val shape = RoundedCornerShape(PipkinTokens.Radius.xxl)
   Box(
     modifier =
@@ -119,7 +120,7 @@ internal fun Composer(
       if (controller.attachments.isNotEmpty()) {
         AttachmentTray(controller.attachments, onRemove = { controller.attachments.remove(it) })
       }
-      ComposerField(controller.draft, onValueChange = { controller.draft = it })
+      ComposerField(controller, onRan = hideKeyboard)
       Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s12))
       Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -249,21 +250,26 @@ private fun BoxScope.RemoveBadge(onRemove: () -> Unit) {
   }
 }
 
+/** The draft field; it reports focus for the slash menu and lets the menu take its keys. */
 @Composable
-private fun ComposerField(value: TextFieldValue, onValueChange: (TextFieldValue) -> Unit) {
+private fun ComposerField(controller: ChatController, onRan: () -> Unit) {
   val colors = pipkinColors
   val maxHeight = max(160.dp, LocalWindowInfo.current.containerDpSize.height * 0.5f)
   val style = TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.content)
   BasicTextField(
-    value = value,
-    onValueChange = onValueChange,
-    modifier = Modifier.fillMaxWidth().heightIn(min = 30.dp, max = maxHeight),
+    value = controller.draft,
+    onValueChange = { controller.slash.onDraftChange(it, onRan) },
+    modifier = Modifier
+      .fillMaxWidth()
+      .heightIn(min = 30.dp, max = maxHeight)
+      .onFocusChanged { controller.composerFocused = it.isFocused }
+      .onPreviewKeyEvent { controller.slash.onKey(it, onRan) },
     textStyle = style,
     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
     cursorBrush = SolidColor(colors.accent),
     decorationBox = { inner ->
       Box(contentAlignment = Alignment.CenterStart) {
-        if (value.text.isEmpty()) {
+        if (controller.draft.text.isEmpty()) {
           Text(text = stringResource(R.string.chat_placeholder), style = style.copy(color = colors.foregroundMuted))
         }
         inner()

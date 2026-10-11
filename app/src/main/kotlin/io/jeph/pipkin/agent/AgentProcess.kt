@@ -129,7 +129,10 @@ internal class AgentProcess(
     job.cancel()
   }
 
-  /** Returns Pi's `disposition`: `started`, `queued` or `handled`. */
+  /**
+   * Returns Pi's `disposition`: `started`, `queued` or `handled`. Pi answers a slash command only once an
+   * extension command finished, which can wait on the user's answers, so those wait without a deadline.
+   */
   suspend fun prompt(message: String, images: List<ImagePart> = emptyList()): String {
     val params = JSONObject()
       .put("message", message)
@@ -144,7 +147,8 @@ internal class AgentProcess(
         ),
       )
     }
-    return call("prompt", params).optString("disposition")
+    val timeout = if (message.startsWith("/")) null else RpcClient.TIMEOUT_MILLIS
+    return call("prompt", params, timeout).optString("disposition")
   }
 
   override suspend fun abort() {
@@ -203,6 +207,13 @@ internal class AgentProcess(
     } catch (_: IOException) {
       false
     }
+  }
+
+  /** Re-reads state and history after Pi moved this process to another session file (fork, clone). */
+  suspend fun reloadSession() {
+    applyState(call("get_state"))
+    timeline.seed(getMessages())
+    onSessionChanged()
   }
 
   /** Connects; a `pi_version` refusal installs the pinned Pi once and retries once. */
@@ -329,9 +340,14 @@ internal class AgentProcess(
     }
   }
 
-  private suspend fun call(command: String, params: JSONObject = JSONObject()): JSONObject {
+  /** Pi's RPC [command]; throws [RpcError]. A null [timeoutMillis] waits until Pi answers or exits. */
+  suspend fun call(
+    command: String,
+    params: JSONObject = JSONObject(),
+    timeoutMillis: Long? = RpcClient.TIMEOUT_MILLIS,
+  ): JSONObject {
     val rpc = connection?.rpc ?: throw RpcError(command, RpcClient.NOT_RUNNING)
-    return rpc.call(command, params)
+    return rpc.call(command, params, timeoutMillis)
   }
 
   private companion object {

@@ -1,5 +1,7 @@
 package io.jeph.pipkin.ui.chat
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.StringRes
@@ -39,10 +41,18 @@ internal class ChatController(
   val process: AgentProcess,
   private val graph: AppGraph,
   private val context: Context,
-  private val scope: CoroutineScope,
+  val scope: CoroutineScope,
   private val snackbar: SnackbarHostState,
+  navigator: ChatNavigator,
 ) {
   var draft by mutableStateOf(TextFieldValue())
+
+  /** Whether the composer's text field has focus; the slash menu only shows while it does. */
+  var composerFocused by mutableStateOf(false)
+
+  val slash = SlashMenu(this)
+
+  val builtins = BuiltinCommands(this, navigator)
 
   /** Images and files for the next prompt, in pick order. */
   val attachments = mutableStateListOf<Attachment>()
@@ -61,12 +71,26 @@ internal class ChatController(
   }
 
   /**
-   * Sends the draft; Pi steers a working run with it. Files are first copied into Termux and listed
-   * by path, since Pi's `prompt` only carries images. A failed send puts the draft back. Returns
-   * false when nothing was sent.
+   * Sends the draft; Pi steers a working run with it. A built-in command such as `/compact` runs in
+   * Pipkin instead. Returns false when nothing was sent.
    */
   fun send(): Boolean {
-    if (sending || !canSend) return false
+    if (!canSend) return false
+    val builtin = parseBuiltin(draft.text).takeIf { attachments.isEmpty() }
+    if (builtin != null) {
+      draft = TextFieldValue()
+      builtins.run(builtin)
+      return true
+    }
+    return sendPrompt()
+  }
+
+  /**
+   * Files are first copied into Termux and listed by path, since Pi's `prompt` only carries images. A
+   * failed send puts the draft back.
+   */
+  private fun sendPrompt(): Boolean {
+    if (sending) return false
     val picked = attachments.toList()
     // Picking checks the limit, but a failed send puts its files back beside any picked meanwhile.
     if (picked.filterIsInstance<Attachment.File>().sumOf { it.bytes.size.toLong() } > ChatFiles.MAX_TOTAL_BYTES) {
@@ -113,10 +137,17 @@ internal class ChatController(
   /** [text] followed by the saved files' paths, `~`-relative like the rest of the app shows them. */
   private fun withFilePaths(text: String, paths: List<String>): String {
     if (paths.isEmpty()) return text
-    val home = graph.hostClient.lastHello.value?.home?.takeIf { it.isNotEmpty() }
+    val home = home
     val list = paths.joinToString("\n") { path -> "- " + (home?.let { tildePath(path, it) } ?: path) }
     val block = "$ATTACHED_FILES\n$list"
     return if (text.isEmpty()) block else "$text\n\n$block"
+  }
+
+  /** The Termux home from the last host hello, for `~`-relative paths. */
+  val home: String? get() = graph.hostClient.lastHello.value?.home?.takeIf { it.isNotEmpty() }
+
+  fun copy(text: String) {
+    context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Pipkin", text))
   }
 
   fun abort() = launchRpc { process.abort() }
@@ -236,7 +267,7 @@ internal class ChatController(
     }
   }
 
-  fun show(@StringRes message: Int) = show(context.getString(message))
+  fun show(@StringRes message: Int, vararg args: Any) = show(context.getString(message, *args))
 
   fun show(message: String) {
     if (message.isBlank()) return
@@ -244,7 +275,8 @@ internal class ChatController(
     scope.launch { snackbar.showSnackbar(message) }
   }
 
-  private fun launchRpc(block: suspend () -> Unit) {
+  /** Runs [block] on the screen's scope, showing an [RpcError] as a snackbar. */
+  fun launchRpc(block: suspend () -> Unit) {
     scope.launch { query { block() } }
   }
 }

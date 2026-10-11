@@ -70,6 +70,54 @@
     <string name="chat_model_search_empty">No matching models</string>
     <string name="chat_reasoning">Reasoning effort</string>
 
+    <!-- Slash commands; descriptions follow Pi's own where Pipkin does the same thing -->
+    <string name="chat_commands_loading">Loading commands…</string>
+    <string name="chat_commands_empty">No commands found</string>
+    <string name="command_settings">Open settings</string>
+    <string name="command_model">Select model</string>
+    <string name="command_thinking">Set thinking level</string>
+    <string name="command_export">Export session as HTML (optionally give a path)</string>
+    <string name="command_copy">Copy last agent message to clipboard</string>
+    <string name="command_name">Set session display name</string>
+    <string name="command_session">Show session info and stats</string>
+    <string name="command_fork">Create a new fork from a previous user message</string>
+    <string name="command_clone">Duplicate the current session at the current position</string>
+    <string name="command_login">Configure provider authentication</string>
+    <string name="command_logout">Remove provider authentication</string>
+    <string name="command_new">Start a new session</string>
+    <string name="command_compact">Manually compact the session context</string>
+    <string name="command_resume">Resume a different session</string>
+    <string name="command_reload">Reload extensions, skills, prompts and context files</string>
+    <string name="chat_copy_nothing">No agent messages to copy yet</string>
+    <string name="chat_exported">Session exported to %1$s</string>
+    <string name="chat_fork_title">Fork from a message</string>
+    <string name="chat_fork_nothing">No messages to fork from</string>
+    <string name="chat_forked">Forked to new session</string>
+    <string name="chat_cloned">Cloned to new session</string>
+    <string name="chat_cancelled_by_extension">An extension cancelled this</string>
+    <string name="chat_thinking_levels">Thinking levels: %1$s</string>
+
+    <!-- Session info sheet (/session) -->
+    <string name="session_info">Session info</string>
+    <string name="session_name">Name</string>
+    <string name="session_file">File</string>
+    <string name="session_in_memory">In-memory</string>
+    <string name="session_id">ID</string>
+    <string name="session_messages">Messages</string>
+    <string name="session_total">Total</string>
+    <string name="session_user">User</string>
+    <string name="session_assistant">Assistant</string>
+    <string name="session_tool_calls">Tool calls</string>
+    <string name="session_tool_results">Tool results</string>
+    <string name="session_tokens">Tokens</string>
+    <string name="session_input">Input</string>
+    <string name="session_cached">Cached</string>
+    <string name="session_output">Output</string>
+    <string name="session_context">Context</string>
+    <string name="session_context_value">%1$s of %2$s (%3$d%%)</string>
+    <string name="session_context_unknown">%1$s window</string>
+    <string name="session_cost">Cost</string>
+
     <!-- Extension dialogs -->
     <string name="chat_choose">Choose an option</string>
     <string name="chat_confirm_title">Confirm</string>
