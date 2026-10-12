@@ -66,8 +66,11 @@ internal fun ToolCallSheet(item: TimelineItem, streamingArguments: (key: String)
   val streamingAtOpen = remember { presentation.running }
   val follow = remember { mutableStateOf(streamingAtOpen) }
   if (streamingAtOpen) AutoFollow(scrollState, follow)
+  // The body already shows a thinking block's text, a command and other tools' arguments; only the file tools'
+  // bodies leave out the path, so only they keep the row's summary under the title.
+  val subtitle = presentation.summary.takeIf { item is TimelineItem.ToolCall && item.toolName in FILE_TOOLS }
   PipkinSheet(onDismissRequest = onDismiss) {
-    SheetTitle(presentation)
+    SheetTitle(presentation, subtitle)
     SelectionContainer {
       Column(
         modifier =
@@ -110,7 +113,7 @@ private fun withStreamedArguments(
 }
 
 @Composable
-private fun SheetTitle(presentation: ToolPresentation) {
+private fun SheetTitle(presentation: ToolPresentation, subtitle: String?) {
   val colors = pipkinColors
   Row(
     modifier =
@@ -131,7 +134,7 @@ private fun SheetTitle(presentation: ToolPresentation) {
     }
     Column(modifier = Modifier.weight(1f)) {
       Text(text = presentation.title, color = colors.foreground, fontSize = PipkinTokens.FontSize.lg)
-      presentation.summary?.let {
+      subtitle?.let {
         Text(
           text = it,
           color = colors.foregroundMuted,
@@ -269,3 +272,5 @@ private fun editPairs(args: JSONObject?): List<Pair<String, String>> {
   val legacyOld = args.stringOrNull("oldText") ?: return pairs
   return pairs + (legacyOld to args.stringOrNull("newText").orEmpty())
 }
+
+private val FILE_TOOLS = setOf("read", "write", "edit")
