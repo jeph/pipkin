@@ -1,6 +1,8 @@
 import { spawn } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
+import type { Socket } from "node:net";
 import { join } from "node:path";
+import type { Readable } from "node:stream";
 import { installedPiVersion, piPackageDir } from "../env.js";
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
@@ -10,6 +12,12 @@ import { systemAppend } from "../prompt.js";
 const STDERR_TAIL = 16 * 1024;
 const TERM_AFTER_MS = 5000;
 const KILL_AFTER_MS = 5000;
+/**
+ * Pi output the host holds while Pipkin is not reading, for example while the phone has frozen Pipkin with the screen
+ * off. Below this Pi never waits on Pipkin; above it Pi waits until Pipkin reads again, so the host's memory stays
+ * bounded.
+ */
+const OUTPUT_BACKLOG_LIMIT = 32 * 1024 * 1024;
 
 /** Keeps only the newest bytes of Pi's stderr for the exit report. */
 class TailBuffer {
@@ -31,6 +39,22 @@ class TailBuffer {
  */
 function note(message: string): void {
   process.stderr.write(`pipkin-host rpc ${new Date().toISOString()}: ${message}\n`);
+}
+
+/**
+ * Copies Pi's stdout to the socket like `pipe`, but lets up to `OUTPUT_BACKLOG_LIMIT` bytes queue in the socket
+ * instead of pipe's 16 KiB, so Pi keeps working while Pipkin is not reading. Never ends the socket: the exit line
+ * follows Pi's output. Once the socket is gone the output is dropped, so a Pi waiting to write gets going again and
+ * sees its stdin close instead of waiting for SIGTERM.
+ */
+function forwardOutput(output: Readable, socket: Socket): void {
+  output.on("data", (chunk: Buffer) => {
+    if (!socket.writable) return;
+    socket.write(chunk);
+    if (socket.writableLength >= OUTPUT_BACKLOG_LIMIT) output.pause();
+  });
+  socket.on("drain", () => output.resume());
+  socket.on("close", () => output.resume());
 }
 
 async function piEntry(root: string): Promise<string> {
@@ -100,7 +124,7 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const { leftover } = ctx.conn;
   if (leftover.length > 0) child.stdin.write(leftover);
   socket.pipe(child.stdin);
-  child.stdout.pipe(socket, { end: false });
+  forwardOutput(child.stdout, socket);
   socket.on("end", () => {
     note("Pipkin ended the connection");
   });

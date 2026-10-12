@@ -1,9 +1,35 @@
 import { access } from "node:fs/promises";
+import { setTimeout as sleep } from "node:timers/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { encodeLine } from "../src/framing.js";
 import { systemAppend } from "../src/prompt.js";
-import { type Dirs, installFakePi, makeDirs, PI_VERSION, removeDirs, startHost } from "./harness.js";
+import { type Dirs, type HostRun, installFakePi, makeDirs, PI_VERSION, removeDirs, startHost } from "./harness.js";
+
+const MiB = 1024 * 1024;
+
+/** True once `file` exists, polling for up to `timeoutMs`. */
+async function appears(file: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await access(file).then(() => true, () => false)) return true;
+    await sleep(50);
+  }
+  return false;
+}
+
+/** Reads lines through `flood_end` and checks every flood line arrived, in order. */
+async function expectWholeFlood(run: HostRun): Promise<void> {
+  const seqs: unknown[] = [];
+  let end = await run.next();
+  while (end?.type === "flood") {
+    seqs.push(end.seq);
+    end = await run.next();
+  }
+  expect(end).toEqual({ type: "flood_end", count: seqs.length });
+  expect(seqs).toEqual(seqs.map((_, index) => index));
+  expect(seqs.length).toBeGreaterThan(0);
+}
 
 describe("rpc mode", () => {
   let dirs: Dirs;
@@ -69,6 +95,60 @@ describe("rpc mode", () => {
     // The host exits only after Pi exited, and fake-pi writes the marker on stdin EOF.
     expect(await run.exited).toBe(0);
     await expect(access(marker)).resolves.toBeUndefined();
+  });
+
+  // Android can freeze Pipkin while the screen is off; Pi must keep working rather than wait for it to read.
+  it("keeps Pi writing while the app is not reading", async () => {
+    const done = path.join(dirs.base, "flood-done");
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION } });
+    expect(await run.next()).toMatchObject({ type: "ready" });
+
+    run.socket.pause();
+    run.send({ type: "flood", bytes: 8 * MiB, done });
+    expect(await appears(done, 10_000)).toBe(true);
+
+    run.socket.resume();
+    await expectWholeFlood(run);
+    run.socket.end();
+    expect(await run.exited).toBe(0);
+  });
+
+  it("makes Pi wait once the unread output reaches the backlog limit, then delivers all of it", async () => {
+    const done = path.join(dirs.base, "flood-done");
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION } });
+    expect(await run.next()).toMatchObject({ type: "ready" });
+
+    run.socket.pause();
+    run.send({ type: "flood", bytes: 48 * MiB, done });
+    expect(await appears(done, 3000)).toBe(false);
+
+    run.socket.resume();
+    await expectWholeFlood(run);
+    expect(await appears(done, 10_000)).toBe(true);
+    run.socket.end();
+    expect(await run.exited).toBe(0);
+  });
+
+  // Pi blocks writing to its stdout, so only dropping the output lets it reach stdin EOF before the SIGTERM fallback.
+  it("lets a waiting Pi exit promptly once the app hangs up", async () => {
+    const done = path.join(dirs.base, "flood-done");
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION } });
+    expect(await run.next()).toMatchObject({ type: "ready" });
+
+    run.socket.pause();
+    run.send({ type: "flood", bytes: 48 * MiB, done });
+    expect(await appears(done, 3000)).toBe(false);
+
+    const hungUpAt = Date.now();
+    run.socket.destroy();
+    expect(await run.exited).toBe(0);
+    expect(Date.now() - hungUpAt).toBeLessThan(3000);
   });
 
   it("refuses a Pi version other than the expected one", async () => {
