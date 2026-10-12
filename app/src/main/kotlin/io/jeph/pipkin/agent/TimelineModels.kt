@@ -12,6 +12,12 @@ data class TimelineState(
   val thinkingLevel: String? = null,
 )
 
+/**
+ * The shortest time between two screen updates of streamed content. Every update re-parses and lays out the
+ * whole streamed block, so the screen takes about ten a second rather than one per delta.
+ */
+internal const val STREAM_UPDATE_MILLIS = 100L
+
 /** One row of the chat stream. [key] stays the same while a streamed block is rebuilt from `message_end`. */
 sealed interface TimelineItem {
   val key: String
@@ -23,6 +29,10 @@ sealed interface TimelineItem {
 
   data class Thinking(override val key: String, val text: String, val streaming: Boolean) : TimelineItem
 
+  /**
+   * While [argsStreaming], [args] is only parsed until the argument the chat row shows (`path`, or `command` for
+   * `bash`) is final; [ChatTimeline.streamingArguments] has the raw text that has arrived so far.
+   */
   data class ToolCall(
     override val key: String,
     val id: String,
@@ -31,6 +41,7 @@ sealed interface TimelineItem {
     val output: String?,
     val isError: Boolean,
     val status: ToolStatus,
+    val argsStreaming: Boolean = false,
   ) : TimelineItem
 
   data class Error(override val key: String, val message: String) : TimelineItem

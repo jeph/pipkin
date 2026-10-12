@@ -9,14 +9,30 @@ import org.json.JSONObject
  * is a key still waiting for its value. Null when the text does not open an object. Pi's RPC mode
  * drops that parsed form from `toolcall_delta`, so the app rebuilds it from the raw deltas.
  */
-internal fun parsePartialJsonObject(text: String): JSONObject? = PartialJsonReader(text).readTopObject()
+internal fun parsePartialJsonObject(text: String): JSONObject? = readPartialJsonObject(text)?.value
+
+/**
+ * [value] as [parsePartialJsonObject] reads it; [lastKey] is the top-level key read last, whose value is the
+ * only one that may still grow.
+ */
+internal class PartialJsonObject(val value: JSONObject, val lastKey: String?)
+
+internal fun readPartialJsonObject(text: String): PartialJsonObject? {
+  val reader = PartialJsonReader(text)
+  val value = reader.readTopObject() ?: return null
+  return PartialJsonObject(value, reader.lastTopKey)
+}
 
 private class PartialJsonReader(private val text: String) {
   private var index = 0
 
+  /** The top-level object's key whose value was read last. */
+  var lastTopKey: String? = null
+    private set
+
   fun readTopObject(): JSONObject? {
     skipWhitespace()
-    return if (peek() == '{') readObject() else null
+    return if (peek() == '{') readObject(top = true) else null
   }
 
   /** The value at the cursor, or null when none has fully started or a number or literal may still grow. */
@@ -24,14 +40,14 @@ private class PartialJsonReader(private val text: String) {
     skipWhitespace()
     return when (peek()) {
       null -> null
-      '{' -> readObject()
+      '{' -> readObject(top = false)
       '[' -> readArray()
       '"' -> readString().text
       else -> readScalar()
     }
   }
 
-  private fun readObject(): JSONObject {
+  private fun readObject(top: Boolean): JSONObject {
     val result = JSONObject()
     index++
     while (true) {
@@ -55,6 +71,7 @@ private class PartialJsonReader(private val text: String) {
       skipWhitespace()
       if (!key.closed || peek() != ':') return result
       index++
+      if (top) lastTopKey = key.text
       val value = readValue() ?: return result
       result.put(key.text, value)
     }

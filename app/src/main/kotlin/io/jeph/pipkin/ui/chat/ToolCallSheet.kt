@@ -15,7 +15,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,8 +27,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
+import io.jeph.pipkin.agent.STREAM_UPDATE_MILLIS
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.ToolStatus
+import io.jeph.pipkin.agent.parsePartialJsonObject
 import io.jeph.pipkin.ui.components.CodeBox
 import io.jeph.pipkin.ui.components.CodeText
 import io.jeph.pipkin.ui.components.LucideIcon
@@ -38,16 +42,20 @@ import io.jeph.pipkin.ui.components.rememberHighlightedCode
 import io.jeph.pipkin.ui.components.splitLines
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
  * Details of a thinking block or tool call; [item] is a [TimelineItem.Thinking] or [TimelineItem.ToolCall].
  * Opened while it still streams, the sheet follows its end like the chat does until the user drags away.
+ * [streamingArguments] gives a tool call's raw arguments while they stream, as the timeline's `streamingArguments`.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ToolCallSheet(item: TimelineItem, onDismiss: () -> Unit) {
+internal fun ToolCallSheet(item: TimelineItem, streamingArguments: (key: String) -> String?, onDismiss: () -> Unit) {
   val presentation = when (item) {
     is TimelineItem.ToolCall -> toolPresentation(item)
     is TimelineItem.Thinking -> toolPresentation(item)
@@ -70,11 +78,33 @@ internal fun ToolCallSheet(item: TimelineItem, onDismiss: () -> Unit) {
       ) {
         when (item) {
           is TimelineItem.Thinking -> PipkinMarkdown(item.text)
-          is TimelineItem.ToolCall -> ToolDetails(item)
+          is TimelineItem.ToolCall -> ToolDetails(withStreamedArguments(item, streamingArguments))
         }
       }
     }
   }
+}
+
+/**
+ * [item] with the arguments that have streamed in so far. The timeline only parses what the chat row shows, so
+ * while the sheet is open it parses the raw text itself, off the main thread and once per [STREAM_UPDATE_MILLIS].
+ */
+@Composable
+private fun withStreamedArguments(
+  item: TimelineItem.ToolCall,
+  streamingArguments: (key: String) -> String?,
+): TimelineItem.ToolCall {
+  if (!item.argsStreaming) return item
+  val streamed by produceState<JSONObject?>(null, item.key) {
+    withContext(Dispatchers.Default) {
+      while (true) {
+        val text = streamingArguments(item.key) ?: break
+        parsePartialJsonObject(text)?.let { value = it }
+        delay(STREAM_UPDATE_MILLIS)
+      }
+    }
+  }
+  return streamed?.let { item.copy(args = it) } ?: item
 }
 
 @Composable

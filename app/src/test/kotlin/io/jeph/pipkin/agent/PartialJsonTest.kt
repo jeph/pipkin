@@ -55,4 +55,13 @@ class PartialJsonTest {
     assertEquals("""{"a":1}""", parsePartialJsonObject("""{"a": 1, "b": 1e999}""").toString())
     assertEquals("{}", parsePartialJsonObject("""{"a" 1}""").toString())
   }
+
+  @Test
+  fun lastKeyIsTheTopLevelKeyReadLast() {
+    assertEquals("content", readPartialJsonObject("""{"path": "a", "content": "de""")?.lastKey)
+    assertEquals("path", readPartialJsonObject("""{"path": "a", "cont""")?.lastKey)
+    // Keys inside a nested value do not count: only a top-level value can still be growing at the end.
+    assertEquals("edits", readPartialJsonObject("""{"path": "a", "edits": [{"oldText": "x""")?.lastKey)
+    assertNull(readPartialJsonObject("{")?.lastKey)
+  }
 }

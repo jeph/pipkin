@@ -107,7 +107,7 @@ private fun ChatContent(
   modifier: Modifier,
 ) {
   val process = controller.process
-  val timeline by process.timeline.state.collectAsStateWithLifecycle()
+  val timeline by process.screenTimeline.collectAsStateWithLifecycle()
   val processState by process.state.collectAsStateWithLifecycle()
   val busy by process.busy.collectAsStateWithLifecycle()
   val keyboard = LocalSoftwareKeyboardController.current
@@ -242,7 +242,7 @@ private fun ChatSheets(
   onNewChat: (cwd: String) -> Unit,
 ) {
   val process = controller.process
-  val timeline by process.timeline.state.collectAsStateWithLifecycle()
+  val timeline by process.screenTimeline.collectAsStateWithLifecycle()
   val busy by process.busy.collectAsStateWithLifecycle()
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
   val sessionName by process.sessionName.collectAsStateWithLifecycle()
@@ -266,7 +266,7 @@ private fun ChatSheets(
 
     is ChatSheet.Tool -> {
       val item = timeline.items.firstOrNull { it.key == sheet.key }
-      if (item != null) ToolCallSheet(item, onDismiss = dismiss)
+      if (item != null) ToolCallSheet(item, process.timeline::streamingArguments, onDismiss = dismiss)
     }
 
     is ChatSheet.SessionInfo -> SessionInfoSheet(sheet.stats, sessionName, controller.home, onDismiss = dismiss)
@@ -285,7 +285,7 @@ private fun ChatDialogs(
   onChatDeleted: () -> Unit,
 ) {
   val process = controller.process
-  val timeline by process.timeline.state.collectAsStateWithLifecycle()
+  val timeline by process.screenTimeline.collectAsStateWithLifecycle()
   val sessionName by process.sessionName.collectAsStateWithLifecycle()
   val dismiss = { onSheet(null) }
   when (sheet) {

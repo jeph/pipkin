@@ -9,17 +9,21 @@ import io.jeph.pipkin.host.objects
 import io.jeph.pipkin.host.strings
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.consumeEach
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.plus
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -100,6 +104,16 @@ internal class AgentProcess(
   private var startJob: Job? = null
 
   val timeline = ChatTimeline()
+
+  /**
+   * [ChatTimeline.state] for the screen, at most once per [STREAM_UPDATE_MILLIS] and always ending on the latest
+   * state. A change after a quiet spell shows at once; while Pi streams, the deltas in between are combined.
+   */
+  val screenTimeline: StateFlow<TimelineState> = timeline.state
+    .transform { state ->
+      emit(state)
+      delay(STREAM_UPDATE_MILLIS)
+    }.stateIn(processScope + Dispatchers.Default, SharingStarted.Eagerly, timeline.state.value)
 
   val state: StateFlow<AgentProcessState> = stateFlow.asStateFlow()
 
@@ -261,7 +275,8 @@ internal class AgentProcess(
     }
     val current = Connection(channel)
     connection = current
-    processScope.launch { read(current) }
+    // Off the main thread: a streamed reply delivers dozens of events a second.
+    processScope.launch(Dispatchers.Default) { read(current) }
     return try {
       applyState(current.rpc.call("get_state"))
       timeline.seed(current.rpc.call("get_messages").optJSONArray("messages") ?: JSONArray())

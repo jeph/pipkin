@@ -140,19 +140,36 @@ class ChatTimelineTest {
   }
 
   @Test
-  fun toolArgumentsGrowWithTheirDeltasUntilToolcallEnd() {
+  fun streamingToolArgumentsParseOnlyUntilTheRowArgumentIsFinal() {
     apply("""{"type":"message_start","message":{"role":"assistant","content":[]}}""")
     update("""{"type":"toolcall_start","contentIndex":0,"id":"c2","toolName":"write"}""")
-    update("""{"type":"toolcall_delta","contentIndex":0,"delta":"{\"path\":\"a.py\",\"content\":\"de"}""")
-    assertEquals("de", (items[0] as ToolCall).args?.getString("content"))
+    assertTrue((items[0] as ToolCall).argsStreaming)
+    assertEquals("", timeline.streamingArguments("m0.0"))
+    update("""{"type":"toolcall_delta","contentIndex":0,"delta":"{\"path\":\"a.p"}""")
+    assertEquals("a.p", (items[0] as ToolCall).args?.getString("path"))
+    // A closed path is still the last key, so it is parsed once more when the next key starts.
+    update("""{"type":"toolcall_delta","contentIndex":0,"delta":"y\""}""")
+    update("""{"type":"toolcall_delta","contentIndex":0,"delta":",\"content\":\"de"}""")
+    assertEquals("a.py", (items[0] as ToolCall).args?.getString("path"))
     update("""{"type":"toolcall_delta","contentIndex":0,"delta":"f f():\\n"}""")
-    val streamed = (items[0] as ToolCall).args
-    assertEquals("a.py", streamed?.getString("path"))
-    assertEquals("def f():\n", streamed?.getString("content"))
+    assertEquals("a.py", (items[0] as ToolCall).args?.getString("path"))
+    assertEquals("""{"path":"a.py","content":"def f():\n""", timeline.streamingArguments("m0.0"))
 
     val call = """{"type":"toolCall","id":"c2","name":"write","arguments":{"path":"a.py","content":"done"}}"""
     update("""{"type":"toolcall_end","contentIndex":0,"toolCall":$call}""")
-    assertEquals("done", (items[0] as ToolCall).args?.getString("content"))
+    val tool = items[0] as ToolCall
+    assertEquals("done", tool.args?.getString("content"))
+    assertFalse(tool.argsStreaming)
+    assertNull(timeline.streamingArguments("m0.0"))
+  }
+
+  @Test
+  fun aBashCommandKeepsParsingWhileItIsTheLastKey() {
+    apply("""{"type":"message_start","message":{"role":"assistant","content":[]}}""")
+    update("""{"type":"toolcall_start","contentIndex":0,"id":"c3","toolName":"bash"}""")
+    update("""{"type":"toolcall_delta","contentIndex":0,"delta":"{\"command\":\"ls"}""")
+    update("""{"type":"toolcall_delta","contentIndex":0,"delta":" -la"}""")
+    assertEquals("ls -la", (items[0] as ToolCall).args?.getString("command"))
   }
 
   @Test

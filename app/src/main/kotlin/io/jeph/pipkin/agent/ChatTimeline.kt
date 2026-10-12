@@ -38,8 +38,8 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private var footer: TurnFooter? = null
   private var live: LiveMessage? = null
 
-  /** The raw JSON of each streaming tool call's arguments so far, by item key. */
-  private val streamingArgs = HashMap<String, StringBuilder>()
+  /** Each streaming tool call's arguments so far, by item key. */
+  private val streamingArgs = HashMap<String, StreamedArguments>()
 
   private var messageSeq = 0
   private var itemSeq = 0
@@ -115,6 +115,12 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
     }
   }
 
+  /**
+   * The raw JSON of tool call [key]'s arguments so far, or null once they finished streaming. The timeline item
+   * only carries what the chat row shows, so a view of the whole arguments parses this text itself.
+   */
+  fun streamingArguments(key: String): String? = synchronized(lock) { streamingArgs[key]?.text?.toString() }
+
   private fun dispatch(event: JSONObject) {
     when (event.optString("type")) {
       "agent_start" -> startRun()
@@ -162,6 +168,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private fun finishRun() {
     busy = false
     live = null
+    streamingArgs.clear()
     items.replaceAll(::settle)
     footer?.let { items += it.copy(durationMillis = clock() - it.startedAt) }
     footer = null
@@ -207,22 +214,28 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
 
       "thinking_end" -> upsert(key, newThinking) { it.copy(text = content ?: it.text, streaming = false) }
 
-      "toolcall_start" ->
-        upsert(key, { pendingTool(key, update.optString("id"), update.optString("toolName")) }) { it }
+      "toolcall_start" -> {
+        // Registered before the first delta, so streamingArguments is only null once the arguments ended.
+        streamingArgs.getOrPut(key, ::StreamedArguments)
+        upsert(key, { pendingTool(key, update.optString("id"), update.optString("toolName")) }) {
+          it.copy(argsStreaming = true)
+        }
+      }
 
       "toolcall_delta" -> {
-        val json = streamingArgs.getOrPut(key, ::StringBuilder).append(update.optString("delta"))
-        val args = parsePartialJsonObject(json.toString()) ?: return
-        val index = items.indexOfLast { it.key == key }
-        val tool = items.getOrNull(index) as? ToolCall ?: return
-        items[index] = tool.copy(args = args)
+        val streamed = streamingArgs.getOrPut(key, ::StreamedArguments)
+        streamed.text.append(update.optString("delta"))
+        val position = items.indexOfLast { it.key == key }
+        (items.getOrNull(position) as? ToolCall)?.let { tool ->
+          streamed.parseForRow(rowArgument(tool.toolName))?.let { items[position] = tool.copy(args = it) }
+        }
       }
 
       "toolcall_end" -> {
         streamingArgs.remove(key)
         val call = update.optJSONObject("toolCall") ?: return
         upsert(key, { pendingTool(key, call.optString("id"), call.optString("name")) }) {
-          it.copy(args = call.optJSONObject("arguments"))
+          it.copy(args = call.optJSONObject("arguments"), argsStreaming = false)
         }
       }
     }
@@ -368,6 +381,22 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   }
 
   private data class LiveMessage(val key: String, val role: String)
+
+  private class StreamedArguments {
+    val text = StringBuilder()
+    private var rowArgumentFinal = false
+
+    /**
+     * The arguments so far for a chat row showing [rowArgument], or null once that argument is final. Parsing
+     * costs as much as the text is long, and nothing on screen needs more than the row until a sheet opens.
+     */
+    fun parseForRow(rowArgument: String): JSONObject? {
+      if (rowArgumentFinal) return null
+      val parsed = readPartialJsonObject(text.toString()) ?: return null
+      rowArgumentFinal = parsed.value.has(rowArgument) && parsed.lastKey != rowArgument
+      return parsed.value
+    }
+  }
 }
 
 /** Rebuilds the items of one `user`, `assistant` or `bashExecution` message; [settled] marks tool calls finished. */
@@ -438,11 +467,14 @@ private fun assistantItems(message: JSONObject, prefix: String, settled: Boolean
 private fun pendingTool(key: String, id: String, toolName: String) =
   ToolCall(key, id, toolName, null, null, false, ToolStatus.Pending)
 
+/** The argument a tool call's chat row shows (see `toolPresentation`). */
+private fun rowArgument(toolName: String) = if (toolName == "bash") "command" else "path"
+
 /** Ends streaming on a run that settled: nothing is still typing or executing. */
 private fun settle(item: TimelineItem): TimelineItem = when {
   item is AssistantText && item.streaming -> item.copy(streaming = false)
   item is Thinking && item.streaming -> item.copy(streaming = false)
-  item is ToolCall && item.status != ToolStatus.Done -> item.copy(status = ToolStatus.Done)
+  item is ToolCall && item.status != ToolStatus.Done -> item.copy(status = ToolStatus.Done, argsStreaming = false)
   else -> item
 }
 
