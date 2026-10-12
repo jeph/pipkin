@@ -1,4 +1,4 @@
-import { access, mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -40,6 +40,19 @@ async function expectWholeFlood(run: HostRun): Promise<void> {
   expect(end).toEqual({ type: "flood_end", count: seqs.length });
   expect(seqs).toEqual(seqs.map((_, index) => index));
   expect(seqs.length).toBeGreaterThan(0);
+}
+
+/** Starts a chat with `packages` bundled and returns `web-search.json` as Pi then finds it, or null when absent. */
+async function webSearchConfigAfterLaunch(dirs: Dirs, packages: string[]): Promise<string | null> {
+  const packageJson = runtimeManifest(packages);
+  await writeRuntimeManifest(dirs, packageJson);
+  const { run } = await startHost("rpc", dirs);
+  await run.next();
+  run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson } });
+  expect(await run.next()).toMatchObject({ type: "ready" });
+  run.socket.end();
+  await run.exited;
+  return readFile(path.join(dirs.configDir, "web-search.json"), "utf8").catch(() => null);
 }
 
 describe("rpc mode", () => {
@@ -213,6 +226,27 @@ describe("rpc mode", () => {
     });
     run.socket.end();
     await run.exited;
+  });
+
+  describe("pi-web-access tool activation", () => {
+    it.each([
+      ["no config", null, { toolActivation: "eager" }],
+      ["a config without a choice", JSON.stringify({ braveApiKey: "k" }), { braveApiKey: "k", toolActivation: "eager" }],
+      ["the user's own choice", JSON.stringify({ toolActivation: "auto" }), { toolActivation: "auto" }],
+    ])("makes the web tools eager given %s, keeping other settings", async (_, before, after) => {
+      if (before !== null) await writeFile(path.join(dirs.configDir, "web-search.json"), before);
+      const config = await webSearchConfigAfterLaunch(dirs, ["pi-web-access"]);
+      expect(JSON.parse(config ?? "null")).toEqual(after);
+    });
+
+    it("leaves a config that is not a JSON object untouched", async () => {
+      await writeFile(path.join(dirs.configDir, "web-search.json"), "{ broken");
+      expect(await webSearchConfigAfterLaunch(dirs, ["pi-web-access"])).toBe("{ broken");
+    });
+
+    it("writes no config when pi-web-access is not bundled", async () => {
+      expect(await webSearchConfigAfterLaunch(dirs, ["other"])).toBeNull();
+    });
   });
 
   it("asks for a reinstall when the bundled packages changed but Pi's version did not", async () => {

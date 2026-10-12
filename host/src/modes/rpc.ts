@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import type { Socket } from "node:net";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
@@ -18,6 +18,7 @@ const KILL_AFTER_MS = 5000;
  * bounded.
  */
 const OUTPUT_BACKLOG_LIMIT = 32 * 1024 * 1024;
+const WEB_ACCESS_PACKAGE = "pi-web-access";
 
 /** Keeps only the newest bytes of Pi's stderr for the exit report. */
 class TailBuffer {
@@ -87,18 +88,38 @@ async function userNpmPackages(configDir: string): Promise<Set<string>> {
   return names;
 }
 
-/**
- * Pipkin's bundled Pi packages, loaded with `-e`: every runtime dependency besides Pi, minus any the user installs
- * through Pi's global settings. Pi exits when two copies of one extension register the same tools, so the user's
- * copy wins.
- */
-async function bundledExtensionDirs(ctx: ModeContext, packageJson: string): Promise<string[]> {
+/** Pipkin's bundled Pi packages: every runtime dependency besides Pi. */
+function bundledPackages(packageJson: string): string[] {
   const manifest = JSON.parse(packageJson) as unknown;
   const dependencies = isObject(manifest) && isObject(manifest.dependencies) ? Object.keys(manifest.dependencies) : [];
+  return dependencies.filter((name) => name !== PI_PACKAGE);
+}
+
+/**
+ * The bundled packages to load with `-e`, minus any the user installs through Pi's global settings. Pi exits when two
+ * copies of one extension register the same tools, so the user's copy wins.
+ */
+async function bundledExtensionDirs(ctx: ModeContext, packages: string[]): Promise<string[]> {
   const userPackages = await userNpmPackages(ctx.env.configDir);
-  return dependencies
-    .filter((name) => name !== PI_PACKAGE && !userPackages.has(name))
-    .map((name) => join(ctx.env.root, "pi", "node_modules", name));
+  return packages.filter((name) => !userPackages.has(name)).map((name) => join(ctx.env.root, "pi", "node_modules", name));
+}
+
+/**
+ * Sets pi-web-access's `toolActivation` to `eager` in its `web-search.json` unless the user chose one, so every chat
+ * has the web tools from its first request instead of behind a `web_enable` call some models only make sometimes.
+ * A file that is not a JSON object is left alone; pi-web-access reports it itself.
+ */
+async function defaultWebToolsToEager(configDir: string): Promise<void> {
+  const path = join(configDir, "web-search.json");
+  let config: unknown;
+  try {
+    config = JSON.parse(await readFile(path, "utf8"));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") return;
+    config = {};
+  }
+  if (!isObject(config) || "toolActivation" in config) return;
+  await writeFile(path, `${JSON.stringify({ ...config, toolActivation: "eager" }, null, 2)}\n`);
 }
 
 /** Error results for rpc; success has no result line, only `pipkin_exit`. */
@@ -139,7 +160,9 @@ export async function rpc(ctx: ModeContext): Promise<void> {
 
   const args = [await piEntry(ctx.env.root), "--mode", "rpc"];
   if (sessionPath !== null) args.push("--session", sessionPath);
-  for (const dir of await bundledExtensionDirs(ctx, packageJson)) args.push("--extension", dir);
+  const packages = bundledPackages(packageJson);
+  if (packages.includes(WEB_ACCESS_PACKAGE)) await defaultWebToolsToEager(ctx.env.configDir);
+  for (const dir of await bundledExtensionDirs(ctx, packages)) args.push("--extension", dir);
   args.push("--append-system-prompt", systemAppend(ctx.env.configDir));
   const child = spawn(process.execPath, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
   const { socket } = ctx.conn;
