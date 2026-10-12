@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The long glyph path keeps its exact shape: the launcher renders this vector once per refresh, and
-     SimmeringPot draws the named groups as cached paths instead of rendering the vector. -->
+     SimmeringPot draws the named groups as cached paths instead of rendering the vector, so it ignores this
+     group's transform.
+     The pot is scaled 1.3x about (256, 272), the centre of the smallest circle around it, which lands on the
+     icon's centre. Its farthest point, a leg's end, is then 210 units from the centre, inside the 66dp
+     (235-unit) circle that every launcher mask shape keeps visible. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" android:width="108dp" android:height="108dp" android:viewportWidth="768" android:viewportHeight="768" tools:ignore="VectorPath">
-    <group android:translateX="128" android:translateY="122">
+    <group android:translateX="128" android:translateY="112" android:pivotX="256" android:pivotY="272" android:scaleX="1.3" android:scaleY="1.3">
         <group android:name="handle">
             <path android:pathData="M344 245H403A12 12 0 0 1 403 269H344Z" android:fillColor="#BD5132" />
         </group>
