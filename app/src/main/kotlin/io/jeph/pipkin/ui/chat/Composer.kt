@@ -66,7 +66,7 @@ import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import org.json.JSONObject
@@ -339,7 +339,7 @@ private fun PrimaryButton(action: PrimaryAction, onSend: () -> Unit, onStop: () 
       modifier = Modifier.size(28.dp).clip(CircleShape).background(colors.accent),
       contentAlignment = Alignment.Center,
     ) {
-      Spinner(tint = colors.accentForeground)
+      SimmeringPot(tint = colors.accentForeground)
     }
 
     PrimaryAction.Send, PrimaryAction.Idle -> IconButton28(

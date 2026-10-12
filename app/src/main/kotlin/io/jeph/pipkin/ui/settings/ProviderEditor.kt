@@ -33,7 +33,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.ProviderConfig
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -197,7 +197,7 @@ private fun ConnectionCheckRow(form: ProviderForm, onCheck: () -> Unit) {
   val check = form.check
   Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
     OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth(), enabled = form.canCheck) {
-      if (check is ConnectionCheck.Checking) Spinner() else Text(stringResource(R.string.provider_check))
+      if (check is ConnectionCheck.Checking) SimmeringPot() else Text(stringResource(R.string.provider_check))
     }
     when (check) {
       is ConnectionCheck.Ok -> Row(
@@ -224,7 +224,7 @@ private fun ProviderActions(form: ProviderForm, onSave: () -> Unit, onRemove: ()
   val colors = pipkinColors
   form.formError?.let { SettingsCaption(text = it, color = colors.destructive) }
   Button(onClick = onSave, modifier = Modifier.fillMaxWidth(), enabled = form.canSave) {
-    if (form.saving) Spinner(tint = colors.accentForeground) else Text(stringResource(R.string.provider_save))
+    if (form.saving) SimmeringPot(tint = colors.accentForeground) else Text(stringResource(R.string.provider_save))
   }
   if (form.editing) {
     TextButton(

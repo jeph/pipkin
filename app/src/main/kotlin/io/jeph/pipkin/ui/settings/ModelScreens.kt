@@ -34,7 +34,7 @@ import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.ModelConfig
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.math.BigDecimal
@@ -216,7 +216,7 @@ private fun CustomModelField(input: CustomModelInput, onAdd: () -> Unit) {
         singleLine = true,
       )
       if (input.adding) {
-        Spinner()
+        SimmeringPot()
       } else {
         IconButton28(
           icon = R.drawable.ic_lucide_plus,

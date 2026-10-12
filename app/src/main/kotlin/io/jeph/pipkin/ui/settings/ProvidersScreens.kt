@@ -39,7 +39,7 @@ import io.jeph.pipkin.ui.auth.ProviderLogo
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -64,7 +64,7 @@ internal fun ProvidersScreen(
     val custom = current?.custom.orEmpty()
     when {
       current == null && refreshError == null ->
-        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Spinner() }
+        Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SimmeringPot() }
 
       signedIn.isEmpty() && custom.isEmpty() -> SettingsCaption(text = stringResource(R.string.providers_empty))
 

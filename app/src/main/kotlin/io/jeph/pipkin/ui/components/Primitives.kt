@@ -1,12 +1,6 @@
 package io.jeph.pipkin.ui.components
 
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -63,30 +56,6 @@ fun LucideIcon(
     painter = painterResource(icon),
     contentDescription = contentDescription,
     modifier = modifier.size(size),
-    tint = tint,
-  )
-}
-
-/** Lucide `loader` rotating continuously; Paseo's activity indicator. */
-@Composable
-fun Spinner(
-  modifier: Modifier = Modifier,
-  size: Dp = PipkinTokens.IconSize.md,
-  tint: Color = pipkinColors.foregroundMuted,
-) {
-  val transition = rememberInfiniteTransition(label = "spinner")
-  val angle =
-    transition.animateFloat(
-      initialValue = 0f,
-      targetValue = 360f,
-      animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Restart),
-      label = "spinnerAngle",
-    )
-  LucideIcon(
-    icon = R.drawable.ic_lucide_loader,
-    contentDescription = null,
-    modifier = modifier.rotate(angle.value),
-    size = size,
     tint = tint,
   )
 }

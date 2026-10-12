@@ -42,7 +42,7 @@ import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.settings.copyToClipboard
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -121,7 +121,7 @@ private fun RunningContent(flow: LoginFlowState, onOpen: (String) -> Unit) {
   val status = flow.status
   val prompt = flow.prompt
   if (browser == null && deviceCode == null && status == null && prompt == null) {
-    LeadingRow(text = stringResource(R.string.login_starting), color = pipkinColors.foregroundMuted) { Spinner() }
+    LeadingRow(text = stringResource(R.string.login_starting), color = pipkinColors.foregroundMuted) { SimmeringPot() }
   }
   browser?.let { BrowserBlock(step = it, onOpen = onOpen) }
   deviceCode?.let { DeviceCodeBlock(step = it, onOpen = onOpen) }
@@ -143,7 +143,7 @@ private fun RunningContent(flow: LoginFlowState, onOpen: (String) -> Unit) {
 @Composable
 private fun BrowserBlock(step: BrowserStep, onOpen: (String) -> Unit) {
   Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
-    LeadingRow(text = stringResource(R.string.login_browser)) { Spinner() }
+    LeadingRow(text = stringResource(R.string.login_browser)) { SimmeringPot() }
     step.instructions?.let {
       Text(text = it, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.base)
     }

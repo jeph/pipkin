@@ -35,7 +35,7 @@ import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinMarkdown
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.time.Instant
@@ -144,7 +144,7 @@ internal fun ToolRow(presentation: ToolPresentation, onClick: () -> Unit, modifi
   ) {
     Box(modifier = Modifier.size(22.dp), contentAlignment = Alignment.Center) {
       if (presentation.running) {
-        Spinner(size = PipkinTokens.IconSize.sm)
+        SimmeringPot(size = PipkinTokens.IconSize.sm)
       } else {
         LucideIcon(
           icon = presentation.icon,
@@ -212,7 +212,7 @@ internal fun TurnFooterRow(item: TimelineItem.TurnFooter, replyText: String?, mo
   ) {
     val duration = item.durationMillis
     if (duration == null) {
-      Spinner(size = PipkinTokens.IconSize.sm)
+      SimmeringPot(size = PipkinTokens.IconSize.sm)
       RunningElapsed(item.startedAt)
     } else {
       Text(text = durationText(duration), color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)

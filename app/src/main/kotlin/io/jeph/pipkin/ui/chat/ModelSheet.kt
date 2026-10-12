@@ -30,7 +30,7 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SearchField
 import io.jeph.pipkin.ui.components.SheetRow
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import org.json.JSONObject
@@ -157,7 +157,7 @@ private fun SheetTitle(text: String) {
 
 @Composable
 private fun Loading() {
-  Box(modifier = Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.Center) { Spinner() }
+  Box(modifier = Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.Center) { SimmeringPot() }
 }
 
 @Composable

@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -87,7 +87,7 @@ private fun StatusBadge(number: Int, status: StepStatus) {
         tint = colors.accent,
       )
 
-      StepStatus.Running -> Spinner(tint = colors.foreground)
+      StepStatus.Running -> SimmeringPot(tint = colors.foreground)
 
       StepStatus.Failed -> LucideIcon(
         icon = R.drawable.ic_lucide_circle_alert,

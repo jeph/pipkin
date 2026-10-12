@@ -18,7 +18,7 @@ import io.jeph.pipkin.AppGraph
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.termux.TermuxInstall
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.io.IOException
@@ -101,7 +101,7 @@ private fun ReinstallRow(
     enabled = !installing,
     onClick = onReinstall,
   ) {
-    if (installing) Spinner()
+    if (installing) SimmeringPot()
   }
   if (installing && progressLine != null) {
     Text(

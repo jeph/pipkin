@@ -36,7 +36,7 @@ import io.jeph.pipkin.ui.components.CodeText
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinMarkdown
 import io.jeph.pipkin.ui.components.PipkinSheet
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.fileLanguage
 import io.jeph.pipkin.ui.components.rememberHighlightedCode
 import io.jeph.pipkin.ui.components.splitLines
@@ -119,7 +119,7 @@ private fun SheetTitle(presentation: ToolPresentation) {
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
     if (presentation.running) {
-      Spinner()
+      SimmeringPot()
     } else {
       LucideIcon(
         icon = presentation.icon,
@@ -201,7 +201,7 @@ private fun RunningLine() {
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
-    Spinner(size = PipkinTokens.IconSize.sm)
+    SimmeringPot(size = PipkinTokens.IconSize.sm)
     Text(
       text = stringResource(R.string.chat_running),
       color = pipkinColors.foregroundMuted,

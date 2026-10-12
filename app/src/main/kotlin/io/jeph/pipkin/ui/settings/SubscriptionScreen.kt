@@ -26,7 +26,7 @@ import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.auth.LoginSheet
 import io.jeph.pipkin.ui.auth.ProviderLogo
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -133,7 +133,11 @@ private fun SubscriptionModels(
   )
   form.formError?.let { SettingsCaption(text = it, color = pipkinColors.destructive) }
   Button(onClick = onSave, modifier = Modifier.fillMaxWidth(), enabled = form.canSave) {
-    if (form.saving) Spinner(tint = pipkinColors.accentForeground) else Text(stringResource(R.string.provider_save))
+    if (form.saving) {
+      SimmeringPot(tint = pipkinColors.accentForeground)
+    } else {
+      Text(stringResource(R.string.provider_save))
+    }
   }
   SettingsSection(title = null) {
     SettingsRow(
@@ -155,11 +159,11 @@ private suspend fun signOut(accounts: AccountRepository, id: String, fallbackErr
   rejected.error
 }
 
-/** Spinner while [loading], the signed-in badge, or a sign-in button; nothing when status is unknown. */
+/** The loading pot while [loading], the signed-in badge, or a sign-in button; nothing when status is unknown. */
 @Composable
 private fun SubscriptionStatus(loading: Boolean, signedIn: Boolean?, onSignIn: () -> Unit) {
   when {
-    loading -> Spinner()
+    loading -> SimmeringPot()
     signedIn == true -> SignedInBadge()
     signedIn == false -> SmallButton(label = stringResource(R.string.settings_sign_in), onClick = onSignIn)
   }

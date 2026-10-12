@@ -31,7 +31,7 @@ import io.jeph.pipkin.termux.TermuxSetup
 import io.jeph.pipkin.ui.components.CodeBox
 import io.jeph.pipkin.ui.components.CodeText
 import io.jeph.pipkin.ui.components.LucideIcon
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -70,7 +70,7 @@ private fun BannerLine(text: String, modifier: Modifier = Modifier) {
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8, Alignment.CenterHorizontally),
   ) {
-    Spinner(size = PipkinTokens.IconSize.sm)
+    SimmeringPot(size = PipkinTokens.IconSize.sm)
     Text(text = text, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
   }
 }

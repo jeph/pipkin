@@ -52,7 +52,7 @@ import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SearchField
 import io.jeph.pipkin.ui.components.SheetRow
-import io.jeph.pipkin.ui.components.Spinner
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.onboarding.PrimaryButton
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -129,7 +129,7 @@ private fun ColumnScope.Browser(
       maxLines = 1,
       overflow = TextOverflow.MiddleEllipsis,
     )
-    if (state.loading) Spinner()
+    if (state.loading) SimmeringPot()
   }
   val added = listing != null && isWorkspace(listing.path)
   PrimaryButton(
