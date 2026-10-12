@@ -84,14 +84,17 @@ export async function ensure(ctx: ModeContext): Promise<JsonObject> {
   await mkdir(piDir, { recursive: true });
   await mkdir(ctx.env.configDir, { recursive: true });
 
+  const packageJsonPath = join(piDir, "package.json");
   const lockPath = join(piDir, "package-lock.json");
-  const onDiskLock = await readFile(lockPath).catch(() => null);
+  const [onDiskPackageJson, onDiskLock] = await Promise.all([
+    readFile(packageJsonPath, "utf8").catch(() => null),
+    readFile(lockPath, "utf8").catch(() => null),
+  ]);
+  // rpc refuses a package.json that differs from the app's, so both files must match to skip the install.
   const current =
-    (await installedPiVersion(ctx.env.root)) === expectedVersion &&
-    onDiskLock !== null &&
-    onDiskLock.equals(Buffer.from(packageLock, "utf8"));
+    (await installedPiVersion(ctx.env.root)) === expectedVersion && onDiskPackageJson === packageJson && onDiskLock === packageLock;
   if (!current) {
-    await writeFile(join(piDir, "package.json"), packageJson);
+    await writeFile(packageJsonPath, packageJson);
     await writeFile(lockPath, packageLock);
     await npmCi(ctx, piDir);
   }

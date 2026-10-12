@@ -1,10 +1,21 @@
-import { access } from "node:fs/promises";
+import { access, mkdir, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { encodeLine } from "../src/framing.js";
 import { systemAppend } from "../src/prompt.js";
-import { type Dirs, type HostRun, installFakePi, makeDirs, PI_VERSION, removeDirs, startHost } from "./harness.js";
+import {
+  type Dirs,
+  type HostRun,
+  installFakePi,
+  makeDirs,
+  PACKAGE_JSON,
+  PI_VERSION,
+  removeDirs,
+  runtimeManifest,
+  startHost,
+  writeRuntimeManifest,
+} from "./harness.js";
 
 const MiB = 1024 * 1024;
 
@@ -64,8 +75,10 @@ describe("rpc mode", () => {
     await run.next();
     const first = { id: "1", type: "prompt", message: "line\u2028separator" };
     run.socket.write(
-      encodeLine({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: "/s.jsonl", expectedVersion: PI_VERSION } }) +
-        encodeLine(first),
+      encodeLine({
+        type: "pipkin_request",
+        params: { cwd: dirs.home, sessionPath: "/s.jsonl", expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON },
+      }) + encodeLine(first),
     );
     expect(await run.next()).toEqual({
       type: "ready",
@@ -89,7 +102,7 @@ describe("rpc mode", () => {
     const marker = path.join(dirs.base, "eof");
     const { run } = await startHost("rpc", dirs, { FAKE_PI_MARKER: marker });
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON } });
     expect(await run.next()).toMatchObject({ type: "ready" });
     run.socket.destroy();
     // The host exits only after Pi exited, and fake-pi writes the marker on stdin EOF.
@@ -102,7 +115,7 @@ describe("rpc mode", () => {
     const done = path.join(dirs.base, "flood-done");
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON } });
     expect(await run.next()).toMatchObject({ type: "ready" });
 
     run.socket.pause();
@@ -119,7 +132,7 @@ describe("rpc mode", () => {
     const done = path.join(dirs.base, "flood-done");
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON } });
     expect(await run.next()).toMatchObject({ type: "ready" });
 
     run.socket.pause();
@@ -138,7 +151,7 @@ describe("rpc mode", () => {
     const done = path.join(dirs.base, "flood-done");
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON } });
     expect(await run.next()).toMatchObject({ type: "ready" });
 
     run.socket.pause();
@@ -154,7 +167,59 @@ describe("rpc mode", () => {
   it("refuses a Pi version other than the expected one", async () => {
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: "9.9.9" } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: "9.9.9", packageJson: PACKAGE_JSON } });
+    expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "pi_version" });
+    expect(await run.next()).toBeUndefined();
+  });
+
+  it("loads every bundled package besides Pi as an extension", async () => {
+    const packageJson = runtimeManifest(["pi-web-access", "@scope/tools"]);
+    await writeRuntimeManifest(dirs, packageJson);
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson } });
+    const modules = path.join(dirs.root, "pi/node_modules");
+    expect(await run.next()).toMatchObject({
+      type: "ready",
+      argv: [
+        "--mode",
+        "rpc",
+        "--extension",
+        path.join(modules, "pi-web-access"),
+        "--extension",
+        path.join(modules, "@scope/tools"),
+        "--append-system-prompt",
+        systemAppend(dirs.configDir),
+      ],
+    });
+    run.socket.end();
+    await run.exited;
+  });
+
+  it("leaves out a bundled package the user's global settings install from npm, but not one only a project declares", async () => {
+    const packageJson = runtimeManifest(["pi-web-access", "@scope/tools", "kept"]);
+    await writeRuntimeManifest(dirs, packageJson);
+    const globalPackages = ["npm:pi-web-access@0.38.0", { source: "npm:@scope/tools@^1", skills: [] }, "npm:kept-not"];
+    await writeFile(path.join(dirs.configDir, "settings.json"), `\uFEFF${JSON.stringify({ packages: globalPackages })}`);
+    // Pi may leave an untrusted project's packages unloaded, so the bundled copy must stay.
+    await mkdir(path.join(dirs.home, ".pi"));
+    await writeFile(path.join(dirs.home, ".pi/settings.json"), JSON.stringify({ packages: ["npm:kept"] }));
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson } });
+    expect(await run.next()).toMatchObject({
+      type: "ready",
+      argv: ["--mode", "rpc", "--extension", path.join(dirs.root, "pi/node_modules/kept"), "--append-system-prompt", systemAppend(dirs.configDir)],
+    });
+    run.socket.end();
+    await run.exited;
+  });
+
+  it("asks for a reinstall when the bundled packages changed but Pi's version did not", async () => {
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    const packageJson = runtimeManifest(["pi-web-access"]);
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson } });
     expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "pi_version" });
     expect(await run.next()).toBeUndefined();
   });
@@ -162,7 +227,10 @@ describe("rpc mode", () => {
   it("reports a missing working directory", async () => {
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: path.join(dirs.base, "nope"), sessionPath: null, expectedVersion: PI_VERSION } });
+    run.send({
+      type: "pipkin_request",
+      params: { cwd: path.join(dirs.base, "nope"), sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON },
+    });
     expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "cwd_missing" });
   });
 });

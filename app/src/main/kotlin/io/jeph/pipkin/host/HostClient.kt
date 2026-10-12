@@ -33,9 +33,12 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   private val failureState = MutableStateFlow<HostFailure?>(null)
   private val installingState = MutableStateFlow(false)
 
-  /** The Pi version the bundled `pi/package.json` pins; `ensure` installs it, `rpc` requires it. */
+  /** The bundled `pi/package.json`: Pi and the Pi packages Pipkin ships; `ensure` installs it, `rpc` requires it. */
+  private val packageJson: String by lazy { asset(PACKAGE_JSON) }
+
+  /** The Pi version the bundled `pi/package.json` pins. */
   val expectedPiVersion: String by lazy {
-    JSONObject(asset(PACKAGE_JSON)).getJSONObject("dependencies").getString(PI_PACKAGE)
+    JSONObject(packageJson).getJSONObject("dependencies").getString(PI_PACKAGE)
   }
 
   /** Hello of the most recent host that connected; Pi's version is updated after [ensure]. */
@@ -53,7 +56,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     try {
       val params = withContext(Dispatchers.IO) {
         JSONObject()
-          .put("packageJson", asset(PACKAGE_JSON))
+          .put("packageJson", packageJson)
           .put("packageLock", asset(PACKAGE_LOCK))
           .put("expectedVersion", expectedPiVersion)
       }
@@ -173,7 +176,8 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
         JSONObject()
           .put("cwd", cwd)
           .put("sessionPath", sessionPath ?: JSONObject.NULL)
-          .put("expectedVersion", expectedPiVersion),
+          .put("expectedVersion", expectedPiVersion)
+          .put("packageJson", packageJson),
       )
       sent = true
     } finally {

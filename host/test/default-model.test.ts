@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { isObject, type JsonObject } from "../src/framing.js";
-import { type Dirs, installRealPi, makeDirs, PI_VERSION, removeDirs, runMode, startHost } from "./harness.js";
+import { type Dirs, installRealPi, makeDirs, PACKAGE_JSON, PI_VERSION, removeDirs, runMode, startHost } from "./harness.js";
 
 const PROVIDER = {
   baseUrl: "https://example.test/v1",
@@ -38,7 +38,7 @@ describe("default_model mode", () => {
   async function newSessionState(): Promise<JsonObject> {
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON } });
     run.send({ id: "s", type: "get_state" });
     for (;;) {
       const message = await run.next();

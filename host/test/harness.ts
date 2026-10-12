@@ -8,6 +8,8 @@ import { inject } from "vitest";
 import { encodeLine, isObject, LineSplitter, type JsonObject } from "../src/framing.js";
 
 export const PI_VERSION = "1.1.0";
+/** The runtime `pi/package.json` that `ensure` would have installed: Pi alone, no bundled extensions. */
+export const PACKAGE_JSON = runtimeManifest([]);
 const FAKE_PI = path.join(import.meta.dirname, "fixtures/fake-pi.mjs");
 const REAL_PI = path.join(import.meta.dirname, "../node_modules/@earendil-works/pi-coding-agent");
 const PROVIDER_CREDENTIAL = /_(API_KEY|TOKEN)$|^(AWS|GOOGLE|AZURE)_/;
@@ -34,12 +36,24 @@ function piDir(dirs: Dirs): string {
   return path.join(dirs.root, "pi/node_modules/@earendil-works/pi-coding-agent");
 }
 
+/** A runtime `pi/package.json` pinning Pi and the given bundled extension packages. */
+export function runtimeManifest(extensions: string[]): string {
+  const dependencies = Object.fromEntries([["@earendil-works/pi-coding-agent", PI_VERSION], ...extensions.map((name) => [name, "1.0.0"])]);
+  return JSON.stringify({ name: "pipkin-pi-runtime", private: true, dependencies });
+}
+
+/** Writes the runtime `pi/package.json` the way `ensure` leaves it after an install. */
+export async function writeRuntimeManifest(dirs: Dirs, packageJson = PACKAGE_JSON): Promise<void> {
+  await writeFile(path.join(dirs.root, "pi/package.json"), packageJson);
+}
+
 /** Installs fake-pi as the pinned Pi package, with Pi's real `bin.pi` layout. */
 export async function installFakePi(dirs: Dirs, version = PI_VERSION): Promise<void> {
   const dir = piDir(dirs);
   await mkdir(path.join(dir, "dist/bundle"), { recursive: true });
   await writeFile(path.join(dir, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", version, bin: { pi: "dist/bundle/cli.js" } }));
   await writeFile(path.join(dir, "dist/bundle/cli.js"), `import ${JSON.stringify(FAKE_PI)};\n`);
+  await writeRuntimeManifest(dirs);
 }
 
 /** Links the real Pi 1.1.0 devDependency in as the pinned install, for modes that use the SDK. */
@@ -47,6 +61,7 @@ export async function installRealPi(dirs: Dirs): Promise<void> {
   const dir = piDir(dirs);
   await mkdir(path.dirname(dir), { recursive: true });
   await symlink(await realpath(REAL_PI), dir);
+  await writeRuntimeManifest(dirs);
 }
 
 export class HostRun {

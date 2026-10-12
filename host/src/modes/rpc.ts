@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import type { Socket } from "node:net";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
-import { installedPiVersion, piPackageDir } from "../env.js";
+import { installedPiVersion, PI_PACKAGE, piPackageDir } from "../env.js";
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { nullableStringParam, stringParam } from "../params.js";
@@ -66,6 +66,41 @@ async function piEntry(root: string): Promise<string> {
   return join(dir, entry);
 }
 
+/**
+ * npm package names the user's global Pi settings install. Pi parses `npm:<name>[@version]` sources with this same
+ * pattern and identifies npm packages by name. Project settings are left out: Pi loads them only after a trust
+ * decision that extensions, `trust.json` and prompts can make, which the host cannot predict.
+ */
+async function userNpmPackages(configDir: string): Promise<Set<string>> {
+  const names = new Set<string>();
+  // A missing or malformed file declares nothing here; Pi reports a malformed one itself.
+  const settings = await readFile(join(configDir, "settings.json"), "utf8")
+    .then((text) => JSON.parse(text.replace(/^\uFEFF/, "")) as unknown)
+    .catch(() => null);
+  if (!isObject(settings) || !Array.isArray(settings.packages)) return names;
+  for (const entry of settings.packages as unknown[]) {
+    const source = isObject(entry) ? entry.source : entry;
+    if (typeof source !== "string" || !source.startsWith("npm:")) continue;
+    const spec = source.slice("npm:".length).trim();
+    names.add(/^(@?[^@]+(?:\/[^@]+)?)(?:@.+)?$/.exec(spec)?.[1] ?? spec);
+  }
+  return names;
+}
+
+/**
+ * Pipkin's bundled Pi packages, loaded with `-e`: every runtime dependency besides Pi, minus any the user installs
+ * through Pi's global settings. Pi exits when two copies of one extension register the same tools, so the user's
+ * copy wins.
+ */
+async function bundledExtensionDirs(ctx: ModeContext, packageJson: string): Promise<string[]> {
+  const manifest = JSON.parse(packageJson) as unknown;
+  const dependencies = isObject(manifest) && isObject(manifest.dependencies) ? Object.keys(manifest.dependencies) : [];
+  const userPackages = await userNpmPackages(ctx.env.configDir);
+  return dependencies
+    .filter((name) => name !== PI_PACKAGE && !userPackages.has(name))
+    .map((name) => join(ctx.env.root, "pi", "node_modules", name));
+}
+
 /** Error results for rpc; success has no result line, only `pipkin_exit`. */
 function fail(ctx: ModeContext, code: string, error: string): void {
   ctx.conn.send({ type: "pipkin_result", ok: false, error, code });
@@ -80,10 +115,17 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const cwd = stringParam(ctx.params, "cwd");
   const sessionPath = nullableStringParam(ctx.params, "sessionPath");
   const expectedVersion = stringParam(ctx.params, "expectedVersion");
+  const packageJson = stringParam(ctx.params, "packageJson");
   const installed = await installedPiVersion(ctx.env.root);
   if (installed !== expectedVersion) {
     const found = installed === null ? "The agent is not installed" : `Agent ${installed} is installed`;
     fail(ctx, "pi_version", `${found}; Pipkin needs ${expectedVersion}`);
+    return;
+  }
+  // Bundled extensions can change while Pi's version stays put; ensure installs from this same manifest.
+  const installedPackageJson = await readFile(join(ctx.env.root, "pi", "package.json"), "utf8").catch(() => null);
+  if (installedPackageJson !== packageJson) {
+    fail(ctx, "pi_version", "The agent's bundled extensions are out of date");
     return;
   }
   const isDirectory = await stat(cwd).then(
@@ -97,6 +139,7 @@ export async function rpc(ctx: ModeContext): Promise<void> {
 
   const args = [await piEntry(ctx.env.root), "--mode", "rpc"];
   if (sessionPath !== null) args.push("--session", sessionPath);
+  for (const dir of await bundledExtensionDirs(ctx, packageJson)) args.push("--extension", dir);
   args.push("--append-system-prompt", systemAppend(ctx.env.configDir));
   const child = spawn(process.execPath, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
   const { socket } = ctx.conn;
