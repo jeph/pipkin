@@ -64,6 +64,13 @@ internal class ChatController(
   var sending by mutableStateOf(false)
     private set
 
+  /** Whether [sending] a slash command, which Pi answers only once the command finished. */
+  var sendingCommand by mutableStateOf(false)
+    private set
+
+  /** Stop was pressed before Pi answered the prompt being sent, so the run that prompt starts is aborted. */
+  private var stopRequested = false
+
   /** Whether the stream keeps its end in view. Sending turns it back on. */
   val follow = mutableStateOf(true)
 
@@ -104,17 +111,21 @@ internal class ChatController(
     draft = TextFieldValue()
     attachments.clear()
     sending = true
+    sendingCommand = sentDraft.text.trim().startsWith("/")
+    stopRequested = false
     follow.value = true
     scope.launch {
       val failure = try {
         val files = picked.filterIsInstance<Attachment.File>().map { it.name to it.bytes }
         val paths = if (files.isEmpty()) emptyList() else graph.hostClient.saveAttachments(files)
-        process.prompt(
+        val disposition = process.prompt(
           withFilePaths(sentDraft.text.trim(), paths),
           picked.filterIsInstance<Attachment.Image>().map {
             it.part
           },
         )
+        // Pi starts the run just after answering, so an abort sent now reaches it.
+        if (stopRequested && disposition == "started") launchRpc { process.abort() }
         null
       } catch (error: RpcError) {
         error.error
@@ -124,6 +135,7 @@ internal class ChatController(
         error.message.orEmpty()
       } finally {
         sending = false
+        sendingCommand = false
       }
       if (failure != null) {
         // The field stayed editable while sending: put the failed text before anything typed since.
@@ -153,7 +165,11 @@ internal class ChatController(
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Pipkin", text))
   }
 
-  fun abort() = launchRpc { process.abort() }
+  /** Stops the run; pressed while a prompt is sending, it also stops the run that prompt starts. */
+  fun abort() {
+    if (sending) stopRequested = true
+    launchRpc { process.abort() }
+  }
 
   fun clearQueue() = launchRpc { process.clearQueue() }
 

@@ -141,8 +141,10 @@ internal fun Composer(
         val contextUsage by controller.process.contextUsage.collectAsStateWithLifecycle()
         ContextMeter(contextUsage, controller.contextDetailsOpen) { controller.contextDetailsOpen = it }
         trailingControls()
+        // Pi answers a prompt within moments by starting its run, so Stop shows from the press on.
         val action = when {
-          controller.sending -> PrimaryAction.Sending
+          controller.sendingCommand -> PrimaryAction.Sending
+          controller.sending -> PrimaryAction.Stop
           controller.canSend -> PrimaryAction.Send
           busy -> PrimaryAction.Stop
           else -> PrimaryAction.Idle
