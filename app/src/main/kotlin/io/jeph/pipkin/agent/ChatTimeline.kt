@@ -79,7 +79,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
         val message = messages.optJSONObject(index) ?: continue
         when (message.optString("role")) {
           "user", "assistant", "bashExecution" ->
-            items += messageItems(message, nextMessageKey(), settled = true, clock)
+            items += messageItems(message, nextMessageKey(), settled = true, message.piTimestamp ?: clock())
 
           "toolResult" -> attachToolResult(message)
         }
@@ -196,24 +196,25 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   }
 
   private fun messageStart(message: JSONObject) {
+    val timestamp = message.piTimestamp ?: clock()
     when (message.optString("role")) {
       "user" -> {
         val key = nextMessageKey()
-        live = LiveMessage(key, "user")
-        items += messageItems(message, key, settled = false, clock)
+        live = LiveMessage(key, "user", timestamp)
+        items += messageItems(message, key, settled = false, timestamp)
       }
 
-      "assistant" -> live = LiveMessage(nextMessageKey(), "assistant")
+      "assistant" -> live = LiveMessage(nextMessageKey(), "assistant", timestamp)
     }
   }
 
   private fun messageUpdate(update: JSONObject) {
     val index = update.optInt("contentIndex", -1)
     if (index < 0) return
-    val current = live?.takeIf { it.role == "assistant" } ?: LiveMessage(nextMessageKey(), "assistant")
+    val current = live?.takeIf { it.role == "assistant" } ?: LiveMessage(nextMessageKey(), "assistant", clock())
     live = current
     val key = "${current.key}.$index"
-    val newText = { AssistantText(key, "", streaming = true) }
+    val newText = { AssistantText(key, "", streaming = true, current.timestamp) }
     val newThinking = { Thinking(key, "", streaming = true) }
     val content = update.optStringOrNull("content")
     when (update.optString("type")) {
@@ -259,11 +260,13 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private fun messageEnd(message: JSONObject) {
     when (val role = message.optString("role")) {
       "user", "assistant", "bashExecution" -> {
-        val prefix = live?.takeIf { it.role == role }?.key ?: nextMessageKey()
+        val started = live?.takeIf { it.role == role }
+        val prefix = started?.key ?: nextMessageKey()
         live = null
         // An aborted message ends without toolcall_end for the call it was streaming.
         if (role == "assistant") streamingArgs.clear()
-        replaceMessage(prefix, messageItems(message, prefix, settled = role == "bashExecution", clock))
+        val timestamp = message.piTimestamp ?: started?.timestamp ?: clock()
+        replaceMessage(prefix, messageItems(message, prefix, settled = role == "bashExecution", timestamp))
       }
 
       "toolResult" -> attachToolResult(message)
@@ -395,7 +398,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
     mutableState.value = TimelineState(snapshot, busy || compacting, queue, pendingUi, model, thinkingLevel)
   }
 
-  private data class LiveMessage(val key: String, val role: String)
+  private data class LiveMessage(val key: String, val role: String, val timestamp: Long)
 
   private class StreamedArguments {
     val text = StringBuilder()
@@ -414,28 +417,26 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   }
 }
 
-/** Rebuilds the items of one `user`, `assistant` or `bashExecution` message; [settled] marks tool calls finished. */
-private fun messageItems(
-  message: JSONObject,
-  prefix: String,
-  settled: Boolean,
-  clock: () -> Long,
-): List<TimelineItem> = when (message.optString("role")) {
-  "user" -> listOf(userItem(message, prefix, clock))
+/**
+ * Rebuilds the items of one `user`, `assistant` or `bashExecution` message sent at [timestamp]; [settled] marks
+ * tool calls finished.
+ */
+private fun messageItems(message: JSONObject, prefix: String, settled: Boolean, timestamp: Long): List<TimelineItem> =
+  when (message.optString("role")) {
+    "user" -> listOf(userItem(message, prefix, timestamp))
 
-  "assistant" -> assistantItems(message, prefix, settled)
+    "assistant" -> assistantItems(message, prefix, settled, timestamp)
 
-  "bashExecution" -> {
-    val exitCode = if (message.isNull("exitCode")) 0 else message.optInt("exitCode")
-    val args = JSONObject().put("command", message.optString("command"))
-    listOf(ToolCall(prefix, prefix, "bash", args, message.optString("output"), exitCode != 0, ToolStatus.Done))
+    "bashExecution" -> {
+      val exitCode = if (message.isNull("exitCode")) 0 else message.optInt("exitCode")
+      val args = JSONObject().put("command", message.optString("command"))
+      listOf(ToolCall(prefix, prefix, "bash", args, message.optString("output"), exitCode != 0, ToolStatus.Done))
+    }
+
+    else -> emptyList()
   }
 
-  else -> emptyList()
-}
-
-private fun userItem(message: JSONObject, key: String, clock: () -> Long): User {
-  val timestamp = message.optLong("timestamp", 0L).takeIf { it > 0 } ?: clock()
+private fun userItem(message: JSONObject, key: String, timestamp: Long): User {
   val blocks = message.optJSONArray("content")
     ?: return User(key, typedText(message.optString("content")), emptyList(), timestamp)
   val images =
@@ -457,27 +458,30 @@ internal fun typedText(text: String): String {
   return "/skill:${match.groupValues[1]}" + if (args.isEmpty()) "" else " $args"
 }
 
-private fun assistantItems(message: JSONObject, prefix: String, settled: Boolean): List<TimelineItem> = buildList {
-  val blocks = message.optJSONArray("content") ?: JSONArray()
-  for (index in 0 until blocks.length()) {
-    val block = blocks.optJSONObject(index) ?: continue
-    val key = "$prefix.$index"
-    when (block.optString("type")) {
-      "text" -> block.optString("text").takeIf { it.isNotBlank() }?.let { add(AssistantText(key, it, false)) }
+private fun assistantItems(message: JSONObject, prefix: String, settled: Boolean, timestamp: Long): List<TimelineItem> =
+  buildList {
+    val blocks = message.optJSONArray("content") ?: JSONArray()
+    for (index in 0 until blocks.length()) {
+      val block = blocks.optJSONObject(index) ?: continue
+      val key = "$prefix.$index"
+      when (block.optString("type")) {
+        "text" -> block.optString("text").takeIf { it.isNotBlank() }?.let {
+          add(AssistantText(key, it, streaming = false, timestamp))
+        }
 
-      "thinking" -> add(Thinking(key, block.optString("thinking"), false))
+        "thinking" -> add(Thinking(key, block.optString("thinking"), streaming = false))
 
-      "toolCall" -> {
-        val status = if (settled) ToolStatus.Done else ToolStatus.Pending
-        val args = block.optJSONObject("arguments")
-        add(ToolCall(key, block.optString("id"), block.optString("name"), args, null, false, status))
+        "toolCall" -> {
+          val status = if (settled) ToolStatus.Done else ToolStatus.Pending
+          val args = block.optJSONObject("arguments")
+          add(ToolCall(key, block.optString("id"), block.optString("name"), args, null, false, status))
+        }
       }
     }
+    if (message.optString("stopReason") == "error") {
+      add(TimelineItem.Error("$prefix.error", message.optStringOrNull("errorMessage") ?: "Request failed"))
+    }
   }
-  if (message.optString("stopReason") == "error") {
-    add(TimelineItem.Error("$prefix.error", message.optStringOrNull("errorMessage") ?: "Request failed"))
-  }
-}
 
 private fun pendingTool(key: String, id: String, toolName: String) =
   ToolCall(key, id, toolName, null, null, false, ToolStatus.Pending)
@@ -507,3 +511,6 @@ private fun JSONArray?.strings(): List<String> = if (this == null) emptyList() e
 
 /** Android's `optString` turns JSON null into "null"; this keeps it null. */
 private fun JSONObject.optStringOrNull(name: String): String? = if (isNull(name)) null else optString(name)
+
+/** The message's `timestamp`, or null when Pi sent none. */
+private val JSONObject.piTimestamp: Long? get() = optLong("timestamp").takeIf { it > 0 }

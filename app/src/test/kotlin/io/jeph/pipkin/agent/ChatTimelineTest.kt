@@ -67,7 +67,7 @@ class ChatTimelineTest {
         """
         [
           {"role":"user","content":"hi","timestamp":5},
-          {"role":"assistant","stopReason":"toolUse","content":[
+          {"role":"assistant","stopReason":"toolUse","timestamp":8,"content":[
             {"type":"thinking","thinking":"hmm"},
             {"type":"text","text":"Listing"},
             {"type":"toolCall","id":"c1","name":"bash","arguments":{"command":"ls"}}
@@ -88,7 +88,7 @@ class ChatTimelineTest {
 
     assertEquals(User("m0", "hi", emptyList(), 5), items[0])
     assertEquals(Thinking("m1.0", "hmm", streaming = false), items[1])
-    assertEquals(AssistantText("m1.1", "Listing", streaming = false), items[2])
+    assertEquals(AssistantText("m1.1", "Listing", streaming = false, timestamp = 8), items[2])
     val tool = items[3] as ToolCall
     assertEquals("c1", tool.id)
     assertEquals("ls", tool.args?.getString("command"))
@@ -150,7 +150,7 @@ class ChatTimelineTest {
 
     apply("""{"type":"message_start","message":{"role":"assistant","content":[]}}""")
     update("""{"type":"text_delta","contentIndex":0,"delta":"Done"}""")
-    assertEquals(AssistantText("m2.0", "Done", streaming = true), items[4])
+    assertEquals(AssistantText("m2.0", "Done", streaming = true, timestamp = 1_000), items[4])
     val done = """{"role":"assistant","stopReason":"stop","content":[{"type":"text","text":"Done."}]}"""
     apply("""{"type":"message_end","message":$done}""")
     apply("""{"type":"agent_end","messages":[],"willRetry":false}""")
@@ -159,7 +159,7 @@ class ChatTimelineTest {
     now = 4_000
     apply("""{"type":"agent_settled","aborted":false}""")
     assertFalse(timeline.state.value.busy)
-    assertEquals(AssistantText("m2.0", "Done.", streaming = false), items[4])
+    assertEquals(AssistantText("m2.0", "Done.", streaming = false, timestamp = 1_000), items[4])
     assertEquals(TurnFooter("t0", 1_000, 3_000), items.last())
     assertEquals(User("m0", "do it", emptyList(), 7), items.first())
     assertEquals(6, items.size)
@@ -318,7 +318,9 @@ class ChatTimelineTest {
     val user = """{"role":"user","content":"do it","timestamp":7}"""
     apply("""{"type":"message_start","message":$user}""")
     apply("""{"type":"message_end","message":$user}""")
-    apply("""{"type":"message_start","message":{"role":"assistant","content":[],"stopReason":"pending"}}""")
+    // Pi stamps a message as it starts; a final copy without a timestamp keeps that time.
+    val pending = """{"role":"assistant","content":[],"stopReason":"pending","timestamp":9}"""
+    apply("""{"type":"message_start","message":$pending}""")
     update("""{"type":"thinking_start","contentIndex":0}""")
     update("""{"type":"thinking_delta","contentIndex":0,"delta":"Let me"}""")
     update("""{"type":"thinking_delta","contentIndex":0,"delta":" think"}""")
@@ -326,7 +328,7 @@ class ChatTimelineTest {
     update("""{"type":"thinking_end","contentIndex":0,"content":"Let me think"}""")
     update("""{"type":"text_start","contentIndex":1}""")
     update("""{"type":"text_delta","contentIndex":1,"delta":"Run"}""")
-    assertEquals(AssistantText("m1.1", "Run", streaming = true), items[2])
+    assertEquals(AssistantText("m1.1", "Run", streaming = true, timestamp = 9), items[2])
     update("""{"type":"toolcall_start","contentIndex":2,"id":"c1","toolName":"bash"}""")
     assertEquals(ToolStatus.Pending, (items[3] as ToolCall).status)
     update("""{"type":"toolcall_delta","contentIndex":2,"delta":"{\"comm"}""")
@@ -341,7 +343,7 @@ class ChatTimelineTest {
     apply("""{"type":"message_end","message":$final}""")
     assertEquals(streamedKeys, items.map { it.key })
     assertEquals(listOf("m0", "m1.0", "m1.1", "m1.2", "t0"), streamedKeys)
-    assertEquals(AssistantText("m1.1", "Running ls", streaming = false), items[2])
+    assertEquals(AssistantText("m1.1", "Running ls", streaming = false, timestamp = 9), items[2])
     assertEquals(Thinking("m1.0", "Let me think", streaming = false), items[1])
   }
 }

@@ -52,15 +52,12 @@ private val UserBubbleShape =
     bottomEnd = PipkinTokens.Radius.xxl,
     bottomStart = PipkinTokens.Radius.xxl,
   )
-private val TimeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+private val TimeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 private val ImageMaxEdge = 160.dp
 
 @Composable
 internal fun UserMessage(item: TimelineItem.User, modifier: Modifier = Modifier) {
   val colors = pipkinColors
-  val time = remember(item.timestamp) {
-    TimeFormat.format(Instant.ofEpochMilli(item.timestamp).atZone(ZoneId.systemDefault()))
-  }
   Column(modifier = modifier.fillMaxWidth(), horizontalAlignment = Alignment.End) {
     Column(
       modifier = Modifier.background(colors.surface3, UserBubbleShape).padding(PipkinTokens.Spacing.s16),
@@ -84,7 +81,7 @@ internal fun UserMessage(item: TimelineItem.User, modifier: Modifier = Modifier)
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
     ) {
-      Text(text = time, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
+      MessageTime(item.timestamp)
       if (item.text.isNotEmpty()) {
         CopyButton(
           text = item.text,
@@ -130,7 +127,7 @@ private fun ImageThumbnail(part: ImagePart) {
   )
 }
 
-/** A block of the agent's reply; once it finished streaming, Paseo's copy button sits under it. */
+/** A block of the agent's reply; once it finished streaming, Paseo's copy button and its time sit under it. */
 @Composable
 internal fun AssistantMessage(item: TimelineItem.AssistantText, modifier: Modifier = Modifier) {
   Column(modifier = modifier.fillMaxWidth().padding(top = PipkinTokens.Spacing.s12)) {
@@ -139,14 +136,27 @@ internal fun AssistantMessage(item: TimelineItem.AssistantText, modifier: Modifi
       Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s12))
       return@Column
     }
-    Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s4))
-    CopyButton(
-      text = item.markdown,
-      contentDescription = stringResource(R.string.chat_copy_reply),
-      tint = pipkinColors.foregroundMuted,
-      iconSize = PipkinTokens.IconSize.sm,
-    )
+    Row(
+      modifier = Modifier.padding(top = PipkinTokens.Spacing.s4),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    ) {
+      CopyButton(
+        text = item.markdown,
+        contentDescription = stringResource(R.string.chat_copy_reply),
+        tint = pipkinColors.foregroundMuted,
+        iconSize = PipkinTokens.IconSize.sm,
+      )
+      MessageTime(item.timestamp)
+    }
   }
+}
+
+/** When a message was sent, as `2:47 PM` in the device's time zone. */
+@Composable
+internal fun MessageTime(timestamp: Long) {
+  val time = remember(timestamp) { TimeFormat.format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault())) }
+  Text(text = time, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
 }
 
 /** Paseo's compact tool-call row: icon badge, title, muted one-line summary. */

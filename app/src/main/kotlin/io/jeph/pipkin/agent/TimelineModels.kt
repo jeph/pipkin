@@ -18,14 +18,23 @@ data class TimelineState(
  */
 internal const val STREAM_UPDATE_MILLIS = 100L
 
-/** One row of the chat stream. [key] stays the same while a streamed block is rebuilt from `message_end`. */
+/**
+ * One row of the chat stream. [key] stays the same while a streamed block is rebuilt from `message_end`. User
+ * messages and text blocks carry their message's `timestamp`: when Pi created it, or when this process first saw it
+ * if Pi gave none.
+ */
 sealed interface TimelineItem {
   val key: String
 
   data class User(override val key: String, val text: String, val images: List<ImagePart>, val timestamp: Long) :
     TimelineItem
 
-  data class AssistantText(override val key: String, val markdown: String, val streaming: Boolean) : TimelineItem
+  data class AssistantText(
+    override val key: String,
+    val markdown: String,
+    val streaming: Boolean,
+    val timestamp: Long,
+  ) : TimelineItem
 
   data class Thinking(override val key: String, val text: String, val streaming: Boolean) : TimelineItem
 
