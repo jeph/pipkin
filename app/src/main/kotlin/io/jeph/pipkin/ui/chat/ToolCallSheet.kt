@@ -64,7 +64,8 @@ internal fun ToolCallSheet(item: TimelineItem, streamingArguments: (key: String)
   val scrollState = rememberScrollState()
   // A finished item only grows while its first layout lands, which must not scroll it to the end.
   val streamingAtOpen = remember { presentation.running }
-  if (streamingAtOpen) AutoFollow(scrollState, remember { mutableStateOf(true) })
+  val follow = remember { mutableStateOf(streamingAtOpen) }
+  if (streamingAtOpen) AutoFollow(scrollState, follow)
   PipkinSheet(onDismissRequest = onDismiss) {
     SheetTitle(presentation)
     SelectionContainer {
@@ -72,6 +73,7 @@ internal fun ToolCallSheet(item: TimelineItem, streamingArguments: (key: String)
         modifier =
           Modifier
             .fillMaxWidth()
+            .pinEnd(scrollState, follow)
             .verticalScroll(scrollState)
             .padding(horizontal = PipkinTokens.Spacing.s16),
         verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),

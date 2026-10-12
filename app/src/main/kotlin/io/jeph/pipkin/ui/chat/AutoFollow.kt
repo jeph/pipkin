@@ -8,7 +8,11 @@ import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.State
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
@@ -62,6 +66,23 @@ internal fun AutoFollow(state: ScrollState, follow: MutableState<Boolean>) {
     distanceFromBottom = { if (state.maxValue == Int.MAX_VALUE) 0 else state.maxValue - state.value },
     scrollDown = { state.scrollBy(it.toFloat()) },
   )
+}
+
+/**
+ * Scrolls [state] to its end while [follow] is on, between the scroll container measuring its content and
+ * placing it, so content that grows is never drawn for a frame below where it settles, as [AutoFollow]'s
+ * scroll alone would leave it. Goes before `verticalScroll(state)`.
+ */
+internal fun Modifier.pinEnd(state: ScrollState, follow: State<Boolean>): Modifier = layout { measurable, constraints ->
+  val placeable = measurable.measure(constraints)
+  layout(placeable.width, placeable.height) {
+    // Read without observing: the scroll position is not an input to this layout step.
+    Snapshot.withoutReadObservation {
+      val distance = state.maxValue - state.value
+      if (follow.value && distance > 0 && !state.isScrollInProgress) state.dispatchRawDelta(distance.toFloat())
+    }
+    placeable.place(0, 0)
+  }
 }
 
 /** Scrolls the end into view; a user drag that takes over cancels only this scroll. */

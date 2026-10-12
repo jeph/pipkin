@@ -25,6 +25,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.Recomposer
+import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +38,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.findViewTreeCompositionContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -86,7 +90,7 @@ internal fun ChatStream(
     derivedStateOf { listState.distanceFromBottom() > threshold }
   }
   Box(modifier = modifier.fillMaxSize()) {
-    StreamList(listState, timeline.items, banner, process, onOpenTool)
+    StreamList(listState, timeline.items, banner, follow, process, onOpenTool)
     if (timeline.items.isEmpty() && processState == AgentProcessState.Ready) {
       EmptyState(noModel = timeline.model == null, onOpenSettings, Modifier.align(Alignment.Center))
     }
@@ -124,16 +128,18 @@ private fun StreamList(
   listState: LazyListState,
   items: List<TimelineItem>,
   banner: AgentProcessState?,
+  follow: State<Boolean>,
   process: AgentProcess,
   onOpenTool: (key: String) -> Unit,
 ) {
   val replies = remember(items) { replyTexts(items) }
-  val anchor = remember(listState) { BottomAnchor(listState) }
+  val recomposer = LocalView.current.findViewTreeCompositionContext() as Recomposer
+  val anchor = remember(listState, follow, recomposer) { BottomAnchor(listState, follow, recomposer) }
   LazyColumn(
     state = listState,
     modifier = Modifier
       .layout { measurable, constraints ->
-        anchor.onHeight(constraints.maxHeight)
+        anchor.beforeMeasure(constraints.maxHeight)
         val placeable = measurable.measure(constraints)
         layout(placeable.width, placeable.height) { placeable.place(0, 0) }
       }.fillMaxSize(),
@@ -162,24 +168,40 @@ private fun StreamList(
 }
 
 /**
- * Keeps what sits at the bottom of the viewport in place when the list's height changes, as when
- * the keyboard opens or the composer grows: the keyboard never covers what the user was reading,
- * and the top of the list scrolls up under the header instead. It runs before the list measures,
- * so the shift lands in the same frame as the resize; at the bottom it also keeps following.
+ * Runs before the list measures, so a scroll it requests lands in the same frame as whatever changed the
+ * layout. While [follow] is on it pins the end to the bottom, so content that grows is never drawn for a
+ * frame below where it settles. Otherwise it keeps what sits at the bottom of the viewport in place when the
+ * list's height changes, as when the keyboard opens or the composer grows: the keyboard never covers what
+ * the user was reading, and the top of the list scrolls up under the header instead.
  */
-private class BottomAnchor(private val listState: LazyListState) {
+private class BottomAnchor(
+  private val listState: LazyListState,
+  private val follow: State<Boolean>,
+  private val recomposer: Recomposer,
+) {
   private var height = UNMEASURED
+  private var changeCount = -1L
 
-  fun onHeight(newHeight: Int) {
+  fun beforeMeasure(newHeight: Int) {
     val shrink = if (height == UNMEASURED) 0 else height - newHeight
     height = newHeight
-    if (shrink == 0) return
+    // Content grows only when composition changed or the list resized. A pin's request remeasures the
+    // list once more with neither; pinning again then would remeasure it every frame.
+    val changed = recomposer.changeCount != changeCount || shrink != 0
+    changeCount = recomposer.changeCount
     // Read without observing: the scroll position is not an input to this layout step.
     Snapshot.withoutReadObservation {
-      listState.requestScrollToItem(
-        listState.firstVisibleItemIndex,
-        listState.firstVisibleItemScrollOffset + shrink,
-      )
+      val count = listState.layoutInfo.totalItemsCount
+      when {
+        follow.value && !listState.isScrollInProgress -> {
+          if (changed && count > 0) listState.requestScrollToItem(count - 1, FOLLOW_OFFSET)
+        }
+
+        shrink != 0 -> listState.requestScrollToItem(
+          listState.firstVisibleItemIndex,
+          listState.firstVisibleItemScrollOffset + shrink,
+        )
+      }
     }
   }
 

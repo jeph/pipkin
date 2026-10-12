@@ -21,6 +21,7 @@ import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.MarkdownTypography
+import com.mikepenz.markdown.model.markdownAnimations
 import com.mikepenz.markdown.model.markdownDimens
 import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.model.rememberMarkdownState
@@ -63,6 +64,9 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
           codeFence = { MarkdownCodeFence(it.content, it.node, style = it.typography.code, block = codeBlock) },
           codeBlock = { MarkdownCodeBlock(it.content, it.node, style = it.typography.code, block = codeBlock) },
         ),
+      // The library animates each text block's size by default, which relayouts every frame a streamed
+      // block grows and leaves the chat's end moving after the text has landed.
+      animations = markdownAnimations(animateTextSize = { this }),
     )
   }
 }
