@@ -1,5 +1,6 @@
 package io.jeph.pipkin
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -26,6 +27,8 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.jeph.pipkin.agent.ChatLocation
+import io.jeph.pipkin.agent.TurnNotifications
 import io.jeph.pipkin.ui.AppNavigator
 import io.jeph.pipkin.ui.Destination
 import io.jeph.pipkin.ui.MainScreen
@@ -42,20 +45,31 @@ import io.jeph.pipkin.ui.settings.SubscriptionScreen
 import io.jeph.pipkin.ui.settings.ownsDraft
 import io.jeph.pipkin.ui.theme.PipkinTheme
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : ComponentActivity() {
+  /** The chat a tapped notification asked for, until the main screen opens it. */
+  private val requestedChat = MutableStateFlow<ChatLocation?>(null)
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    // A recreated activity gets its launch intent again, but that chat was opened the first time.
+    if (savedInstanceState == null) requestedChat.value = TurnNotifications.chatLocation(intent)
     enableEdgeToEdge()
     val graph = appGraph
     setContent {
       val theme by graph.preferences.theme.collectAsStateWithLifecycle()
       PipkinTheme(theme) {
         Surface(modifier = Modifier.fillMaxSize(), color = pipkinColors.surface0) {
-          PipkinApp(graph)
+          PipkinApp(graph, requestedChat)
         }
       }
     }
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    requestedChat.value = TurnNotifications.chatLocation(intent)
   }
 }
 
@@ -64,7 +78,7 @@ class MainActivity : ComponentActivity() {
  * screens slide in from the end edge over the one below, and slide back out when popped.
  */
 @Composable
-private fun PipkinApp(graph: AppGraph) {
+private fun PipkinApp(graph: AppGraph, requestedChat: MutableStateFlow<ChatLocation?>) {
   val navigator = rememberSaveable(saver = AppNavigator.Saver) {
     AppNavigator(listOf(if (graph.preferences.setupComplete.value) Destination.Main else Destination.Onboarding))
   }
@@ -72,8 +86,13 @@ private fun PipkinApp(graph: AppGraph) {
   val stack by navigator.stack.collectAsStateWithLifecycle()
   val holder = rememberSaveableStateHolder()
   val drafts = remember { ProviderDrafts() }
+  val chat by requestedChat.collectAsStateWithLifecycle()
   ForgetPopped(stack, holder)
   LaunchedEffect(stack) { if (stack.none(::ownsDraft)) drafts.release() }
+  // The main screen opens the requested chat once it is on top; before setup there is no main screen yet.
+  LaunchedEffect(chat) {
+    if (chat != null && Destination.Main in navigator.stack.value) navigator.popTo(Destination.Main)
+  }
   BackHandler(enabled = stack.size > 1) { navigator.pop() }
   AnimatedContent(
     targetState = stack,
@@ -83,17 +102,24 @@ private fun PipkinApp(graph: AppGraph) {
   ) { shown ->
     val top = shown.last()
     holder.SaveableStateProvider(AppNavigator.key(top)) {
-      Screen(shown, navigator, actions, drafts)
+      Screen(shown, navigator, actions, drafts, requestedChat)
     }
   }
 }
 
 /** The top of [shown]; model sub-pages edit the draft of the subscription or provider page below. */
 @Composable
-private fun Screen(shown: List<Destination>, navigator: AppNavigator, actions: ShellActions, drafts: ProviderDrafts) {
+private fun Screen(
+  shown: List<Destination>,
+  navigator: AppNavigator,
+  actions: ShellActions,
+  drafts: ProviderDrafts,
+  requestedChat: MutableStateFlow<ChatLocation?>,
+) {
   when (val top = shown.last()) {
     Destination.Main -> MainScreen(
       actions = actions,
+      requestedChat = requestedChat,
       onOpenSettings = { navigator.push(Destination.Settings) },
       onOpenOnboarding = { navigator.push(Destination.Onboarding) },
     )

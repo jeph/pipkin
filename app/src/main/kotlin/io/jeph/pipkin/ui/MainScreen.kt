@@ -35,11 +35,14 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
+import io.jeph.pipkin.agent.ChatLocation
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.chat.ChatScreen
 import io.jeph.pipkin.ui.components.LocalPotsSimmer
 import io.jeph.pipkin.ui.sidebar.Sidebar
 import io.jeph.pipkin.ui.theme.PipkinTokens
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
 
 private enum class Panel { Sidebar, Chat }
@@ -49,10 +52,16 @@ private val PanelAnimation = tween<Float>(durationMillis = 220, easing = FastOut
 
 /**
  * The main screen: the sidebar and the chat as full-width sliding panels. Opens a chat on entry when
- * none is shown; one-shot shell notices show as a snackbar.
+ * none is shown, and shows [requestedChat] when a notification asks for it; one-shot shell notices
+ * show as a snackbar.
  */
 @Composable
-internal fun MainScreen(actions: ShellActions, onOpenSettings: () -> Unit, onOpenOnboarding: () -> Unit) {
+internal fun MainScreen(
+  actions: ShellActions,
+  requestedChat: MutableStateFlow<ChatLocation?>,
+  onOpenSettings: () -> Unit,
+  onOpenOnboarding: () -> Unit,
+) {
   val snackbar = remember { SnackbarHostState() }
   val genericError = stringResource(R.string.shell_error_generic)
   LaunchedEffect(actions) { actions.notices.collect { snackbar.showSnackbar(it ?: genericError) } }
@@ -64,6 +73,12 @@ internal fun MainScreen(actions: ShellActions, onOpenSettings: () -> Unit, onOpe
   val sidebarOpen = panels.targetValue == Panel.Sidebar
   BackHandler(enabled = sidebarOpen) { showPanel(Panel.Chat) }
   SidebarOpenedEffect(sidebarOpen)
+  LaunchedEffect(requestedChat) {
+    requestedChat.filterNotNull().collect { chat ->
+      requestedChat.value = null
+      if (actions.openChat(chat.cwd, chat.sessionPath)) showPanel(Panel.Chat)
+    }
+  }
 
   Box(modifier = Modifier.fillMaxSize()) {
     MobilePanels(

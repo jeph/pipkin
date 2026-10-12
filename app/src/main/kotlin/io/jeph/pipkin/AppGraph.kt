@@ -8,6 +8,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.KeepAlive
+import io.jeph.pipkin.agent.TurnNotifications
 import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.data.ModelDefaults
 import io.jeph.pipkin.data.Preferences
@@ -26,9 +27,11 @@ internal class AppGraph(application: Application) {
   val preferences = Preferences(application)
   val keepAlive = KeepAlive(application)
   val sessionRepository = SessionRepository(hostClient, scope)
-  val registry: AgentRegistry<AgentProcess> = AgentRegistry(scope) { cwd, sessionPath ->
-    AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, onSessionChanged = sessionRepository::refresh)
-  }
+  private val turnNotifications = TurnNotifications(application)
+  val registry: AgentRegistry<AgentProcess> =
+    AgentRegistry(scope, onRunEnded = turnNotifications::runEnded) { cwd, sessionPath ->
+      AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, onSessionChanged = sessionRepository::refresh)
+    }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
   val modelDefaults = ModelDefaults(hostClient)
 

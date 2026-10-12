@@ -35,6 +35,7 @@ class AgentRegistryTest {
   }
 
   private val created = mutableListOf<FakeProcess>()
+  private val ended = mutableListOf<FakeProcess>()
 
   @Test
   fun openReusesTheProcessOfAnOpenSession() = registryTest { registry ->
@@ -172,6 +173,29 @@ class AgentRegistryTest {
   }
 
   @Test
+  fun runEndedReportsEachEndOfWorkButNotIdleStartsOrClosing() = registryTest { registry ->
+    val a = registry.open(CWD, "/s/a.jsonl")
+    val b = registry.open(CWD, "/s/b.jsonl")
+    settle()
+    assertEquals(emptyList<FakeProcess>(), ended)
+
+    a.busy.value = true
+    b.busy.value = true
+    settle()
+    a.busy.value = false
+    settle()
+    a.busy.value = true
+    settle()
+    a.busy.value = false
+    settle()
+    registry.close(b)
+    b.busy.value = false
+    settle()
+
+    assertEquals(listOf(a, a), ended)
+  }
+
+  @Test
   fun abortAllAbortsWorkersAndEndsThoseThatCannotAbort() = registryTest { registry ->
     val worker = registry.open(CWD, "/s/worker.jsonl")
     val stuckHidden = registry.open(CWD, "/s/stuck-hidden.jsonl")
@@ -202,7 +226,11 @@ class AgentRegistryTest {
   ) = runBlocking {
     val scope = CoroutineScope(coroutineContext + SupervisorJob())
     try {
-      block(AgentRegistry(scope, idleCloseMillis) { cwd, path -> FakeProcess(cwd, path).also(created::add) })
+      block(
+        AgentRegistry(scope, idleCloseMillis, ended::add) { cwd, path ->
+          FakeProcess(cwd, path).also(created::add)
+        },
+      )
     } finally {
       scope.cancel()
     }

@@ -33,7 +33,10 @@ internal class ShellActions(private val graph: AppGraph) {
   val home: String get() = graph.hostClient.lastHello.value?.home?.takeIf { it.isNotEmpty() } ?: TERMUX_HOME
 
   /** Shows [session]'s chat; false (with a notice) when four chats are working. */
-  fun openSession(session: SessionInfo): Boolean = show { registry.open(session.cwd, session.path) }
+  fun openSession(session: SessionInfo): Boolean = openChat(session.cwd, session.path)
+
+  /** Shows the chat in session file [sessionPath]; false (with a notice) when four chats are working. */
+  fun openChat(cwd: String, sessionPath: String): Boolean = show { registry.open(cwd, sessionPath) }
 
   /** Shows a new chat in [cwd]; false (with a notice) when four chats are working. */
   fun newChat(cwd: String): Boolean = show { registry.open(cwd, null) }

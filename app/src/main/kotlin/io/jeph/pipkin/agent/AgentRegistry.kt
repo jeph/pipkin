@@ -46,11 +46,12 @@ internal class TooManyRunning :
 /**
  * The app's open agent processes, at most [MAX_PROCESSES]. A process that is neither busy nor
  * visible is closed after [idleCloseMillis]; opening one more evicts the least-recently-visible idle
- * process. Main thread only.
+ * process. [onRunEnded] hears each time an open process stops being busy. Main thread only.
  */
 internal class AgentRegistry<P : ManagedProcess>(
   private val scope: CoroutineScope,
   private val idleCloseMillis: Long = IDLE_CLOSE_MILLIS,
+  private val onRunEnded: (P) -> Unit = {},
   private val factory: (cwd: String, sessionPath: String?) -> P,
 ) {
   private class Entry(var lastVisible: Long) {
@@ -169,7 +170,14 @@ internal class AgentRegistry<P : ManagedProcess>(
   }
 
   private suspend fun watch(process: P) = coroutineScope {
-    launch { process.busy.collect { updateBusy() } }
+    launch {
+      var wasBusy = false
+      process.busy.collect { busy ->
+        updateBusy()
+        if (wasBusy && !busy) onRunEnded(process)
+        wasBusy = busy
+      }
+    }
     launch {
       process.sessionFile.collect { path -> if (path != null) rekey(process, ChatKey.session(path)) }
     }
