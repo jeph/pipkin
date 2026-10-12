@@ -69,8 +69,13 @@ internal fun ToolCallSheet(item: TimelineItem, streamingArguments: (key: String)
   // The body already shows a thinking block's text, a command and other tools' arguments; only the file tools'
   // bodies leave out the path, so only they keep the row's summary under the title.
   val subtitle = presentation.summary.takeIf { item is TimelineItem.ToolCall && item.toolName in FILE_TOOLS }
+  val copyText = when (item) {
+    is TimelineItem.Thinking -> item.text
+    is TimelineItem.ToolCall -> remember(item) { item.cardText() }
+    else -> ""
+  }.takeUnless { presentation.running || it.isBlank() }
   PipkinSheet(onDismissRequest = onDismiss) {
-    SheetTitle(presentation, subtitle)
+    SheetTitle(presentation, subtitle, copyText)
     SelectionContainer {
       Column(
         modifier =
@@ -112,8 +117,9 @@ private fun withStreamedArguments(
   return streamed?.let { item.copy(args = it) } ?: item
 }
 
+/** The sheet's header; once the item finished, [copyText] backs a copy button at its end. */
 @Composable
-private fun SheetTitle(presentation: ToolPresentation, subtitle: String?) {
+private fun SheetTitle(presentation: ToolPresentation, subtitle: String?, copyText: String?) {
   val colors = pipkinColors
   Row(
     modifier =
@@ -143,6 +149,14 @@ private fun SheetTitle(presentation: ToolPresentation, subtitle: String?) {
           overflow = TextOverflow.Ellipsis,
         )
       }
+    }
+    copyText?.let {
+      CopyButton(
+        text = it,
+        contentDescription = stringResource(R.string.chat_copy_details),
+        tint = colors.foregroundMuted,
+        iconSize = PipkinTokens.IconSize.md,
+      )
     }
   }
 }
@@ -271,6 +285,25 @@ private fun editPairs(args: JSONObject?): List<Pair<String, String>> {
   }
   val legacyOld = args.stringOrNull("oldText") ?: return pairs
   return pairs + (legacyOld to args.stringOrNull("newText").orEmpty())
+}
+
+/** The sheet's body for tool call [this] as plain text, sections separated by blank lines; the header stays out. */
+internal fun TimelineItem.ToolCall.cardText(): String {
+  val sections = when (toolName) {
+    // The sheet shows the output right under the command, in the same box.
+    "bash" -> listOf(listOfNotNull("$ " + args?.stringOrNull("command").orEmpty(), output).joinToString("\n"))
+
+    "edit" -> editPairs(args).map { (oldText, newText) ->
+      (oldText.lines().map { "- $it" } + newText.lines().map { "+ $it" }).joinToString("\n")
+    } + output
+
+    "write" -> listOf(args?.stringOrNull("content"), output)
+
+    "read" -> listOf(output)
+
+    else -> listOf(args?.takeIf { it.length() > 0 }?.toString(2), output)
+  }
+  return sections.filterNot { it.isNullOrEmpty() }.joinToString("\n\n")
 }
 
 private val FILE_TOOLS = setOf("read", "write", "edit")

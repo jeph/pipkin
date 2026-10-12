@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -77,12 +79,21 @@ internal fun UserMessage(item: TimelineItem.User, modifier: Modifier = Modifier)
         }
       }
     }
-    Text(
-      text = time,
-      modifier = Modifier.padding(top = PipkinTokens.Spacing.s4),
-      color = colors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.meta,
-    )
+    Row(
+      modifier = Modifier.padding(top = PipkinTokens.Spacing.s4).heightIn(min = 28.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    ) {
+      Text(text = time, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
+      if (item.text.isNotEmpty()) {
+        CopyButton(
+          text = item.text,
+          contentDescription = stringResource(R.string.chat_copy_message),
+          tint = colors.foregroundMuted,
+          iconSize = PipkinTokens.IconSize.sm,
+        )
+      }
+    }
   }
 }
 
@@ -119,12 +130,23 @@ private fun ImageThumbnail(part: ImagePart) {
   )
 }
 
+/** A block of the agent's reply; once it finished streaming, Paseo's copy button sits under it. */
 @Composable
 internal fun AssistantMessage(item: TimelineItem.AssistantText, modifier: Modifier = Modifier) {
-  PipkinMarkdown(
-    markdown = item.markdown,
-    modifier = modifier.fillMaxWidth().padding(vertical = PipkinTokens.Spacing.s12),
-  )
+  Column(modifier = modifier.fillMaxWidth().padding(top = PipkinTokens.Spacing.s12)) {
+    PipkinMarkdown(markdown = item.markdown, modifier = Modifier.fillMaxWidth())
+    if (item.streaming) {
+      Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s12))
+      return@Column
+    }
+    Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s4))
+    CopyButton(
+      text = item.markdown,
+      contentDescription = stringResource(R.string.chat_copy_reply),
+      tint = pipkinColors.foregroundMuted,
+      iconSize = PipkinTokens.IconSize.sm,
+    )
+  }
 }
 
 /** Paseo's compact tool-call row: icon badge, title, muted one-line summary. */
@@ -201,30 +223,21 @@ internal fun NoticeRow(text: String, modifier: Modifier = Modifier) {
   )
 }
 
-/** Live `m:ss` while the run works; the duration and a copy button for the turn's last reply once it settled. */
+/** Live `m:ss` while the run works, then how long it took. */
 @Composable
-internal fun TurnFooterRow(item: TimelineItem.TurnFooter, replyText: String?, modifier: Modifier = Modifier) {
-  val colors = pipkinColors
+internal fun TurnFooterRow(item: TimelineItem.TurnFooter, modifier: Modifier = Modifier) {
   Row(
     modifier = modifier.fillMaxWidth().heightIn(min = 28.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
     val duration = item.durationMillis
-    if (duration == null) {
-      SimmeringPot(size = PipkinTokens.IconSize.sm)
-      RunningElapsed(item.startedAt)
-    } else {
-      Text(text = durationText(duration), color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
-      if (replyText != null) {
-        CopyButton(
-          text = replyText,
-          contentDescription = stringResource(R.string.chat_copy_reply),
-          tint = colors.foregroundMuted,
-          iconSize = PipkinTokens.IconSize.sm,
-        )
-      }
+    if (duration != null) {
+      Text(text = durationText(duration), color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
+      return@Row
     }
+    SimmeringPot(size = PipkinTokens.IconSize.sm)
+    RunningElapsed(item.startedAt)
   }
 }
 

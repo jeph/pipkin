@@ -132,7 +132,6 @@ private fun StreamList(
   process: AgentProcess,
   onOpenTool: (key: String) -> Unit,
 ) {
-  val replies = remember(items) { replyTexts(items) }
   val recomposer = LocalView.current.findViewTreeCompositionContext() as Recomposer
   val anchor = remember(listState, follow, recomposer) { BottomAnchor(listState, follow, recomposer) }
   LazyColumn(
@@ -158,7 +157,6 @@ private fun StreamList(
     itemsIndexed(items, key = { _, item -> item.key }, contentType = { _, item -> item::class }) { index, item ->
       StreamItem(
         item = item,
-        replyText = replies[item.key],
         onOpenTool = onOpenTool,
         onRestart = process::restart,
         modifier = Modifier.contentWidth().padding(top = gapBefore(items.getOrNull(index - 1), item)),
@@ -213,7 +211,6 @@ private class BottomAnchor(
 @Composable
 private fun StreamItem(
   item: TimelineItem,
-  replyText: String?,
   onOpenTool: (key: String) -> Unit,
   onRestart: () -> Unit,
   modifier: Modifier,
@@ -225,7 +222,7 @@ private fun StreamItem(
     is TimelineItem.ToolCall -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
     is TimelineItem.Error -> ErrorRow(item.message, modifier)
     is TimelineItem.Notice -> NoticeRow(item.text, modifier)
-    is TimelineItem.TurnFooter -> TurnFooterRow(item, replyText, modifier)
+    is TimelineItem.TurnFooter -> TurnFooterRow(item, modifier)
     is TimelineItem.ExitBanner -> ExitBannerCard(item, onRestart, modifier)
   }
 }
@@ -292,25 +289,6 @@ private fun gapBefore(previous: TimelineItem?, item: TimelineItem): Dp = when {
   previous is TimelineItem.User && item is TimelineItem.User -> PipkinTokens.Spacing.s4
   previous is TimelineItem.User || item is TimelineItem.User -> PipkinTokens.Spacing.s16
   else -> PipkinTokens.Spacing.s4
-}
-
-/** Each settled turn footer's last assistant text, for its copy button. */
-private fun replyTexts(items: List<TimelineItem>): Map<String, String> {
-  val replies = HashMap<String, String>()
-  var last: String? = null
-  for (item in items) {
-    when (item) {
-      is TimelineItem.AssistantText -> last = item.markdown
-
-      is TimelineItem.TurnFooter -> {
-        last?.let { replies[item.key] = it }
-        last = null
-      }
-
-      else -> Unit
-    }
-  }
-  return replies
 }
 
 private fun Modifier.contentWidth(): Modifier = widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth()
