@@ -44,6 +44,23 @@ class ChatTimelineTest {
   }
 
   @Test
+  fun guardedSeedKeepsAStreamThatMovedOn() {
+    apply("""{"type":"agent_start"}""")
+    val since = timeline.appliedEvents
+    val history = JSONArray("""[{"role":"user","content":"go","timestamp":5}]""")
+
+    // A new message arrived while the history was being fetched, so the live stream wins.
+    apply("""{"type":"message_start","message":{"role":"user","content":"next","timestamp":9}}""")
+    assertFalse(timeline.seed(history, ifNoEventsSince = since))
+    assertTrue(timeline.state.value.busy)
+    assertEquals(listOf("next"), items.filterIsInstance<User>().map { it.text })
+
+    assertTrue(timeline.seed(history, ifNoEventsSince = timeline.appliedEvents))
+    assertFalse(timeline.state.value.busy)
+    assertEquals(listOf(User("m1", "go", emptyList(), 5)), items)
+  }
+
+  @Test
   fun seedMapsEveryRoleAndAttachesToolResults() {
     timeline.seed(
       JSONArray(

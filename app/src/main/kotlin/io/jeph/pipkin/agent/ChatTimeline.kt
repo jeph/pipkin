@@ -53,10 +53,20 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private var pendingUi: ExtensionUiRequest? = null
   private var model: JSONObject? = null
   private var thinkingLevel: String? = null
+  private var appliedCount = 0L
 
-  /** Replaces the stream with `get_messages` `data.messages`. Pi is idle whenever its history is seeded. */
-  fun seed(messages: JSONArray) {
+  /** How many events [apply] has taken so far; [seed] can compare against it. */
+  val appliedEvents: Long get() = synchronized(lock) { appliedCount }
+
+  /**
+   * Replaces the stream with `get_messages` `data.messages`. Pi is idle whenever its history is seeded. With
+   * [ifNoEventsSince], it seeds only when no event was applied after [appliedEvents] read that value: the stream is
+   * live then and the history may predate it. That check holds [apply]'s lock, so no event lands in between.
+   * Returns whether it seeded.
+   */
+  fun seed(messages: JSONArray, ifNoEventsSince: Long? = null): Boolean {
     synchronized(lock) {
+      if (ifNoEventsSince != null && appliedCount != ifNoEventsSince) return false
       items.clear()
       live = null
       streamingArgs.clear()
@@ -75,12 +85,14 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
         }
       }
       publish()
+      return true
     }
   }
 
   /** Applies one non-response Pi stdout record. Unknown events are ignored. */
   fun apply(event: JSONObject) {
     synchronized(lock) {
+      appliedCount += 1
       dispatch(event)
       publish()
     }

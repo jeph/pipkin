@@ -109,10 +109,6 @@ internal class AgentProcess(
   @Volatile
   private var lastAutoReconnectAt: Long? = null
 
-  /** Pi events applied so far; [resync] tells from it whether the stream moved while it waited. */
-  @Volatile
-  private var eventCount = 0L
-
   val timeline = ChatTimeline()
 
   /**
@@ -265,7 +261,7 @@ internal class AgentProcess(
    */
   suspend fun resync() {
     if (stateFlow.value != AgentProcessState.Ready) return
-    val eventsBefore = eventCount
+    val eventsBefore = timeline.appliedEvents
     val data = try {
       call("get_state", timeoutMillis = RESYNC_TIMEOUT_MILLIS)
     } catch (error: RpcError) {
@@ -277,14 +273,16 @@ internal class AgentProcess(
     val shown = timeline.state.value
     val piWorking = data.optBoolean("isStreaming") || data.optBoolean("isCompacting")
     // Events that arrived meanwhile show the stream is live, and a dialog means Pi waits on the user.
-    if (piWorking || !shown.busy || shown.pendingUi != null || eventCount != eventsBefore) return
-    Log.w(TAG, "Pi is idle but the chat still shows a run; reloading its history")
-    try {
-      timeline.seed(getMessages())
+    if (piWorking || !shown.busy || shown.pendingUi != null || timeline.appliedEvents != eventsBefore) return
+    val messages = try {
+      getMessages()
     } catch (error: RpcError) {
       Log.w(TAG, "Re-sync get_messages failed: ${error.error}")
-      return
+      null
     }
+    // A run that started while get_messages was answered has delivered events; its stream supersedes this reload.
+    if (messages == null || !timeline.seed(messages, ifNoEventsSince = eventsBefore)) return
+    Log.w(TAG, "Pi was idle but the chat still showed a run; reloaded its history")
     refreshContextUsage()
     onSessionChanged()
   }
@@ -402,7 +400,6 @@ internal class AgentProcess(
   }
 
   private fun onEvent(event: JSONObject) {
-    eventCount += 1
     timeline.apply(event)
     when (event.optString("type")) {
       // Each turn adds a response and tool results to the context; compaction shrinks it.
