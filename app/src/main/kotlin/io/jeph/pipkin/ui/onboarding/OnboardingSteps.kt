@@ -65,6 +65,30 @@ internal fun TermuxStep(
   }
 }
 
+/** The Android settings Pipkin asks for itself, as opposed to Termux's. */
+@Composable
+internal fun AndroidSettingsSteps(
+  state: OnboardingState,
+  number: (SetupStep) -> Int,
+  notificationsBlocked: Boolean,
+  onAllowNotifications: () -> Unit,
+  onAllowBackground: () -> Unit,
+) {
+  if (state.checks.notificationsGranted != null) {
+    NotificationsStep(
+      number = number(SetupStep.Notifications),
+      status = state.status(SetupStep.Notifications),
+      blocked = notificationsBlocked,
+      onAllow = onAllowNotifications,
+    )
+  }
+  BackgroundStep(
+    number = number(SetupStep.Background),
+    status = state.status(SetupStep.Background),
+    onAllow = onAllowBackground,
+  )
+}
+
 @Composable
 internal fun NotificationsStep(number: Int, status: StepStatus, blocked: Boolean, onAllow: () -> Unit) {
   StepCard(
@@ -79,6 +103,23 @@ internal fun NotificationsStep(number: Int, status: StepStatus, blocked: Boolean
       StepText(stringResource(R.string.onboarding_notifications_body))
       val action = if (blocked) R.string.onboarding_open_settings else R.string.onboarding_notifications_allow
       PrimaryButton(stringResource(action), onAllow)
+    }
+  }
+}
+
+@Composable
+internal fun BackgroundStep(number: Int, status: StepStatus, onAllow: () -> Unit) {
+  StepCard(
+    number = number,
+    title = stringResource(R.string.onboarding_background_title),
+    status = status,
+    tag = stringResource(R.string.onboarding_recommended),
+  ) {
+    if (status == StepStatus.Done) {
+      StepText(stringResource(R.string.onboarding_background_done))
+    } else {
+      StepText(stringResource(R.string.onboarding_background_body))
+      PrimaryButton(stringResource(R.string.onboarding_background_allow), onAllow)
     }
   }
 }

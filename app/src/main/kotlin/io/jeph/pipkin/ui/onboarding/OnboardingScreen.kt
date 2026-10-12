@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,6 +64,8 @@ private sealed interface OnboardingAction {
   data object UninstallTermux : OnboardingAction
 
   data object AllowNotifications : OnboardingAction
+
+  data object AllowBackground : OnboardingAction
 
   data object AllowRunCommand : OnboardingAction
 
@@ -101,6 +104,8 @@ internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit)
       OnboardingAction.UninstallTermux -> context.startSafely { TermuxInstall.requestUninstall(context) }
 
       OnboardingAction.AllowNotifications -> requestPermission(Manifest.permission.POST_NOTIFICATIONS)
+
+      OnboardingAction.AllowBackground -> context.startSafely { requestBackgroundExemption(context) }
 
       OnboardingAction.AllowRunCommand -> requestPermission(TermuxInstall.RUN_COMMAND_PERMISSION)
 
@@ -249,14 +254,13 @@ private fun OnboardingSteps(state: OnboardingState, onAction: (OnboardingAction)
     onOpenFDroid = { onAction(OnboardingAction.OpenFDroid) },
     onUninstall = { onAction(OnboardingAction.UninstallTermux) },
   )
-  if (notificationsShown) {
-    NotificationsStep(
-      number = number(SetupStep.Notifications),
-      status = state.status(SetupStep.Notifications),
-      blocked = Manifest.permission.POST_NOTIFICATIONS in state.blockedPermissions,
-      onAllow = { onAction(OnboardingAction.AllowNotifications) },
-    )
-  }
+  AndroidSettingsSteps(
+    state = state,
+    number = number,
+    notificationsBlocked = Manifest.permission.POST_NOTIFICATIONS in state.blockedPermissions,
+    onAllowNotifications = { onAction(OnboardingAction.AllowNotifications) },
+    onAllowBackground = { onAction(OnboardingAction.AllowBackground) },
+  )
   RunCommandStep(
     number = number(SetupStep.RunCommand),
     status = state.status(SetupStep.RunCommand),
@@ -322,6 +326,17 @@ private fun copyCommand(context: Context, command: String) {
 private fun openNotificationSettings(context: Context) {
   context.startActivity(
     Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
+  )
+}
+
+/**
+ * Android's own exemption prompt rather than the settings list: Pipkin is the client of a long-running agent and is
+ * not distributed through Google Play, whose policy restricts this request.
+ */
+@SuppressLint("BatteryLife")
+private fun requestBackgroundExemption(context: Context) {
+  context.startActivity(
+    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${context.packageName}".toUri()),
   )
 }
 

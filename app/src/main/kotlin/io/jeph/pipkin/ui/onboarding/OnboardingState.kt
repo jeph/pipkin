@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
 import io.jeph.pipkin.host.AuthStatus
 import io.jeph.pipkin.host.HostHello
 import io.jeph.pipkin.termux.TermuxInstall
@@ -18,6 +19,8 @@ internal data class DeviceChecks(
   val runCommandGranted: Boolean,
   /** Null below API 33, where notifications need no runtime permission and the step is hidden. */
   val notificationsGranted: Boolean?,
+  /** Pipkin is exempt from battery optimization, so Android keeps its connection to the agent while the screen is off. */
+  val backgroundAllowed: Boolean,
 ) {
   companion object {
     fun read(context: Context) = DeviceChecks(
@@ -29,6 +32,8 @@ internal data class DeviceChecks(
       } else {
         null
       },
+      backgroundAllowed = context.getSystemService(PowerManager::class.java)
+        .isIgnoringBatteryOptimizations(context.packageName),
     )
   }
 }
@@ -68,6 +73,7 @@ internal data class OnboardingState(
   fun status(step: SetupStep): StepStatus = when (step) {
     SetupStep.Termux -> termuxStatus()
     SetupStep.Notifications -> if (checks.notificationsGranted == false) StepStatus.Pending else StepStatus.Done
+    SetupStep.Background -> if (checks.backgroundAllowed) StepStatus.Done else StepStatus.Pending
     SetupStep.RunCommand -> runCommandStatus()
     SetupStep.TermuxSetup -> termuxSetupStatus()
     SetupStep.InstallPi -> installPiStatus()

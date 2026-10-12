@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import org.json.JSONException
 
 /** Onboarding steps in display order. */
-internal enum class SetupStep { Termux, Notifications, RunCommand, TermuxSetup, InstallPi, SignIn }
+internal enum class SetupStep { Termux, Notifications, Background, RunCommand, TermuxSetup, InstallPi, SignIn }
 
 /**
  * A failed attempt pinned to the step that fixes it. A null [message] means the generic install

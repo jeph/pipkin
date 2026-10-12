@@ -24,6 +24,11 @@
     <string name="onboarding_notifications_allow">Allow notifications</string>
     <string name="onboarding_notifications_done">Notifications are on.</string>
 
+    <string name="onboarding_background_title">Run in the background</string>
+    <string name="onboarding_background_body">Lets Pipkin keep following a chat while the screen is off. Without it, Android can cut Pipkin off from the agent mid-run.</string>
+    <string name="onboarding_background_allow">Allow</string>
+    <string name="onboarding_background_done">Pipkin can run in the background.</string>
+
     <string name="onboarding_run_command_title">Allow Pipkin to run commands in Termux</string>
     <string name="onboarding_run_command_body">Pipkin runs its agent through Termux.</string>
     <string name="onboarding_run_command_needs_termux">Install Termux first.</string>
