@@ -33,6 +33,12 @@ sealed interface Destination {
   data class ModelEditor(val modelId: String) : Destination
 
   data object Onboarding : Destination
+
+  /** Archived chats, with search, restore and delete. */
+  data object Archive : Destination
+
+  /** The read-only transcript of the archived chat in session file [path]. */
+  data class ArchivedChat(val path: String) : Destination
 }
 
 /** The screen stack; never empty. Main thread only. */
@@ -83,6 +89,8 @@ class AppNavigator(initial: List<Destination>) {
       is Destination.ProviderEditor -> PROVIDER + d.id.orEmpty()
       Destination.AddModels -> ADD_MODELS
       is Destination.ModelEditor -> MODEL + d.modelId
+      Destination.Archive -> ARCHIVE
+      is Destination.ArchivedChat -> ARCHIVED_CHAT + d.path
     }
 
     private fun destination(key: String): Destination? = when {
@@ -93,6 +101,8 @@ class AppNavigator(initial: List<Destination>) {
       key == PROVIDERS -> Destination.Providers
       key == ADD_PROVIDER -> Destination.AddProvider
       key == ADD_MODELS -> Destination.AddModels
+      key == ARCHIVE -> Destination.Archive
+      key.startsWith(ARCHIVED_CHAT) -> Destination.ArchivedChat(key.removePrefix(ARCHIVED_CHAT))
       key.startsWith(MODEL) -> Destination.ModelEditor(key.removePrefix(MODEL))
       key.startsWith(SUBSCRIPTION) -> Destination.Subscription(key.removePrefix(SUBSCRIPTION))
       key.startsWith(PROVIDER) -> Destination.ProviderEditor(key.removePrefix(PROVIDER).ifEmpty { null })
@@ -109,5 +119,7 @@ class AppNavigator(initial: List<Destination>) {
     private const val SUBSCRIPTION = "subscription:"
     private const val ADD_MODELS = "add-models"
     private const val MODEL = "model:"
+    private const val ARCHIVE = "archive"
+    private const val ARCHIVED_CHAT = "archived-chat:"
   }
 }

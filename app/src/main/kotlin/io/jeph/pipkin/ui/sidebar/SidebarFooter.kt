@@ -25,9 +25,48 @@ import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** Termux/Pi health (tap opens onboarding when setup needs attention), Add workspace and Settings. */
+/** Termux/Pi health (tap opens onboarding when setup needs attention), Add workspace, Archive and Settings. */
 @Composable
-internal fun SidebarFooter(onAddWorkspace: () -> Unit, onOpenSettings: () -> Unit, onOpenOnboarding: () -> Unit) {
+internal fun SidebarFooter(
+  onAddWorkspace: () -> Unit,
+  onOpenArchive: () -> Unit,
+  onOpenSettings: () -> Unit,
+  onOpenOnboarding: () -> Unit,
+) {
+  val colors = pipkinColors
+  Column(modifier = Modifier.fillMaxWidth()) {
+    HorizontalDivider(thickness = 1.dp, color = colors.border)
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .heightIn(min = 56.dp)
+        .padding(horizontal = PipkinTokens.Spacing.s16),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    ) {
+      HostStatus(onOpenOnboarding, Modifier.weight(1f))
+      IconButton28(
+        icon = R.drawable.ic_lucide_folder_plus,
+        contentDescription = stringResource(R.string.shell_add_workspace),
+        onClick = onAddWorkspace,
+      )
+      IconButton28(
+        icon = R.drawable.ic_lucide_archive,
+        contentDescription = stringResource(R.string.archive_open),
+        onClick = onOpenArchive,
+      )
+      IconButton28(
+        icon = R.drawable.ic_lucide_settings,
+        contentDescription = stringResource(R.string.shell_settings),
+        onClick = onOpenSettings,
+      )
+    }
+  }
+}
+
+/** Termux/Pi health; tapping it opens onboarding when setup needs attention. */
+@Composable
+private fun HostStatus(onOpenOnboarding: () -> Unit, modifier: Modifier) {
   val colors = pipkinColors
   val hostClient = LocalContext.current.appGraph.hostClient
   val hello by hostClient.lastHello.collectAsStateWithLifecycle()
@@ -46,43 +85,20 @@ internal fun SidebarFooter(onAddWorkspace: () -> Unit, onOpenSettings: () -> Uni
     hello?.piVersion?.let { stringResource(R.string.shell_termux_status, it) }
       ?: stringResource(R.string.shell_termux_status_unknown)
   }
-  Column(modifier = Modifier.fillMaxWidth()) {
-    HorizontalDivider(thickness = 1.dp, color = colors.border)
-    Row(
-      modifier = Modifier
-        .fillMaxWidth()
-        .heightIn(min = 56.dp)
-        .padding(horizontal = PipkinTokens.Spacing.s16),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
-    ) {
-      Row(
-        modifier = Modifier
-          .weight(1f)
-          .then(if (needsSetup) Modifier.clickable(onClick = onOpenOnboarding) else Modifier)
-          .padding(vertical = PipkinTokens.Spacing.s8),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
-      ) {
-        dot?.let { StatusDot(it) }
-        Text(
-          text = label,
-          color = if (needsSetup) colors.foreground else colors.foregroundMuted,
-          fontSize = PipkinTokens.FontSize.sm,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-      }
-      IconButton28(
-        icon = R.drawable.ic_lucide_folder_plus,
-        contentDescription = stringResource(R.string.shell_add_workspace),
-        onClick = onAddWorkspace,
-      )
-      IconButton28(
-        icon = R.drawable.ic_lucide_settings,
-        contentDescription = stringResource(R.string.shell_settings),
-        onClick = onOpenSettings,
-      )
-    }
+  Row(
+    modifier = modifier
+      .then(if (needsSetup) Modifier.clickable(onClick = onOpenOnboarding) else Modifier)
+      .padding(vertical = PipkinTokens.Spacing.s8),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+  ) {
+    dot?.let { StatusDot(it) }
+    Text(
+      text = label,
+      color = if (needsSetup) colors.foreground else colors.foregroundMuted,
+      fontSize = PipkinTokens.FontSize.sm,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+    )
   }
 }

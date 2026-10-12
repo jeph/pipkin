@@ -15,7 +15,8 @@ internal sealed interface ChatSheet {
 
   data object ConfirmReload : ChatSheet
 
-  data object ConfirmDelete : ChatSheet
+  /** Archiving would stop the run Pi is working on. */
+  data object ConfirmArchive : ChatSheet
 
   /** The detail sheet of the thinking block or tool call with this timeline key. */
   data class Tool(val key: String) : ChatSheet

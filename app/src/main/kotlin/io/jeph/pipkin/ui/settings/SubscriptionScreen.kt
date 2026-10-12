@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +26,7 @@ import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.auth.LoginSheet
 import io.jeph.pipkin.ui.auth.ProviderLogo
 import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -47,7 +47,7 @@ internal fun SubscriptionScreen(
   val accounts = LocalContext.current.appGraph.accountRepository
   val status by accounts.status.collectAsStateWithLifecycle()
   val refreshError by accounts.refreshError.collectAsStateWithLifecycle()
-  val snackbar = remember { SnackbarHostState() }
+  val snackbar = remember { SnackbarStackState() }
   val scope = rememberCoroutineScope()
   var busy by remember { mutableStateOf(false) }
   var signingIn by rememberSaveable { mutableStateOf(false) }
@@ -65,7 +65,7 @@ internal fun SubscriptionScreen(
     scope.launch {
       val error = signOut(accounts, id, failed)
       busy = false
-      if (error == null) onBack() else snackbar.showSnackbar(error)
+      if (error == null) onBack() else snackbar.show(error)
     }
   }
   SettingsPage(

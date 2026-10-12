@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.StringRes
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -19,18 +18,19 @@ import io.jeph.pipkin.agent.RpcError
 import io.jeph.pipkin.agent.TimelineEffect
 import io.jeph.pipkin.agent.UiAnswer
 import io.jeph.pipkin.host.HostRejected
+import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.sidebar.tildePath
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/** What the header's ellipsis sheet can do. [onCopyPath] is null until Pi reported a session file. */
+/** What the header's ellipsis sheet can do. [onCopyPath] and [onArchive] are null until Pi reported a session file. */
 internal class ChatActions(
   val onNewChat: () -> Unit,
   val onRename: () -> Unit,
   val onReload: () -> Unit,
   val onCopyPath: (() -> Unit)?,
-  val onDelete: () -> Unit,
+  val onArchive: (() -> Unit)?,
 )
 
 /**
@@ -42,7 +42,7 @@ internal class ChatController(
   private val graph: AppGraph,
   private val context: Context,
   val scope: CoroutineScope,
-  private val snackbar: SnackbarHostState,
+  private val snackbar: SnackbarStackState,
   navigator: ChatNavigator,
 ) {
   var draft by mutableStateOf(TextFieldValue())
@@ -251,31 +251,6 @@ internal class ChatController(
     }
   }
 
-  /**
-   * Ends Pi, deletes the session file and hands over to [onDeleted], which opens another chat. Runs on
-   * the app scope, since closing the process clears the visible chat and disposes this screen's scope.
-   */
-  fun delete(onDeleted: () -> Unit) {
-    val path = process.sessionFile.value
-    graph.registry.close(process)
-    graph.scope.launch {
-      val failure = if (path != null) deleteSession(path) else null
-      onDeleted()
-      failure?.let { show(it) }
-    }
-  }
-
-  /** Deletes [path]; returns the user-facing failure message, or null. */
-  private suspend fun deleteSession(path: String): String? = try {
-    graph.sessionRepository.delete(path)
-    null
-  } catch (error: IOException) {
-    error.message.orEmpty()
-  } catch (error: HostRejected) {
-    // Pi writes the session file with its first reply, so a chat without one has nothing to delete.
-    error.error.takeUnless { error.code == "not_found" }
-  }
-
   /** The single collector of the timeline's one-shot extension effects. */
   suspend fun collectEffects() {
     process.timeline.effects.collect { effect ->
@@ -290,8 +265,8 @@ internal class ChatController(
 
   fun show(message: String) {
     if (message.isBlank()) return
-    // showSnackbar suspends until dismissed; a separate coroutine keeps callers and effects flowing.
-    scope.launch { snackbar.showSnackbar(message) }
+    // show suspends until the snackbar leaves; a separate coroutine keeps callers and effects flowing.
+    scope.launch { snackbar.show(message) }
   }
 
   /** Runs [block] on the screen's scope, showing an [RpcError] as a snackbar. */

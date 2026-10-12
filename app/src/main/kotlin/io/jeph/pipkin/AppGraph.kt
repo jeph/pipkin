@@ -13,6 +13,7 @@ import io.jeph.pipkin.agent.TurnNotifications
 import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.data.ModelDefaults
 import io.jeph.pipkin.data.Preferences
+import io.jeph.pipkin.data.SessionArchive
 import io.jeph.pipkin.data.SessionRepository
 import io.jeph.pipkin.host.HostClient
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +33,7 @@ internal class AppGraph(application: Application) {
   val keepAlive = KeepAlive(application)
   val preferences = Preferences(application)
   val sessionRepository = SessionRepository(hostClient, scope)
+  val sessionArchive = SessionArchive(sessionRepository, preferences, scope)
   private val turnNotifications = TurnNotifications(application)
   val registry: AgentRegistry<AgentProcess> =
     AgentRegistry(scope, onRunEnded = turnNotifications::runEnded) { cwd, sessionPath ->

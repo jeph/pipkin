@@ -10,6 +10,7 @@ class WorkspacesTest {
     path = path,
     id = path,
     cwd = cwd,
+    cwdExists = true,
     name = null,
     created = 0,
     modified = 0,

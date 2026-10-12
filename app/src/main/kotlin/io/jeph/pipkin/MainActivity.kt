@@ -33,6 +33,8 @@ import io.jeph.pipkin.ui.AppNavigator
 import io.jeph.pipkin.ui.Destination
 import io.jeph.pipkin.ui.MainScreen
 import io.jeph.pipkin.ui.ShellActions
+import io.jeph.pipkin.ui.archive.ArchiveScreen
+import io.jeph.pipkin.ui.archive.ArchivedChatScreen
 import io.jeph.pipkin.ui.onboarding.OnboardingScreen
 import io.jeph.pipkin.ui.onboarding.PermissionsScreen
 import io.jeph.pipkin.ui.settings.AddModelsScreen
@@ -122,8 +124,12 @@ private fun Screen(
       actions = actions,
       requestedChat = requestedChat,
       onOpenSettings = { navigator.push(Destination.Settings) },
+      onOpenArchive = { navigator.push(Destination.Archive) },
+      onOpenArchivedChat = { navigator.push(Destination.ArchivedChat(it)) },
       onOpenOnboarding = { navigator.push(Destination.Onboarding) },
     )
+
+    Destination.Archive, is Destination.ArchivedChat -> ArchivePage(top, navigator, actions, requestedChat)
 
     Destination.Settings -> SettingsScreen(
       onBack = { navigator.pop() },
@@ -172,6 +178,30 @@ private fun Screen(
     Destination.Onboarding -> OnboardingScreen(
       onFinished = { navigator.replaceAll(Destination.Main) },
       onAddProvider = { navigator.push(Destination.ProviderEditor(null)) },
+    )
+  }
+}
+
+/** The archive list, or one archived chat's transcript; restoring that one reopens it on the main screen. */
+@Composable
+private fun ArchivePage(
+  top: Destination,
+  navigator: AppNavigator,
+  actions: ShellActions,
+  requestedChat: MutableStateFlow<ChatLocation?>,
+) {
+  if (top is Destination.ArchivedChat) {
+    ArchivedChatScreen(
+      path = top.path,
+      actions = actions,
+      onBack = { navigator.pop() },
+      onRestored = { requestedChat.value = it },
+    )
+  } else {
+    ArchiveScreen(
+      actions = actions,
+      onBack = { navigator.pop() },
+      onOpenChat = { navigator.push(Destination.ArchivedChat(it)) },
     )
   }
 }

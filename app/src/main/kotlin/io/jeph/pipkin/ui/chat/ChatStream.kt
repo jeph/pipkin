@@ -46,7 +46,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
-import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.TimelineState
@@ -66,19 +65,20 @@ private const val LAUNCHER_MASK_SCALE = 1.5f
 
 /**
  * The chat stream: process banner, timeline items, the empty state and Paseo's scroll-to-bottom button.
- * Keeps the end in view while the user is at the bottom; dragging away stops following.
+ * Keeps the end in view while the user is at the bottom; dragging away stops following. [onRestart]
+ * retries a failed start and restarts an exited Pi.
  */
 @Composable
 internal fun ChatStream(
-  process: AgentProcess,
   timeline: TimelineState,
   processState: AgentProcessState,
   follow: MutableState<Boolean>,
   onOpenTool: (key: String) -> Unit,
   onOpenSettings: () -> Unit,
+  onRestart: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val listState = remember(process) { LazyListState() }
+  val listState = remember { LazyListState() }
   val scope = rememberCoroutineScope()
   val banner = processState.takeIf {
     it is AgentProcessState.Starting || it is AgentProcessState.Installing || it is AgentProcessState.Failed
@@ -90,7 +90,7 @@ internal fun ChatStream(
     derivedStateOf { listState.distanceFromBottom() > threshold }
   }
   Box(modifier = modifier.fillMaxSize()) {
-    StreamList(listState, timeline.items, banner, follow, process, onOpenTool)
+    StreamList(listState, timeline.items, banner, follow, onRestart, onOpenTool)
     if (timeline.items.isEmpty() && processState == AgentProcessState.Ready) {
       EmptyState(noModel = timeline.model == null, onOpenSettings, Modifier.align(Alignment.Center))
     }
@@ -129,7 +129,7 @@ private fun StreamList(
   items: List<TimelineItem>,
   banner: AgentProcessState?,
   follow: State<Boolean>,
-  process: AgentProcess,
+  onRestart: () -> Unit,
   onOpenTool: (key: String) -> Unit,
 ) {
   val recomposer = LocalView.current.findViewTreeCompositionContext() as Recomposer
@@ -151,14 +151,14 @@ private fun StreamList(
   ) {
     if (banner != null) {
       item(key = BANNER_KEY, contentType = BANNER_KEY) {
-        StatusBanner(banner, onRetry = process::restart, Modifier.contentWidth().padding(top = PipkinTokens.Spacing.s8))
+        StatusBanner(banner, onRetry = onRestart, Modifier.contentWidth().padding(top = PipkinTokens.Spacing.s8))
       }
     }
     itemsIndexed(items, key = { _, item -> item.key }, contentType = { _, item -> item::class }) { index, item ->
       StreamItem(
         item = item,
         onOpenTool = onOpenTool,
-        onRestart = process::restart,
+        onRestart = onRestart,
         modifier = Modifier.contentWidth().padding(top = gapBefore(items.getOrNull(index - 1), item)),
       )
     }

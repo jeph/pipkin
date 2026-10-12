@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONException
 
 /**
@@ -38,12 +39,15 @@ internal class SessionRepository(private val hostClient: HostClient, scope: Coro
     requests.trySend(Unit)
   }
 
-  /** Deletes the session file; throws [HostFailure][io.jeph.pipkin.host.HostFailure] or [HostRejected]. */
-  suspend fun delete(path: String) {
-    hostClient.deleteSession(path)
-    sessionsState.value = sessionsState.value.filterNot { it.path == path }
+  /** Deletes the session files; throws [HostFailure][io.jeph.pipkin.host.HostFailure] or [HostRejected]. */
+  suspend fun delete(paths: Collection<String>) {
+    hostClient.deleteSessions(paths.toList())
+    sessionsState.value = sessionsState.value.filterNot { it.path in paths }
     refresh()
   }
+
+  /** The session's messages for a read-only transcript; throws like [delete], or [JSONException]. */
+  suspend fun messages(path: String): JSONArray = hostClient.sessionMessages(path)
 
   private suspend fun load() {
     try {

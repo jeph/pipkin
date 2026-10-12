@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="archive_title">Archive</string>
+    <string name="archive_open">Archived chats</string>
+    <string name="archive_back">Back</string>
+    <string name="archive_action">Archive</string>
+    <string name="archive_undo">Undo</string>
+    <plurals name="archive_archived">
+        <item quantity="one">Chat archived</item>
+        <item quantity="other">%1$d chats archived</item>
+    </plurals>
+
+    <string name="archive_stop_title">Stop and archive?</string>
+    <string name="archive_stop_text">Pipkin is working in this chat. Archiving it stops the current run.</string>
+    <string name="archive_stop_confirm">Stop and archive</string>
+
+    <string name="archive_workspace_actions">Actions for %1$s</string>
+    <string name="archive_remove_workspace">Remove workspace</string>
+    <string name="archive_remove_title">Remove %1$s?</string>
+    <plurals name="archive_remove_text">
+        <item quantity="one">The workspace leaves the sidebar and its chat is archived. Adding the folder back won\'t restore it.</item>
+        <item quantity="other">The workspace leaves the sidebar and its %1$d chats are archived. Adding the folder back won\'t restore them.</item>
+    </plurals>
+    <string name="archive_remove_text_empty">The workspace leaves the sidebar. Its folder stays in Termux.</string>
+    <string name="archive_remove_working_single">Pipkin is working in a chat there; the run stops.</string>
+    <plurals name="archive_remove_working">
+        <item quantity="one">One of them is working; its run stops.</item>
+        <item quantity="other">%1$d of them are working; their runs stop.</item>
+    </plurals>
+    <string name="archive_remove_confirm">Remove</string>
+
+    <string name="archive_search">Search by title or folder</string>
+    <string name="archive_empty">No archived chats</string>
+    <string name="archive_no_matches">No matching chats</string>
+    <string name="archive_folder_missing">Folder missing</string>
+    <plurals name="archive_selected">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <string name="archive_clear_selection">Clear selection</string>
+    <string name="archive_select_all">Select all</string>
+    <string name="archive_select">Select %1$s</string>
+    <string name="archive_deselect">Deselect %1$s</string>
+    <string name="archive_restore">Restore</string>
+    <string name="archive_restore_count">Restore (%1$d)</string>
+    <string name="archive_delete">Delete</string>
+    <string name="archive_delete_count">Delete (%1$d)</string>
+    <plurals name="archive_restored">
+        <item quantity="one">Chat restored</item>
+        <item quantity="other">%1$d chats restored</item>
+    </plurals>
+    <plurals name="archive_deleted">
+        <item quantity="one">Chat deleted</item>
+        <item quantity="other">%1$d chats deleted</item>
+    </plurals>
+    <plurals name="archive_delete_title">
+        <item quantity="one">Delete this chat?</item>
+        <item quantity="other">Delete %1$d chats?</item>
+    </plurals>
+    <plurals name="archive_delete_text">
+        <item quantity="one">Its session file is deleted. This can\'t be undone.</item>
+        <item quantity="other">Their session files are deleted. This can\'t be undone.</item>
+    </plurals>
+    <string name="archive_chat_actions">Archived chat actions</string>
+
+    <string name="archive_read_only">Archived · read only</string>
+    <string name="archive_read_only_missing">Archived · its folder is missing, so it can\'t be restored</string>
+    <string name="archive_transcript_failed">Couldn\'t load this chat.</string>
+    <string name="archive_transcript_empty">This chat has no messages.</string>
+    <string name="archive_retry">Retry</string>
+</resources>

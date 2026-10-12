@@ -64,9 +64,7 @@ internal fun SessionRow(
     }
     Column(modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s6)) {
       Text(
-        text = session.name?.takeIf { it.isNotBlank() }
-          ?: session.firstMessage.takeIf { it.isNotBlank() }
-          ?: stringResource(R.string.shell_session_untitled),
+        text = sessionTitle(session),
         color = colors.foreground,
         fontSize = PipkinTokens.FontSize.base,
         maxLines = 1,
@@ -88,6 +86,12 @@ internal fun SessionRow(
   }
 }
 
+/** The chat's name, else its first message, else "New chat". */
+@Composable
+internal fun sessionTitle(session: SessionInfo): String = session.name?.takeIf { it.isNotBlank() }
+  ?: session.firstMessage.takeIf { it.isNotBlank() }
+  ?: stringResource(R.string.shell_session_untitled)
+
 /** The simmering pot while Pi works; a danger dot after Pi exited with a failure; nothing otherwise. */
 @Composable
 private fun ActivityMark(process: AgentProcess) {
@@ -102,7 +106,7 @@ private fun ActivityMark(process: AgentProcess) {
 
 /** `now`, `5m`, `2h`, `3d`, then a short date. */
 @Composable
-private fun relativeTime(epochMillis: Long): String {
+internal fun relativeTime(epochMillis: Long): String {
   val elapsed = (System.currentTimeMillis() - epochMillis).coerceAtLeast(0)
   val minutes = elapsed / DateUtils.MINUTE_IN_MILLIS
   val hours = elapsed / DateUtils.HOUR_IN_MILLIS

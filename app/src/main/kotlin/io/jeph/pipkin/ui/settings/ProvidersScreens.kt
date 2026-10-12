@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,6 +38,8 @@ import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.components.SnackbarStack
+import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -147,7 +147,7 @@ internal fun AddProviderScreen(onBack: () -> Unit, onAddCompatible: () -> Unit, 
 internal fun SettingsPage(
   title: String,
   onBack: () -> Unit,
-  snackbar: SnackbarHostState? = null,
+  snackbar: SnackbarStackState? = null,
   content: @Composable ColumnScope.() -> Unit,
 ) {
   Box(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
@@ -180,7 +180,10 @@ internal fun SettingsPage(
       }
     }
     if (snackbar != null) {
-      SnackbarHost(hostState = snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+      SnackbarStack(
+        snackbar,
+        Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(PipkinTokens.Spacing.s16),
+      )
     }
   }
 }

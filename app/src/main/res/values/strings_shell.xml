@@ -21,12 +21,9 @@
     <string name="shell_time_days">%1$dd</string>
 
     <string name="shell_session_rename">Rename</string>
-    <string name="shell_session_delete">Delete</string>
     <string name="shell_rename_title">Rename chat</string>
     <string name="shell_rename_label">Name</string>
     <string name="shell_rename_save">Save</string>
-    <string name="shell_delete_title">Delete chat?</string>
-    <string name="shell_delete_text">This deletes the chat\'s session file. It can\'t be undone.</string>
     <string name="shell_cancel">Cancel</string>
 
     <string name="shell_browse_home">Termux home</string>

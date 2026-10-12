@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +29,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -39,6 +38,8 @@ import io.jeph.pipkin.agent.ChatLocation
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.chat.ChatScreen
 import io.jeph.pipkin.ui.components.LocalPotsSimmer
+import io.jeph.pipkin.ui.components.SnackbarStack
+import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.sidebar.Sidebar
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,19 +53,20 @@ private val PanelAnimation = tween<Float>(durationMillis = 220, easing = FastOut
 
 /**
  * The main screen: the sidebar and the chat as full-width sliding panels. Opens a chat on entry when
- * none is shown, and shows [requestedChat] when a notification asks for it; one-shot shell notices
- * show as a snackbar.
+ * none is shown, and shows [requestedChat] when a notification asks for it (an archived one opens as its
+ * transcript instead); one-shot shell notices show as snackbars.
  */
 @Composable
 internal fun MainScreen(
   actions: ShellActions,
   requestedChat: MutableStateFlow<ChatLocation?>,
   onOpenSettings: () -> Unit,
+  onOpenArchive: () -> Unit,
+  onOpenArchivedChat: (path: String) -> Unit,
   onOpenOnboarding: () -> Unit,
 ) {
-  val snackbar = remember { SnackbarHostState() }
-  val genericError = stringResource(R.string.shell_error_generic)
-  LaunchedEffect(actions) { actions.notices.collect { snackbar.showSnackbar(it ?: genericError) } }
+  val snackbar = remember { SnackbarStackState() }
+  ShellNotices(actions, snackbar)
   LaunchedEffect(actions) { actions.openAtStartup() }
 
   val panels = rememberSaveable(saver = AnchoredDraggableState.Saver()) { AnchoredDraggableState(Panel.Chat) }
@@ -73,10 +75,14 @@ internal fun MainScreen(
   val sidebarOpen = panels.targetValue == Panel.Sidebar
   BackHandler(enabled = sidebarOpen) { showPanel(Panel.Chat) }
   SidebarOpenedEffect(sidebarOpen)
+  val sessionArchive = LocalContext.current.appGraph.sessionArchive
   LaunchedEffect(requestedChat) {
     requestedChat.filterNotNull().collect { chat ->
       requestedChat.value = null
-      if (actions.openChat(chat.cwd, chat.sessionPath)) showPanel(Panel.Chat)
+      when {
+        sessionArchive.isArchived(chat.sessionPath) -> onOpenArchivedChat(chat.sessionPath)
+        actions.openChat(chat.cwd, chat.sessionPath) -> showPanel(Panel.Chat)
+      }
     }
   }
 
@@ -90,6 +96,7 @@ internal fun MainScreen(
             actions = actions,
             onClose = { showPanel(Panel.Chat) },
             onOpenSettings = onOpenSettings,
+            onOpenArchive = onOpenArchive,
             onOpenOnboarding = onOpenOnboarding,
           )
         }
@@ -102,13 +109,36 @@ internal fun MainScreen(
         )
       },
     )
-    SnackbarHost(
-      hostState = snackbar,
+    SnackbarStack(
+      state = snackbar,
       modifier = Modifier
         .align(Alignment.BottomCenter)
         .windowInsetsPadding(WindowInsets.safeDrawing)
         .padding(PipkinTokens.Spacing.s16),
     )
+  }
+}
+
+/** Shows [actions]' notices as they arrive, alongside any already showing; an archive notice offers Undo while it shows. */
+@Composable
+private fun ShellNotices(actions: ShellActions, snackbar: SnackbarStackState) {
+  val resources = LocalResources.current
+  val genericError = stringResource(R.string.shell_error_generic)
+  val undo = stringResource(R.string.archive_undo)
+  LaunchedEffect(actions) {
+    actions.notices.collect { notice ->
+      launch {
+        when (notice) {
+          is ShellNotice.Failure -> snackbar.show(notice.message ?: genericError)
+
+          is ShellNotice.Archived -> {
+            val count = notice.paths.size
+            val message = resources.getQuantityString(R.plurals.archive_archived, count, count)
+            if (snackbar.show(message, actionLabel = undo)) actions.unarchive(notice.paths)
+          }
+        }
+      }
+    }
   }
 }
 
@@ -181,6 +211,6 @@ private fun WorkspacePanel(actions: ShellActions, onToggleSidebar: () -> Unit, o
     onToggleSidebar = onToggleSidebar,
     onNewChat = { cwd -> actions.newChat(cwd) },
     onOpenSettings = onOpenSettings,
-    onChatDeleted = actions::openMostRecent,
+    onArchive = actions::archive,
   )
 }

@@ -1,9 +1,6 @@
-import { realpath, unlink } from "node:fs/promises";
+import { realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, sep } from "node:path";
-import { HostError } from "../env.js";
-import type { JsonObject } from "../framing.js";
-import type { ModeContext } from "../mode.js";
-import { stringParam } from "../params.js";
+import { HostError } from "./env.js";
 
 async function resolveExisting(path: string): Promise<string> {
   try {
@@ -14,15 +11,16 @@ async function resolveExisting(path: string): Promise<string> {
   }
 }
 
-/** Deletes a session file, refusing anything that resolves outside the sessions directory. */
-export async function deleteSession(ctx: ModeContext): Promise<JsonObject> {
-  const path = stringParam(ctx.params, "path");
-  const base = await resolveExisting(join(ctx.env.configDir, "sessions"));
+/**
+ * The real path of the session file [path], refusing anything that resolves outside the sessions folder
+ * (`outside_sessions`). A missing file throws `not_found`.
+ */
+export async function sessionFile(configDir: string, path: string): Promise<string> {
+  const base = await resolveExisting(join(configDir, "sessions"));
   const target = await resolveExisting(path);
   const inside = relative(base, target);
   if (inside === "" || inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
     throw new HostError("outside_sessions", "That file is not inside Pipkin's sessions folder");
   }
-  await unlink(target);
-  return {};
+  return target;
 }

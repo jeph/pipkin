@@ -21,11 +21,12 @@ internal data class HostHello(
   }
 }
 
-/** One Pi session file; times are epoch milliseconds. */
+/** One Pi session file; times are epoch milliseconds. [cwdExists] is false once its workspace folder is gone. */
 internal data class SessionInfo(
   val path: String,
   val id: String,
   val cwd: String,
+  val cwdExists: Boolean,
   val name: String?,
   val created: Long,
   val modified: Long,
@@ -37,6 +38,7 @@ internal data class SessionInfo(
       path = json.getString("path"),
       id = json.optString("id"),
       cwd = json.optString("cwd"),
+      cwdExists = json.optBoolean("cwdExists", true),
       name = json.opt("name") as? String,
       created = json.optLong("created"),
       modified = json.optLong("modified"),

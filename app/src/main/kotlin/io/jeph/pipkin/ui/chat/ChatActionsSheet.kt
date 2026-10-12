@@ -39,11 +39,12 @@ internal fun ChatActionsSheet(actions: ChatActions, onDismiss: () -> Unit) {
       enabled = copyPath != null,
       onClick = { copyPath?.let(dismissThen) },
     )
+    val archive = actions.onArchive
     SheetRow(
-      label = stringResource(R.string.chat_action_delete),
-      icon = R.drawable.ic_lucide_trash_2,
-      labelColor = pipkinColors.destructive,
-      onClick = { dismissThen(actions.onDelete) },
+      label = stringResource(R.string.chat_action_archive),
+      icon = R.drawable.ic_lucide_archive,
+      enabled = archive != null,
+      onClick = { archive?.let(dismissThen) },
     )
   }
 }

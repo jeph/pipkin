@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,6 +32,8 @@ import io.jeph.pipkin.ui.auth.LoginSheet
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.SnackbarStack
+import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.ThemeMode
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun SettingsScreen(onBack: () -> Unit, onOpenPermissions: () -> Unit, onOpenProviders: () -> Unit) {
   val graph = LocalContext.current.appGraph
-  val snackbar = remember { SnackbarHostState() }
+  val snackbar = remember { SnackbarStackState() }
   Box(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
     Column(modifier = Modifier.fillMaxSize()) {
       HeaderBar(
@@ -63,14 +63,17 @@ internal fun SettingsScreen(onBack: () -> Unit, onOpenPermissions: () -> Unit, o
         onOpenPermissions = onOpenPermissions,
       )
     }
-    SnackbarHost(hostState = snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
+    SnackbarStack(
+      snackbar,
+      Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(PipkinTokens.Spacing.s16),
+    )
   }
 }
 
 @Composable
 private fun SettingsContent(
   graph: AppGraph,
-  snackbar: SnackbarHostState,
+  snackbar: SnackbarStackState,
   onOpenProviders: () -> Unit,
   onOpenPermissions: () -> Unit,
 ) {
@@ -117,7 +120,7 @@ private fun ProvidersSection(onOpenProviders: () -> Unit) {
 }
 
 @Composable
-private fun AgentSection(graph: AppGraph, snackbar: SnackbarHostState) {
+private fun AgentSection(graph: AppGraph, snackbar: SnackbarStackState) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
@@ -129,7 +132,7 @@ private fun AgentSection(graph: AppGraph, snackbar: SnackbarHostState) {
       title = stringResource(R.string.settings_reload_agents),
       onClick = {
         graph.registry.reloadIdle()
-        scope.launch { snackbar.showSnackbar(reloaded) }
+        scope.launch { snackbar.show(reloaded) }
       },
     )
     SettingsDivider()

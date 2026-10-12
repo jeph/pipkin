@@ -6,7 +6,7 @@ import type { ModeContext } from "./mode.js";
 import { authStatus } from "./modes/auth-status.js";
 import { browse } from "./modes/browse.js";
 import { defaultModel } from "./modes/default-model.js";
-import { deleteSession } from "./modes/delete-session.js";
+import { deleteSessions } from "./modes/delete-sessions.js";
 import { ensure } from "./modes/ensure.js";
 import { login } from "./modes/login.js";
 import { logout } from "./modes/logout.js";
@@ -16,6 +16,7 @@ import { providerRemove } from "./modes/provider-remove.js";
 import { providerSave } from "./modes/provider-save.js";
 import { rpc } from "./modes/rpc.js";
 import { saveAttachments } from "./modes/save-attachments.js";
+import { sessionMessages } from "./modes/session-messages.js";
 import { sessions } from "./modes/sessions.js";
 import { subscriptionSave } from "./modes/subscription-save.js";
 
@@ -97,8 +98,10 @@ async function main(): Promise<void> {
       return respond(ctx, ensure);
     case "sessions":
       return respond(ctx, sessions);
-    case "delete_session":
-      return respond(ctx, deleteSession);
+    case "session_messages":
+      return respond(ctx, sessionMessages);
+    case "delete_sessions":
+      return respond(ctx, deleteSessions);
     case "browse":
       return respond(ctx, browse);
     case "save_attachments":

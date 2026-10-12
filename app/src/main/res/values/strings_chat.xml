@@ -7,7 +7,7 @@
     <string name="chat_action_rename">Rename</string>
     <string name="chat_action_reload">Reload agent</string>
     <string name="chat_action_copy_path">Copy session path</string>
-    <string name="chat_action_delete">Delete chat</string>
+    <string name="chat_action_archive">Archive chat</string>
     <string name="chat_rename_title">Rename chat</string>
     <string name="chat_rename_hint">Chat name</string>
     <string name="chat_save">Save</string>
@@ -15,9 +15,6 @@
     <string name="chat_reload_confirm_title">Stop and reload?</string>
     <string name="chat_reload_confirm_text">Pipkin is working. Reloading stops the current run.</string>
     <string name="chat_reload_confirm">Stop and reload</string>
-    <string name="chat_delete_confirm_title">Delete this chat?</string>
-    <string name="chat_delete_confirm_text">Its session file is deleted from Pipkin\'s sessions folder.</string>
-    <string name="chat_delete">Delete</string>
 
     <!-- Stream -->
     <string name="chat_starting">Starting…</string>

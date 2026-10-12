@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
+import org.json.JSONObject
 
 /** App settings in the `pipkin` SharedPreferences file. Setters persist and publish immediately. */
 internal class Preferences(context: Context) {
@@ -18,6 +19,7 @@ internal class Preferences(context: Context) {
   private val lastProjectCwdState = MutableStateFlow(prefs.getString(LAST_PROJECT_CWD, null))
   private val workspacesState = MutableStateFlow(readWorkspaces())
   private val collapsedState = MutableStateFlow(prefs.getStringSet(COLLAPSED_WORKSPACES, null).orEmpty().toSet())
+  private val archivedState = MutableStateFlow(readArchived())
 
   /** Onboarding finished or was skipped. */
   val setupComplete: StateFlow<Boolean> = setupCompleteState.asStateFlow()
@@ -32,6 +34,9 @@ internal class Preferences(context: Context) {
 
   /** Workspaces whose chats the sidebar hides. */
   val collapsedWorkspaces: StateFlow<Set<String>> = collapsedState.asStateFlow()
+
+  /** Archived session files by path, each with when it was archived (epoch milliseconds). */
+  val archivedSessions: StateFlow<Map<String, Long>> = archivedState.asStateFlow()
 
   fun setSetupComplete(complete: Boolean) {
     prefs.edit { putBoolean(SETUP_COMPLETE, complete) }
@@ -57,6 +62,27 @@ internal class Preferences(context: Context) {
     workspacesState.value = updated
   }
 
+  /** Takes [cwd] off the sidebar's workspaces; it shows again only while it has chats or once added back. */
+  fun removeWorkspace(cwd: String) {
+    val updated = workspacesState.value.filterNot { sameFolder(it, cwd) }
+    val collapsed = collapsedState.value.filterNot { sameFolder(it, cwd) }.toSet()
+    prefs.edit {
+      putString(WORKSPACES, JSONArray(updated).toString())
+      putStringSet(COLLAPSED_WORKSPACES, collapsed)
+    }
+    workspacesState.value = updated
+    collapsedState.value = collapsed
+  }
+
+  /** Marks [paths] archived at [at]; a path already archived keeps its time. */
+  fun archiveSessions(paths: Collection<String>, at: Long) {
+    writeArchived(archivedState.value + paths.filterNot(archivedState.value::containsKey).associateWith { at })
+  }
+
+  fun unarchiveSessions(paths: Collection<String>) {
+    writeArchived(archivedState.value - paths.toSet())
+  }
+
   fun setWorkspaceCollapsed(cwd: String, collapsed: Boolean) {
     val updated = if (collapsed) collapsedState.value + cwd else collapsedState.value - cwd
     prefs.edit { putStringSet(COLLAPSED_WORKSPACES, updated) }
@@ -68,6 +94,16 @@ internal class Preferences(context: Context) {
     return List(array.length()) { array.getString(it) }
   }
 
+  private fun writeArchived(archived: Map<String, Long>) {
+    prefs.edit { putString(ARCHIVED_SESSIONS, JSONObject(archived).toString()) }
+    archivedState.value = archived
+  }
+
+  private fun readArchived(): Map<String, Long> {
+    val json = JSONObject(prefs.getString(ARCHIVED_SESSIONS, null) ?: return emptyMap())
+    return json.keys().asSequence().associateWith(json::getLong)
+  }
+
   private companion object {
     const val FILE = "pipkin"
     const val SETUP_COMPLETE = "setupComplete"
@@ -75,5 +111,6 @@ internal class Preferences(context: Context) {
     const val LAST_PROJECT_CWD = "lastProjectCwd"
     const val WORKSPACES = "workspaces"
     const val COLLAPSED_WORKSPACES = "collapsedWorkspaces"
+    const val ARCHIVED_SESSIONS = "archivedSessions"
   }
 }

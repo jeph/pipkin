@@ -17,16 +17,16 @@ import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-private enum class Stage { Menu, Rename, Delete }
+private enum class Stage { Menu, Rename }
 
-/** The sidebar's per-chat sheet (Rename, Delete) and the dialogs it leads to. */
+/** The sidebar's per-chat sheet (Rename, Archive) and the rename dialog it leads to. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SessionActions(
   session: SessionInfo,
   onDismiss: () -> Unit,
   onRename: (String) -> Unit,
-  onDelete: () -> Unit,
+  onArchive: () -> Unit,
 ) {
   var stage by rememberSaveable(session.path) { mutableStateOf(Stage.Menu) }
   when (stage) {
@@ -37,10 +37,12 @@ internal fun SessionActions(
         onClick = { stage = Stage.Rename },
       )
       SheetRow(
-        label = stringResource(R.string.shell_session_delete),
-        icon = R.drawable.ic_lucide_trash_2,
-        labelColor = pipkinColors.destructive,
-        onClick = { stage = Stage.Delete },
+        label = stringResource(R.string.archive_action),
+        icon = R.drawable.ic_lucide_archive,
+        onClick = {
+          onDismiss()
+          onArchive()
+        },
       )
     }
 
@@ -49,14 +51,6 @@ internal fun SessionActions(
       onDismiss = onDismiss,
       onConfirm = { name ->
         onRename(name)
-        onDismiss()
-      },
-    )
-
-    Stage.Delete -> DeleteDialog(
-      onDismiss = onDismiss,
-      onConfirm = {
-        onDelete()
         onDismiss()
       },
     )
@@ -81,24 +75,6 @@ private fun RenameDialog(initial: String, onDismiss: () -> Unit, onConfirm: (Str
     confirmButton = {
       TextButton(onClick = { onConfirm(name.trim()) }, enabled = name.isNotBlank()) {
         Text(stringResource(R.string.shell_rename_save))
-      }
-    },
-    dismissButton = {
-      TextButton(onClick = onDismiss) { Text(stringResource(R.string.shell_cancel)) }
-    },
-  )
-}
-
-@Composable
-private fun DeleteDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    containerColor = pipkinColors.surface1,
-    title = { Text(stringResource(R.string.shell_delete_title)) },
-    text = { Text(stringResource(R.string.shell_delete_text), color = pipkinColors.foregroundMuted) },
-    confirmButton = {
-      TextButton(onClick = onConfirm) {
-        Text(stringResource(R.string.shell_session_delete), color = pipkinColors.destructive)
       }
     },
     dismissButton = {

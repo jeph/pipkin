@@ -75,9 +75,14 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   suspend fun sessions(): List<SessionInfo> =
     call("sessions", JSONObject()).optJSONArray("sessions").objects().map(SessionInfo::from)
 
-  suspend fun deleteSession(path: String) {
-    call("delete_session", JSONObject().put("path", path))
+  /** Deletes the session files at [paths]; one that is already gone counts as deleted. */
+  suspend fun deleteSessions(paths: List<String>) {
+    call("delete_sessions", JSONObject().put("paths", JSONArray(paths)))
   }
+
+  /** A session's messages as Pi's RPC `get_messages` reports them, read without starting Pi. */
+  suspend fun sessionMessages(path: String): JSONArray =
+    call("session_messages", JSONObject().put("path", path)).optJSONArray("messages") ?: JSONArray()
 
   suspend fun authStatus(): AuthStatus = AuthStatus.from(call("auth_status", JSONObject()))
 

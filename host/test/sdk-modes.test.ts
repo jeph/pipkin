@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type Dirs, installRealPi, makeDirs, removeDirs, runMode } from "./harness.js";
@@ -17,6 +17,74 @@ describe("modes backed by the Pi SDK", () => {
 
   it("lists no sessions in a fresh config", async () => {
     expect(await runMode("sessions", dirs, {})).toEqual({ type: "pipkin_result", ok: true, data: { sessions: [] } });
+  });
+
+  /** Writes a Pi session file for [cwd] holding [messages], one entry each in a single branch. */
+  async function writeSession(cwd: string, id: string, messages: object[]): Promise<string> {
+    const dir = path.join(dirs.configDir, "sessions", `--${cwd.replace(/^\//, "").replaceAll("/", "-")}--`);
+    await mkdir(dir, { recursive: true });
+    const file = path.join(dir, `2026-10-12T00-00-00-000Z_${id}.jsonl`);
+    const header = { type: "session", version: 3, id, timestamp: "2026-10-12T00:00:00.000Z", cwd };
+    const entries = messages.map((message, index) => ({
+      type: "message",
+      id: `e${index}`,
+      parentId: index === 0 ? null : `e${index - 1}`,
+      timestamp: "2026-10-12T00:00:01.000Z",
+      message,
+    }));
+    await writeFile(file, [header, ...entries].map((line) => JSON.stringify(line) + "\n").join(""));
+    return file;
+  }
+
+  const USER = { role: "user", content: "hello", timestamp: 1 };
+  const ASSISTANT = {
+    role: "assistant",
+    content: [{ type: "text", text: "hi there" }],
+    api: "openai-responses",
+    provider: "p",
+    model: "m",
+    usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+    stopReason: "stop",
+    timestamp: 2,
+  };
+
+  it("tells whether each session's workspace folder still exists", async () => {
+    const gone = path.join(dirs.base, "gone");
+    await writeSession(dirs.home, "kept", [USER, ASSISTANT]);
+    await writeSession(gone, "lost", [USER, ASSISTANT]);
+    expect(await runMode("sessions", dirs, {})).toMatchObject({
+      ok: true,
+      data: {
+        sessions: expect.arrayContaining([
+          expect.objectContaining({ id: "kept", cwd: dirs.home, cwdExists: true }),
+          expect.objectContaining({ id: "lost", cwd: gone, cwdExists: false }),
+        ]),
+      },
+    });
+  });
+
+  it("reads a session's messages without changing its file", async () => {
+    const file = await writeSession(dirs.home, "s1", [USER, ASSISTANT]);
+    const before = await readFile(file, "utf8");
+    expect(await runMode("session_messages", dirs, { path: file })).toEqual({
+      type: "pipkin_result",
+      ok: true,
+      data: { messages: [USER, ASSISTANT] },
+    });
+    expect(await readFile(file, "utf8")).toBe(before);
+  });
+
+  it("refuses to read a transcript outside the sessions folder", async () => {
+    await mkdir(path.join(dirs.configDir, "sessions"), { recursive: true });
+    const outside = path.join(dirs.configDir, "settings.json");
+    await writeFile(outside, "{}");
+    expect(await runMode("session_messages", dirs, { path: outside })).toMatchObject({ ok: false, code: "outside_sessions" });
+  });
+
+  it("reports a transcript whose file is gone as not found", async () => {
+    await mkdir(path.join(dirs.configDir, "sessions"), { recursive: true });
+    const gone = path.join(dirs.configDir, "sessions", "gone.jsonl");
+    expect(await runMode("session_messages", dirs, { path: gone })).toMatchObject({ ok: false, code: "not_found" });
   });
 
   const BUILTIN = ["anthropic", "openai-codex"].map((id) => ({

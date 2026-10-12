@@ -7,13 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -32,6 +29,8 @@ import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.SnackbarStack
+import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -45,11 +44,11 @@ internal fun ChatScreen(
   onToggleSidebar: () -> Unit,
   onNewChat: (cwd: String) -> Unit,
   onOpenSettings: () -> Unit,
-  onChatDeleted: () -> Unit,
+  onArchive: (AgentProcess) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   // Outlive a process swap, so a message about the closed chat (delete failed) still shows.
-  val snackbar = remember { SnackbarHostState() }
+  val snackbar = remember { SnackbarStackState() }
   val scope = rememberCoroutineScope()
   if (process == null) {
     PlaceholderChat(onToggleSidebar, modifier)
@@ -68,8 +67,8 @@ internal fun ChatScreen(
   }
   LaunchedEffect(controller) { controller.collectEffects() }
   ChatContent(controller, snackbar, onToggleSidebar, onOpenSettings, onSheet = { sheet = it }, modifier)
-  ChatSheets(controller, sheet, onSheet = { sheet = it }, onNewChat)
-  ChatDialogs(controller, sheet, onSheet = { sheet = it }, onChatDeleted)
+  ChatSheets(controller, sheet, onSheet = { sheet = it }, onNewChat, onArchive)
+  ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive)
 }
 
 /** A [ChatNavigator] that outlives recompositions and always calls the latest callbacks. */
@@ -100,7 +99,7 @@ private fun rememberNavigator(
 @Composable
 private fun ChatContent(
   controller: ChatController,
-  snackbar: SnackbarHostState,
+  snackbar: SnackbarStackState,
   onToggleSidebar: () -> Unit,
   onOpenSettings: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
@@ -128,15 +127,18 @@ private fun ChatContent(
       Modifier.onUnhandledTap(dismissKeyboard),
     )
     Box(modifier = Modifier.weight(1f).fillMaxWidth().onUnhandledTap(dismissKeyboard)) {
-      ChatStream(
-        process = process,
-        timeline = timeline,
-        processState = processState,
-        follow = controller.follow,
-        onOpenTool = { onSheet(ChatSheet.Tool(it)) },
-        onOpenSettings = onOpenSettings,
-      )
-      ChatSnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
+      // A fresh list per chat, so switching chats never carries the old one's scroll position over.
+      key(process) {
+        ChatStream(
+          timeline = timeline,
+          processState = processState,
+          follow = controller.follow,
+          onOpenTool = { onSheet(ChatSheet.Tool(it)) },
+          onOpenSettings = onOpenSettings,
+          onRestart = process::restart,
+        )
+      }
+      SnackbarStack(snackbar, Modifier.align(Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16))
       SlashMenuHost(controller, ready = processState == AgentProcessState.Ready, Modifier.align(Alignment.BottomCenter))
     }
     if (timeline.queue.isNotEmpty()) {
@@ -221,25 +223,12 @@ private fun PlaceholderChat(onToggleSidebar: () -> Unit, modifier: Modifier) {
 }
 
 @Composable
-private fun ChatSnackbarHost(state: SnackbarHostState, modifier: Modifier) {
-  val colors = pipkinColors
-  SnackbarHost(hostState = state, modifier = modifier.padding(PipkinTokens.Spacing.s16)) { data ->
-    Snackbar(
-      snackbarData = data,
-      shape = RoundedCornerShape(PipkinTokens.Radius.lg),
-      containerColor = colors.surface3,
-      contentColor = colors.foreground,
-      actionColor = colors.accent,
-    )
-  }
-}
-
-@Composable
 private fun ChatSheets(
   controller: ChatController,
   sheet: ChatSheet?,
   onSheet: (ChatSheet?) -> Unit,
   onNewChat: (cwd: String) -> Unit,
+  onArchive: (AgentProcess) -> Unit,
 ) {
   val process = controller.process
   val timeline by process.screenTimeline.collectAsStateWithLifecycle()
@@ -255,7 +244,9 @@ private fun ChatSheets(
         onRename = { onSheet(ChatSheet.Rename) },
         onReload = { if (busy) onSheet(ChatSheet.ConfirmReload) else controller.reload() },
         onCopyPath = sessionFile?.let { path -> { copy(path) } },
-        onDelete = { onSheet(ChatSheet.ConfirmDelete) },
+        onArchive = sessionFile?.let {
+          { if (busy) onSheet(ChatSheet.ConfirmArchive) else onArchive(process) }
+        },
       ),
       onDismiss = dismiss,
     )
@@ -282,7 +273,7 @@ private fun ChatDialogs(
   controller: ChatController,
   sheet: ChatSheet?,
   onSheet: (ChatSheet?) -> Unit,
-  onChatDeleted: () -> Unit,
+  onArchive: (AgentProcess) -> Unit,
 ) {
   val process = controller.process
   val timeline by process.screenTimeline.collectAsStateWithLifecycle()
@@ -313,13 +304,13 @@ private fun ChatDialogs(
       onDismiss = dismiss,
     )
 
-    ChatSheet.ConfirmDelete -> ConfirmDialog(
-      title = stringResource(R.string.chat_delete_confirm_title),
-      text = stringResource(R.string.chat_delete_confirm_text),
-      confirmLabel = stringResource(R.string.chat_delete),
+    ChatSheet.ConfirmArchive -> ConfirmDialog(
+      title = stringResource(R.string.archive_stop_title),
+      text = stringResource(R.string.archive_stop_text),
+      confirmLabel = stringResource(R.string.archive_stop_confirm),
       onConfirm = {
         dismiss()
-        controller.delete(onChatDeleted)
+        onArchive(process)
       },
       onDismiss = dismiss,
       destructive = true,
