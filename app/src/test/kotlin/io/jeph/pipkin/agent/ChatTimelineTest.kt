@@ -26,6 +26,24 @@ class ChatTimelineTest {
   private val items get() = timeline.state.value.items
 
   @Test
+  fun seedDuringAnOpenRunReplacesItWithTheSettledHistory() {
+    apply("""{"type":"agent_start"}""")
+    apply("""{"type":"message_start","message":{"role":"assistant","content":[]}}""")
+    update("""{"type":"text_delta","contentIndex":0,"delta":"Work"}""")
+
+    timeline.seed(JSONArray("""[{"role":"user","content":"go","timestamp":5}]"""))
+    assertFalse(timeline.state.value.busy)
+    assertEquals(listOf(User("m1", "go", emptyList(), 5)), items)
+
+    // A settle that was still on its way ends nothing more; the next run opens a fresh footer.
+    apply("""{"type":"agent_settled","aborted":false}""")
+    assertEquals(listOf(User("m1", "go", emptyList(), 5)), items)
+    apply("""{"type":"agent_start"}""")
+    assertTrue(timeline.state.value.busy)
+    assertEquals(TurnFooter("t1", 1_000, null), items.last())
+  }
+
+  @Test
   fun seedMapsEveryRoleAndAttachesToolResults() {
     timeline.seed(
       JSONArray(

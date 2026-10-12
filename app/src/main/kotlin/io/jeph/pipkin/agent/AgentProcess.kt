@@ -1,5 +1,7 @@
 package io.jeph.pipkin.agent
 
+import android.os.SystemClock
+import android.util.Log
 import io.jeph.pipkin.host.HostChannel
 import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.host.HostFailure
@@ -103,6 +105,14 @@ internal class AgentProcess(
   private var connection: Connection? = null
   private var startJob: Job? = null
 
+  /** When [onConnectionEnded] last reconnected on its own ([SystemClock.elapsedRealtime]); null before the first time. */
+  @Volatile
+  private var lastAutoReconnectAt: Long? = null
+
+  /** Pi events applied so far; [resync] tells from it whether the stream moved while it waited. */
+  @Volatile
+  private var eventCount = 0L
+
   val timeline = ChatTimeline()
 
   /**
@@ -186,9 +196,6 @@ internal class AgentProcess(
     call("abort")
   }
 
-  /** `get_state` data; also refreshes [sessionFile], [sessionName] and the timeline's model and thinking level. */
-  suspend fun getState(): JSONObject = call("get_state").also(::applyState)
-
   suspend fun getMessages(): JSONArray = call("get_messages").optJSONArray("messages") ?: JSONArray()
 
   /** Pi Model objects (`provider`, `id`, `name`, `input`, …). */
@@ -246,6 +253,38 @@ internal class AgentProcess(
   suspend fun reloadSession() {
     applyState(call("get_state"))
     timeline.seed(getMessages())
+    refreshContextUsage()
+    onSessionChanged()
+  }
+
+  /**
+   * Brings the timeline in line with Pi after Pipkin was away, since events can go missing while it is in the
+   * background. The `get_state` write also surfaces a connection that died unnoticed, which [read] then replaces.
+   * A Pi that cannot answer `get_state` in [RESYNC_TIMEOUT_MILLIS] is unreachable, so this process reconnects; the
+   * session file keeps the history.
+   */
+  suspend fun resync() {
+    if (stateFlow.value != AgentProcessState.Ready) return
+    val eventsBefore = eventCount
+    val data = try {
+      call("get_state", timeoutMillis = RESYNC_TIMEOUT_MILLIS)
+    } catch (error: RpcError) {
+      Log.w(TAG, "Re-sync get_state failed (timedOut=${error.timedOut}): ${error.error}")
+      if (error.timedOut && stateFlow.value == AgentProcessState.Ready) restart()
+      return
+    }
+    applyState(data)
+    val shown = timeline.state.value
+    val piWorking = data.optBoolean("isStreaming") || data.optBoolean("isCompacting")
+    // Events that arrived meanwhile show the stream is live, and a dialog means Pi waits on the user.
+    if (piWorking || !shown.busy || shown.pendingUi != null || eventCount != eventsBefore) return
+    Log.w(TAG, "Pi is idle but the chat still shows a run; reloading its history")
+    try {
+      timeline.seed(getMessages())
+    } catch (error: RpcError) {
+      Log.w(TAG, "Re-sync get_messages failed: ${error.error}")
+      return
+    }
     refreshContextUsage()
     onSessionChanged()
   }
@@ -315,18 +354,35 @@ internal class AgentProcess(
   private suspend fun read(current: Connection) {
     try {
       current.channel.lines.collect { line -> dispatch(current, line) }
-      if (!current.closing && current.rejection == null && connection === current) reportExit(current.exit)
+      if (!current.closing && current.rejection == null && connection === current) onConnectionEnded(current)
     } finally {
-      // After reportExit, so a command failing on this exit sees the Exited state.
+      // After onConnectionEnded, so a command failing on this exit sees the Exited state.
       current.rpc.close(RpcClient.NOT_RUNNING)
     }
   }
 
-  /** Pi ended unasked; [exit] is the host's `pipkin_exit`, null when the connection just dropped. */
-  private fun reportExit(exit: JSONObject?) {
+  /**
+   * The connection ended unasked. Without the host's `pipkin_exit` the connection dropped rather than Pi exiting,
+   * so a connection that was working reconnects and reloads the history; Pi stopped with it, so no run survives.
+   * Otherwise, or on a second drop within [AUTO_RECONNECT_INTERVAL_MILLIS] (so a failing host cannot loop), the
+   * timeline shows an exit banner.
+   */
+  private fun onConnectionEnded(current: Connection) {
+    val exit = current.exit
+    val now = SystemClock.elapsedRealtime()
+    val recentlyReconnected = lastAutoReconnectAt?.let { now - it < AUTO_RECONNECT_INTERVAL_MILLIS } ?: false
+    if (exit == null && stateFlow.value == AgentProcessState.Ready && !recentlyReconnected) {
+      Log.w(TAG, "Connection to Pi dropped without an exit record; reconnecting")
+      lastAutoReconnectAt = now
+      timeline.clearPendingUi()
+      processScope.launch(Dispatchers.Main) { restart() }
+      return
+    }
     val code = if (exit == null || exit.isNull("code")) null else exit.optInt("code")
+    val signal = exit?.opt("signal") as? String
+    Log.w(TAG, "Pi stopped: exitRecord=${exit != null} code=$code signal=$signal")
     val stderr = exit?.optString("stderr").orEmpty()
-    stateFlow.value = AgentProcessState.Exited(code, exit?.opt("signal") as? String, stderr)
+    stateFlow.value = AgentProcessState.Exited(code, signal, stderr)
     timeline.showExit(code, stderr)
   }
 
@@ -346,6 +402,7 @@ internal class AgentProcess(
   }
 
   private fun onEvent(event: JSONObject) {
+    eventCount += 1
     timeline.apply(event)
     when (event.optString("type")) {
       // Each turn adds a response and tool results to the context; compaction shrinks it.
@@ -380,7 +437,7 @@ internal class AgentProcess(
   /** Best-effort `get_state` after a change Pi may have adjusted; events and the next change correct a miss. */
   private suspend fun syncState() {
     try {
-      getState()
+      applyState(call("get_state"))
     } catch (_: RpcError) {
       // The change itself succeeded; a stale level or model label is corrected by the next get_state.
     }
@@ -397,6 +454,9 @@ internal class AgentProcess(
   }
 
   private companion object {
+    const val TAG = "PipkinAgent"
     const val PI_VERSION = "pi_version"
+    const val RESYNC_TIMEOUT_MILLIS = 15_000L
+    const val AUTO_RECONNECT_INTERVAL_MILLIS = 60_000L
   }
 }

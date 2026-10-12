@@ -61,8 +61,8 @@ internal object HostLauncher {
       result
     } finally {
       server.unregister(token)
-      // Once connected, the host's exit is reported by the channel itself.
-      HostResultReceiver.unregister(id)
+      // Once connected, the channel reports the host's end; Termux's result only adds the host's diagnostics.
+      if (channel != null) HostResultReceiver.logExit(id, mode) else HostResultReceiver.unregister(id)
       // If the host matched in the same instant, it gets no request and exits on its own after 10 s.
       if (channel == null) connected.cancel()
     }

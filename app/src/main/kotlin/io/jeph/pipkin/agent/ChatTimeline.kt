@@ -54,13 +54,16 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private var model: JSONObject? = null
   private var thinkingLevel: String? = null
 
-  /** Replaces the stream with `get_messages` `data.messages`. */
+  /** Replaces the stream with `get_messages` `data.messages`. Pi is idle whenever its history is seeded. */
   fun seed(messages: JSONArray) {
     synchronized(lock) {
       items.clear()
       live = null
       streamingArgs.clear()
-      // A seed follows a new connection or session, so no compaction is running any more.
+      // A seed follows a new connection, a session switch or a re-sync with an idle Pi, so neither a run nor a
+      // compaction is still going.
+      busy = false
+      footer = null
       compacting = false
       for (index in 0 until messages.length()) {
         val message = messages.optJSONObject(index) ?: continue

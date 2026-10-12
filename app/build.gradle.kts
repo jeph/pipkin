@@ -312,6 +312,9 @@ android {
     compose = true
   }
 
+  // Production classes log through android.util.Log, whose JVM stub otherwise throws in unit tests.
+  testOptions { unitTests.isReturnDefaultValues = true }
+
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21

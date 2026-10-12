@@ -41,17 +41,20 @@ internal class HostChannel(
 
   init {
     scope.launch {
+      var ending = "end of stream"
       try {
         while (true) {
           val line = reader.readLine(HostProtocol.MAX_LINE_BYTES) ?: break
           parse(line)?.let { inbox.send(it) }
         }
-      } catch (_: IOException) {
+      } catch (error: IOException) {
         // Socket closed locally or by the host, or an oversized line; both end the channel.
+        ending = "${error.javaClass.simpleName}: ${error.message}"
       } finally {
         inbox.close()
         close()
         done.complete(Unit)
+        Log.i(TAG, "Host ${hello.optString("mode")} channel ended: $ending")
       }
     }
   }

@@ -3,30 +3,25 @@ package io.jeph.pipkin.host
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.util.Log
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Explicit mutable PendingIntent target; the manifest keeps this receiver unexported. Termux fires
- * it when a launched `host.mjs` command exits. [HostLauncher] only listens until the host connects
- * back, so a receipt here means the launch failed.
+ * it when a launched `host.mjs` command exits. Before the host connects back a receipt means the
+ * launch failed; after, [HostLauncher] only has the exit logged.
  */
 class HostResultReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
     val id = intent.data?.lastPathSegment ?: return
-    val callback = callbacks.remove(id) ?: return
-    val result = intent.getBundleExtra("result")
-    // Termux results may contain the full command (and so the host script); never log them.
-    val exitCode = result?.getInt("exitCode", -1) ?: -1
-    val err = result?.getInt("err", ERRNO_SUCCESS) ?: ERRNO_SUCCESS
-    val failure = failureFor(exitCode, err, result?.getString("errmsg").orEmpty().take(ERRMSG_LIMIT))
-    Log.w(TAG, "Termux host launch failed: exitCode=$exitCode err=$err -> ${failure.kind}")
-    callback(failure)
+    callbacks.remove(id)?.invoke(intent.getBundleExtra("result"))
   }
 
   internal companion object {
     private const val TAG = "Pipkin"
     private const val ERRMSG_LIMIT = 8192
+    private const val STDERR_LOG_LIMIT = 4096
 
     /** Termux's `Errno.ERRNO_SUCCESS` is `Activity.RESULT_OK` (-1); any other value is a Termux-side error. */
     private const val ERRNO_SUCCESS = -1
@@ -37,10 +32,32 @@ class HostResultReceiver : BroadcastReceiver() {
     /** Termux's exit code for a command it SIGKILLed because its service was stopping. */
     private const val EXIT_SIGKILL = 137
 
-    private val callbacks = ConcurrentHashMap<String, (HostFailure) -> Unit>()
+    private val callbacks = ConcurrentHashMap<String, (Bundle?) -> Unit>()
 
-    fun register(id: String, callback: (HostFailure) -> Unit) {
-      check(callbacks.putIfAbsent(id, callback) == null)
+    /** Until the host connects, its exit means the launch failed: [onFailure] hears why. */
+    fun register(id: String, onFailure: (HostFailure) -> Unit) {
+      check(
+        callbacks.putIfAbsent(id) { result ->
+          // Termux results may contain the full command (and so the host script); never log them.
+          val exitCode = result?.getInt("exitCode", -1) ?: -1
+          val err = result?.getInt("err", ERRNO_SUCCESS) ?: ERRNO_SUCCESS
+          val failure = failureFor(exitCode, err, result?.getString("errmsg").orEmpty().take(ERRMSG_LIMIT))
+          Log.w(TAG, "Termux host launch failed: exitCode=$exitCode err=$err -> ${failure.kind}")
+          onFailure(failure)
+        } == null,
+      )
+    }
+
+    /**
+     * Once the host connected, its exit is only logged, with the host's own stderr: its diagnostics say when
+     * and why a connection ended. The stderr never carries the command, unlike the rest of the result.
+     */
+    fun logExit(id: String, mode: String) {
+      callbacks[id] = { result ->
+        val exitCode = result?.getInt("exitCode", -1) ?: -1
+        val stderr = result?.getString("stderr").orEmpty().takeLast(STDERR_LOG_LIMIT).trimEnd()
+        Log.i(TAG, "Termux host $mode exited: exitCode=$exitCode stderr:\n$stderr")
+      }
     }
 
     fun unregister(id: String) {

@@ -25,6 +25,14 @@ class TailBuffer {
   }
 }
 
+/**
+ * One timestamped line on the host's stderr. Termux returns it to Pipkin once the host exits, which logs it, so a
+ * dropped connection can be traced to its side.
+ */
+function note(message: string): void {
+  process.stderr.write(`pipkin-host rpc ${new Date().toISOString()}: ${message}\n`);
+}
+
 async function piEntry(root: string): Promise<string> {
   const dir = piPackageDir(root);
   const manifest = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as unknown;
@@ -78,6 +86,7 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const report = (code: number | null, signal: string | null): void => {
     if (reported) return;
     reported = true;
+    note(`pi exited: code=${code} signal=${signal} socketWritable=${socket.writable}`);
     ctx.conn.send({ type: "pipkin_exit", code, signal, stderr: stderr.text() });
     ctx.conn.finish();
   };
@@ -92,15 +101,25 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   if (leftover.length > 0) child.stdin.write(leftover);
   socket.pipe(child.stdin);
   child.stdout.pipe(socket, { end: false });
+  socket.on("end", () => {
+    note("Pipkin ended the connection");
+  });
+  socket.on("error", (error) => {
+    note(`socket error: ${error.message}`);
+  });
 
   const stop = (): void => {
+    note("stopping pi");
     if (!child.stdin.writableEnded) child.stdin.end();
     const running = (): boolean => child.exitCode === null && child.signalCode === null;
     setTimeout(() => {
       if (!running()) return;
+      note("pi ignored stdin EOF; sending SIGTERM");
       child.kill("SIGTERM");
       setTimeout(() => {
-        if (running()) child.kill("SIGKILL");
+        if (!running()) return;
+        note("pi ignored SIGTERM; sending SIGKILL");
+        child.kill("SIGKILL");
       }, KILL_AFTER_MS).unref();
     }, TERM_AFTER_MS).unref();
   };

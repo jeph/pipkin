@@ -42,6 +42,8 @@ internal class AppGraph(application: Application) {
         override fun onStart(owner: LifecycleOwner) {
           // Before setup, Termux may not be able to run the host yet.
           if (preferences.setupComplete.value) sessionRepository.refresh()
+          // Events may have gone missing while Pipkin was in the background.
+          for (process in registry.processes.value.values) scope.launch { process.resync() }
         }
       },
     )

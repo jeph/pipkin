@@ -8,8 +8,15 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
-/** A Pi RPC command failed: Pi answered `success:false`, did not answer in time, or is not running. */
-internal class RpcError(val command: String, val error: String, cause: Throwable? = null) : Exception(error, cause)
+/**
+ * A Pi RPC command failed: Pi answered `success:false`, did not answer in time ([timedOut]), or is not running.
+ */
+internal class RpcError(
+  val command: String,
+  val error: String,
+  cause: Throwable? = null,
+  val timedOut: Boolean = false,
+) : Exception(error, cause)
 
 /**
  * Correlates Pi RPC commands with their `response` records. Ids are `r<counter>`; every caller
@@ -51,7 +58,7 @@ internal class RpcClient(
         reply.await()
       } else {
         withTimeoutOrNull(timeoutMillis) { reply.await() }
-          ?: throw RpcError(command, "The agent did not answer $command in time.")
+          ?: throw RpcError(command, "The agent did not answer $command in time.", timedOut = true)
       }
       if (!response.optBoolean("success")) {
         throw RpcError(command, response.optString("error").ifEmpty { "The agent rejected $command." })
