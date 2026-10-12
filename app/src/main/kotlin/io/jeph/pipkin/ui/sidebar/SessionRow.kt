@@ -30,11 +30,12 @@ import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** One chat in the sidebar: activity dot, title, age and an actions button (long-press opens the same). */
+/** One chat in the sidebar: activity mark, title, age and an actions button (long-press opens the same). */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun SessionRow(
@@ -58,8 +59,8 @@ internal fun SessionRow(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
-    Box(modifier = Modifier.size(6.dp)) {
-      process?.let { ActivityDot(it) }
+    Box(modifier = Modifier.size(PipkinTokens.IconSize.md), contentAlignment = Alignment.Center) {
+      process?.let { ActivityMark(it) }
     }
     Column(modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s6)) {
       Text(
@@ -87,14 +88,14 @@ internal fun SessionRow(
   }
 }
 
-/** Running while Pi works; danger after Pi exited with a failure; nothing otherwise. */
+/** The simmering pot while Pi works; a danger dot after Pi exited with a failure; nothing otherwise. */
 @Composable
-private fun ActivityDot(process: AgentProcess) {
+private fun ActivityMark(process: AgentProcess) {
   val busy by process.busy.collectAsStateWithLifecycle()
   val state by process.state.collectAsStateWithLifecycle()
   val crashed = (state as? AgentProcessState.Exited)?.code.let { it != null && it != 0 }
   when {
-    busy -> StatusDot(pipkinColors.dotRunning)
+    busy -> SimmeringPot()
     crashed -> StatusDot(pipkinColors.dotDanger)
   }
 }

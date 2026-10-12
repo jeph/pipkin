@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
@@ -51,9 +52,15 @@ private const val LID_PIVOT_X = 243f
 private const val LID_PIVOT_Y = 218f
 
 /**
+ * False where pots are composed but off screen: they then hold their current frame instead of redrawing the
+ * window ten times a second for nothing.
+ */
+val LocalPotsSimmer = compositionLocalOf { true }
+
+/**
  * Pipkin's loading indicator: the launcher icon's pot simmering, steam rising out of it while the lid hops as
  * each wisp leaves. Every pot on screen steps on the same [FRAME_MILLIS] boundaries, so they share frames
- * with each other.
+ * with each other. Pots hold still while [LocalPotsSimmer] is false.
  */
 @Composable
 fun SimmeringPot(
@@ -64,7 +71,9 @@ fun SimmeringPot(
   val icon = ImageVector.vectorResource(R.drawable.ic_launcher_foreground)
   val pot = remember(icon) { Pot(icon) }
   var step by remember { mutableLongStateOf(0L) }
-  LaunchedEffect(Unit) {
+  val simmer = LocalPotsSimmer.current
+  LaunchedEffect(simmer) {
+    if (!simmer) return@LaunchedEffect
     // Awaiting a frame rather than only delaying pauses the loop while the app is in the background.
     while (true) {
       val now = withFrameMillis { frameMillis ->

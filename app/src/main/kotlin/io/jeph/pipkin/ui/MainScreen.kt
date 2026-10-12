@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -36,6 +37,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.chat.ChatScreen
+import io.jeph.pipkin.ui.components.LocalPotsSimmer
 import io.jeph.pipkin.ui.sidebar.Sidebar
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import kotlinx.coroutines.launch
@@ -67,12 +69,15 @@ internal fun MainScreen(actions: ShellActions, onOpenSettings: () -> Unit, onOpe
     MobilePanels(
       state = panels,
       sidebar = {
-        Sidebar(
-          actions = actions,
-          onClose = { showPanel(Panel.Chat) },
-          onOpenSettings = onOpenSettings,
-          onOpenOnboarding = onOpenOnboarding,
-        )
+        // The sidebar stays composed behind the chat, where its working chats' pots would redraw for nothing.
+        CompositionLocalProvider(LocalPotsSimmer provides sidebarOpen) {
+          Sidebar(
+            actions = actions,
+            onClose = { showPanel(Panel.Chat) },
+            onOpenSettings = onOpenSettings,
+            onOpenOnboarding = onOpenOnboarding,
+          )
+        }
       },
       workspace = {
         WorkspacePanel(

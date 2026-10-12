@@ -24,7 +24,6 @@ data class PipkinColors(
   val dotSuccess: Color,
   val dotDanger: Color,
   val dotWarning: Color,
-  val dotRunning: Color,
 )
 
 val DarkPipkinColors =
@@ -47,7 +46,6 @@ val DarkPipkinColors =
     dotSuccess = Color(0xFF35C264),
     dotDanger = Color(0xFFF7796D),
     dotWarning = Color(0xFFDB932E),
-    dotRunning = Color(0xFF5CAAF6),
   )
 
 val LightPipkinColors =
@@ -70,5 +68,4 @@ val LightPipkinColors =
     dotSuccess = Color(0xFF299F51),
     dotDanger = Color(0xFFF12E2F),
     dotWarning = Color(0xFFB37824),
-    dotRunning = Color(0xFF268AE0),
   )
