@@ -34,6 +34,7 @@ import io.jeph.pipkin.ui.Destination
 import io.jeph.pipkin.ui.MainScreen
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.onboarding.OnboardingScreen
+import io.jeph.pipkin.ui.onboarding.PermissionsScreen
 import io.jeph.pipkin.ui.settings.AddModelsScreen
 import io.jeph.pipkin.ui.settings.AddProviderScreen
 import io.jeph.pipkin.ui.settings.ModelEditorScreen
@@ -126,9 +127,11 @@ private fun Screen(
 
     Destination.Settings -> SettingsScreen(
       onBack = { navigator.pop() },
-      onOpenOnboarding = { navigator.push(Destination.Onboarding) },
+      onOpenPermissions = { navigator.push(Destination.Permissions) },
       onOpenProviders = { navigator.push(Destination.Providers) },
     )
+
+    Destination.Permissions -> PermissionsScreen(onBack = { navigator.pop() })
 
     Destination.Providers -> ProvidersScreen(
       onBack = { navigator.pop() },

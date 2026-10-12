@@ -41,7 +41,7 @@ import kotlinx.coroutines.launch
 
 /** Paseo-style settings: providers, agent, appearance, Termux and about cards under a back header. */
 @Composable
-internal fun SettingsScreen(onBack: () -> Unit, onOpenOnboarding: () -> Unit, onOpenProviders: () -> Unit) {
+internal fun SettingsScreen(onBack: () -> Unit, onOpenPermissions: () -> Unit, onOpenProviders: () -> Unit) {
   val graph = LocalContext.current.appGraph
   val snackbar = remember { SnackbarHostState() }
   Box(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
@@ -60,7 +60,7 @@ internal fun SettingsScreen(onBack: () -> Unit, onOpenOnboarding: () -> Unit, on
         graph = graph,
         snackbar = snackbar,
         onOpenProviders = onOpenProviders,
-        onOpenOnboarding = onOpenOnboarding,
+        onOpenPermissions = onOpenPermissions,
       )
     }
     SnackbarHost(hostState = snackbar, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding())
@@ -72,7 +72,7 @@ private fun SettingsContent(
   graph: AppGraph,
   snackbar: SnackbarHostState,
   onOpenProviders: () -> Unit,
-  onOpenOnboarding: () -> Unit,
+  onOpenPermissions: () -> Unit,
 ) {
   Column(
     modifier =
@@ -90,7 +90,7 @@ private fun SettingsContent(
       ProvidersSection(onOpenProviders = onOpenProviders)
       AgentSection(graph = graph, snackbar = snackbar)
       AppearanceSection(preferences = graph.preferences)
-      TermuxSection(graph = graph, onOpenOnboarding = onOpenOnboarding)
+      TermuxSection(graph = graph, onOpenPermissions = onOpenPermissions)
       AboutSection()
     }
   }

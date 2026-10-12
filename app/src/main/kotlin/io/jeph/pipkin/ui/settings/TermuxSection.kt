@@ -31,9 +31,9 @@ private sealed interface ReinstallOutcome {
   data class Failed(val message: String) : ReinstallOutcome
 }
 
-/** Termux and Pi versions, re-running onboarding, and reinstalling the pinned Pi runtime. */
+/** Termux and Pi versions, the permissions page, and reinstalling the pinned Pi runtime. */
 @Composable
-internal fun TermuxSection(graph: AppGraph, onOpenOnboarding: () -> Unit) {
+internal fun TermuxSection(graph: AppGraph, onOpenPermissions: () -> Unit) {
   val context = LocalContext.current
   val hostClient = graph.hostClient
   val termuxVersion = remember(context) { TermuxInstall.version(context) }
@@ -68,7 +68,7 @@ internal fun TermuxSection(graph: AppGraph, onOpenOnboarding: () -> Unit) {
   SettingsSection(title = stringResource(R.string.settings_section_termux)) {
     SettingsRow(title = stringResource(R.string.settings_termux)) { SettingsValue(status) }
     SettingsDivider()
-    SettingsRow(title = stringResource(R.string.settings_run_setup), onClick = onOpenOnboarding)
+    SettingsRow(title = stringResource(R.string.settings_permissions), onClick = onOpenPermissions)
     SettingsDivider()
     ReinstallRow(
       installing = installing,

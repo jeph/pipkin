@@ -69,21 +69,20 @@ internal fun TermuxStep(
 @Composable
 internal fun AndroidSettingsSteps(
   state: OnboardingState,
-  number: (SetupStep) -> Int,
   notificationsBlocked: Boolean,
   onAllowNotifications: () -> Unit,
   onAllowBackground: () -> Unit,
 ) {
   if (state.checks.notificationsGranted != null) {
     NotificationsStep(
-      number = number(SetupStep.Notifications),
+      number = state.stepNumber(SetupStep.Notifications),
       status = state.status(SetupStep.Notifications),
       blocked = notificationsBlocked,
       onAllow = onAllowNotifications,
     )
   }
   BackgroundStep(
-    number = number(SetupStep.Background),
+    number = state.stepNumber(SetupStep.Background),
     status = state.status(SetupStep.Background),
     onAllow = onAllowBackground,
   )

@@ -1,31 +1,9 @@
-// POST_NOTIFICATIONS is a compile-time string; the notifications step only exists on API 33+.
-@file:SuppressLint("InlinedApi")
-
 package io.jeph.pipkin.ui.onboarding
 
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.ActivityNotFoundException
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.Intent
-import android.provider.Settings
-import android.widget.Toast
-import androidx.activity.compose.LocalActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -35,44 +13,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.AppGraph
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
-import io.jeph.pipkin.termux.TermuxInstall
-import io.jeph.pipkin.termux.TermuxSetup
 import io.jeph.pipkin.ui.auth.LoginSheet
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
-/** What a tap on the onboarding page asks for; handled in [OnboardingScreen]. */
+/** What a tap on an onboarding-only step or the footer asks for; handled in [OnboardingScreen]. */
 private sealed interface OnboardingAction {
-  data object OpenFDroid : OnboardingAction
-
-  data object UninstallTermux : OnboardingAction
-
-  data object AllowNotifications : OnboardingAction
-
-  data object AllowBackground : OnboardingAction
-
-  data object AllowRunCommand : OnboardingAction
-
-  data object CopyAndOpenTermux : OnboardingAction
-
-  data object CopyCommand : OnboardingAction
-
   data object InstallPi : OnboardingAction
 
   data class Login(val providerId: String) : OnboardingAction
@@ -83,7 +43,7 @@ private sealed interface OnboardingAction {
 }
 
 /**
- * Setup checklist: Termux, permissions, the Termux setup command, the Pi install and sign-in.
+ * Setup checklist: the [PermissionSteps], then the Pi install and sign-in.
  * Every step is re-checked on resume, so returning from Termux or system settings updates the page;
  * reopening it after setup shows finished steps as done.
  */
@@ -94,28 +54,10 @@ internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit)
   var checks by remember { mutableStateOf(DeviceChecks.read(context)) }
   var loginProvider by rememberSaveable { mutableStateOf<String?>(null) }
   val state = rememberOnboardingState(graph, checks)
-  val requestPermission = rememberPermissionRequest(state.blockedPermissions) { checks = DeviceChecks.read(context) }
+  val onPermissionAction = rememberPermissionActions(state) { checks = DeviceChecks.read(context) }
   RecheckOnResume(graph, state) { checks = it }
-
-  OnboardingPage(state = state) { action ->
+  val onAction: (OnboardingAction) -> Unit = { action ->
     when (action) {
-      OnboardingAction.OpenFDroid -> context.startSafely { TermuxInstall.openFDroidPage(context) }
-
-      OnboardingAction.UninstallTermux -> context.startSafely { TermuxInstall.requestUninstall(context) }
-
-      OnboardingAction.AllowNotifications -> requestPermission(Manifest.permission.POST_NOTIFICATIONS)
-
-      OnboardingAction.AllowBackground -> context.startSafely { requestBackgroundExemption(context) }
-
-      OnboardingAction.AllowRunCommand -> requestPermission(TermuxInstall.RUN_COMMAND_PERMISSION)
-
-      OnboardingAction.CopyAndOpenTermux -> {
-        SetupProgress.markTermuxCommandSent()
-        context.startSafely { TermuxSetup.copyAndOpen(context, state.termuxCommand) }
-      }
-
-      OnboardingAction.CopyCommand -> copyCommand(context, state.termuxCommand)
-
       OnboardingAction.InstallPi -> SetupProgress.install(graph)
 
       is OnboardingAction.Login -> loginProvider = action.providerId
@@ -127,6 +69,12 @@ internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit)
         onFinished()
       }
     }
+  }
+
+  SetupPage(header = { HeaderBar(title = stringResource(R.string.onboarding_title)) }) {
+    PermissionSteps(state, onPermissionAction)
+    AgentSteps(state, onAction)
+    OnboardingFooter(canContinue = state.authStatus?.anyConfigured == true, onAction = onAction)
   }
 
   loginProvider?.let { LoginSheet(providerId = it, onDismiss = { loginProvider = null }) }
@@ -156,40 +104,8 @@ private fun RecheckOnResume(graph: AppGraph, state: OnboardingState, onChecks: (
   }
 }
 
-/**
- * Returns a request for a runtime permission. Once Android stops prompting ("don't ask again"),
- * the same request opens the system screen where the user can still grant it.
- */
 @Composable
-private fun rememberPermissionRequest(blocked: Set<String>, onResult: () -> Unit): (String) -> Unit {
-  val context = LocalContext.current
-  val activity = LocalActivity.current
-  val currentBlocked by rememberUpdatedState(blocked)
-  val currentOnResult by rememberUpdatedState(onResult)
-  fun record(permission: String, granted: Boolean) {
-    // Without a rationale after a denial, Android will not show the prompt again.
-    val permanentlyDenied = !granted && activity?.shouldShowRequestPermissionRationale(permission) == false
-    SetupProgress.setPermissionBlocked(permission, permanentlyDenied)
-    currentOnResult()
-  }
-  val runCommand = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-    record(TermuxInstall.RUN_COMMAND_PERMISSION, it)
-  }
-  val notifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-    record(Manifest.permission.POST_NOTIFICATIONS, it)
-  }
-  return { permission ->
-    val isRunCommand = permission == TermuxInstall.RUN_COMMAND_PERMISSION
-    when {
-      permission !in currentBlocked -> (if (isRunCommand) runCommand else notifications).launch(permission)
-      isRunCommand -> context.startSafely { TermuxInstall.openRunCommandPermissionSettings(context) }
-      else -> context.startSafely { openNotificationSettings(context) }
-    }
-  }
-}
-
-@Composable
-private fun rememberOnboardingState(graph: AppGraph, checks: DeviceChecks): OnboardingState {
+internal fun rememberOnboardingState(graph: AppGraph, checks: DeviceChecks): OnboardingState {
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val lastFailure by graph.hostClient.lastFailure.collectAsStateWithLifecycle()
   val hostInstalling by graph.hostClient.installing.collectAsStateWithLifecycle()
@@ -215,71 +131,11 @@ private fun rememberOnboardingState(graph: AppGraph, checks: DeviceChecks): Onbo
   )
 }
 
+/** The Pi install and sign-in, which follow the [PermissionSteps]. */
 @Composable
-private fun OnboardingPage(state: OnboardingState, onAction: (OnboardingAction) -> Unit) {
-  Column(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    HeaderBar(title = stringResource(R.string.onboarding_title))
-    Column(
-      modifier =
-        Modifier
-          .fillMaxWidth()
-          .weight(1f)
-          .verticalScroll(rememberScrollState())
-          .navigationBarsPadding()
-          .padding(PipkinTokens.Spacing.s16),
-      horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-      Column(
-        modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
-      ) {
-        OnboardingSteps(state, onAction)
-        OnboardingFooter(canContinue = state.authStatus?.anyConfigured == true, onAction = onAction)
-      }
-    }
-  }
-}
-
-@Composable
-private fun OnboardingSteps(state: OnboardingState, onAction: (OnboardingAction) -> Unit) {
-  val notificationsShown = state.checks.notificationsGranted != null
-  val number = { step: SetupStep ->
-    if (!notificationsShown && step > SetupStep.Notifications) step.ordinal else step.ordinal + 1
-  }
-  TermuxStep(
-    number = number(SetupStep.Termux),
-    status = state.status(SetupStep.Termux),
-    termux = state.checks.termux,
-    version = state.checks.termuxVersion,
-    onOpenFDroid = { onAction(OnboardingAction.OpenFDroid) },
-    onUninstall = { onAction(OnboardingAction.UninstallTermux) },
-  )
-  AndroidSettingsSteps(
-    state = state,
-    number = number,
-    notificationsBlocked = Manifest.permission.POST_NOTIFICATIONS in state.blockedPermissions,
-    onAllowNotifications = { onAction(OnboardingAction.AllowNotifications) },
-    onAllowBackground = { onAction(OnboardingAction.AllowBackground) },
-  )
-  RunCommandStep(
-    number = number(SetupStep.RunCommand),
-    status = state.status(SetupStep.RunCommand),
-    termuxInstalled = state.checks.termux != TermuxInstall.Status.NotInstalled,
-    blocked = TermuxInstall.RUN_COMMAND_PERMISSION in state.blockedPermissions,
-    error = state.errorFor(SetupStep.RunCommand),
-    onAllow = { onAction(OnboardingAction.AllowRunCommand) },
-  )
-  TermuxSetupStep(
-    number = number(SetupStep.TermuxSetup),
-    status = state.status(SetupStep.TermuxSetup),
-    command = state.termuxCommand,
-    error = state.errorFor(SetupStep.TermuxSetup),
-    enabled = state.checks.termux == TermuxInstall.Status.Supported,
-    onCopyAndOpen = { onAction(OnboardingAction.CopyAndOpenTermux) },
-    onCopy = { onAction(OnboardingAction.CopyCommand) },
-  )
+private fun AgentSteps(state: OnboardingState, onAction: (OnboardingAction) -> Unit) {
   InstallPiStep(
-    number = number(SetupStep.InstallPi),
+    number = state.stepNumber(SetupStep.InstallPi),
     status = state.status(SetupStep.InstallPi),
     version = state.expectedPiVersion,
     progress = state.progress,
@@ -288,7 +144,7 @@ private fun OnboardingSteps(state: OnboardingState, onAction: (OnboardingAction)
     onInstall = { onAction(OnboardingAction.InstallPi) },
   )
   SignInStep(
-    number = number(SetupStep.SignIn),
+    number = state.stepNumber(SetupStep.SignIn),
     status = state.status(SetupStep.SignIn),
     authStatus = state.authStatus,
     enabled = state.piReady,
@@ -315,36 +171,5 @@ private fun OnboardingFooter(canContinue: Boolean, onAction: (OnboardingAction) 
       onClick = { onAction(OnboardingAction.Finish) },
       enabled = canContinue,
     )
-  }
-}
-
-private fun copyCommand(context: Context, command: String) {
-  context.getSystemService(ClipboardManager::class.java)
-    .setPrimaryClip(ClipData.newPlainText("Termux command", command))
-}
-
-private fun openNotificationSettings(context: Context) {
-  context.startActivity(
-    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName),
-  )
-}
-
-/**
- * Android's own exemption prompt rather than the settings list: Pipkin is the client of a long-running agent and is
- * not distributed through Google Play, whose policy restricts this request.
- */
-@SuppressLint("BatteryLife")
-private fun requestBackgroundExemption(context: Context) {
-  context.startActivity(
-    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, "package:${context.packageName}".toUri()),
-  )
-}
-
-/** Runs an activity start; a device without a matching app (no browser, Termux gone) gets a toast, not a crash. */
-private inline fun Context.startSafely(start: () -> Unit) {
-  try {
-    start()
-  } catch (_: ActivityNotFoundException) {
-    Toast.makeText(this, R.string.onboarding_no_activity, Toast.LENGTH_SHORT).show()
   }
 }

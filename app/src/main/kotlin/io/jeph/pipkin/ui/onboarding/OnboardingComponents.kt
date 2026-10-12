@@ -9,12 +9,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
@@ -34,6 +39,30 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+
+/** A setup page: [header] over a scrolling, width-capped column of step cards. */
+@Composable
+internal fun SetupPage(header: @Composable () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+  Column(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
+    header()
+    Column(
+      modifier =
+        Modifier
+          .fillMaxWidth()
+          .weight(1f)
+          .verticalScroll(rememberScrollState())
+          .navigationBarsPadding()
+          .padding(PipkinTokens.Spacing.s16),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      Column(
+        modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
+        content = content,
+      )
+    }
+  }
+}
 
 /** A numbered setup step: surface1 card, 1dp border, radius 8, status badge and title over [content]. */
 @Composable

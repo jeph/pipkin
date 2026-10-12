@@ -12,6 +12,23 @@ import io.jeph.pipkin.termux.TermuxSetup
 
 internal enum class StepStatus { Pending, Running, Done, Failed }
 
+/** What a tap on a [PermissionSteps] step asks for; handled by [rememberPermissionActions]. */
+internal sealed interface PermissionAction {
+  data object OpenFDroid : PermissionAction
+
+  data object UninstallTermux : PermissionAction
+
+  data object AllowNotifications : PermissionAction
+
+  data object AllowBackground : PermissionAction
+
+  data object AllowRunCommand : PermissionAction
+
+  data object CopyAndOpenTermux : PermissionAction
+
+  data object CopyCommand : PermissionAction
+}
+
 /** What Android reports about Termux and Pipkin's permissions; re-read on every resume. */
 internal data class DeviceChecks(
   val termux: TermuxInstall.Status,
@@ -69,6 +86,10 @@ internal data class OnboardingState(
     get() = errorFor(SetupStep.TermuxSetup)?.command ?: TermuxSetup.COMMAND
 
   fun errorFor(step: SetupStep): SetupError? = error?.takeIf { it.step == step }
+
+  /** The number shown on [step]'s card; the notifications step is hidden below API 33. */
+  fun stepNumber(step: SetupStep): Int =
+    if (checks.notificationsGranted == null && step > SetupStep.Notifications) step.ordinal else step.ordinal + 1
 
   fun status(step: SetupStep): StepStatus = when (step) {
     SetupStep.Termux -> termuxStatus()

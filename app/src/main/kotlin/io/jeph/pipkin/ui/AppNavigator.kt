@@ -11,6 +11,9 @@ sealed interface Destination {
 
   data object Settings : Destination
 
+  /** Termux setup and Pipkin's Android permissions, reached from Settings. */
+  data object Permissions : Destination
+
   /** The list of added providers. */
   data object Providers : Destination
 
@@ -72,6 +75,7 @@ class AppNavigator(initial: List<Destination>) {
     fun key(d: Destination): String = when (d) {
       Destination.Main -> MAIN
       Destination.Settings -> SETTINGS
+      Destination.Permissions -> PERMISSIONS
       Destination.Onboarding -> ONBOARDING
       Destination.Providers -> PROVIDERS
       Destination.AddProvider -> ADD_PROVIDER
@@ -84,6 +88,7 @@ class AppNavigator(initial: List<Destination>) {
     private fun destination(key: String): Destination? = when {
       key == MAIN -> Destination.Main
       key == SETTINGS -> Destination.Settings
+      key == PERMISSIONS -> Destination.Permissions
       key == ONBOARDING -> Destination.Onboarding
       key == PROVIDERS -> Destination.Providers
       key == ADD_PROVIDER -> Destination.AddProvider
@@ -96,6 +101,7 @@ class AppNavigator(initial: List<Destination>) {
 
     private const val MAIN = "main"
     private const val SETTINGS = "settings"
+    private const val PERMISSIONS = "permissions"
     private const val ONBOARDING = "onboarding"
     private const val PROVIDER = "provider:"
     private const val PROVIDERS = "providers"
