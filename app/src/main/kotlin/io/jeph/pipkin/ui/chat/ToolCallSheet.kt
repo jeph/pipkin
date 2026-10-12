@@ -218,7 +218,7 @@ private fun Label(text: String) {
 }
 
 /**
- * Removed lines on a destructive tint, added lines on an accent tint, one block per replacement. Each side
+ * Removed lines on a destructive tint, added lines on a success tint, one block per replacement. Each side
  * is coloured for [language] as a whole, so strings and comments spanning lines keep their colour.
  */
 @Composable
@@ -238,7 +238,7 @@ private fun EditDiff(edits: List<Pair<String, String>>, language: String?) {
         val removed = rememberHighlightedCode(oldText, language)
         val added = rememberHighlightedCode(newText, language)
         removed.splitLines().forEach { DiffLine("- ", it, colors.destructive.copy(alpha = 0.16f)) }
-        added.splitLines().forEach { DiffLine("+ ", it, colors.accent.copy(alpha = 0.16f)) }
+        added.splitLines().forEach { DiffLine("+ ", it, colors.dotSuccess.copy(alpha = 0.16f)) }
       }
     }
   }
