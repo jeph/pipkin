@@ -3,6 +3,7 @@ package io.jeph.pipkin
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import io.jeph.pipkin.agent.AgentProcess
@@ -17,15 +18,19 @@ import io.jeph.pipkin.host.HostClient
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** The app's long-lived objects, built once by [PipkinApplication]. Reach it with [Context.appGraph]. */
 internal class AppGraph(application: Application) {
   /** Lives as long as the process; main-thread confined. */
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-  val hostClient = HostClient(application)
-  val preferences = Preferences(application)
+  val hostClient = HostClient(
+    application,
+    foreground = ProcessLifecycleOwner.get().lifecycle.currentStateFlow.map { it.isAtLeast(Lifecycle.State.STARTED) },
+  )
   val keepAlive = KeepAlive(application)
+  val preferences = Preferences(application)
   val sessionRepository = SessionRepository(hostClient, scope)
   private val turnNotifications = TurnNotifications(application)
   val registry: AgentRegistry<AgentProcess> =

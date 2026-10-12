@@ -1,12 +1,15 @@
 package io.jeph.pipkin.host
 
 import android.content.Context
+import android.util.Log
 import java.io.IOException
 import java.util.Base64
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
@@ -18,8 +21,13 @@ import org.json.JSONObject
  * Suspend API over `host.mjs` modes. Each call launches one host process, sends one
  * `pipkin_request` and, except for [openRpc], reads lines until `pipkin_result`.
  * Throws [HostFailure] when the host could not run and [HostRejected] when it refused.
+ *
+ * A launch waits until Pipkin is in the [foreground]. In the background Android may refuse to start Termux, and in
+ * Doze it blocks the host's connection back to Pipkin once Pipkin's foreground service stops, so the launch would
+ * fail. Nothing launched from the background needs to run before the user returns: reconnects and session lists
+ * are only seen on screen.
  */
-internal class HostClient(context: Context) {
+internal class HostClient(context: Context, private val foreground: Flow<Boolean>) {
   private val context = context.applicationContext
   private val helloState = MutableStateFlow<HostHello?>(null)
   private val failureState = MutableStateFlow<HostFailure?>(null)
@@ -176,6 +184,10 @@ internal class HostClient(context: Context) {
   }
 
   private suspend fun connect(mode: String): HostChannel {
+    if (!foreground.first()) {
+      Log.i(TAG, "Host $mode waits until Pipkin is in the foreground")
+      foreground.first { it }
+    }
     val channel = try {
       HostLauncher.launch(context, mode)
     } catch (failure: HostFailure) {
@@ -223,6 +235,7 @@ internal class HostClient(context: Context) {
     context.assets.open(name).bufferedReader(Charsets.UTF_8).use { it.readText() }
 
   private companion object {
+    const val TAG = "PipkinHost"
     const val PACKAGE_JSON = "pi/package.json"
     const val PACKAGE_LOCK = "pi/package-lock.json"
     const val PI_PACKAGE = "@earendil-works/pi-coding-agent"
