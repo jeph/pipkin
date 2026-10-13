@@ -39,6 +39,7 @@ internal fun TerminalActionsSheet(
   onDismiss: () -> Unit,
 ) {
   var stage by rememberSaveable(session.id) { mutableStateOf(Stage.Menu) }
+  val name by session.name.collectAsStateWithLifecycle()
   val dismissThen = { action: () -> Unit ->
     onDismiss()
     action()
@@ -74,7 +75,7 @@ internal fun TerminalActionsSheet(
 
     Stage.Rename -> RenameDialog(
       title = stringResource(R.string.terminal_rename_title),
-      initial = session.name.value.orEmpty(),
+      initial = name.orEmpty(),
       onDismiss = onDismiss,
       onConfirm = { dismissThen { session.rename(it) } },
     )
