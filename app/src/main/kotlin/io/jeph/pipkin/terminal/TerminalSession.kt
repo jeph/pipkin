@@ -55,11 +55,15 @@ internal class TerminalSession(
   private val stateFlow = MutableStateFlow<TerminalState>(TerminalState.Starting)
   private var connection: Job? = null
   private val nameFlow = MutableStateFlow<String?>(null)
+  private val busyFlow = MutableStateFlow(false)
 
   val state: StateFlow<TerminalState> = stateFlow.asStateFlow()
 
   /** The name the user gave this terminal; null shows "Terminal [number]". */
   val name: StateFlow<String?> = nameFlow.asStateFlow()
+
+  /** Whether the host sees commands or jobs running in the shell, beyond the shell waiting at its prompt. */
+  val busy: StateFlow<Boolean> = busyFlow.asStateFlow()
 
   fun rename(name: String) {
     nameFlow.value = name
@@ -115,6 +119,7 @@ internal class TerminalSession(
       relay(channel)
     } finally {
       channel.close()
+      busyFlow.value = false
     }
   }
 
@@ -138,6 +143,8 @@ internal class TerminalSession(
             }
 
             HostProtocol.EXIT -> exit = line
+
+            "busy" -> busyFlow.value = line.optBoolean("busy")
 
             HostProtocol.RESULT -> HostRejected.from(line)?.let { stateFlow.value = TerminalState.Failed(it.error) }
           }

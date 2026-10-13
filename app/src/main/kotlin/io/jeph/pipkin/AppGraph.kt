@@ -8,6 +8,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentRegistry
+import io.jeph.pipkin.agent.AgentService
 import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.agent.TurnNotifications
 import io.jeph.pipkin.data.AccountRepository
@@ -20,11 +21,12 @@ import io.jeph.pipkin.terminal.TerminalRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** The app's long-lived objects, built once by [PipkinApplication]. Reach it with [Context.appGraph]. */
-internal class AppGraph(application: Application) {
+internal class AppGraph(private val application: Application) {
   /** Lives as long as the process; main-thread confined. */
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
   val hostClient = HostClient(
@@ -45,7 +47,7 @@ internal class AppGraph(application: Application) {
   val terminals = TerminalRegistry(application, hostClient, scope)
 
   init {
-    holdWhileBusy()
+    holdWhileWorking()
     ProcessLifecycleOwner.get().lifecycle.addObserver(
       object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
@@ -58,17 +60,22 @@ internal class AppGraph(application: Application) {
     )
   }
 
-  /** One [KeepAlive] acquisition while any chat works, so switching apps does not stop it. */
-  private fun holdWhileBusy() {
+  /**
+   * One [KeepAlive] acquisition while any chat works or any terminal runs a command, so switching apps does not stop
+   * them. The notification follows which of the two is working, also while sign-in or a Pi install keeps it up.
+   */
+  private fun holdWhileWorking() {
     scope.launch {
       var hold: AutoCloseable? = null
-      registry.busy.collect { busy ->
-        if (busy && hold == null) {
-          hold = keepAlive.acquire("chats working")
-        } else if (!busy) {
+      registry.busy.combine(terminals.busy, ::Pair).collect { (chats, terminalsBusy) ->
+        if (chats || terminalsBusy) {
+          if (hold == null) hold = keepAlive.acquire(if (chats) "chats working" else "terminal command")
+        } else {
           hold?.close()
           hold = null
         }
+        // The service may still run for another holder; a no-op once it has stopped.
+        AgentService.refresh(application)
       }
     }
   }

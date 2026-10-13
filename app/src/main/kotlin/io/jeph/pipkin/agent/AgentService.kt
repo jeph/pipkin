@@ -46,10 +46,11 @@ class AgentService : Service() {
     when (intent?.action) {
       ACTION_BUSY -> {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-          startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+          startForeground(NOTIFICATION_ID, notification(this), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
-          startForeground(NOTIFICATION_ID, notification())
+          startForeground(NOTIFICATION_ID, notification(this))
         }
+        foreground = true
         handler.removeCallbacks(renew)
         renew.run()
       }
@@ -63,6 +64,7 @@ class AgentService : Service() {
   }
 
   private fun release() {
+    foreground = false
     handler.removeCallbacks(renew)
     if (wakeLock.isHeld) wakeLock.release()
     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -70,25 +72,13 @@ class AgentService : Service() {
   }
 
   override fun onDestroy() {
+    foreground = false
     handler.removeCallbacks(renew)
     if (wakeLock.isHeld) wakeLock.release()
     super.onDestroy()
   }
 
   override fun onBind(intent: Intent?): IBinder? = null
-
-  private fun notification(): Notification {
-    val open = PendingIntent.getActivity(this, 20, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
-    val stop = PendingIntent.getService(this, 21, intent(this, ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)
-    return Notification.Builder(this, CHANNEL)
-      .setSmallIcon(R.drawable.ic_launcher_foreground)
-      .setContentTitle(getString(R.string.agent_notification_title))
-      .setContentText(getString(R.string.agent_notification_text))
-      .setContentIntent(open)
-      .setOngoing(true)
-      .addAction(Notification.Action.Builder(null, getString(R.string.agent_notification_stop), stop).build())
-      .build()
-  }
 
   companion object {
     const val ACTION_BUSY = "io.jeph.pipkin.action.BUSY"
@@ -101,7 +91,43 @@ class AgentService : Service() {
     private const val WAKE_LEASE_MILLIS = 20 * 60_000L
     private const val WAKE_RENEW_MILLIS = 10 * 60_000L
 
+    /** Whether the service runs in the foreground, showing its notification. Main-thread confined. */
+    private var foreground = false
+
     private fun intent(context: Context, action: String) = Intent(context, AgentService::class.java).setAction(action)
+
+    /**
+     * Says what keeps Pipkin working: chats, with Stop, or else, while only terminals run commands, the terminal
+     * notice without Stop, which would not stop them. Sign-in and Pi installs show the chats' notice.
+     */
+    private fun notification(context: Context): Notification {
+      val graph = context.appGraph
+      val terminalsOnly = graph.terminals.busy.value && !graph.registry.busy.value
+      val open =
+        PendingIntent.getActivity(context, 20, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+      val builder = Notification.Builder(context, CHANNEL)
+        .setSmallIcon(R.drawable.ic_launcher_foreground)
+        .setContentIntent(open)
+        .setOngoing(true)
+      if (terminalsOnly) {
+        return builder
+          .setContentTitle(context.getString(R.string.agent_notification_terminal_title))
+          .setContentText(context.getString(R.string.agent_notification_terminal_text))
+          .build()
+      }
+      val stop = PendingIntent.getService(context, 21, intent(context, ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)
+      return builder
+        .setContentTitle(context.getString(R.string.agent_notification_title))
+        .setContentText(context.getString(R.string.agent_notification_text))
+        .addAction(Notification.Action.Builder(null, context.getString(R.string.agent_notification_stop), stop).build())
+        .build()
+    }
+
+    /** Re-posts the notification after what keeps Pipkin working changed; nothing while the service is stopped. */
+    fun refresh(context: Context) {
+      if (!foreground) return
+      context.getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(context))
+    }
 
     /**
      * Active → foreground with wake lock; inactive → release and stop. Safe from any thread.

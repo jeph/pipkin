@@ -1,5 +1,5 @@
 import { execFile, spawn } from "node:child_process";
-import { readFile, rm, stat } from "node:fs/promises";
+import { readdir, readFile, rm, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
@@ -20,11 +20,94 @@ const STDERR_TAIL = 16 * 1024;
 /** How long a resize waits for the shell to record its terminal, which it does as it starts. */
 const DEVICE_WAIT_MS = 50;
 const DEVICE_ATTEMPTS = 40;
+/** How often the host looks for work in the shell's session. */
+const BUSY_POLL_MS = 1000;
+/**
+ * Polls in a row that must find work before the host reports the shell busy, so quick children such as a prompt's
+ * hooks or the shell's own startup don't count.
+ */
+const BUSY_POLLS = 2;
+/**
+ * Polls in a row that must find no work before the host reports the shell idle, so a poll landing between two
+ * commands of one command line doesn't let Pipkin's keep-alive go, which it may not get back from the background.
+ */
+const IDLE_POLLS = 3;
 
 const execFileAsync = promisify(execFile);
 
 function isPositiveInt(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value > 0;
+}
+
+/** The fields of `/proc/<pid>/stat` the busy check uses. */
+export interface ProcStat {
+  pid: number;
+  ppid: number;
+  session: number;
+}
+
+/**
+ * Parses `/proc/<pid>/stat`. The command name sits in parentheses and may itself hold spaces and parentheses, so the
+ * fields are read after its last `)`: state, ppid, process group, then session.
+ */
+export function parseProcStat(text: string): ProcStat | undefined {
+  const open = text.indexOf("(");
+  const close = text.lastIndexOf(")");
+  if (open < 0 || close < open) return undefined;
+  const pid = Number(text.slice(0, open).trim());
+  const fields = text.slice(close + 1).trim().split(/\s+/);
+  const ppid = Number(fields[1]);
+  const session = Number(fields[3]);
+  if (![pid, ppid, session].every(Number.isInteger)) return undefined;
+  return { pid, ppid, session };
+}
+
+/**
+ * Whether anything besides the shell runs in the session `script`'s child leads: foreground commands, background jobs,
+ * a `wait`ed job and whatever they start. A shell builtin looping on its own, or a program that started a session of
+ * its own, doesn't count.
+ */
+export function sessionHasWork(processes: ProcStat[], scriptPid: number): boolean {
+  const leader = processes.find((it) => it.ppid === scriptPid && it.session === it.pid);
+  if (leader === undefined) return false;
+  return processes.some((it) => it.session === leader.session && it.pid !== leader.pid);
+}
+
+/** This user's processes; Android hides other users' from `/proc`. */
+async function listProcesses(): Promise<ProcStat[]> {
+  const pids = (await readdir("/proc")).filter((name) => /^\d+$/.test(name));
+  const stats = await Promise.all(
+    pids.map((pid) => readFile(`/proc/${pid}/stat`, "utf8").then(parseProcStat, () => undefined)),
+  );
+  return stats.filter((it) => it !== undefined);
+}
+
+/**
+ * Reports through [onChange] whether the shell under `script` ([scriptPid]) has work running, polling `/proc` until
+ * the returned function stops it. The shell starts idle.
+ */
+function watchBusy(scriptPid: number, onChange: (busy: boolean) => void): () => void {
+  let busy = false;
+  // Polls in a row that disagree with `busy`.
+  let streak = 0;
+  let polling = false;
+  const timer = setInterval(() => {
+    if (polling) return;
+    polling = true;
+    void listProcesses()
+      .then((processes) => {
+        streak = sessionHasWork(processes, scriptPid) === busy ? 0 : streak + 1;
+        if (streak < (busy ? IDLE_POLLS : BUSY_POLLS)) return;
+        busy = !busy;
+        streak = 0;
+        onChange(busy);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        polling = false;
+      });
+  }, BUSY_POLL_MS);
+  return () => clearInterval(timer);
 }
 
 /**
@@ -79,8 +162,8 @@ class Resizer {
 /**
  * Runs the user's login shell on a pseudo-terminal in `cwd`, through util-linux's `script` from Termux's bootstrap.
  * After the request the connection stays JSONL both ways: Pipkin sends `input` (base64 bytes) and `resize`
- * (`rows`, `cols`); the host sends `output` (base64 bytes) and, once the shell has gone, one `pipkin_exit`.
- * Closing the connection ends the shell.
+ * (`rows`, `cols`); the host sends `output` (base64 bytes), `busy` (`busy`) whenever work starts or stops running in
+ * the shell, and, once the shell has gone, one `pipkin_exit`. Closing the connection ends the shell.
  */
 export async function terminal(ctx: ModeContext): Promise<void> {
   const cwd = stringParam(ctx.params, "cwd");
@@ -130,10 +213,14 @@ export async function terminal(ctx: ModeContext): Promise<void> {
     }
   });
 
+  const stopWatching =
+    child.pid === undefined ? () => undefined : watchBusy(child.pid, (busy) => conn.send({ type: "busy", busy }));
+
   let reported = false;
   const report = (code: number | null, signal: string | null): void => {
     if (reported) return;
     reported = true;
+    stopWatching();
     void rm(deviceFile, { force: true }).finally(() => {
       conn.send({ type: "pipkin_exit", code, signal, stderr });
       conn.finish();

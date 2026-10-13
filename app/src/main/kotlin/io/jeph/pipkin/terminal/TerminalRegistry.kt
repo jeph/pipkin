@@ -5,9 +5,15 @@ import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.host.HostClient
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 
 /**
@@ -27,6 +33,14 @@ internal class TerminalRegistry(
 
   /** The terminal the workspace shows instead of [Shown.chat]; null or another chat shows the chat. */
   val shown: StateFlow<Shown?> = shownFlow.asStateFlow()
+
+  /** Whether any open terminal has commands or jobs running. */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  val busy: StateFlow<Boolean> = sessionsFlow
+    .flatMapLatest { sessions ->
+      if (sessions.isEmpty()) flowOf(false) else combine(sessions.map { it.busy }) { states -> states.any { it } }
+    }
+    .stateIn(scope, SharingStarted.Eagerly, false)
 
   /** Starts a shell in [chat]'s folder and shows it in place of the chat. */
   fun open(chat: AgentProcess) {

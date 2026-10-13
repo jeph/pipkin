@@ -6,6 +6,8 @@
     <string name="agent_notification_title">Pipkin agent is working</string>
     <string name="agent_notification_text">Running in Termux. Progress continues if you leave the app.</string>
     <string name="agent_notification_stop">Stop</string>
+    <string name="agent_notification_terminal_title">A terminal command is running</string>
+    <string name="agent_notification_terminal_text">Running in Termux. It continues if you leave the app.</string>
 
     <string name="turn_notification_channel">Finished chats</string>
     <string name="turn_notification_done">Pipkin finished.</string>
