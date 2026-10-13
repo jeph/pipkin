@@ -84,8 +84,8 @@ export async function login(ctx: ModeContext): Promise<JsonObject> {
   }
   const pi = await loadPi(ctx.env.root);
   const runtime = await createRuntime(ctx);
-  // ChatGPT sign-in needs a stable device ID; Pi's own settings hold it, shared with terminal `pi`.
-  const settings = pi.SettingsManager.create(ctx.env.home);
+  // ChatGPT sign-in needs a stable device ID, kept in Pipkin's own Pi settings.
+  const settings = pi.SettingsManager.create(ctx.env.home, ctx.env.configDir);
   try {
     await runtime.login(providerId, "oauth", bridge(ctx), { getDeviceId: () => settings.getOrCreateDeviceId() });
   } finally {

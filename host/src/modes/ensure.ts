@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { access, appendFile, cp, mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { HostError, installedPiVersion } from "../env.js";
@@ -9,15 +9,6 @@ import { stringParam } from "../params.js";
 
 /** Longest progress line forwarded; npm never needs more, and the app shows only a few lines. */
 const MAX_PROGRESS_LINE = 4096;
-
-async function exists(path: string): Promise<boolean> {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function forwardLines(stream: Readable, send: (line: string) => void): void {
   let carry = "";
@@ -50,32 +41,6 @@ async function npmCi(ctx: ModeContext, cwd: string): Promise<void> {
   if (code !== 0) throw new HostError("npm_failed", `npm ci failed (exit ${code ?? "signal"})`);
 }
 
-/** Copies a pre-Pipkin `~/.pi/agent` once, so existing terminal Pi config carries over. */
-async function migrateLegacyConfig(ctx: ModeContext): Promise<void> {
-  const { configDir, home } = ctx.env;
-  for (const name of ["settings.json", "auth.json", "models.json"]) {
-    if (await exists(join(configDir, name))) return;
-  }
-  const legacy = join(home, ".pi", "agent");
-  if (!(await exists(legacy))) return;
-  await cp(legacy, configDir, { recursive: true, force: false });
-}
-
-/** Lets terminal `pi` in Termux share the config Pipkin uses. */
-async function exportConfigDir(ctx: ModeContext): Promise<void> {
-  const bashrc = join(ctx.env.home, ".bashrc");
-  const line = `export PI_CODING_AGENT_DIR="${ctx.env.configDir}"`;
-  let current = "";
-  try {
-    current = await readFile(bashrc, "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-  }
-  if (current.split("\n").includes(line)) return;
-  const separator = current.length > 0 && !current.endsWith("\n") ? "\n" : "";
-  await appendFile(bashrc, `${separator}${line}\n`);
-}
-
 export async function ensure(ctx: ModeContext): Promise<JsonObject> {
   const packageJson = stringParam(ctx.params, "packageJson");
   const packageLock = stringParam(ctx.params, "packageLock");
@@ -99,7 +64,5 @@ export async function ensure(ctx: ModeContext): Promise<JsonObject> {
     await npmCi(ctx, piDir);
   }
 
-  await migrateLegacyConfig(ctx);
-  await exportConfigDir(ctx);
   return { piVersion: await installedPiVersion(ctx.env.root) };
 }
