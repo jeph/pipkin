@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 /** What the header's ellipsis sheet can do. [onCopyPath] and [onArchive] are null until Pi reported a session file. */
 internal class ChatActions(
   val onNewChat: () -> Unit,
+  val onNewTerminal: () -> Unit,
   val onRename: () -> Unit,
   val onReload: () -> Unit,
   val onCopyPath: (() -> Unit)?,

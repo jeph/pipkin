@@ -16,6 +16,7 @@ import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.data.SessionArchive
 import io.jeph.pipkin.data.SessionRepository
 import io.jeph.pipkin.host.HostClient
+import io.jeph.pipkin.terminal.TerminalRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +42,7 @@ internal class AppGraph(application: Application) {
     }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
   val modelDefaults = ModelDefaults(hostClient)
+  val terminals = TerminalRegistry(application, hostClient, scope)
 
   init {
     holdWhileBusy()

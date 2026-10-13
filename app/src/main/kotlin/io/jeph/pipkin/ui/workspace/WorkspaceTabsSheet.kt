@@ -40,11 +40,13 @@ import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.ChatKey
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.SessionInfo
+import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SwipeToArchive
 import io.jeph.pipkin.ui.sidebar.tildePath
+import io.jeph.pipkin.ui.terminal.TerminalActionsSheet
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -85,20 +87,26 @@ internal fun TabCountButton(count: Int, onClick: () -> Unit) {
 }
 
 /**
- * Paseo's mobile tab switcher as a sheet: the workspace's path over the chats in the workspace of the shown chat
- * [process], the shown one highlighted. Tapping a chat shows it and closes the sheet; a chat is archived by swiping it
- * right or from its actions sheet, which also renames it. Archiving closes the sheet, so the shell's Undo shows.
+ * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace of the shown chat
+ * [process], its terminals and then its chats, the shown one highlighted. Tapping a tab shows it and closes the sheet.
+ * A chat is archived by swiping it right or from its actions sheet, which also renames it; archiving closes the sheet,
+ * so the shell's Undo shows. A terminal's actions sheet renames or closes it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ChatTabsSheet(process: AgentProcess, actions: ShellActions, onDismiss: () -> Unit) {
+internal fun WorkspaceTabsSheet(process: AgentProcess, actions: ShellActions, onDismiss: () -> Unit) {
   val graph = LocalContext.current.appGraph
-  val tabs = rememberWorkspaceChats(process)
+  val tabs = rememberWorkspaceTabs(process)
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
   val latestDismiss by rememberUpdatedState(onDismiss)
   val archiving = remember(actions) { TabArchiving(actions, onArchived = { latestDismiss() }) }
   var menuFor by remember { mutableStateOf<SessionInfo?>(null) }
+  var terminalMenuFor by remember { mutableStateOf<TerminalSession?>(null) }
+  val show = { terminal: TerminalSession? ->
+    graph.terminals.show(process, terminal)
+    onDismiss()
+  }
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
   PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = 0.85f) {
     // A long path keeps its end, the folder that tells workspaces apart.
@@ -110,13 +118,18 @@ internal fun ChatTabsSheet(process: AgentProcess, actions: ShellActions, onDismi
       maxLines = 1,
       overflow = TextOverflow.StartEllipsis,
     )
-    ChatTabList(
+    TabList(
       process = process,
       tabs = tabs,
       archiving = archiving,
-      onOpen = { session -> if (actions.openSession(session)) onDismiss() },
-      onShown = onDismiss,
-      onActions = { menuFor = it },
+      callbacks = TabListCallbacks(
+        // The chat shown next starts on its own tab, not on a terminal shown with this one.
+        onOpenChat = { session -> if (actions.openSession(session)) show(null) },
+        onShowChat = { show(null) },
+        onShowTerminal = show,
+        onChatActions = { menuFor = it },
+        onTerminalActions = { terminalMenuFor = it },
+      ),
       modifier = Modifier.weight(1f, fill = false),
     )
   }
@@ -128,32 +141,66 @@ internal fun ChatTabsSheet(process: AgentProcess, actions: ShellActions, onDismi
       onArchive = { archiving.archive(session) },
     )
   }
-  if (archiving.confirming != null) {
-    ConfirmDialog(
-      title = stringResource(R.string.archive_stop_title),
-      text = stringResource(R.string.archive_stop_text),
-      confirmLabel = stringResource(R.string.archive_stop_confirm),
-      onConfirm = archiving::confirm,
-      onDismiss = archiving::cancel,
-      destructive = true,
+  terminalMenuFor?.let { terminal ->
+    TerminalActionsSheet(
+      session = terminal,
+      onNewTerminal = null,
+      onRestart = null,
+      onClose = { graph.terminals.close(terminal) },
+      onDismiss = { terminalMenuFor = null },
     )
   }
+  ConfirmArchive(archiving)
 }
 
-/** The tab menu's rows: the shown chat first while it has no saved history, then the saved chats. */
+/** "Stop and archive" for a slid-out chat Pi is working in. */
 @Composable
-private fun ChatTabList(
+private fun ConfirmArchive(archiving: TabArchiving) {
+  if (archiving.confirming == null) return
+  ConfirmDialog(
+    title = stringResource(R.string.archive_stop_title),
+    text = stringResource(R.string.archive_stop_text),
+    confirmLabel = stringResource(R.string.archive_stop_confirm),
+    onConfirm = archiving::confirm,
+    onDismiss = archiving::cancel,
+    destructive = true,
+  )
+}
+
+/** What the tab menu's rows do. */
+private class TabListCallbacks(
+  val onOpenChat: (SessionInfo) -> Unit,
+  val onShowChat: () -> Unit,
+  val onShowTerminal: (TerminalSession) -> Unit,
+  val onChatActions: (SessionInfo) -> Unit,
+  val onTerminalActions: (TerminalSession) -> Unit,
+)
+
+/**
+ * The tab menu's rows: the workspace's terminals, the shown chat while it has no saved history, then the saved chats.
+ * The shown chat is highlighted only while no terminal is shown in its place.
+ */
+@Composable
+private fun TabList(
   process: AgentProcess,
-  tabs: WorkspaceChats,
+  tabs: WorkspaceTabs,
   archiving: TabArchiving,
-  onOpen: (SessionInfo) -> Unit,
-  onShown: () -> Unit,
-  onActions: (SessionInfo) -> Unit,
+  callbacks: TabListCallbacks,
   modifier: Modifier,
 ) {
   val processes by LocalContext.current.appGraph.registry.processes.collectAsStateWithLifecycle()
   val shownPath by process.sessionFile.collectAsStateWithLifecycle()
+  val chatShown = tabs.shownTerminal == null
   LazyColumn(modifier = modifier) {
+    items(tabs.terminals, key = { "terminal-${it.id}" }) { terminal ->
+      TerminalTabRow(
+        session = terminal,
+        shown = terminal == tabs.shownTerminal,
+        onOpen = { callbacks.onShowTerminal(terminal) },
+        onActions = { callbacks.onTerminalActions(terminal) },
+        modifier = Modifier.animateItem(),
+      )
+    }
     if (tabs.shownUnsaved) {
       item(key = UNSAVED_KEY) {
         val name by process.sessionName.collectAsStateWithLifecycle()
@@ -161,15 +208,15 @@ private fun ChatTabList(
           title = name ?: stringResource(R.string.chat_new_chat),
           modified = null,
           process = process,
-          shown = true,
-          onOpen = onShown,
+          shown = chatShown,
+          onOpen = callbacks.onShowChat,
           onActions = null,
           modifier = Modifier.animateItem(),
         )
       }
     }
     items(tabs.chats, key = { it.path }) { session ->
-      val shown = session.path == shownPath
+      val current = session.path == shownPath
       SwipeToArchive(
         leaving = session.path in archiving.leaving,
         onSwiped = { archiving.archive(session) },
@@ -181,9 +228,9 @@ private fun ChatTabList(
           title = sessionTitle(session),
           modified = session.modified,
           process = processes[ChatKey.session(session.path)],
-          shown = shown,
-          onOpen = { if (shown) onShown() else onOpen(session) },
-          onActions = { onActions(session) },
+          shown = current && chatShown,
+          onOpen = { if (current) callbacks.onShowChat() else callbacks.onOpenChat(session) },
+          onActions = { callbacks.onChatActions(session) },
         )
       }
     }

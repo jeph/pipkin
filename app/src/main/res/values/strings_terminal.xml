@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Terminal tabs -->
+    <string name="terminal_new">New terminal</string>
+    <string name="terminal_title">Terminal %1$d</string>
+
+    <!-- Terminal -->
+    <string name="terminal_actions">Terminal actions</string>
+    <string name="terminal_rename">Rename</string>
+    <string name="terminal_rename_title">Rename terminal</string>
+    <string name="terminal_restart">Restart shell</string>
+    <string name="terminal_close">Close terminal</string>
+    <string name="terminal_close_confirm_title">Close terminal?</string>
+    <string name="terminal_close_confirm_text">Any running process in this terminal will be stopped immediately.</string>
+    <string name="terminal_close_confirm">Close</string>
+    <string name="terminal_starting">Starting shell…</string>
+    <string name="terminal_exited_code">The shell exited with code %1$d.</string>
+    <string name="terminal_exited">The shell stopped.</string>
+
+    <!-- Key bar, after Paseo's -->
+    <string name="terminal_key_esc">Esc</string>
+    <string name="terminal_key_tab">Tab</string>
+    <string name="terminal_key_ctrl">Ctrl</string>
+    <string name="terminal_key_alt">Alt</string>
+    <string name="terminal_key_shift">Shift</string>
+    <string name="terminal_key_paste">Paste</string>
+    <string name="terminal_key_enter">Enter</string>
+    <string name="terminal_key_up">Up</string>
+    <string name="terminal_key_down">Down</string>
+    <string name="terminal_key_left">Left</string>
+    <string name="terminal_key_right">Right</string>
+    <string name="terminal_show_keyboard">Show keyboard</string>
+    <string name="terminal_hide_keyboard">Hide keyboard</string>
+</resources>

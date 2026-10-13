@@ -26,12 +26,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.ChatLocation
@@ -41,6 +43,7 @@ import io.jeph.pipkin.ui.components.LocalPotsSimmer
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.sidebar.Sidebar
+import io.jeph.pipkin.ui.terminal.TerminalScreen
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -104,6 +107,7 @@ internal fun MainScreen(
       workspace = {
         WorkspacePanel(
           actions = actions,
+          sidebarOpen = sidebarOpen,
           onToggleSidebar = { showPanel(if (sidebarOpen) Panel.Chat else Panel.Sidebar) },
           onOpenSettings = onOpenSettings,
         )
@@ -200,16 +204,44 @@ private fun AnchoredDraggableState<Panel>.offsetOr(width: Float): Float =
   offset.takeUnless { it.isNaN() } ?: if (currentValue == Panel.Chat) width else 0f
 
 /**
- * The layer beside the sidebar: the shown chat, whose header's tab menu switches between the chats in its workspace.
- * Paseo's Changes, Files and Terminal tabs would join that menu without changing [MobilePanels].
+ * The layer beside the sidebar: the shown chat, or a terminal of its workspace shown in its place, whose header's tab
+ * menu switches between the chats and terminals in that workspace. Back from a terminal returns to the chat, unless
+ * the sidebar is open and takes it.
  */
 @Composable
-private fun WorkspacePanel(actions: ShellActions, onToggleSidebar: () -> Unit, onOpenSettings: () -> Unit) {
-  val process by LocalContext.current.appGraph.registry.visible.collectAsStateWithLifecycle()
-  ChatScreen(
-    process = process,
-    actions = actions,
-    onToggleSidebar = onToggleSidebar,
-    onOpenSettings = onOpenSettings,
-  )
+private fun WorkspacePanel(
+  actions: ShellActions,
+  sidebarOpen: Boolean,
+  onToggleSidebar: () -> Unit,
+  onOpenSettings: () -> Unit,
+) {
+  val graph = LocalContext.current.appGraph
+  val process by graph.registry.visible.collectAsStateWithLifecycle()
+  val shown by graph.terminals.shown.collectAsStateWithLifecycle()
+  val chat = process
+  val terminal = shown?.takeIf { it.chat == chat }?.session
+  val focus = LocalFocusManager.current
+  val terminalShown = terminal != null
+  // Removing the focused terminal view hands focus to the first text field, the chat's composer, raising the keyboard.
+  LaunchedEffect(terminalShown) { if (!terminalShown) focus.clearFocus() }
+  Box(modifier = Modifier.fillMaxSize()) {
+    // The chat stays composed under its terminal, so its draft and scroll position survive a visit to the terminal.
+    ChatScreen(
+      process = chat,
+      actions = actions,
+      onToggleSidebar = onToggleSidebar,
+      onOpenSettings = onOpenSettings,
+      modifier = if (terminal != null) Modifier.clearAndSetSemantics {} else Modifier,
+    )
+    if (chat == null || terminal == null) return@Box
+    BackHandler(enabled = !sidebarOpen) { graph.terminals.show(chat, null) }
+    TerminalScreen(
+      session = terminal,
+      chat = chat,
+      actions = actions,
+      onToggleSidebar = onToggleSidebar,
+      // A pointer input makes the terminal a hit target, so touches between its controls don't reach the chat.
+      modifier = Modifier.pointerInput(Unit) {},
+    )
+  }
 }

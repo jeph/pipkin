@@ -47,6 +47,7 @@ internal fun SessionActions(
     }
 
     Stage.Rename -> RenameDialog(
+      title = stringResource(R.string.shell_rename_title),
       initial = session.name.orEmpty(),
       onDismiss = onDismiss,
       onConfirm = { name ->
@@ -57,13 +58,14 @@ internal fun SessionActions(
   }
 }
 
+/** Asks for a new name, starting from [initial]; Save trims it and is disabled while it is blank. */
 @Composable
-private fun RenameDialog(initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+internal fun RenameDialog(title: String, initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
   var name by rememberSaveable { mutableStateOf(initial) }
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = pipkinColors.surface1,
-    title = { Text(stringResource(R.string.shell_rename_title)) },
+    title = { Text(title) },
     text = {
       OutlinedTextField(
         value = name,

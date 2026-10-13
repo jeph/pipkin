@@ -23,6 +23,11 @@ internal fun ChatActionsSheet(actions: ChatActions, onDismiss: () -> Unit) {
       onClick = { dismissThen(actions.onNewChat) },
     )
     SheetRow(
+      label = stringResource(R.string.terminal_new),
+      icon = R.drawable.ic_lucide_square_terminal,
+      onClick = { dismissThen(actions.onNewTerminal) },
+    )
+    SheetRow(
       label = stringResource(R.string.chat_action_rename),
       icon = R.drawable.ic_lucide_pencil,
       onClick = { dismissThen(actions.onRename) },

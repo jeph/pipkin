@@ -192,6 +192,23 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     return channel
   }
 
+  /**
+   * Starts a login shell on a pseudo-terminal in [cwd], [rows] by [cols], and returns its channel: `output` lines
+   * carry base64 bytes until a `pipkin_exit` line; send `input` and `resize` lines. A refusal (`cwd_missing`) arrives
+   * instead as a `pipkin_result` line. Closing the channel ends the shell.
+   */
+  suspend fun openTerminal(cwd: String, rows: Int, cols: Int): HostChannel {
+    val channel = connect("terminal")
+    var sent = false
+    try {
+      sendRequest(channel, JSONObject().put("cwd", cwd).put("rows", rows).put("cols", cols))
+      sent = true
+    } finally {
+      if (!sent) channel.close()
+    }
+    return channel
+  }
+
   private suspend fun connect(mode: String): HostChannel {
     if (!foreground.first()) {
       Log.i(TAG, "Host $mode waits until Pipkin is in the foreground")

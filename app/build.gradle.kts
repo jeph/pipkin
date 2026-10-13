@@ -356,6 +356,9 @@ dependencies {
   implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
   implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.45.0")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+  // The snapshot of main at c3480d9, which aligns IME input with Termux; 0.1.0-alpha01 predates it.
+  implementation("io.github.sagernet:libghostty-android:0.1.0-20260909.143535-10")
+  implementation("io.github.sagernet:libghostty-android-compose:0.1.0-20260909.143535-10")
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.json:json:20260814")
 }

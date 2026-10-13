@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  JetBrains Mono 2.304 (https://github.com/JetBrains/JetBrainsMono, release v2.304), SIL Open Font License 1.1.
+  The Regular and Bold TTFs are unmodified; the license text ships as assets/licenses/JetBrainsMono-OFL.txt.
+-->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android">
+    <font
+        android:font="@font/jetbrains_mono_regular"
+        android:fontStyle="normal"
+        android:fontWeight="400" />
+    <font
+        android:font="@font/jetbrains_mono_bold"
+        android:fontStyle="normal"
+        android:fontWeight="700" />
+</font-family>

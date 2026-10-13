@@ -19,6 +19,7 @@ import { saveAttachments } from "./modes/save-attachments.js";
 import { sessionMessages } from "./modes/session-messages.js";
 import { sessions } from "./modes/sessions.js";
 import { subscriptionSave } from "./modes/subscription-save.js";
+import { terminal } from "./modes/terminal.js";
 
 const PROTOCOL = 1;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -89,6 +90,14 @@ async function main(): Promise<void> {
     case "rpc":
       try {
         await rpc(ctx);
+      } catch (error) {
+        conn.send(failure(error));
+        conn.finish();
+      }
+      return;
+    case "terminal":
+      try {
+        await terminal(ctx);
       } catch (error) {
         conn.send(failure(error));
         conn.finish();

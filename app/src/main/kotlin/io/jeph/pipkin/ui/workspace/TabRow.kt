@@ -29,10 +29,12 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.host.SessionInfo
+import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.StatusDot
+import io.jeph.pipkin.ui.terminal.terminalTitle
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -40,7 +42,6 @@ import io.jeph.pipkin.ui.theme.pipkinColors
  * One chat in the tab menu: what Pi is doing in it, its title and age, highlighted while it is the one shown, and an
  * actions button that long-press also opens. A chat with no saved history yet has no age and no actions.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ChatTabRow(
   title: String,
@@ -50,6 +51,57 @@ internal fun ChatTabRow(
   onOpen: () -> Unit,
   onActions: (() -> Unit)?,
   modifier: Modifier = Modifier,
+) {
+  TabRow(
+    mark = { if (process != null) ActivityMark(process) else IdleMark() },
+    title = title,
+    detail = modified?.let { relativeTime(it) },
+    shown = shown,
+    onOpen = onOpen,
+    onActions = onActions,
+    actionsDescription = stringResource(R.string.shell_session_actions),
+    modifier = modifier,
+  )
+}
+
+/** One terminal in the tab menu: the terminal icon and its name, highlighted while it is the one shown. */
+@Composable
+internal fun TerminalTabRow(
+  session: TerminalSession,
+  shown: Boolean,
+  onOpen: () -> Unit,
+  onActions: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  TabRow(
+    mark = {
+      LucideIcon(
+        icon = R.drawable.ic_lucide_square_terminal,
+        contentDescription = null,
+        tint = pipkinColors.foregroundMuted,
+      )
+    },
+    title = terminalTitle(session),
+    detail = null,
+    shown = shown,
+    onOpen = onOpen,
+    onActions = onActions,
+    actionsDescription = stringResource(R.string.terminal_actions),
+    modifier = modifier,
+  )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun TabRow(
+  mark: @Composable () -> Unit,
+  title: String,
+  detail: String?,
+  shown: Boolean,
+  onOpen: () -> Unit,
+  onActions: (() -> Unit)?,
+  actionsDescription: String,
+  modifier: Modifier,
 ) {
   val colors = pipkinColors
   Row(
@@ -64,9 +116,7 @@ internal fun ChatTabRow(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
-    Box(modifier = Modifier.size(PipkinTokens.IconSize.lg), contentAlignment = Alignment.Center) {
-      if (process != null) ActivityMark(process) else IdleMark()
-    }
+    Box(modifier = Modifier.size(PipkinTokens.IconSize.lg), contentAlignment = Alignment.Center) { mark() }
     Column(modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s6)) {
       Text(
         text = title,
@@ -75,19 +125,14 @@ internal fun ChatTabRow(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      if (modified != null) {
-        Text(
-          text = relativeTime(modified),
-          color = colors.foregroundMuted,
-          fontSize = PipkinTokens.FontSize.sm,
-          maxLines = 1,
-        )
+      if (detail != null) {
+        Text(text = detail, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm, maxLines = 1)
       }
     }
     if (onActions != null) {
       IconButton28(
         icon = R.drawable.ic_lucide_ellipsis,
-        contentDescription = stringResource(R.string.shell_session_actions),
+        contentDescription = actionsDescription,
         onClick = onActions,
         modifier = Modifier.size(36.dp),
         tint = colors.foregroundMuted,

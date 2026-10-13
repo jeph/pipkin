@@ -21,3 +21,11 @@ export function stringArrayParam(params: JsonObject, key: string): string[] {
   }
   return value;
 }
+
+export function positiveIntParam(params: JsonObject, key: string): number {
+  const value = params[key];
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new HostError("bad_params", `Parameter "${key}" must be a positive integer`);
+  }
+  return value;
+}

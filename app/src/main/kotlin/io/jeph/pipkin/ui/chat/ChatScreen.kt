@@ -36,13 +36,13 @@ import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import io.jeph.pipkin.ui.workspace.ChatTabsSheet
 import io.jeph.pipkin.ui.workspace.TabCountButton
-import io.jeph.pipkin.ui.workspace.rememberWorkspaceChats
+import io.jeph.pipkin.ui.workspace.WorkspaceTabsSheet
+import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 
 /**
  * One chat: header, stream and composer for [process]; a null process shows a starting placeholder. The header's tab
- * button opens the tab menu of the chats in [process]'s workspace.
+ * button opens the tab menu of the chats and terminals in [process]'s workspace.
  */
 @Composable
 internal fun ChatScreen(
@@ -86,10 +86,11 @@ internal fun ChatScreen(
     sheet,
     onSheet = { sheet = it },
     onNewChat = { actions.newChat(it) },
+    onNewTerminal = { context.appGraph.terminals.open(process) },
     onArchive = actions::archive,
   )
   ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive = actions::archive)
-  if (tabsOpen) ChatTabsSheet(process, actions, onDismiss = { tabsOpen = false })
+  if (tabsOpen) WorkspaceTabsSheet(process, actions, onDismiss = { tabsOpen = false })
 }
 
 /** A [ChatNavigator] that outlives recompositions and always calls the latest callbacks. */
@@ -225,7 +226,7 @@ private fun ChatHeader(
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
   val sessions by graph.sessionRepository.sessions.collectAsStateWithLifecycle()
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceChats(process)
+  val tabs = rememberWorkspaceTabs(process)
   val firstMessage = sessions.firstOrNull { it.path == sessionFile }?.firstMessage?.takeIf { it.isNotBlank() }
   HeaderBar(
     title = sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),
@@ -244,7 +245,7 @@ private fun ChatHeader(
 }
 
 @Composable
-private fun MenuButton(onToggleSidebar: () -> Unit) {
+internal fun MenuButton(onToggleSidebar: () -> Unit) {
   IconButton28(
     icon = R.drawable.ic_lucide_menu,
     contentDescription = stringResource(R.string.chat_toggle_sidebar),
@@ -269,6 +270,7 @@ private fun ChatSheets(
   sheet: ChatSheet?,
   onSheet: (ChatSheet?) -> Unit,
   onNewChat: (cwd: String) -> Unit,
+  onNewTerminal: () -> Unit,
   onArchive: (AgentProcess) -> Unit,
 ) {
   val process = controller.process
@@ -282,6 +284,7 @@ private fun ChatSheets(
     ChatSheet.Actions -> ChatActionsSheet(
       actions = ChatActions(
         onNewChat = { onNewChat(process.cwd) },
+        onNewTerminal = onNewTerminal,
         onRename = { onSheet(ChatSheet.Rename) },
         onReload = { if (busy) onSheet(ChatSheet.ConfirmReload) else controller.reload() },
         onCopyPath = sessionFile?.let { path -> { copy(path) } },
