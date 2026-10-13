@@ -19,12 +19,20 @@ export interface Dirs {
   root: string;
   configDir: string;
   home: string;
+  /** Stands in for Termux's `$PREFIX`. */
+  prefix: string;
 }
 
 export async function makeDirs(): Promise<Dirs> {
   const base = await realpath(await mkdtemp(path.join(os.tmpdir(), "pipkin-host-test-")));
-  const dirs = { base, root: path.join(base, "root"), configDir: path.join(base, "config"), home: path.join(base, "home") };
-  await Promise.all([dirs.root, dirs.configDir, dirs.home].map((dir) => mkdir(dir, { recursive: true })));
+  const dirs = {
+    base,
+    root: path.join(base, "root"),
+    configDir: path.join(base, "config"),
+    home: path.join(base, "home"),
+    prefix: path.join(base, "prefix"),
+  };
+  await Promise.all([dirs.root, dirs.configDir, dirs.home, dirs.prefix].map((dir) => mkdir(dir, { recursive: true })));
   return dirs;
 }
 
@@ -135,6 +143,7 @@ export async function startHost(
       PIPKIN_ROOT: dirs.root,
       PI_CODING_AGENT_DIR: dirs.configDir,
       HOME: dirs.home,
+      PREFIX: dirs.prefix,
       ...extraEnv,
     },
     stdio: ["ignore", "inherit", "inherit"],

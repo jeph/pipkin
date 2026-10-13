@@ -1,4 +1,4 @@
-// Stand-in for `pi --mode rpc`: reports its argv, echoes each stdin JSONL line as
+// Stand-in for `pi --mode rpc`: reports its argv, cwd and the variables of REPORTED_ENV it inherited, echoes each stdin JSONL line as
 // {"type":"echo","command":...}, writes to stderr, and exits on stdin EOF like Pi does.
 // Splits on LF only so U+2028 inside JSON strings survives, as Pi's framing requires.
 // {"type":"flood","bytes":N,"done":path} instead writes about N bytes of numbered lines, waiting on
@@ -23,7 +23,9 @@ async function flood(bytes, done) {
 }
 
 process.stderr.write("fake-pi ready\n");
-process.stdout.write(`${JSON.stringify({ type: "ready", argv: process.argv.slice(2), cwd: process.cwd() })}\n`);
+const REPORTED_ENV = ["PIPKIN_TOKEN", "PIPKIN_ROOT", "PI_CODING_AGENT_DIR", "SESSION_VAR"];
+const env = Object.fromEntries(REPORTED_ENV.filter((name) => name in process.env).map((name) => [name, process.env[name]]));
+process.stdout.write(`${JSON.stringify({ type: "ready", argv: process.argv.slice(2), cwd: process.cwd(), env })}\n`);
 
 let carry = "";
 process.stdin.setEncoding("utf8");

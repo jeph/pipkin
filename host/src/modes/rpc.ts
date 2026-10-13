@@ -8,6 +8,7 @@ import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { nullableStringParam, stringParam } from "../params.js";
 import { systemAppend } from "../prompt.js";
+import { termuxSessionEnv } from "../termux-session.js";
 
 const STDERR_TAIL = 16 * 1024;
 const TERM_AFTER_MS = 5000;
@@ -164,7 +165,8 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   if (packages.includes(WEB_ACCESS_PACKAGE)) await defaultWebToolsToEager(ctx.env.configDir);
   for (const dir of await bundledExtensionDirs(ctx, packages)) args.push("--extension", dir);
   args.push("--append-system-prompt", systemAppend(ctx.env.configDir));
-  const child = spawn(process.execPath, args, { cwd, stdio: ["pipe", "pipe", "pipe"] });
+  const env = await termuxSessionEnv(ctx.env);
+  const child = spawn(process.execPath, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
   const { socket } = ctx.conn;
   const stderr = new TailBuffer();
   child.stderr.on("data", (chunk: Buffer) => {

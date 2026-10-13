@@ -19,6 +19,12 @@ import {
 
 const MiB = 1024 * 1024;
 
+/** Stands in for Termux's `$PREFIX/bin/login`: runs [startup] the way a profile and `~/.bashrc` would, then the command. */
+async function writeLogin(dirs: Dirs, startup: string): Promise<void> {
+  await mkdir(path.join(dirs.prefix, "bin"), { recursive: true });
+  await writeFile(path.join(dirs.prefix, "bin/login"), `#!/bin/sh\n[ "$1" = -i ] && shift\n${startup}\nexec /bin/sh "$@"\n`, { mode: 0o755 });
+}
+
 /** True once `file` exists, polling for up to `timeoutMs`. */
 async function appears(file: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
@@ -97,6 +103,7 @@ describe("rpc mode", () => {
       type: "ready",
       argv: ["--mode", "rpc", "--session", "/s.jsonl", "--append-system-prompt", systemAppend(dirs.configDir)],
       cwd: dirs.home,
+      env: { PI_CODING_AGENT_DIR: dirs.configDir },
     });
     expect(await run.next()).toEqual({ type: "echo", command: first });
     const second = { id: "2", type: "get_state" };
@@ -256,6 +263,38 @@ describe("rpc mode", () => {
     run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson } });
     expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "pi_version" });
     expect(await run.next()).toBeUndefined();
+  });
+
+  it("starts Pi with what the Termux session's startup files export, keeping Pipkin's config directory", async () => {
+    await writeLogin(
+      dirs,
+      [
+        'export SESSION_VAR="token=${PIPKIN_TOKEN:-none} root=${PIPKIN_ROOT:-none}"',
+        "export PI_CODING_AGENT_DIR=/elsewhere",
+        "echo startup noise",
+        "echo startup warning >&2",
+      ].join("\n"),
+    );
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON } });
+    const ready = await run.next();
+    expect(ready).toMatchObject({ type: "ready" });
+    expect(ready?.env).toEqual({ PI_CODING_AGENT_DIR: dirs.configDir, SESSION_VAR: "token=none root=none" });
+    run.socket.end();
+    await run.exited;
+  });
+
+  it("starts Pi with the host's environment, minus its own variables, when the startup files fail", async () => {
+    await writeLogin(dirs, "export SESSION_VAR=partial\nexit 1");
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON } });
+    const ready = await run.next();
+    expect(ready).toMatchObject({ type: "ready" });
+    expect(ready?.env).toEqual({ PI_CODING_AGENT_DIR: dirs.configDir });
+    run.socket.end();
+    await run.exited;
   });
 
   it("reports a missing working directory", async () => {

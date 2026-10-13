@@ -16,6 +16,8 @@ export interface HostEnv {
   /** `PI_CODING_AGENT_DIR` on shared storage. */
   configDir: string;
   home: string;
+  /** Termux's `$PREFIX`, the root of its packages. */
+  prefix: string;
 }
 
 /** A failure with a machine-readable code, reported as `pipkin_result` `ok:false`. */
@@ -54,6 +56,7 @@ export function readHostEnv(): HostEnv | undefined {
   const token = process.env.PIPKIN_TOKEN;
   const root = process.env.PIPKIN_ROOT;
   const configDir = process.env.PI_CODING_AGENT_DIR;
-  if (!token || !root || !configDir) return undefined;
-  return { token, root, configDir, home: process.env.HOME ?? os.homedir() };
+  const prefix = process.env.PREFIX;
+  if (!token || !root || !configDir || !prefix) return undefined;
+  return { token, root, configDir, home: process.env.HOME ?? os.homedir(), prefix };
 }

@@ -58,7 +58,7 @@ async function main(): Promise<void> {
   const env = readHostEnv();
   const port = Number(portArg);
   if (mode === undefined || env === undefined || !Number.isInteger(port) || port <= 0 || port > 65_535) {
-    process.stderr.write("usage: PIPKIN_TOKEN=… PIPKIN_ROOT=… PI_CODING_AGENT_DIR=… host.mjs <mode> <port>\n");
+    process.stderr.write("usage: PIPKIN_TOKEN=… PIPKIN_ROOT=… PI_CODING_AGENT_DIR=… PREFIX=… host.mjs <mode> <port>\n");
     process.exit(EXIT_USAGE);
   }
 
