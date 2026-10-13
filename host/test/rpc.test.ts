@@ -48,9 +48,8 @@ async function expectWholeFlood(run: HostRun): Promise<void> {
   expect(seqs.length).toBeGreaterThan(0);
 }
 
-/** Starts a chat with `packages` bundled and returns `web-search.json` as Pi then finds it, or null when absent. */
-async function webSearchConfigAfterLaunch(dirs: Dirs, packages: string[]): Promise<string | null> {
-  const packageJson = runtimeManifest(packages);
+/** Starts a chat with `packageJson` as the runtime manifest and ends it once Pi is ready. */
+async function launchChat(dirs: Dirs, packageJson = PACKAGE_JSON): Promise<void> {
   await writeRuntimeManifest(dirs, packageJson);
   const { run } = await startHost("rpc", dirs);
   await run.next();
@@ -58,6 +57,11 @@ async function webSearchConfigAfterLaunch(dirs: Dirs, packages: string[]): Promi
   expect(await run.next()).toMatchObject({ type: "ready" });
   run.socket.end();
   await run.exited;
+}
+
+/** Starts a chat with `packages` bundled and returns `web-search.json` as Pi then finds it, or null when absent. */
+async function webSearchConfigAfterLaunch(dirs: Dirs, packages: string[]): Promise<string | null> {
+  await launchChat(dirs, runtimeManifest(packages));
   return readFile(path.join(dirs.configDir, "web-search.json"), "utf8").catch(() => null);
 }
 
@@ -253,6 +257,26 @@ describe("rpc mode", () => {
 
     it("writes no config when pi-web-access is not bundled", async () => {
       expect(await webSearchConfigAfterLaunch(dirs, ["other"])).toBeNull();
+    });
+  });
+
+  describe("steering mode", () => {
+    it.each([
+      ["no settings", null, { steeringMode: "all" }],
+      ["settings without a choice", { defaultModel: "m" }, { defaultModel: "m", steeringMode: "all" }],
+      ["the user's own choice", { steeringMode: "one-at-a-time" }, { steeringMode: "one-at-a-time" }],
+    ])("delivers queued steers together given %s, keeping other settings", async (_, before, after) => {
+      const settingsPath = path.join(dirs.configDir, "settings.json");
+      if (before !== null) await writeFile(settingsPath, JSON.stringify(before));
+      await launchChat(dirs);
+      expect(JSON.parse(await readFile(settingsPath, "utf8"))).toEqual(after);
+    });
+
+    it("leaves settings Pi cannot read untouched", async () => {
+      const settingsPath = path.join(dirs.configDir, "settings.json");
+      await writeFile(settingsPath, "{ broken");
+      await launchChat(dirs);
+      expect(await readFile(settingsPath, "utf8")).toBe("{ broken");
     });
   });
 

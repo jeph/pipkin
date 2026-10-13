@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promis
 import { createServer, type Socket } from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { inject } from "vitest";
 import { encodeLine, isObject, LineSplitter, type JsonObject } from "../src/framing.js";
 
@@ -55,12 +56,17 @@ export async function writeRuntimeManifest(dirs: Dirs, packageJson = PACKAGE_JSO
   await writeFile(path.join(dirs.root, "pi/package.json"), packageJson);
 }
 
-/** Installs fake-pi as the pinned Pi package, with Pi's real `bin.pi` layout. */
+/**
+ * Installs fake-pi as the pinned Pi package, with Pi's real `bin.pi` layout. Its SDK entry offers Pi's real
+ * `SettingsManager`, which `rpc` uses to default the steering mode.
+ */
 export async function installFakePi(dirs: Dirs, version = PI_VERSION): Promise<void> {
   const dir = piDir(dirs);
   await mkdir(path.join(dir, "dist/bundle"), { recursive: true });
   await writeFile(path.join(dir, "package.json"), JSON.stringify({ name: "@earendil-works/pi-coding-agent", version, bin: { pi: "dist/bundle/cli.js" } }));
   await writeFile(path.join(dir, "dist/bundle/cli.js"), `import ${JSON.stringify(FAKE_PI)};\n`);
+  const realSdk = pathToFileURL(path.join(await realpath(REAL_PI), "dist/index.js")).href;
+  await writeFile(path.join(dir, "dist/index.js"), `export { SettingsManager } from ${JSON.stringify(realSdk)};\n`);
   await writeRuntimeManifest(dirs);
 }
 

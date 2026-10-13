@@ -3,11 +3,12 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import type { Socket } from "node:net";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
-import { installedPiVersion, PI_PACKAGE, piPackageDir } from "../env.js";
+import { installedPiVersion, loadPi, PI_PACKAGE, piPackageDir } from "../env.js";
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { nullableStringParam, stringParam } from "../params.js";
 import { systemAppend } from "../prompt.js";
+import { openSettingsIfValid } from "../settings.js";
 import { termuxSessionEnv } from "../termux-session.js";
 
 const STDERR_TAIL = 16 * 1024;
@@ -68,17 +69,20 @@ async function piEntry(root: string): Promise<string> {
   return join(dir, entry);
 }
 
+/** The user's global Pi settings as parsed JSON; null when the file is missing or malformed, which Pi reports itself. */
+async function readGlobalSettings(configDir: string): Promise<unknown> {
+  return readFile(join(configDir, "settings.json"), "utf8")
+    .then((text) => JSON.parse(text.replace(/^\uFEFF/, "")) as unknown)
+    .catch(() => null);
+}
+
 /**
  * npm package names the user's global Pi settings install. Pi parses `npm:<name>[@version]` sources with this same
  * pattern and identifies npm packages by name. Project settings are left out: Pi loads them only after a trust
  * decision that extensions, `trust.json` and prompts can make, which the host cannot predict.
  */
-async function userNpmPackages(configDir: string): Promise<Set<string>> {
+function userNpmPackages(settings: unknown): Set<string> {
   const names = new Set<string>();
-  // A missing or malformed file declares nothing here; Pi reports a malformed one itself.
-  const settings = await readFile(join(configDir, "settings.json"), "utf8")
-    .then((text) => JSON.parse(text.replace(/^\uFEFF/, "")) as unknown)
-    .catch(() => null);
   if (!isObject(settings) || !Array.isArray(settings.packages)) return names;
   for (const entry of settings.packages as unknown[]) {
     const source = isObject(entry) ? entry.source : entry;
@@ -100,8 +104,8 @@ function bundledPackages(packageJson: string): string[] {
  * The bundled packages to load with `-e`, minus any the user installs through Pi's global settings. Pi exits when two
  * copies of one extension register the same tools, so the user's copy wins.
  */
-async function bundledExtensionDirs(ctx: ModeContext, packages: string[]): Promise<string[]> {
-  const userPackages = await userNpmPackages(ctx.env.configDir);
+function bundledExtensionDirs(ctx: ModeContext, packages: string[], settings: unknown): string[] {
+  const userPackages = userNpmPackages(settings);
   return packages.filter((name) => !userPackages.has(name)).map((name) => join(ctx.env.root, "pi", "node_modules", name));
 }
 
@@ -121,6 +125,20 @@ async function defaultWebToolsToEager(configDir: string): Promise<void> {
   }
   if (!isObject(config) || "toolActivation" in config) return;
   await writeFile(path, `${JSON.stringify({ ...config, toolActivation: "eager" }, null, 2)}\n`);
+}
+
+/**
+ * Sets Pi's `steeringMode` to `all` unless the user chose one, so every steer sent during a turn reaches the model
+ * together, as Pipkin's single steering box shows them. Writes through Pi's locked `SettingsManager`, since another
+ * chat's Pi may be saving settings too; Pi itself reports settings it cannot read. A failed write only leaves Pi's
+ * one-at-a-time default, which the steering box follows as well.
+ */
+async function defaultSteeringToAll(ctx: ModeContext, settings: unknown): Promise<void> {
+  if (isObject(settings) && "steeringMode" in settings) return;
+  const current = openSettingsIfValid(ctx, await loadPi(ctx.env.root));
+  if (current === undefined || current.manager.getGlobalSettings().steeringMode !== undefined) return;
+  current.manager.setSteeringMode("all");
+  await current.manager.flush();
 }
 
 /** Error results for rpc; success has no result line, only `pipkin_exit`. */
@@ -163,7 +181,9 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   if (sessionPath !== null) args.push("--session", sessionPath);
   const packages = bundledPackages(packageJson);
   if (packages.includes(WEB_ACCESS_PACKAGE)) await defaultWebToolsToEager(ctx.env.configDir);
-  for (const dir of await bundledExtensionDirs(ctx, packages)) args.push("--extension", dir);
+  const settings = await readGlobalSettings(ctx.env.configDir);
+  await defaultSteeringToAll(ctx, settings);
+  for (const dir of bundledExtensionDirs(ctx, packages, settings)) args.push("--extension", dir);
   args.push("--append-system-prompt", systemAppend(ctx.env.configDir));
   const env = await termuxSessionEnv(ctx.env);
   const child = spawn(process.execPath, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });

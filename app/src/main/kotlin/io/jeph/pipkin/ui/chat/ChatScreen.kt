@@ -66,6 +66,7 @@ internal fun ChatScreen(
     ChatController(process, context.appGraph, context.applicationContext, scope, snackbar, navigator)
   }
   LaunchedEffect(controller) { controller.collectEffects() }
+  LaunchedEffect(controller) { controller.steering.collectQueue() }
   ChatContent(controller, snackbar, onToggleSidebar, onOpenSettings, onSheet = { sheet = it }, modifier)
   ChatSheets(controller, sheet, onSheet = { sheet = it }, onNewChat, onArchive)
   ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive)
@@ -142,7 +143,14 @@ private fun ChatContent(
       SlashMenuHost(controller, ready = processState == AgentProcessState.Ready, Modifier.align(Alignment.BottomCenter))
     }
     if (timeline.queue.isNotEmpty()) {
-      QueueRows(timeline.queue, onClear = controller::clearQueue, Modifier.padding(bottom = PipkinTokens.Spacing.s8))
+      SteeringBox(
+        queue = timeline.queue,
+        editEnabled = !timeline.queueInFlight,
+        sendNowEnabled = !timeline.queueInFlight && !controller.sending,
+        onEdit = controller.steering::edit,
+        onSendNow = controller.steering::sendNow,
+        modifier = Modifier.padding(bottom = PipkinTokens.Spacing.s8),
+      )
     }
     Composer(
       controller = controller,

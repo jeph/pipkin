@@ -216,6 +216,38 @@ class ChatTimelineTest {
   }
 
   @Test
+  fun queueIsInFlightFromTurnEndUntilTheNextReplyOrTheRunEnds() {
+    val inFlight = { timeline.state.value.queueInFlight }
+    apply("""{"type":"agent_start"}""")
+    assertFalse(inFlight())
+    apply("""{"type":"turn_end"}""")
+    assertTrue(inFlight())
+    // The steers Pi took arrive as user messages before the reply.
+    apply("""{"type":"turn_start"}""")
+    apply("""{"type":"message_start","message":{"role":"user","content":[{"type":"text","text":"steer"}]}}""")
+    assertTrue(inFlight())
+    apply("""{"type":"message_start","message":{"role":"assistant","content":[]}}""")
+    assertFalse(inFlight())
+    apply("""{"type":"turn_end"}""")
+    apply("""{"type":"agent_end"}""")
+    assertFalse(inFlight())
+  }
+
+  @Test
+  fun startedUserMessagesListsOnlyThoseAfterTheMark() {
+    apply("""{"type":"message_start","message":{"role":"user","content":"before"}}""")
+    val mark = timeline.startedUserMessages.mark()
+    assertEquals(emptyList<String>(), timeline.startedUserMessages.textsSince(mark))
+    apply("""{"type":"message_start","message":{"role":"assistant","content":[]}}""")
+    apply(
+      """{"type":"message_start","message":{"role":"user","content":[{"type":"text","text":"a"},""" +
+        """{"type":"image","data":"x","mimeType":"image/png"}]}}""",
+    )
+    apply("""{"type":"message_start","message":{"role":"user","content":"b"}}""")
+    assertEquals(listOf("a", "b"), timeline.startedUserMessages.textsSince(mark))
+  }
+
+  @Test
   fun extensionUiDialogsArePendingAndFireAndForgetBecomeEffects() = runBlocking {
     apply(
       """{"type":"extension_ui_request","id":"u1","method":"select","title":"Allow?","options":["Allow","Block"],

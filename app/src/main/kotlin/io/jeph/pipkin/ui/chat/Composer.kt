@@ -363,37 +363,54 @@ private fun PrimaryButton(action: PrimaryAction, onSend: () -> Unit, onStop: () 
   }
 }
 
-/** Steering and follow-up messages Pi has not taken yet, with a Clear that empties Pi's queue. */
+/**
+ * The messages Pi has queued but not taken yet, one per line, so the user sees what is about to steer the run.
+ * Edit takes them back into the composer; Send now stops the run and sends them at once. Both are off while Pi may
+ * be taking the queue for its next turn, since it then delivers the messages regardless.
+ */
 @Composable
-internal fun QueueRows(queue: List<String>, onClear: () -> Unit, modifier: Modifier = Modifier) {
+internal fun SteeringBox(
+  queue: List<String>,
+  editEnabled: Boolean,
+  sendNowEnabled: Boolean,
+  onEdit: () -> Unit,
+  onSendNow: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
   val colors = pipkinColors
   Box(modifier = modifier.fillMaxWidth().padding(horizontal = PipkinTokens.Spacing.s16), Alignment.TopCenter) {
     Column(
-      modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth(),
-      verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+      modifier =
+        Modifier
+          .widthIn(max = PipkinTokens.contentMaxWidth)
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
+          .background(colors.surface2)
+          .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4, bottom = PipkinTokens.Spacing.s12),
     ) {
-      queue.forEachIndexed { index, text ->
-        Row(
-          modifier =
-            Modifier
-              .fillMaxWidth()
-              .heightIn(min = 36.dp)
-              .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
-              .background(colors.surface2)
-              .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4),
-          verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Text(
-            text = stringResource(R.string.chat_queued, text.replace('\n', ' ')),
-            modifier = Modifier.weight(1f),
-            color = colors.foregroundMuted,
-            fontSize = PipkinTokens.FontSize.base,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-          )
-          if (index == 0) TextButton(onClick = onClear) { Text(text = stringResource(R.string.chat_clear)) }
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+          text = stringResource(R.string.chat_steering),
+          modifier = Modifier.weight(1f),
+          color = colors.foregroundMuted,
+          fontSize = PipkinTokens.FontSize.sm,
+        )
+        TextButton(onClick = onEdit, enabled = editEnabled) { Text(text = stringResource(R.string.chat_steering_edit)) }
+        TextButton(onClick = onSendNow, enabled = sendNowEnabled) {
+          Text(text = stringResource(R.string.chat_steering_send_now))
         }
       }
+      Text(
+        text = queue.joinToString("\n"),
+        modifier = Modifier.padding(end = PipkinTokens.Spacing.s8),
+        color = colors.foreground,
+        fontSize = PipkinTokens.FontSize.base,
+        maxLines = STEERING_MAX_LINES,
+        overflow = TextOverflow.Ellipsis,
+      )
     }
   }
 }
+
+/** Long enough to read several queued messages, short enough to leave the stream most of the screen. */
+private const val STEERING_MAX_LINES = 6

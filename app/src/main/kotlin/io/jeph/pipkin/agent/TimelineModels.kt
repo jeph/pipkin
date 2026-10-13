@@ -10,6 +10,11 @@ data class TimelineState(
   val pendingUi: ExtensionUiRequest? = null,
   val model: JSONObject? = null,
   val thinkingLevel: String? = null,
+  /**
+   * Pi may already have taken [queue]'s messages for its next turn: from `turn_end` until that turn's reply starts
+   * or the run ends. `clear_queue` still returns them meanwhile, yet Pi delivers them anyway.
+   */
+  val queueInFlight: Boolean = false,
 )
 
 /**

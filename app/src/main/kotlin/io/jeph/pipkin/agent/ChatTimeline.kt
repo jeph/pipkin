@@ -50,6 +50,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   /** Between `compaction_start` and `compaction_end`; a manual compaction runs outside any agent run. */
   private var compacting = false
   private var queue = emptyList<String>()
+  private var queueInFlight = false
   private var pendingUi: ExtensionUiRequest? = null
   private var model: JSONObject? = null
   private var thinkingLevel: String? = null
@@ -57,6 +58,9 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
 
   /** How many events [apply] has taken so far; [seed] can compare against it. */
   val appliedEvents: Long get() = synchronized(lock) { appliedCount }
+
+  /** Every user message Pi started, in order. */
+  val startedUserMessages = StartedUserMessages()
 
   /**
    * Replaces the stream with `get_messages` `data.messages`. Pi is idle whenever its history is seeded. With
@@ -75,6 +79,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       busy = false
       footer = null
       compacting = false
+      queueInFlight = false
       for (index in 0 until messages.length()) {
         val message = messages.optJSONObject(index) ?: continue
         when (message.optString("role")) {
@@ -117,6 +122,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
     synchronized(lock) {
       finishRun()
       compacting = false
+      queueInFlight = false
       pendingUi = null
       items += ExitBanner("x${itemSeq++}", code, stderr)
       publish()
@@ -141,6 +147,11 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       "agent_start" -> startRun()
 
       "agent_settled" -> finishRun()
+
+      // Pi takes the steers for the next turn right after `turn_end` and delivers them before its reply starts.
+      "turn_end" -> queueInFlight = true
+
+      "agent_end" -> queueInFlight = false
 
       "message_start" -> event.optJSONObject("message")?.let(::messageStart)
 
@@ -202,9 +213,13 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
         val key = nextMessageKey()
         live = LiveMessage(key, "user", timestamp)
         items += messageItems(message, key, settled = false, timestamp)
+        startedUserMessages.add(message.optJSONArray("content")?.text() ?: message.optString("content"))
       }
 
-      "assistant" -> live = LiveMessage(nextMessageKey(), "assistant", timestamp)
+      "assistant" -> {
+        live = LiveMessage(nextMessageKey(), "assistant", timestamp)
+        queueInFlight = false
+      }
     }
   }
 
@@ -395,7 +410,8 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private fun publish() {
     val snapshot = footer?.let { items + it } ?: items.toList()
     // A manual compaction runs outside any agent run, but it is work Stop can end and keep-alive must cover.
-    mutableState.value = TimelineState(snapshot, busy || compacting, queue, pendingUi, model, thinkingLevel)
+    mutableState.value =
+      TimelineState(snapshot, busy || compacting, queue, pendingUi, model, thinkingLevel, queueInFlight)
   }
 
   private data class LiveMessage(val key: String, val role: String, val timestamp: Long)
@@ -414,6 +430,36 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       rowArgumentFinal = parsed.value.has(rowArgument) && parsed.lastKey != rowArgument
       return parsed.value
     }
+  }
+}
+
+/**
+ * Counts the user messages Pi started and keeps the texts of the latest ones, so a caller can tell which messages
+ * arrived after a [mark]. Safe to use from any thread.
+ */
+class StartedUserMessages {
+  private var count = 0L
+  private val recentTexts = ArrayDeque<String>()
+
+  /** The messages started so far, for [textsSince]. */
+  @Synchronized
+  fun mark(): Long = count
+
+  /** The texts of the messages started after [mark] was taken, oldest first. */
+  @Synchronized
+  fun textsSince(mark: Long): List<String> =
+    recentTexts.takeLast((count - mark).coerceIn(0L, recentTexts.size.toLong()).toInt())
+
+  @Synchronized
+  internal fun add(text: String) {
+    count += 1
+    recentTexts.addLast(text)
+    if (recentTexts.size > RECENT_TEXTS) recentTexts.removeFirst()
+  }
+
+  private companion object {
+    /** More than Pi can queue and deliver while a caller holds a mark. */
+    const val RECENT_TEXTS = 64
   }
 }
 

@@ -62,8 +62,9 @@
     <string name="chat_files_too_large">Files can add up to 10 MB per message</string>
     <string name="chat_send">Send</string>
     <string name="chat_stop">Stop</string>
-    <string name="chat_queued">Queued: %1$s</string>
-    <string name="chat_clear">Clear</string>
+    <string name="chat_steering">Steering</string>
+    <string name="chat_steering_edit">Edit</string>
+    <string name="chat_steering_send_now">Send now</string>
     <string name="chat_model">Model</string>
     <string name="chat_no_model_chip">No model</string>
     <string name="chat_model_search">Search models</string>

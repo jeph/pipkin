@@ -57,10 +57,12 @@ internal class ChatController(
 
   val builtins = BuiltinCommands(this, navigator)
 
+  val steering = ChatSteering(this)
+
   /** Images and files for the next prompt, in pick order. */
   val attachments = mutableStateListOf<Attachment>()
 
-  /** True between sending `prompt` and Pi's response. */
+  /** True from a send until Pi answered its `prompt`. */
   var sending by mutableStateOf(false)
     private set
 
@@ -107,46 +109,61 @@ internal class ChatController(
       show(R.string.chat_files_too_large)
       return false
     }
-    val sentDraft = draft
+    val text = draft.text
     draft = TextFieldValue()
     attachments.clear()
+    launchSending(command = text.trim().startsWith("/")) {
+      deliver(text, picked)?.let { failure -> restoreDraft(text, picked, failure) }
+    }
+    return true
+  }
+
+  /** Runs [block] with [sending] set from now on, so a second send waits and Stop applies to it. */
+  fun launchSending(command: Boolean, block: suspend () -> Unit) {
     sending = true
-    sendingCommand = sentDraft.text.trim().startsWith("/")
+    sendingCommand = command
     stopRequested = false
     follow.value = true
     scope.launch {
-      val failure = try {
-        val files = picked.filterIsInstance<Attachment.File>().map { it.name to it.bytes }
-        val paths = if (files.isEmpty()) emptyList() else graph.hostClient.saveAttachments(files)
-        val disposition = process.prompt(
-          withFilePaths(sentDraft.text.trim(), paths),
-          picked.filterIsInstance<Attachment.Image>().map {
-            it.part
-          },
-        )
-        // Pi starts the run just after answering, so an abort sent now reaches it.
-        if (stopRequested && disposition == "started") launchRpc { process.abort() }
-        null
-      } catch (error: RpcError) {
-        error.error
-      } catch (error: HostRejected) {
-        error.error
-      } catch (error: IOException) {
-        error.message.orEmpty()
+      try {
+        block()
       } finally {
         sending = false
         sendingCommand = false
       }
-      if (failure != null) {
-        // The field stayed editable while sending: put the failed text before anything typed since.
-        val typed = draft.text
-        val restored = if (typed.isBlank()) sentDraft.text else "${sentDraft.text}\n$typed"
-        draft = TextFieldValue(restored, TextRange(restored.length))
-        attachments.addAll(0, picked)
-        show(failure)
-      }
     }
-    return true
+  }
+
+  /** Prompts Pi with [text] and [picked], first stopping the run when [interrupt]; returns why that failed, if it did. */
+  suspend fun deliver(text: String, picked: List<Attachment>, interrupt: Boolean = false): String? = try {
+    val files = picked.filterIsInstance<Attachment.File>().map { it.name to it.bytes }
+    val paths = if (files.isEmpty()) emptyList() else graph.hostClient.saveAttachments(files)
+    val message = withFilePaths(text.trim(), paths)
+    val images = picked.filterIsInstance<Attachment.Image>()
+    if (interrupt) process.abort()
+    val disposition = process.prompt(message, images.map { it.part })
+    if (disposition == "queued") steering.record(message, images)
+    // Pi starts the run just after answering, so an abort sent now reaches it.
+    if (stopRequested && disposition == "started") launchRpc { process.abort() }
+    null
+  } catch (error: RpcError) {
+    error.error
+  } catch (error: HostRejected) {
+    error.error
+  } catch (error: IOException) {
+    error.message.orEmpty()
+  }
+
+  /**
+   * Puts [text] and [picked] back in the composer ahead of anything typed or picked since, as the field stays
+   * editable while sending, and shows [failure] when there is one.
+   */
+  fun restoreDraft(text: String, picked: List<Attachment>, failure: String? = null) {
+    val typed = draft.text
+    val restored = if (typed.isBlank()) text else "$text\n$typed"
+    draft = TextFieldValue(restored, TextRange(restored.length))
+    attachments.addAll(0, picked)
+    failure?.let(::show)
   }
 
   /** [text] followed by the saved files' paths, `~`-relative like the rest of the app shows them. */
@@ -170,8 +187,6 @@ internal class ChatController(
     if (sending) stopRequested = true
     launchRpc { process.abort() }
   }
-
-  fun clearQueue() = launchRpc { process.clearQueue() }
 
   fun rename(name: String) = launchRpc { process.setSessionName(name.trim()) }
 
