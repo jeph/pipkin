@@ -144,7 +144,7 @@ private fun ChatContent(
     }
     if (timeline.queue.isNotEmpty()) {
       SteeringBox(
-        queue = timeline.queue,
+        summary = controller.steering.summary(timeline.queue),
         editEnabled = !timeline.queueInFlight,
         sendNowEnabled = !timeline.queueInFlight && !controller.sending,
         onEdit = controller.steering::edit,

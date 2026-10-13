@@ -138,11 +138,12 @@ internal class ChatController(
   suspend fun deliver(text: String, picked: List<Attachment>, interrupt: Boolean = false): String? = try {
     val files = picked.filterIsInstance<Attachment.File>().map { it.name to it.bytes }
     val paths = if (files.isEmpty()) emptyList() else graph.hostClient.saveAttachments(files)
-    val message = withFilePaths(text.trim(), paths)
+    val typed = text.trim()
+    val message = withFilePaths(typed, paths)
     val images = picked.filterIsInstance<Attachment.Image>()
     if (interrupt) process.abort()
     val disposition = process.prompt(message, images.map { it.part })
-    if (disposition == "queued") steering.record(message, images)
+    if (disposition == "queued") steering.record(message, typed, images, paths.size)
     // Pi starts the run just after answering, so an abort sent now reaches it.
     if (stopRequested && disposition == "started") launchRpc { process.abort() }
     null

@@ -1,27 +1,38 @@
 package io.jeph.pipkin.ui.chat
 
+import androidx.compose.runtime.mutableStateMapOf
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * The steering box's Edit and Send now. Pi's queue reports only texts, so this keeps the images Pipkin sent with
- * each queued steer to bring them back along with the text.
+ * The steering box's contents, Edit and Send now. Pi's queue reports only texts, so this keeps what Pipkin sent
+ * with each queued steer: the text as typed, its images to bring back with it, and how many files it listed.
  */
 internal class ChatSteering(private val controller: ChatController) {
-  /** Images sent with steers Pi still queues, by the text Pi queued them under. */
-  private val queuedImages = mutableMapOf<String, List<Attachment.Image>>()
+  /**
+   * What went into each steer Pi still queues that carried attachments, by the text Pi queued it under. Snapshot
+   * state, since Pi reports the queue before it answers the prompt and the box must catch up once this is noted.
+   */
+  private val sentSteers = mutableStateMapOf<String, SentSteer>()
 
-  /** Notes the [images] sent with a steer Pi queued as [message]. */
-  fun record(message: String, images: List<Attachment.Image>) {
-    if (images.isNotEmpty()) queuedImages[message] = images
+  /** Notes a steer Pi queued as [message]: the [typed] text, its [images] and how many [files] it listed. */
+  fun record(message: String, typed: String, images: List<Attachment.Image>, files: Int) {
+    if (images.isNotEmpty() || files > 0) sentSteers[message] = SentSteer(typed, images, files)
   }
 
-  /** Forgets the images of steers Pi delivered or dropped; the screen runs it for as long as it shows. */
+  /** The box's view of [queue]: each message as typed, one per line, and how many attachments came with them. */
+  fun summary(queue: List<String>): SteeringSummary {
+    val sent = queue.map { sentSteers[it] }
+    val text = queue.zip(sent) { message, steer -> steer?.typed ?: message }.filter { it.isNotBlank() }
+    return SteeringSummary(text.joinToString("\n"), sent.sumOf { it?.attachments ?: 0 })
+  }
+
+  /** Forgets the steers Pi delivered or dropped; the screen runs it for as long as it shows. */
   suspend fun collectQueue() {
     controller.process.timeline.state.map { it.queue }.distinctUntilChanged().collect { queue ->
-      queuedImages.keys.retainAll(queue.toSet())
+      sentSteers.keys.retainAll(queue.toSet())
     }
   }
 
@@ -54,17 +65,25 @@ internal class ChatSteering(private val controller: ChatController) {
   private suspend fun take(): QueuedSteer? {
     val timeline = controller.process.timeline
     // clear_queue reports the emptied queue before it answers, which prunes the map before the answer arrives.
-    val images = queuedImages.toMap()
+    val sent = sentSteers.toMap()
     val mark = timeline.startedUserMessages.mark()
     val texts = controller.query { clearQueue() } ?: return null
-    queuedImages.clear()
+    sentSteers.clear()
     timeline.state.first { !it.queueInFlight }
     val kept = texts.toMutableList()
     timeline.startedUserMessages.textsSince(mark).forEach(kept::remove)
     if (kept.isEmpty()) return null
-    return QueuedSteer(kept.joinToString("\n"), kept.flatMap { images[it].orEmpty() })
+    return QueuedSteer(kept.joinToString("\n"), kept.flatMap { sent[it]?.images.orEmpty() })
   }
 }
 
-/** Pi's queued steers, joined into the one message the steering box shows, with the images Pipkin sent along. */
+/** What the steering box shows: the queued messages as typed, and how many attachments they carry. */
+internal class SteeringSummary(val text: String, val attachments: Int)
+
+/** A queued steer as Pipkin sent it; Pi's text adds the [files]' paths to [typed]. */
+private class SentSteer(val typed: String, val images: List<Attachment.Image>, val files: Int) {
+  val attachments get() = images.size + files
+}
+
+/** Pi's queued steers, joined into one message, with the images Pipkin sent along. */
 private class QueuedSteer(val text: String, val images: List<Attachment.Image>)

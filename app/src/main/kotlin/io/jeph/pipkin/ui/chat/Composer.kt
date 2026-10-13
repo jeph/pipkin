@@ -53,6 +53,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -364,13 +365,14 @@ private fun PrimaryButton(action: PrimaryAction, onSend: () -> Unit, onStop: () 
 }
 
 /**
- * The messages Pi has queued but not taken yet, one per line, so the user sees what is about to steer the run.
- * Edit takes them back into the composer; Send now stops the run and sends them at once. Both are off while Pi may
- * be taking the queue for its next turn, since it then delivers the messages regardless.
+ * The messages Pi has queued but not taken yet, one per line as typed, so the user sees what is about to steer the
+ * run; attachments show only as a count. Edit takes them back into the composer; Send now stops the run and sends
+ * them at once. Both are off while Pi may be taking the queue for its next turn, since it then delivers the
+ * messages regardless.
  */
 @Composable
 internal fun SteeringBox(
-  queue: List<String>,
+  summary: SteeringSummary,
   editEnabled: Boolean,
   sendNowEnabled: Boolean,
   onEdit: () -> Unit,
@@ -400,14 +402,35 @@ internal fun SteeringBox(
           Text(text = stringResource(R.string.chat_steering_send_now))
         }
       }
-      Text(
-        text = queue.joinToString("\n"),
-        modifier = Modifier.padding(end = PipkinTokens.Spacing.s8),
-        color = colors.foreground,
-        fontSize = PipkinTokens.FontSize.base,
-        maxLines = STEERING_MAX_LINES,
-        overflow = TextOverflow.Ellipsis,
-      )
+      if (summary.text.isNotEmpty()) {
+        Text(
+          text = summary.text,
+          modifier = Modifier.padding(end = PipkinTokens.Spacing.s8),
+          color = colors.foreground,
+          fontSize = PipkinTokens.FontSize.base,
+          maxLines = STEERING_MAX_LINES,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+      if (summary.attachments > 0) {
+        Row(
+          modifier = Modifier.padding(top = PipkinTokens.Spacing.s4),
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+        ) {
+          LucideIcon(
+            R.drawable.ic_lucide_paperclip,
+            contentDescription = null,
+            size = PipkinTokens.IconSize.sm,
+            tint = colors.foregroundMuted,
+          )
+          Text(
+            text = pluralStringResource(R.plurals.chat_steering_attachments, summary.attachments, summary.attachments),
+            color = colors.foregroundMuted,
+            fontSize = PipkinTokens.FontSize.sm,
+          )
+        }
+      }
     }
   }
 }

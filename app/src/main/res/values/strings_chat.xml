@@ -65,6 +65,10 @@
     <string name="chat_steering">Steering</string>
     <string name="chat_steering_edit">Edit</string>
     <string name="chat_steering_send_now">Send now</string>
+    <plurals name="chat_steering_attachments">
+        <item quantity="one">%1$d attachment</item>
+        <item quantity="other">%1$d attachments</item>
+    </plurals>
     <string name="chat_model">Model</string>
     <string name="chat_no_model_chip">No model</string>
     <string name="chat_model_search">Search models</string>
