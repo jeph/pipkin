@@ -14,7 +14,9 @@ Once the push has landed, remove the worktree and its branch so they don't pile 
 
 ## Testing on devices
 
-Test changes on the Android emulator. It has one shared copy of Pipkin, and any agent may replace it with a build from its worktree.
+Test changes on an Android emulator. Several agents work at once, so each worktree gets its own emulator, and agents never share one: installs, app data, and taps from one agent would otherwise overwrite or interrupt another's test. Don't install on, drive, or shut down an emulator that another worktree or project is using.
+
+Before testing, create an emulator for the worktree, named after its branch, from a system image under `~/Library/Android/sdk/system-images`, for example `echo no | avdmanager create avd -n pipkin-<branch> -k "system-images;android-36;google_apis_playstore;arm64-v8a"` (the `echo no` answers its custom hardware profile prompt). Boot it on a free even port with `emulator -avd pipkin-<branch> -port <port>`, and pass `-s emulator-<port>` to every `adb` command so it can't reach another agent's emulator or the phone. When you remove the worktree, shut the emulator down with `adb -s emulator-<port> emu kill` and delete it with `avdmanager delete avd -n pipkin-<branch>`.
 
 The user's phone is sometimes reachable over `adb`, but it's their own phone, not a test device. Ask the user before you install a build on it, run commands on it, or test on it, and do only what they agreed to. Never change settings on the phone, whether in Android, Termux, Pipkin, or any other app, without asking first.
 
