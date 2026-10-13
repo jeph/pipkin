@@ -8,8 +8,8 @@
     <string name="shell_add_workspace">Add workspace</string>
     <string name="shell_workspace_open">Open %1$s</string>
     <plurals name="shell_tabs_button">
-        <item quantity="one">%1$d chat in this workspace</item>
-        <item quantity="other">%1$d chats in this workspace</item>
+        <item quantity="one">%1$d tab in this workspace</item>
+        <item quantity="other">%1$d tabs in this workspace</item>
     </plurals>
     <string name="shell_new_chat_in_project">New chat in %1$s</string>
     <string name="shell_settings">Settings</string>

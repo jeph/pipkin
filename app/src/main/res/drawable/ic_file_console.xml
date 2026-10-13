@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- material-icon-theme icon "console" (material-icon-theme 5.32.0, MIT licence), colours toned as Paseo's file-icon-svg.ts does. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="16"
+    android:viewportHeight="16">
+    <path
+        android:fillColor="#e2866a"
+        android:pathData="M2 2a1 1 0 0 0 -1 1v10c0 .554 .446 1 1 1h12c.554 0 1 -.446 1 -1V3a1 1 0 0 0 -1 -1zm0 3h12v8H2zm1 2 2 2 -2 2 1 1 3 -3 -3 -3zm5 3.5V12h5v-1.5z" />
+</vector>

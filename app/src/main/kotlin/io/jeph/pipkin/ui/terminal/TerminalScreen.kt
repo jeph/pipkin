@@ -45,6 +45,7 @@ import io.jeph.pipkin.terminal.TerminalState
 import io.jeph.pipkin.ui.chat.MenuButton
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.files.ExplorerToggle
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -53,8 +54,8 @@ import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 
 /**
  * One terminal tab, shown in place of [chat]: a header with the terminal's name over its folder, the workspace's tab
- * button, which calls [onOpenTabs], and the terminal's actions; libghostty's terminal; and Paseo's key bar above the
- * keyboard. An ended shell shows a bar to start another.
+ * button, which calls [onOpenTabs], the terminal's actions and the explorer toggle; libghostty's terminal; and Paseo's
+ * key bar above the keyboard. An ended shell shows a bar to start another.
  */
 @Composable
 internal fun TerminalScreen(
@@ -62,6 +63,7 @@ internal fun TerminalScreen(
   chat: AgentProcess,
   onToggleSidebar: () -> Unit,
   onOpenTabs: () -> Unit,
+  onToggleExplorer: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val graph = LocalContext.current.appGraph
@@ -81,6 +83,7 @@ internal fun TerminalScreen(
           contentDescription = stringResource(R.string.terminal_actions),
           onClick = { actionsOpen = true },
         )
+        ExplorerToggle(onToggleExplorer)
       },
     )
     // The terminal view and its key state are per session; a new session starts fresh.

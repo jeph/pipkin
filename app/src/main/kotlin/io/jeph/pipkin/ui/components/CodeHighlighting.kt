@@ -61,15 +61,30 @@ internal fun withPlainTail(highlighted: AnnotatedString?, code: String): Annotat
 internal fun fileLanguage(path: String): String? =
   path.substringAfterLast('/').substringAfterLast('.', "").ifEmpty { null }
 
-/** Each line of this text with its styles, split at `\n`, `\r\n` or `\r` like [String.lines]. */
+/**
+ * Each line of this text with its styles, split at `\n`, `\r\n` or `\r` like [String.lines]. One pass over the
+ * styles, so a whole file's worth of lines costs about its length rather than lines times styles.
+ */
 internal fun AnnotatedString.splitLines(): List<AnnotatedString> {
+  val styles = spanStyles.sortedBy { it.start }
   val lines = mutableListOf<AnnotatedString>()
+  var next = 0
+  val open = mutableListOf<AnnotatedString.Range<SpanStyle>>()
+  fun addLine(start: Int, end: Int) {
+    while (next < styles.size && styles[next].start < end) open += styles[next++]
+    val lineStyles = open.mapNotNull { style ->
+      if (style.end <= start || style.start >= end) return@mapNotNull null
+      AnnotatedString.Range(style.item, maxOf(style.start, start) - start, minOf(style.end, end) - start)
+    }
+    open.removeAll { it.end <= end }
+    lines += AnnotatedString(text.substring(start, end), lineStyles)
+  }
   var start = 0
   for (lineBreak in LINE_BREAK.findAll(text)) {
-    lines += subSequence(start, lineBreak.range.first)
+    addLine(start, lineBreak.range.first)
     start = lineBreak.range.last + 1
   }
-  lines += subSequence(start, length)
+  addLine(start, length)
   return lines
 }
 

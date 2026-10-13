@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="files_explorer_open">Open file explorer</string>
+    <string name="files_explorer_close">Close file explorer</string>
+    <string name="files_explorer_title">Files</string>
+    <string name="files_new_folder">New folder</string>
+    <string name="files_folder_placeholder">Folder name</string>
+    <string name="files_show_hidden">Show hidden files</string>
+    <string name="files_hide_hidden">Hide hidden files</string>
+    <string name="files_refresh">Refresh files</string>
+    <string name="files_refreshing">Refreshing files</string>
+    <string name="files_loading">Loading files…</string>
+    <string name="files_empty">No files</string>
+    <string name="files_empty_visible">No visible files</string>
+    <string name="files_retry">Retry</string>
+
+    <string name="file_loading">Loading file…</string>
+    <string name="file_binary">Binary preview unavailable</string>
+    <string name="file_too_large">This file is too large to display</string>
+    <string name="file_failed">Failed to load file</string>
+    <plurals name="file_lines">
+        <item quantity="one">%1$d line</item>
+        <item quantity="other">%1$d lines</item>
+    </plurals>
+    <string name="file_actions">File actions</string>
+    <string name="file_copy_path">Copy path</string>
+    <string name="file_close">Close file</string>
+</resources>

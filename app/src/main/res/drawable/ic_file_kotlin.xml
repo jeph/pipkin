@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- material-icon-theme icon "kotlin" (material-icon-theme 5.32.0, MIT licence), colours toned as Paseo's file-icon-svg.ts does. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path android:pathData="M2.975 2.976v18.048h18.05v-.03l-4.478 -4.511 -4.48 -4.515 4.48 -4.515 4.443 -4.477z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="2.8468"
+                android:startY="21.3788"
+                android:endX="21.1225"
+                android:endY="2.8994">
+                <item
+                    android:color="#7865d2"
+                    android:offset="0" />
+                <item
+                    android:color="#bd59d4"
+                    android:offset="0.5" />
+                <item
+                    android:color="#d26f69"
+                    android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

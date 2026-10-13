@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- material-icon-theme icon "lock" (material-icon-theme 5.32.0, MIT licence), colours toned as Paseo's file-icon-svg.ts does. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="32"
+    android:viewportHeight="32">
+    <path
+        android:fillColor="#f2d88b"
+        android:pathData="M25 12h-3V8a6 6 0 0 0 -12 0v4H7a1 1 0 0 0 -1 1v16a1 1 0 0 0 1 1h18a1 1 0 0 0 1 -1V13a1 1 0 0 0 -1 -1M14 8a2 2 0 0 1 4 0v4h-4Zm2 17a4 4 0 1 1 4 -4 4 4 0 0 1 -4 4" />
+</vector>

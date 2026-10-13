@@ -32,6 +32,7 @@ import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
+import io.jeph.pipkin.ui.files.ExplorerToggle
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -40,7 +41,8 @@ import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 
 /**
  * One chat: header, stream and composer for [process]; a null process shows a starting placeholder. The header's tab
- * button, and `/resume`, open the workspace's tab menu through [onOpenTabs].
+ * button, and `/resume`, open the workspace's tab menu through [onOpenTabs]; its explorer toggle calls
+ * [onToggleExplorer].
  */
 @Composable
 internal fun ChatScreen(
@@ -48,6 +50,7 @@ internal fun ChatScreen(
   actions: ShellActions,
   onOpenTabs: () -> Unit,
   onToggleSidebar: () -> Unit,
+  onToggleExplorer: () -> Unit,
   onOpenSettings: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -78,7 +81,16 @@ internal fun ChatScreen(
   }
   LaunchedEffect(controller) { controller.collectEffects() }
   LaunchedEffect(controller) { controller.steering.collectQueue() }
-  ChatContent(controller, snackbar, onToggleSidebar, openTabs, onOpenSettings, onSheet = { sheet = it }, modifier)
+  ChatContent(
+    controller,
+    snackbar,
+    onToggleSidebar,
+    openTabs,
+    onToggleExplorer,
+    onOpenSettings,
+    onSheet = { sheet = it },
+    modifier,
+  )
   ChatSheets(
     controller,
     sheet,
@@ -121,6 +133,7 @@ private fun ChatContent(
   snackbar: SnackbarStackState,
   onToggleSidebar: () -> Unit,
   onOpenTabs: () -> Unit,
+  onToggleExplorer: () -> Unit,
   onOpenSettings: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
   modifier: Modifier,
@@ -145,6 +158,7 @@ private fun ChatContent(
       onToggleSidebar,
       onOpenTabs,
       onActions = { onSheet(ChatSheet.Actions) },
+      onToggleExplorer = onToggleExplorer,
       Modifier.onUnhandledTap(dismissKeyboard),
     )
     Box(modifier = Modifier.weight(1f).fillMaxWidth().onUnhandledTap(dismissKeyboard)) {
@@ -208,7 +222,7 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
 
 /**
  * Session name (or the first message) over the project path, with `~` for the Termux home; the tab button with the
- * number of chats in the workspace sits before the actions button.
+ * number of tabs in the workspace sits before the actions button, and the file explorer's toggle ends the row.
  */
 @Composable
 private fun ChatHeader(
@@ -216,6 +230,7 @@ private fun ChatHeader(
   onToggleSidebar: () -> Unit,
   onOpenTabs: () -> Unit,
   onActions: () -> Unit,
+  onToggleExplorer: () -> Unit,
   modifier: Modifier,
 ) {
   val graph = LocalContext.current.appGraph
@@ -237,6 +252,7 @@ private fun ChatHeader(
         contentDescription = stringResource(R.string.chat_actions),
         onClick = onActions,
       )
+      ExplorerToggle(onToggleExplorer)
     },
   )
 }

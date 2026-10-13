@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +39,8 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.ChatKey
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.files.FileTab
+import io.jeph.pipkin.files.FileTabRegistry
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.ShellActions
@@ -45,13 +48,15 @@ import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SnackbarStackOverlay
 import io.jeph.pipkin.ui.components.SnackbarStackState
-import io.jeph.pipkin.ui.components.SwipeToArchive
+import io.jeph.pipkin.ui.components.SwipeAway
+import io.jeph.pipkin.ui.files.FileActionsSheet
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.terminal.TerminalActionsSheet
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.workspace.WorkspaceTab
 
-/** Paseo's compact-header tab switcher trigger: the number of chats in the workspace in a small outlined square. */
+/** Paseo's compact-header tab switcher trigger: the number of tabs in the workspace in a small outlined square. */
 @Composable
 internal fun TabCountButton(count: Int, onClick: () -> Unit) {
   val colors = pipkinColors
@@ -89,9 +94,10 @@ internal fun TabCountButton(count: Int, onClick: () -> Unit) {
 
 /**
  * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace of the shown chat
- * [process], its terminals and then its chats, the shown one highlighted. Tapping a tab shows it and closes the sheet.
- * A chat is archived by swiping it right or from its actions sheet, which also renames it; the sheet stays open and
- * shows the shell's [snackbar], so the archive's Undo is in reach. A terminal's actions sheet renames or closes it.
+ * [process], its terminals, its open files and then its chats, the shown one highlighted. Tapping a tab shows it and
+ * closes the sheet. A chat is archived by swiping it right or from its actions sheet, which also renames it; the sheet
+ * stays open and shows the shell's [snackbar], so the archive's Undo is in reach. A file closes by swiping it right or
+ * from its actions sheet; a terminal's actions sheet renames or closes it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,10 +112,9 @@ internal fun WorkspaceTabsSheet(
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
   val archiving = remember(actions) { TabArchiving(actions) }
-  var menuFor by remember { mutableStateOf<SessionInfo?>(null) }
-  var terminalMenuFor by remember { mutableStateOf<TerminalSession?>(null) }
-  val show = { terminal: TerminalSession? ->
-    graph.terminals.show(process, terminal)
+  var menu by remember { mutableStateOf<TabMenu?>(null) }
+  val show = { tab: WorkspaceTab? ->
+    graph.shownTab.show(process, tab)
     onDismiss()
   }
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
@@ -129,34 +134,16 @@ internal fun WorkspaceTabsSheet(
       tabs = tabs,
       archiving = archiving,
       callbacks = TabListCallbacks(
-        // The chat shown next starts on its own tab, not on a terminal shown with this one.
+        // The chat shown next starts on its own tab, not on a terminal or file shown with this one.
         onOpenChat = { session -> if (actions.openSession(session)) show(null) },
-        onShowChat = { show(null) },
-        onShowTerminal = show,
-        onChatActions = { menuFor = it },
-        onTerminalActions = { terminalMenuFor = it },
+        onShow = show,
+        onActions = { menu = it },
       ),
       modifier = Modifier.weight(1f, fill = false),
     )
     SnackbarStackOverlay(snackbar)
   }
-  menuFor?.let { session ->
-    SessionActions(
-      session = session,
-      onDismiss = { menuFor = null },
-      onRename = { actions.rename(session, it) },
-      onArchive = { archiving.archive(session) },
-    )
-  }
-  terminalMenuFor?.let { terminal ->
-    TerminalActionsSheet(
-      session = terminal,
-      onNewTerminal = null,
-      onRestart = null,
-      onClose = { graph.terminals.close(terminal) },
-      onDismiss = { terminalMenuFor = null },
-    )
-  }
+  menu?.let { TabMenuSheet(it, actions, archiving, onDismiss = { menu = null }) }
   ConfirmArchive(archiving)
 }
 
@@ -174,18 +161,51 @@ private fun ConfirmArchive(archiving: TabArchiving) {
   )
 }
 
+/** A tab whose actions sheet is open. */
+private sealed interface TabMenu {
+  data class Chat(val session: SessionInfo) : TabMenu
+
+  data class Terminal(val session: TerminalSession) : TabMenu
+
+  data class File(val file: FileTab) : TabMenu
+}
+
+/** [menu]'s actions sheet: a chat's renames or archives it, a terminal's renames or closes it, a file's closes it. */
+@Composable
+private fun TabMenuSheet(menu: TabMenu, actions: ShellActions, archiving: TabArchiving, onDismiss: () -> Unit) {
+  val graph = LocalContext.current.appGraph
+  when (menu) {
+    is TabMenu.Chat -> SessionActions(
+      session = menu.session,
+      onDismiss = onDismiss,
+      onRename = { actions.rename(menu.session, it) },
+      onArchive = { archiving.archive(menu.session) },
+    )
+
+    is TabMenu.Terminal -> TerminalActionsSheet(
+      session = menu.session,
+      onNewTerminal = null,
+      onRestart = null,
+      onClose = { graph.terminals.close(menu.session) },
+      onDismiss = onDismiss,
+    )
+
+    is TabMenu.File -> FileActionsSheet(file = menu.file, onClose = {
+      graph.files.close(menu.file)
+    }, onDismiss = onDismiss)
+  }
+}
+
 /** What the tab menu's rows do. */
 private class TabListCallbacks(
   val onOpenChat: (SessionInfo) -> Unit,
-  val onShowChat: () -> Unit,
-  val onShowTerminal: (TerminalSession) -> Unit,
-  val onChatActions: (SessionInfo) -> Unit,
-  val onTerminalActions: (TerminalSession) -> Unit,
+  val onShow: (WorkspaceTab?) -> Unit,
+  val onActions: (TabMenu) -> Unit,
 )
 
 /**
- * The tab menu's rows: the workspace's terminals, the shown chat while it has no saved history, then the saved chats.
- * The shown chat is highlighted only while no terminal is shown in its place.
+ * The tab menu's rows: the workspace's terminals and open files, the shown chat while it has no saved history, then
+ * the saved chats. The shown chat is highlighted only while no other tab is shown in its place.
  */
 @Composable
 private fun TabList(
@@ -195,19 +215,23 @@ private fun TabList(
   callbacks: TabListCallbacks,
   modifier: Modifier,
 ) {
-  val processes by LocalContext.current.appGraph.registry.processes.collectAsStateWithLifecycle()
+  val graph = LocalContext.current.appGraph
+  val processes by graph.registry.processes.collectAsStateWithLifecycle()
   val shownPath by process.sessionFile.collectAsStateWithLifecycle()
-  val chatShown = tabs.shownTerminal == null
+  val closing = remember(graph) { FileClosing(graph.files) }
+  val chatShown = tabs.shownTab == null
   LazyColumn(modifier = modifier) {
     items(tabs.terminals, key = { "terminal-${it.id}" }) { terminal ->
+      val tab = WorkspaceTab.Terminal(terminal)
       TerminalTabRow(
         session = terminal,
-        shown = terminal == tabs.shownTerminal,
-        onOpen = { callbacks.onShowTerminal(terminal) },
-        onActions = { callbacks.onTerminalActions(terminal) },
+        shown = tab == tabs.shownTab,
+        onOpen = { callbacks.onShow(tab) },
+        onActions = { callbacks.onActions(TabMenu.Terminal(terminal)) },
         modifier = Modifier.animateItem(),
       )
     }
+    fileRows(tabs, closing, callbacks)
     if (tabs.shownUnsaved) {
       item(key = UNSAVED_KEY) {
         val name by process.sessionName.collectAsStateWithLifecycle()
@@ -216,7 +240,7 @@ private fun TabList(
           modified = null,
           process = process,
           shown = chatShown,
-          onOpen = callbacks.onShowChat,
+          onOpen = { callbacks.onShow(null) },
           onActions = null,
           modifier = Modifier.animateItem(),
         )
@@ -224,7 +248,7 @@ private fun TabList(
     }
     items(tabs.chats, key = { it.path }) { session ->
       val current = session.path == shownPath
-      SwipeToArchive(
+      SwipeAway(
         leaving = session.path in archiving.leaving,
         onSwiped = { archiving.archive(session) },
         onLeft = { archiving.onLeft(session) },
@@ -236,16 +260,54 @@ private fun TabList(
           modified = session.modified,
           process = processes[ChatKey.session(session.path)],
           shown = current && chatShown,
-          onOpen = { if (current) callbacks.onShowChat() else callbacks.onOpenChat(session) },
-          onActions = { callbacks.onChatActions(session) },
+          onOpen = { if (current) callbacks.onShow(null) else callbacks.onOpenChat(session) },
+          onActions = { callbacks.onActions(TabMenu.Chat(session)) },
         )
       }
     }
   }
 }
 
+/** The workspace's open files; one closes by swiping it right, as a chat archives. */
+private fun LazyListScope.fileRows(tabs: WorkspaceTabs, closing: FileClosing, callbacks: TabListCallbacks) {
+  items(tabs.files, key = { "file-${it.id}" }) { file ->
+    val tab = WorkspaceTab.File(file)
+    SwipeAway(
+      leaving = file.id in closing.leaving,
+      onSwiped = { closing.close(file) },
+      onLeft = { closing.onLeft(file) },
+      containerColor = pipkinColors.surface1,
+      modifier = Modifier.animateItem(),
+      mark = R.drawable.ic_lucide_x,
+    ) {
+      FileTabRow(
+        file = file,
+        shown = tab == tabs.shownTab,
+        onOpen = { callbacks.onShow(tab) },
+        onActions = { callbacks.onActions(TabMenu.File(file)) },
+      )
+    }
+  }
+}
+
 /** The lazy-list key of the shown chat's row while it has no saved history. */
 private const val UNSAVED_KEY = "unsaved"
+
+/** Closing files from the tab menu: a row first slides out, then its file closes. */
+private class FileClosing(private val files: FileTabRegistry) {
+  /** Ids of files whose rows are sliding out. */
+  var leaving by mutableStateOf(emptySet<Int>())
+    private set
+
+  fun close(file: FileTab) {
+    leaving += file.id
+  }
+
+  fun onLeft(file: FileTab) {
+    files.close(file)
+    leaving -= file.id
+  }
+}
 
 /**
  * Archiving from the tab menu. A row first slides out; once it is gone the chat is archived, or, when Pi is working in

@@ -168,6 +168,26 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   }
 
   /**
+   * Starts a `files` host for [FileHost] and returns its channel once the host is ready for requests; closing the
+   * channel ends the host. Cancelling the caller closes it too.
+   */
+  suspend fun openFiles(): HostChannel {
+    val channel = connect("files")
+    var started = false
+    try {
+      sendRequest(channel, JSONObject())
+      val line = withTimeoutOrNull(FILES_START_TIMEOUT_MILLIS) {
+        channel.lines.firstOrNull { it.optString("type") in FILES_START_REPLIES } ?: throw HostFailure.Disconnected()
+      } ?: throw HostFailure.Timeout()
+      if (line.optString("type") == HostProtocol.RESULT) throw HostRejected.from(line) ?: HostFailure.Disconnected()
+      started = true
+      return channel
+    } finally {
+      if (!started) channel.close()
+    }
+  }
+
+  /**
    * Starts `pi --mode rpc` and returns its channel: Pi's RPC JSONL both ways, ended by a
    * `pipkin_exit` line. A refusal (`pi_version`, `cwd_missing`) arrives instead as a
    * `pipkin_result` line; see [HostRejected.from].
@@ -268,5 +288,9 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     const val DEFAULT_TIMEOUT_MILLIS = 60_000L
     const val ENSURE_TIMEOUT_MILLIS = 15 * 60_000L
     const val LOGIN_TIMEOUT_MILLIS = 10 * 60_000L
+    const val FILES_START_TIMEOUT_MILLIS = 15_000L
+
+    /** `pipkin_files_ready`, or the `pipkin_result` that refuses the request instead. */
+    val FILES_START_REPLIES = setOf("pipkin_files_ready", HostProtocol.RESULT)
   }
 }

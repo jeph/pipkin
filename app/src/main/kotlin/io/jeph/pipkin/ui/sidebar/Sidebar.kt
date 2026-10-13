@@ -55,7 +55,7 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
-import io.jeph.pipkin.ui.components.SwipeToArchive
+import io.jeph.pipkin.ui.components.SwipeAway
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.flow.combine
@@ -292,7 +292,7 @@ private fun WorkspaceList(
   LazyColumn(modifier = modifier.fillMaxWidth()) {
     items(workspaces, key = { it.cwd }) { workspace ->
       val cwd = workspace.cwd
-      SwipeToArchive(
+      SwipeAway(
         leaving = cwd in removal.leaving,
         onSwiped = {},
         onLeft = { removal.onLeft(cwd) },

@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.components
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
@@ -44,18 +45,19 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/** Share of the row's width past which letting go archives it. */
-private const val ARCHIVE_THRESHOLD = 0.35f
+/** Share of the row's width past which letting go removes it. */
+private const val RELEASE_THRESHOLD = 0.35f
 
-/** A rightward fling at least this fast archives from any distance. */
+/** A rightward fling at least this fast removes the row from any distance. */
 private val FLING_VELOCITY = 900.dp
 
 private const val SLIDE_OUT_MILLIS = 160
 
 /**
- * An inbox-style swipe to archive. Dragging [content] right reveals an archive mark that lights up, with a haptic
- * tick, once letting go would archive: past [ARCHIVE_THRESHOLD] of the width or on a fast fling. Then [onSwiped]
- * asks the caller to archive, which it answers by setting [leaving]; a shorter drag springs back.
+ * An inbox-style swipe to remove a row, such as archiving a chat or closing a file. Dragging [content] right reveals
+ * [mark], which lights up, with a haptic tick, once letting go would remove the row: past [RELEASE_THRESHOLD] of the
+ * width or on a fast fling. Then [onSwiped] asks the caller to remove it, which it answers by setting [leaving]; a
+ * shorter drag springs back.
  *
  * While [leaving] the content slides out to the end and [onLeft] runs once it is gone; when [leaving] turns false
  * again (a cancelled confirmation) it slides back. With [swipeEnabled] false it only slides on [leaving], as a
@@ -64,12 +66,13 @@ private const val SLIDE_OUT_MILLIS = 160
  * Only a drag that starts rightward is claimed, so a leftward one still reaches the panels behind.
  */
 @Composable
-internal fun SwipeToArchive(
+internal fun SwipeAway(
   leaving: Boolean,
   onSwiped: () -> Unit,
   onLeft: () -> Unit,
   containerColor: Color,
   modifier: Modifier = Modifier,
+  @DrawableRes mark: Int = R.drawable.ic_lucide_archive,
   swipeEnabled: Boolean = true,
   content: @Composable () -> Unit,
 ) {
@@ -94,10 +97,10 @@ internal fun SwipeToArchive(
     modifier = modifier
       .onSizeChanged { width = it.width }
       .pointerInput(swipeEnabled && !leaving) {
-        if (swipeEnabled && !leaving) archiveDrag(swipe, scope, haptics, flingVelocity) { latestOnSwiped() }
+        if (swipeEnabled && !leaving) swipeDrag(swipe, scope, haptics, flingVelocity) { latestOnSwiped() }
       },
   ) {
-    if (offset > 0f) ArchiveMark(armed = leaving || offset >= width * ARCHIVE_THRESHOLD, Modifier.matchParentSize())
+    if (offset > 0f) SwipeMark(mark, armed = leaving || offset >= width * RELEASE_THRESHOLD, Modifier.matchParentSize())
     Box(
       modifier = Modifier
         .graphicsLayer { translationX = swipe.offset.value }
@@ -119,10 +122,10 @@ private class SwipeOffset {
 }
 
 /**
- * Follows a drag that starts rightward, ticking as it crosses [ARCHIVE_THRESHOLD] either way. Letting go past it
+ * Follows a drag that starts rightward, ticking as it crosses [RELEASE_THRESHOLD] either way. Letting go past it
  * (unless flung back left), or flinging right from anywhere, calls [onSwiped]; anything else springs back.
  */
-private suspend fun PointerInputScope.archiveDrag(
+private suspend fun PointerInputScope.swipeDrag(
   swipe: SwipeOffset,
   scope: CoroutineScope,
   haptics: HapticFeedback,
@@ -142,7 +145,7 @@ private suspend fun PointerInputScope.archiveDrag(
     val tracker = VelocityTracker()
     tracker.addPointerInputChange(start)
     val width = size.width.toFloat()
-    val threshold = width * ARCHIVE_THRESHOLD
+    val threshold = width * RELEASE_THRESHOLD
     var position = (swipe.offset.value + overSlop).coerceIn(0f, width)
     var wasArmed = position >= threshold
     scope.launch { swipe.offset.snapTo(position) }
@@ -167,22 +170,22 @@ private suspend fun PointerInputScope.archiveDrag(
   }
 }
 
-/** The archive icon the swipe uncovers; it lights up and grows once letting go would archive. */
+/** The [icon] the swipe uncovers; it lights up and grows once letting go would remove the row. */
 @Composable
-private fun ArchiveMark(armed: Boolean, modifier: Modifier) {
+private fun SwipeMark(@DrawableRes icon: Int, armed: Boolean, modifier: Modifier) {
   val colors = pipkinColors
-  val background by animateColorAsState(if (armed) colors.accent else colors.surface3, label = "archiveMark")
+  val background by animateColorAsState(if (armed) colors.accent else colors.surface3, label = "swipeMark")
   val scale by animateFloatAsState(
     targetValue = if (armed) 1.2f else 0.9f,
     animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-    label = "archiveMarkScale",
+    label = "swipeMarkScale",
   )
   Box(
     modifier = modifier.background(background).padding(start = PipkinTokens.Spacing.s24),
     contentAlignment = Alignment.CenterStart,
   ) {
     LucideIcon(
-      icon = R.drawable.ic_lucide_archive,
+      icon = icon,
       contentDescription = null,
       modifier = Modifier.graphicsLayer {
         scaleX = scale

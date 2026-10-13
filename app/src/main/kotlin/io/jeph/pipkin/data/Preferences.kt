@@ -19,6 +19,7 @@ internal class Preferences(context: Context) {
   private val lastProjectCwdState = MutableStateFlow(prefs.getString(LAST_PROJECT_CWD, null))
   private val workspacesState = MutableStateFlow(readWorkspaces())
   private val archivedState = MutableStateFlow(readArchived())
+  private val showHiddenFilesState = MutableStateFlow(prefs.getBoolean(SHOW_HIDDEN_FILES, true))
 
   /** Onboarding finished or was skipped. */
   val setupComplete: StateFlow<Boolean> = setupCompleteState.asStateFlow()
@@ -33,6 +34,9 @@ internal class Preferences(context: Context) {
 
   /** Archived session files by path, each with when it was archived (epoch milliseconds). */
   val archivedSessions: StateFlow<Map<String, Long>> = archivedState.asStateFlow()
+
+  /** Whether the file explorer lists dot files and folders; Paseo shows them unless asked not to. */
+  val showHiddenFiles: StateFlow<Boolean> = showHiddenFilesState.asStateFlow()
 
   fun setSetupComplete(complete: Boolean) {
     prefs.edit { putBoolean(SETUP_COMPLETE, complete) }
@@ -74,6 +78,11 @@ internal class Preferences(context: Context) {
     writeArchived(archivedState.value - paths.toSet())
   }
 
+  fun setShowHiddenFiles(show: Boolean) {
+    prefs.edit { putBoolean(SHOW_HIDDEN_FILES, show) }
+    showHiddenFilesState.value = show
+  }
+
   private fun readWorkspaces(): List<String> {
     val array = JSONArray(prefs.getString(WORKSPACES, null) ?: return emptyList())
     return List(array.length()) { array.getString(it) }
@@ -96,5 +105,6 @@ internal class Preferences(context: Context) {
     const val LAST_PROJECT_CWD = "lastProjectCwd"
     const val WORKSPACES = "workspaces"
     const val ARCHIVED_SESSIONS = "archivedSessions"
+    const val SHOW_HIDDEN_FILES = "showHiddenFiles"
   }
 }

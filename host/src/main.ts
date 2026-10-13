@@ -8,6 +8,7 @@ import { browse } from "./modes/browse.js";
 import { defaultModel } from "./modes/default-model.js";
 import { deleteSessions } from "./modes/delete-sessions.js";
 import { ensure } from "./modes/ensure.js";
+import { files } from "./modes/files.js";
 import { login } from "./modes/login.js";
 import { logout } from "./modes/logout.js";
 import { modelDefaults } from "./modes/model-defaults.js";
@@ -111,6 +112,8 @@ async function main(): Promise<void> {
       return respond(ctx, sessionMessages);
     case "delete_sessions":
       return respond(ctx, deleteSessions);
+    case "files":
+      return respond(ctx, files);
     case "browse":
       return respond(ctx, browse);
     case "save_attachments":

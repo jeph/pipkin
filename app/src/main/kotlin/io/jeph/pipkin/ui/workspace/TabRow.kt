@@ -2,6 +2,7 @@ package io.jeph.pipkin.ui.workspace
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -28,12 +30,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
+import io.jeph.pipkin.files.FileTab
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.StatusDot
+import io.jeph.pipkin.ui.files.fileIcon
 import io.jeph.pipkin.ui.terminal.terminalTitle
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -91,6 +95,33 @@ internal fun TerminalTabRow(
   )
 }
 
+/** One open file in the tab menu: its file-type icon, its name over its folder, highlighted while it is the one shown. */
+@Composable
+internal fun FileTabRow(
+  file: FileTab,
+  shown: Boolean,
+  onOpen: () -> Unit,
+  onActions: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  TabRow(
+    mark = {
+      Image(
+        painter = painterResource(fileIcon(file.name)),
+        contentDescription = null,
+        modifier = Modifier.size(PipkinTokens.IconSize.md),
+      )
+    },
+    title = file.name,
+    detail = file.folder.ifEmpty { null },
+    shown = shown,
+    onOpen = onOpen,
+    onActions = onActions,
+    actionsDescription = stringResource(R.string.file_actions),
+    modifier = modifier,
+  )
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TabRow(
@@ -126,7 +157,13 @@ private fun TabRow(
         overflow = TextOverflow.Ellipsis,
       )
       if (detail != null) {
-        Text(text = detail, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm, maxLines = 1)
+        Text(
+          text = detail,
+          color = colors.foregroundMuted,
+          fontSize = PipkinTokens.FontSize.sm,
+          maxLines = 1,
+          overflow = TextOverflow.StartEllipsis,
+        )
       }
     }
     if (onActions != null) {

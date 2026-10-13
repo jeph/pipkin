@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- material-icon-theme icon "haskell" (material-icon-theme 5.32.0, MIT licence), colours toned as Paseo's file-icon-svg.ts does. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="16dp"
+    android:height="16dp"
+    android:viewportWidth="300"
+    android:viewportHeight="300">
+    <path
+        android:fillColor="#d26f69"
+        android:pathData="m23.928 240.5 59.94 -89.852 -59.94 -89.855h44.955l59.94 89.855 -59.94 89.852z" />
+    <path
+        android:fillColor="#e9b16e"
+        android:pathData="m83.869 240.5 59.94 -89.852 -59.94 -89.855h44.955l119.88 179.71h-44.95l-37.46 -56.156 -37.468 56.156z" />
+    <path
+        android:fillColor="#f7ee97"
+        android:pathData="m228.72 188.08 -19.98 -29.953h69.93v29.956h-49.95zm-29.97 -44.924 -19.98 -29.953h99.901v29.953z" />
+</vector>
