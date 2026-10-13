@@ -19,9 +19,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -45,6 +47,7 @@ import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.sidebar.Sidebar
 import io.jeph.pipkin.ui.terminal.TerminalScreen
 import io.jeph.pipkin.ui.theme.PipkinTokens
+import io.jeph.pipkin.ui.workspace.WorkspaceTabsSheet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
@@ -108,6 +111,7 @@ internal fun MainScreen(
         WorkspacePanel(
           actions = actions,
           sidebarOpen = sidebarOpen,
+          snackbar = snackbar,
           onToggleSidebar = { showPanel(if (sidebarOpen) Panel.Chat else Panel.Sidebar) },
           onOpenSettings = onOpenSettings,
         )
@@ -206,18 +210,23 @@ private fun AnchoredDraggableState<Panel>.offsetOr(width: Float): Float =
 /**
  * The layer beside the sidebar: the shown chat, or a terminal of its workspace shown in its place, whose header's tab
  * menu switches between the chats and terminals in that workspace. Back from a terminal returns to the chat, unless
- * the sidebar is open and takes it.
+ * the sidebar is open and takes it. The tab menu belongs to the panel rather than either screen, so it stays open when
+ * archiving from it replaces the shown chat and with it the terminal shown in its place; it shows [snackbar] over
+ * itself.
  */
 @Composable
 private fun WorkspacePanel(
   actions: ShellActions,
   sidebarOpen: Boolean,
+  snackbar: SnackbarStackState,
   onToggleSidebar: () -> Unit,
   onOpenSettings: () -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
   val process by graph.registry.visible.collectAsStateWithLifecycle()
   val shown by graph.terminals.shown.collectAsStateWithLifecycle()
+  var tabsOpen by rememberSaveable { mutableStateOf(false) }
+  val openTabs = { tabsOpen = true }
   val chat = process
   val terminal = shown?.takeIf { it.chat == chat }?.session
   val focus = LocalFocusManager.current
@@ -229,19 +238,22 @@ private fun WorkspacePanel(
     ChatScreen(
       process = chat,
       actions = actions,
+      onOpenTabs = openTabs,
       onToggleSidebar = onToggleSidebar,
       onOpenSettings = onOpenSettings,
       modifier = if (terminal != null) Modifier.clearAndSetSemantics {} else Modifier,
     )
-    if (chat == null || terminal == null) return@Box
-    BackHandler(enabled = !sidebarOpen) { graph.terminals.show(chat, null) }
-    TerminalScreen(
-      session = terminal,
-      chat = chat,
-      actions = actions,
-      onToggleSidebar = onToggleSidebar,
-      // A pointer input makes the terminal a hit target, so touches between its controls don't reach the chat.
-      modifier = Modifier.pointerInput(Unit) {},
-    )
+    if (chat != null && terminal != null) {
+      BackHandler(enabled = !sidebarOpen) { graph.terminals.show(chat, null) }
+      TerminalScreen(
+        session = terminal,
+        chat = chat,
+        onToggleSidebar = onToggleSidebar,
+        onOpenTabs = openTabs,
+        // A pointer input makes the terminal a hit target, so touches between its controls don't reach the chat.
+        modifier = Modifier.pointerInput(Unit) {},
+      )
+    }
   }
+  if (tabsOpen && chat != null) WorkspaceTabsSheet(chat, actions, snackbar, onDismiss = { tabsOpen = false })
 }

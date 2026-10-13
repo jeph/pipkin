@@ -15,7 +15,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,17 +36,17 @@ import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.TabCountButton
-import io.jeph.pipkin.ui.workspace.WorkspaceTabsSheet
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 
 /**
  * One chat: header, stream and composer for [process]; a null process shows a starting placeholder. The header's tab
- * button opens the tab menu of the chats and terminals in [process]'s workspace.
+ * button, and `/resume`, open the workspace's tab menu through [onOpenTabs].
  */
 @Composable
 internal fun ChatScreen(
   process: AgentProcess?,
   actions: ShellActions,
+  onOpenTabs: () -> Unit,
   onToggleSidebar: () -> Unit,
   onOpenSettings: () -> Unit,
   modifier: Modifier = Modifier,
@@ -55,7 +54,6 @@ internal fun ChatScreen(
   // Outlive a process swap, so a message about the closed chat (delete failed) still shows.
   val snackbar = remember { SnackbarStackState() }
   val scope = rememberCoroutineScope()
-  var tabsOpen by rememberSaveable { mutableStateOf(false) }
   if (process == null) {
     PlaceholderChat(onToggleSidebar, modifier)
     return
@@ -66,7 +64,7 @@ internal fun ChatScreen(
   val openTabs = {
     keyboard?.hide()
     focus.clearFocus()
-    tabsOpen = true
+    onOpenTabs()
   }
   var sheet by remember(process) { mutableStateOf<ChatSheet?>(null) }
   val navigator = rememberNavigator(
@@ -90,7 +88,6 @@ internal fun ChatScreen(
     onArchive = actions::archive,
   )
   ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive = actions::archive)
-  if (tabsOpen) WorkspaceTabsSheet(process, actions, onDismiss = { tabsOpen = false })
 }
 
 /** A [ChatNavigator] that outlives recompositions and always calls the latest callbacks. */

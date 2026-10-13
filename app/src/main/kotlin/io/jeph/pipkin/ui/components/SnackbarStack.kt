@@ -16,11 +16,15 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +51,9 @@ internal class SnackbarStackState {
 
   /** The host's, so a longer timeout the user set in Android's accessibility settings applies. */
   internal var accessibility: AccessibilityManager? = null
+
+  /** How many [SnackbarStackOverlay]s are composed; while any is, they show the snackbars instead of [SnackbarStack]. */
+  internal var overlays by mutableIntStateOf(0)
 
   /** Shows [message], with [actionLabel] as its action when given; true when the action was taken. */
   suspend fun show(message: String, actionLabel: String? = null): Boolean {
@@ -87,10 +94,30 @@ internal class SnackbarEntry(val message: String, val actionLabel: String?) {
 
 /**
  * [state]'s snackbars in Pipkin's colors, newest at the bottom, with any action in the accent color. Swiping one
- * sideways dismisses it without its action, so an Undo it offers is not taken.
+ * sideways dismisses it without its action, so an Undo it offers is not taken. Shows nothing while a
+ * [SnackbarStackOverlay] of [state] is composed.
  */
 @Composable
 internal fun SnackbarStack(state: SnackbarStackState, modifier: Modifier = Modifier) {
+  if (state.overlays == 0) StackColumn(state, modifier)
+}
+
+/**
+ * [state]'s snackbars inside a sheet that covers the [SnackbarStack] showing them, so an Undo stays in reach while the
+ * sheet is open. Once the sheet closes they show in the [SnackbarStack] again, where they are.
+ */
+@Composable
+internal fun SnackbarStackOverlay(state: SnackbarStackState, modifier: Modifier = Modifier) {
+  DisposableEffect(state) {
+    state.overlays += 1
+    onDispose { state.overlays -= 1 }
+  }
+  // Waits for its own count, so the stack and an overlay switch in one frame instead of both animating an entry.
+  if (state.overlays > 0) StackColumn(state, modifier)
+}
+
+@Composable
+private fun StackColumn(state: SnackbarStackState, modifier: Modifier) {
   val accessibility = LocalAccessibilityManager.current
   SideEffect { state.accessibility = accessibility }
   Column(modifier = modifier.padding(bottom = MATERIAL_INSET)) {

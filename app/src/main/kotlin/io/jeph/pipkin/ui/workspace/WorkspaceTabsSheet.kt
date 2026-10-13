@@ -17,7 +17,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +43,8 @@ import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.PipkinSheet
+import io.jeph.pipkin.ui.components.SnackbarStackOverlay
+import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.components.SwipeToArchive
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.terminal.TerminalActionsSheet
@@ -89,18 +90,22 @@ internal fun TabCountButton(count: Int, onClick: () -> Unit) {
 /**
  * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace of the shown chat
  * [process], its terminals and then its chats, the shown one highlighted. Tapping a tab shows it and closes the sheet.
- * A chat is archived by swiping it right or from its actions sheet, which also renames it; archiving closes the sheet,
- * so the shell's Undo shows. A terminal's actions sheet renames or closes it.
+ * A chat is archived by swiping it right or from its actions sheet, which also renames it; the sheet stays open and
+ * shows the shell's [snackbar], so the archive's Undo is in reach. A terminal's actions sheet renames or closes it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun WorkspaceTabsSheet(process: AgentProcess, actions: ShellActions, onDismiss: () -> Unit) {
+internal fun WorkspaceTabsSheet(
+  process: AgentProcess,
+  actions: ShellActions,
+  snackbar: SnackbarStackState,
+  onDismiss: () -> Unit,
+) {
   val graph = LocalContext.current.appGraph
   val tabs = rememberWorkspaceTabs(process)
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
-  val latestDismiss by rememberUpdatedState(onDismiss)
-  val archiving = remember(actions) { TabArchiving(actions, onArchived = { latestDismiss() }) }
+  val archiving = remember(actions) { TabArchiving(actions) }
   var menuFor by remember { mutableStateOf<SessionInfo?>(null) }
   var terminalMenuFor by remember { mutableStateOf<TerminalSession?>(null) }
   val show = { terminal: TerminalSession? ->
@@ -108,6 +113,7 @@ internal fun WorkspaceTabsSheet(process: AgentProcess, actions: ShellActions, on
     onDismiss()
   }
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
+  LaunchedEffect(tabs.chats) { archiving.forgetGone(tabs.chats) }
   PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = 0.85f) {
     // A long path keeps its end, the folder that tells workspaces apart.
     Text(
@@ -132,6 +138,7 @@ internal fun WorkspaceTabsSheet(process: AgentProcess, actions: ShellActions, on
       ),
       modifier = Modifier.weight(1f, fill = false),
     )
+    SnackbarStackOverlay(snackbar)
   }
   menuFor?.let { session ->
     SessionActions(
@@ -241,10 +248,10 @@ private fun TabList(
 private const val UNSAVED_KEY = "unsaved"
 
 /**
- * Archiving from the tab menu. A row first slides out; once it is gone the chat is archived and [onArchived] runs, or,
- * when Pi is working in it, the user is asked first and a cancelled row slides back.
+ * Archiving from the tab menu. A row first slides out; once it is gone the chat is archived, or, when Pi is working in
+ * it, the user is asked first and a cancelled row slides back.
  */
-private class TabArchiving(private val actions: ShellActions, private val onArchived: () -> Unit) {
+private class TabArchiving(private val actions: ShellActions) {
   /** Session files of rows sliding out, or out and waiting for the user. */
   var leaving by mutableStateOf(emptySet<String>())
     private set
@@ -258,11 +265,11 @@ private class TabArchiving(private val actions: ShellActions, private val onArch
   }
 
   fun onLeft(session: SessionInfo) {
-    if (actions.isWorking(session.path)) confirming = session else archiveNow(session)
+    if (actions.isWorking(session.path)) confirming = session else actions.archive(session)
   }
 
   fun confirm() {
-    confirming?.let(::archiveNow)
+    confirming?.let(actions::archive)
     confirming = null
   }
 
@@ -271,8 +278,9 @@ private class TabArchiving(private val actions: ShellActions, private val onArch
     confirming = null
   }
 
-  private fun archiveNow(session: SessionInfo) {
-    actions.archive(session)
-    onArchived()
+  /** Forgets rows that left [chats], so a chat Undo brings back shows instead of staying slid out. */
+  fun forgetGone(chats: List<SessionInfo>) {
+    val listed = chats.mapTo(HashSet()) { it.path }
+    leaving = leaving.filterTo(HashSet()) { it in listed }
   }
 }

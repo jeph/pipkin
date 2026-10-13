@@ -42,7 +42,6 @@ import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.terminal.TerminalState
-import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.MenuButton
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.IconButton28
@@ -50,27 +49,25 @@ import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.TabCountButton
-import io.jeph.pipkin.ui.workspace.WorkspaceTabsSheet
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 
 /**
  * One terminal tab, shown in place of [chat]: a header with the terminal's name over its folder, the workspace's tab
- * button and the terminal's actions; libghostty's terminal; and Paseo's key bar above the keyboard. An ended shell
- * shows a bar to start another.
+ * button, which calls [onOpenTabs], and the terminal's actions; libghostty's terminal; and Paseo's key bar above the
+ * keyboard. An ended shell shows a bar to start another.
  */
 @Composable
 internal fun TerminalScreen(
   session: TerminalSession,
   chat: AgentProcess,
-  actions: ShellActions,
   onToggleSidebar: () -> Unit,
+  onOpenTabs: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val graph = LocalContext.current.appGraph
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val tabs = rememberWorkspaceTabs(chat)
   var actionsOpen by remember(session) { mutableStateOf(false) }
-  var tabsOpen by remember { mutableStateOf(false) }
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
     HeaderBar(
@@ -78,7 +75,7 @@ internal fun TerminalScreen(
       subtitle = hello?.home?.let { tildePath(session.cwd, it) } ?: session.cwd,
       leading = { MenuButton(onToggleSidebar) },
       trailing = {
-        TabCountButton(count = tabs.count, onClick = { tabsOpen = true })
+        TabCountButton(count = tabs.count, onClick = onOpenTabs)
         IconButton28(
           icon = R.drawable.ic_lucide_ellipsis,
           contentDescription = stringResource(R.string.terminal_actions),
@@ -99,7 +96,6 @@ internal fun TerminalScreen(
       onDismiss = { actionsOpen = false },
     )
   }
-  if (tabsOpen) WorkspaceTabsSheet(chat, actions, onDismiss = { tabsOpen = false })
 }
 
 /** libghostty's terminal, the shell's status when it isn't running, and the key bar above the keyboard. */
