@@ -30,6 +30,8 @@ Leave code you change better than you found it, and limit the cleanup to that co
 
 Write commit messages in the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format: `<type>(<optional scope>): <description>`, for example `feat(composer): add a context window meter next to the send button`. Use `feat` for new behavior, `fix` for bug fixes, `docs` for documentation-only changes, and `refactor`, `perf`, `test`, `build`, `ci`, or `chore` where they fit. Mark breaking changes with `!` after the type or scope and a `BREAKING CHANGE:` footer.
 
+Commits are signed through 1Password, so commit normally first. If 1Password doesn't allow the signature, for example because the request times out or the agent returns an error, commit again without signing using `git -c commit.gpgsign=false commit`. Don't change the repository's or your global Git signing settings to get around it.
+
 ## Third-party licenses
 
 Before adding a dependency, whether a Gradle dependency in `app/build.gradle.kts`, a host package in `host/package.json`, or a Pi runtime package in `app/src/main/assets/pi/package.json`, check its license. Don't add copyleft code (GPL, LGPL, AGPL) without asking first, since it would change how Pipkin can be distributed.
