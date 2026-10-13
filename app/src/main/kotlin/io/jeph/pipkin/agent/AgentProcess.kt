@@ -66,6 +66,7 @@ internal sealed interface UiAnswer {
  * [restart] reconnects in place (exit banner Restart, failure Retry), [close] ends it for good.
  * Pi stops when the channel closes. Command wrappers throw [RpcError].
  */
+@Suppress("TooManyFunctions") // One typed wrapper per Pi RPC command, beside the connection they share.
 internal class AgentProcess(
   private val hostClient: HostClient,
   private val keepAlive: KeepAlive?,
@@ -171,22 +172,20 @@ internal class AgentProcess(
    * extension command finished, which can wait on the user's answers, so those wait without a deadline.
    */
   suspend fun prompt(message: String, images: List<ImagePart> = emptyList()): String {
-    val params = JSONObject()
-      .put("message", message)
+    val params = messageParams(message, images)
       // Pi only reads streamingBehavior while a run is streaming, so steering is safe to always request
       // and avoids a rejection when a run starts between the UI's busy check and this command.
       .put("streamingBehavior", "steer")
-    if (images.isNotEmpty()) {
-      params.put(
-        "images",
-        JSONArray(
-          images.map { JSONObject().put("type", "image").put("data", it.data).put("mimeType", it.mimeType) },
-        ),
-      )
-    }
     val timeout = if (message.startsWith("/")) null else RpcClient.TIMEOUT_MILLIS
     return call("prompt", params, timeout).optString("disposition")
   }
+
+  /**
+   * Queues [message] as a steer, even while Pi is idle, since the next run Pi starts takes the queued steers into
+   * its first turn. Returns Pi's `disposition`: `queued`, or `handled` when an extension consumed it.
+   */
+  suspend fun steer(message: String, images: List<ImagePart> = emptyList()): String =
+    call("steer", messageParams(message, images)).optString("disposition")
 
   override suspend fun abort() {
     call("abort")
@@ -456,4 +455,12 @@ internal class AgentProcess(
     const val RESYNC_TIMEOUT_MILLIS = 15_000L
     const val AUTO_RECONNECT_INTERVAL_MILLIS = 60_000L
   }
+}
+
+/** The `message` and `images` of Pi's `prompt` and `steer`. */
+private fun messageParams(message: String, images: List<ImagePart>): JSONObject {
+  val params = JSONObject().put("message", message)
+  if (images.isEmpty()) return params
+  val parts = images.map { JSONObject().put("type", "image").put("data", it.data).put("mimeType", it.mimeType) }
+  return params.put("images", JSONArray(parts))
 }

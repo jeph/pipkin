@@ -134,18 +134,40 @@ internal class ChatController(
     }
   }
 
-  /** Prompts Pi with [text] and [picked], first stopping the run when [interrupt]; returns why that failed, if it did. */
-  suspend fun deliver(text: String, picked: List<Attachment>, interrupt: Boolean = false): String? = try {
+  /** Prompts Pi with [text] and [picked]; returns why that failed, if it did. */
+  private suspend fun deliver(text: String, picked: List<Attachment>): String? = failureOf {
     val files = picked.filterIsInstance<Attachment.File>().map { it.name to it.bytes }
     val paths = if (files.isEmpty()) emptyList() else graph.hostClient.saveAttachments(files)
     val typed = text.trim()
     val message = withFilePaths(typed, paths)
-    val images = picked.filterIsInstance<Attachment.Image>()
-    if (interrupt) process.abort()
-    val disposition = process.prompt(message, images.map { it.part })
-    if (disposition == "queued") steering.record(message, typed, images, paths.size)
-    // Pi starts the run just after answering, so an abort sent now reaches it.
+    val disposition = process.prompt(message, picked.filterIsInstance<Attachment.Image>().map { it.part })
+    if (disposition == "queued") steering.record(message, typed, picked)
+    abortIfStopped(disposition)
+  }
+
+  /**
+   * Stops the run and sends [steers] as the messages they were queued as, one each, as Pi delivers steers itself:
+   * Pi takes the steers queued when a run starts into its first turn, so all but the first are queued before
+   * the first is prompted. Returns why that failed, if it did.
+   */
+  suspend fun interruptWith(steers: List<TakenSteer>): String? = failureOf {
+    process.abort()
+    for (steer in steers.drop(1)) {
+      if (process.steer(steer.message, steer.images) == "queued") steering.record(steer)
+    }
+    val first = steers.first()
+    val disposition = process.prompt(first.message, first.images)
+    if (disposition == "queued") steering.record(first)
+    abortIfStopped(disposition)
+  }
+
+  /** Pi starts the run just after answering, so an abort for a Stop pressed while sending reaches it now. */
+  private fun abortIfStopped(disposition: String) {
     if (stopRequested && disposition == "started") launchRpc { process.abort() }
+  }
+
+  private suspend fun failureOf(block: suspend () -> Unit): String? = try {
+    block()
     null
   } catch (error: RpcError) {
     error.error

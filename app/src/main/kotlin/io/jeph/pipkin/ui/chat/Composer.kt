@@ -367,8 +367,8 @@ private fun PrimaryButton(action: PrimaryAction, onSend: () -> Unit, onStop: () 
 /**
  * The messages Pi has queued but not taken yet, one per line as typed, so the user sees what is about to steer the
  * run; attachments show only as a count. Edit takes them back into the composer; Send now stops the run and sends
- * them at once. Both are off while Pi may be taking the queue for its next turn, since it then delivers the
- * messages regardless.
+ * them at once, each as its own message. Both are off while Pi may be taking the queue for its next turn, since it
+ * then delivers the messages regardless.
  */
 @Composable
 internal fun SteeringBox(
