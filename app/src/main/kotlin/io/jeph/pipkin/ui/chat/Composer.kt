@@ -142,18 +142,23 @@ internal fun Composer(
         val contextUsage by controller.process.contextUsage.collectAsStateWithLifecycle()
         ContextMeter(contextUsage, controller.contextDetailsOpen) { controller.contextDetailsOpen = it }
         trailingControls()
-        // Pi answers a prompt within moments by starting its run, so Stop shows from the press on.
-        val action = when {
-          controller.sendingCommand -> PrimaryAction.Sending
-          controller.sending -> PrimaryAction.Stop
-          controller.canSend -> PrimaryAction.Send
-          busy -> PrimaryAction.Stop
-          else -> PrimaryAction.Idle
-        }
-        PrimaryButton(action, onSend = send, onStop = controller::abort)
+        PrimaryButton(primaryAction(controller, busy), onSend = send, onStop = controller::abort)
       }
     }
   }
+}
+
+/**
+ * Pi answers a prompt within moments by starting its run, so Stop shows from the press on. A photo-only steer
+ * greys out Send rather than showing Stop, which a tap meant as sending would otherwise press.
+ */
+private fun primaryAction(controller: ChatController, busy: Boolean): PrimaryAction = when {
+  controller.sendingCommand -> PrimaryAction.Sending
+  controller.sending -> PrimaryAction.Stop
+  controller.canSend -> PrimaryAction.Send
+  controller.photosOnlySteer -> PrimaryAction.Idle
+  busy -> PrimaryAction.Stop
+  else -> PrimaryAction.Idle
 }
 
 /** One horizontally scrolling row, so any number of attachments never pushes the toolbar off screen. */
