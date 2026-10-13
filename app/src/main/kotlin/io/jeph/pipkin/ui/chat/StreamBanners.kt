@@ -24,6 +24,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.TimelineItem
@@ -39,7 +41,12 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 @Composable
 internal fun StatusBanner(state: AgentProcessState, onRetry: () -> Unit, modifier: Modifier = Modifier) {
   when (state) {
-    AgentProcessState.Starting -> BannerLine(stringResource(R.string.chat_starting), modifier)
+    AgentProcessState.Starting -> BannerLine(
+      text = stringResource(R.string.chat_starting),
+      modifier = modifier,
+      potSize = PipkinTokens.IconSize.lg,
+      fontSize = PipkinTokens.FontSize.lg,
+    )
 
     is AgentProcessState.Installing -> Column(modifier = modifier) {
       BannerLine(stringResource(R.string.chat_installing))
@@ -63,15 +70,21 @@ internal fun StatusBanner(state: AgentProcessState, onRetry: () -> Unit, modifie
   }
 }
 
+/** A pot beside [text]; Starting is the chat's only content while a session opens, so it uses larger sizes. */
 @Composable
-private fun BannerLine(text: String, modifier: Modifier = Modifier) {
+private fun BannerLine(
+  text: String,
+  modifier: Modifier = Modifier,
+  potSize: Dp = PipkinTokens.IconSize.sm,
+  fontSize: TextUnit = PipkinTokens.FontSize.meta,
+) {
   Row(
     modifier = modifier.fillMaxWidth().padding(vertical = PipkinTokens.Spacing.s8),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8, Alignment.CenterHorizontally),
   ) {
-    SimmeringPot(size = PipkinTokens.IconSize.sm)
-    Text(text = text, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
+    SimmeringPot(size = potSize)
+    Text(text = text, color = pipkinColors.foregroundMuted, fontSize = fontSize)
   }
 }
 
