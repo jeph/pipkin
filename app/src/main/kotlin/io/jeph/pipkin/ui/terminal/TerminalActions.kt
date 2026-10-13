@@ -74,7 +74,7 @@ internal fun TerminalActionsSheet(
 
     Stage.Rename -> RenameDialog(
       title = stringResource(R.string.terminal_rename_title),
-      initial = terminalTitle(session),
+      initial = session.name.value.orEmpty(),
       onDismiss = onDismiss,
       onConfirm = { dismissThen { session.rename(it) } },
     )
