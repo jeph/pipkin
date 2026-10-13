@@ -16,7 +16,7 @@ import org.json.JSONArray
 import org.json.JSONException
 
 /**
- * Pi's session list, newest first. Refreshed on app foreground, when the sidebar opens, after a run
+ * Pi's session list, newest first. Refreshed on app foreground, when the sidebar or a tab menu opens, after a run
  * settles and after renames and deletes. A failed refresh keeps the previous list; the host failure is
  * reported through [HostClient.lastFailure].
  */

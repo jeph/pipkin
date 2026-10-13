@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +28,7 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.SnackbarStack
@@ -34,32 +36,43 @@ import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.ui.workspace.ChatTabsSheet
+import io.jeph.pipkin.ui.workspace.TabCountButton
+import io.jeph.pipkin.ui.workspace.rememberWorkspaceChats
 
 /**
- * One chat: header, stream and composer for [process]; a null process shows a starting placeholder.
+ * One chat: header, stream and composer for [process]; a null process shows a starting placeholder. The header's tab
+ * button opens the tab menu of the chats in [process]'s workspace.
  */
 @Composable
 internal fun ChatScreen(
   process: AgentProcess?,
+  actions: ShellActions,
   onToggleSidebar: () -> Unit,
-  onNewChat: (cwd: String) -> Unit,
   onOpenSettings: () -> Unit,
-  onArchive: (AgentProcess) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   // Outlive a process swap, so a message about the closed chat (delete failed) still shows.
   val snackbar = remember { SnackbarStackState() }
   val scope = rememberCoroutineScope()
+  var tabsOpen by rememberSaveable { mutableStateOf(false) }
   if (process == null) {
     PlaceholderChat(onToggleSidebar, modifier)
     return
   }
   val context = LocalContext.current
+  val keyboard = LocalSoftwareKeyboardController.current
+  val focus = LocalFocusManager.current
+  val openTabs = {
+    keyboard?.hide()
+    focus.clearFocus()
+    tabsOpen = true
+  }
   var sheet by remember(process) { mutableStateOf<ChatSheet?>(null) }
   val navigator = rememberNavigator(
     onSheet = { sheet = it },
-    onNewChat = { onNewChat(process.cwd) },
-    onOpenSidebar = onToggleSidebar,
+    onNewChat = { actions.newChat(process.cwd) },
+    onOpenTabs = openTabs,
     onOpenSettings = onOpenSettings,
   )
   val controller = remember(process) {
@@ -67,9 +80,16 @@ internal fun ChatScreen(
   }
   LaunchedEffect(controller) { controller.collectEffects() }
   LaunchedEffect(controller) { controller.steering.collectQueue() }
-  ChatContent(controller, snackbar, onToggleSidebar, onOpenSettings, onSheet = { sheet = it }, modifier)
-  ChatSheets(controller, sheet, onSheet = { sheet = it }, onNewChat, onArchive)
-  ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive)
+  ChatContent(controller, snackbar, onToggleSidebar, openTabs, onOpenSettings, onSheet = { sheet = it }, modifier)
+  ChatSheets(
+    controller,
+    sheet,
+    onSheet = { sheet = it },
+    onNewChat = { actions.newChat(it) },
+    onArchive = actions::archive,
+  )
+  ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive = actions::archive)
+  if (tabsOpen) ChatTabsSheet(process, actions, onDismiss = { tabsOpen = false })
 }
 
 /** A [ChatNavigator] that outlives recompositions and always calls the latest callbacks. */
@@ -77,12 +97,12 @@ internal fun ChatScreen(
 private fun rememberNavigator(
   onSheet: (ChatSheet) -> Unit,
   onNewChat: () -> Unit,
-  onOpenSidebar: () -> Unit,
+  onOpenTabs: () -> Unit,
   onOpenSettings: () -> Unit,
 ): ChatNavigator {
   val latestSheet by rememberUpdatedState(onSheet)
   val latestNewChat by rememberUpdatedState(onNewChat)
-  val latestSidebar by rememberUpdatedState(onOpenSidebar)
+  val latestTabs by rememberUpdatedState(onOpenTabs)
   val latestSettings by rememberUpdatedState(onOpenSettings)
   return remember {
     object : ChatNavigator {
@@ -90,7 +110,7 @@ private fun rememberNavigator(
 
       override fun newChat() = latestNewChat()
 
-      override fun openSidebar() = latestSidebar()
+      override fun openTabs() = latestTabs()
 
       override fun openSettings() = latestSettings()
     }
@@ -102,6 +122,7 @@ private fun ChatContent(
   controller: ChatController,
   snackbar: SnackbarStackState,
   onToggleSidebar: () -> Unit,
+  onOpenTabs: () -> Unit,
   onOpenSettings: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
   modifier: Modifier,
@@ -124,6 +145,7 @@ private fun ChatContent(
     ChatHeader(
       process,
       onToggleSidebar,
+      onOpenTabs,
       onActions = { onSheet(ChatSheet.Actions) },
       Modifier.onUnhandledTap(dismissKeyboard),
     )
@@ -186,14 +208,24 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
   )
 }
 
-/** Session name (or the first message) over the project path, with `~` for the Termux home. */
+/**
+ * Session name (or the first message) over the project path, with `~` for the Termux home; the tab button with the
+ * number of chats in the workspace sits before the actions button.
+ */
 @Composable
-private fun ChatHeader(process: AgentProcess, onToggleSidebar: () -> Unit, onActions: () -> Unit, modifier: Modifier) {
+private fun ChatHeader(
+  process: AgentProcess,
+  onToggleSidebar: () -> Unit,
+  onOpenTabs: () -> Unit,
+  onActions: () -> Unit,
+  modifier: Modifier,
+) {
   val graph = LocalContext.current.appGraph
   val sessionName by process.sessionName.collectAsStateWithLifecycle()
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
   val sessions by graph.sessionRepository.sessions.collectAsStateWithLifecycle()
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
+  val tabs = rememberWorkspaceChats(process)
   val firstMessage = sessions.firstOrNull { it.path == sessionFile }?.firstMessage?.takeIf { it.isNotBlank() }
   HeaderBar(
     title = sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),
@@ -201,6 +233,7 @@ private fun ChatHeader(process: AgentProcess, onToggleSidebar: () -> Unit, onAct
     modifier = modifier,
     leading = { MenuButton(onToggleSidebar) },
     trailing = {
+      TabCountButton(count = tabs.count, onClick = onOpenTabs)
       IconButton28(
         icon = R.drawable.ic_lucide_ellipsis,
         contentDescription = stringResource(R.string.chat_actions),

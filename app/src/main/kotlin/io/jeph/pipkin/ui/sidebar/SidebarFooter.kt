@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -40,22 +39,22 @@ internal fun SidebarFooter(
       modifier = Modifier
         .fillMaxWidth()
         .heightIn(min = 56.dp)
-        .padding(horizontal = PipkinTokens.Spacing.s16),
+        .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s8),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
     ) {
       HostStatus(onOpenOnboarding, Modifier.weight(1f))
-      IconButton28(
+      SidebarIconButton(
         icon = R.drawable.ic_lucide_folder_plus,
         contentDescription = stringResource(R.string.shell_add_workspace),
         onClick = onAddWorkspace,
       )
-      IconButton28(
+      SidebarIconButton(
         icon = R.drawable.ic_lucide_archive,
         contentDescription = stringResource(R.string.archive_open),
         onClick = onOpenArchive,
       )
-      IconButton28(
+      SidebarIconButton(
         icon = R.drawable.ic_lucide_settings,
         contentDescription = stringResource(R.string.shell_settings),
         onClick = onOpenSettings,

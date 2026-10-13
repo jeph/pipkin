@@ -18,7 +18,6 @@ internal class Preferences(context: Context) {
   }
   private val lastProjectCwdState = MutableStateFlow(prefs.getString(LAST_PROJECT_CWD, null))
   private val workspacesState = MutableStateFlow(readWorkspaces())
-  private val collapsedState = MutableStateFlow(prefs.getStringSet(COLLAPSED_WORKSPACES, null).orEmpty().toSet())
   private val archivedState = MutableStateFlow(readArchived())
 
   /** Onboarding finished or was skipped. */
@@ -26,14 +25,11 @@ internal class Preferences(context: Context) {
 
   val theme: StateFlow<ThemeMode> = themeState.asStateFlow()
 
-  /** The workspace folder of the last chat started from the sidebar. */
+  /** The workspace folder last opened, or last started a chat in, from the sidebar. */
   val lastProjectCwd: StateFlow<String?> = lastProjectCwdState.asStateFlow()
 
   /** Folders added as sidebar workspaces, newest first, kept even while they have no chats. */
   val workspaces: StateFlow<List<String>> = workspacesState.asStateFlow()
-
-  /** Workspaces whose chats the sidebar hides. */
-  val collapsedWorkspaces: StateFlow<Set<String>> = collapsedState.asStateFlow()
 
   /** Archived session files by path, each with when it was archived (epoch milliseconds). */
   val archivedSessions: StateFlow<Map<String, Long>> = archivedState.asStateFlow()
@@ -65,13 +61,8 @@ internal class Preferences(context: Context) {
   /** Takes [cwd] off the sidebar's workspaces; it shows again only while it has chats or once added back. */
   fun removeWorkspace(cwd: String) {
     val updated = workspacesState.value.filterNot { sameFolder(it, cwd) }
-    val collapsed = collapsedState.value.filterNot { sameFolder(it, cwd) }.toSet()
-    prefs.edit {
-      putString(WORKSPACES, JSONArray(updated).toString())
-      putStringSet(COLLAPSED_WORKSPACES, collapsed)
-    }
+    prefs.edit { putString(WORKSPACES, JSONArray(updated).toString()) }
     workspacesState.value = updated
-    collapsedState.value = collapsed
   }
 
   /** Marks [paths] archived at [at]; a path already archived keeps its time. */
@@ -81,12 +72,6 @@ internal class Preferences(context: Context) {
 
   fun unarchiveSessions(paths: Collection<String>) {
     writeArchived(archivedState.value - paths.toSet())
-  }
-
-  fun setWorkspaceCollapsed(cwd: String, collapsed: Boolean) {
-    val updated = if (collapsed) collapsedState.value + cwd else collapsedState.value - cwd
-    prefs.edit { putStringSet(COLLAPSED_WORKSPACES, updated) }
-    collapsedState.value = updated
   }
 
   private fun readWorkspaces(): List<String> {
@@ -110,7 +95,6 @@ internal class Preferences(context: Context) {
     const val THEME = "theme"
     const val LAST_PROJECT_CWD = "lastProjectCwd"
     const val WORKSPACES = "workspaces"
-    const val COLLAPSED_WORKSPACES = "collapsedWorkspaces"
     const val ARCHIVED_SESSIONS = "archivedSessions"
   }
 }

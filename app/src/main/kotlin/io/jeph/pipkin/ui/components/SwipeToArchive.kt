@@ -1,4 +1,4 @@
-package io.jeph.pipkin.ui.sidebar
+package io.jeph.pipkin.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -39,7 +39,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
-import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.CoroutineScope
@@ -60,9 +59,9 @@ private const val SLIDE_OUT_MILLIS = 160
  *
  * While [leaving] the content slides out to the end and [onLeft] runs once it is gone; when [leaving] turns false
  * again (a cancelled confirmation) it slides back. With [swipeEnabled] false it only slides on [leaving], as a
- * workspace's folder row does when the workspace is removed.
+ * workspace's row in the sidebar does when the workspace is removed.
  *
- * Only a drag that starts rightward is claimed, so a leftward one still reaches the panels behind the sidebar.
+ * Only a drag that starts rightward is claimed, so a leftward one still reaches the panels behind.
  */
 @Composable
 internal fun SwipeToArchive(

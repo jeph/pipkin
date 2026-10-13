@@ -4,8 +4,10 @@ import android.annotation.SuppressLint
 import io.jeph.pipkin.AppGraph
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
+import io.jeph.pipkin.agent.ChatKey
 import io.jeph.pipkin.agent.RpcError
 import io.jeph.pipkin.agent.TooManyRunning
+import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.data.sameFolder
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.SessionInfo
@@ -23,12 +25,12 @@ internal sealed interface ShellNotice {
   /** A failure; a null [message] has no message of its own. */
   data class Failure(val message: String?) : ShellNotice
 
-  /** Chats were archived from the sidebar or the chat header; Undo takes [paths] back out of the archive. */
+  /** Chats were archived from the tab menu or the chat header; Undo takes [paths] back out of the archive. */
   data class Archived(val paths: List<String>) : ShellNotice
 }
 
 /**
- * The shell's chat operations: which chat the chat panel shows, new chats, the sidebar's rename, and
+ * The shell's chat operations: which chat the chat panel shows, workspaces and new chats, the tab menu's rename, and
  * archiving, restoring and deleting chats. Notices surface as [notices] for the shell's snackbar. Main thread only.
  */
 internal class ShellActions(private val graph: AppGraph) {
@@ -36,6 +38,9 @@ internal class ShellActions(private val graph: AppGraph) {
   private val registry get() = graph.registry
   private val sessions get() = graph.sessionRepository
   private val sessionArchive get() = graph.sessionArchive
+
+  /** Session files of the chat last shown in each workspace, by folder key, so returning to one shows that chat. */
+  private val lastShownIn = HashMap<String, String>()
 
   val notices: Flow<ShellNotice> = noticeChannel.receiveAsFlow()
 
@@ -51,21 +56,42 @@ internal class ShellActions(private val graph: AppGraph) {
   /** Shows a new chat in [cwd]; false (with a notice) when four chats are working. */
   fun newChat(cwd: String): Boolean = show { registry.open(cwd, null) }
 
-  /** Shows the most recent chat that is not archived, or a new one in the last project (or home) when there is none. */
-  fun openMostRecent() {
-    show(::mostRecent)
+  /**
+   * Shows the workspace [cwd]: the chat last shown there while it is still open or listed, else its newest chat, else
+   * a new one; false (with a notice) when four chats are working.
+   */
+  fun openWorkspace(cwd: String): Boolean = show { workspaceChat(cwd) }
+
+  /** The process for [openWorkspace]; throws [TooManyRunning] when it needs a slot and all four chats are working. */
+  private fun workspaceChat(cwd: String): AgentProcess {
+    registry.visible.value?.takeIf { sameFolder(it.cwd, cwd) }?.let { return it }
+    val last = lastShownIn[folderKey(cwd)]?.takeIf { path ->
+      !sessionArchive.isArchived(path) &&
+        (ChatKey.session(path) in registry.processes.value || sessionArchive.active.value.any { it.path == path })
+    }
+    return registry.open(cwd, last ?: newestIn(cwd)?.path)
+  }
+
+  /**
+   * Shows the most recent chat that is not archived, in [cwd] when given, or a new one there; without [cwd], in the
+   * last project (or home) when there is none.
+   */
+  private fun openMostRecent(cwd: String? = null) {
+    show { mostRecent(cwd) }
   }
 
   /** The process for [openMostRecent]; throws [TooManyRunning] when it needs a slot and all four chats are working. */
-  private fun mostRecent(): AgentProcess {
-    // The archive marks are the source of truth; the active list catches up with them a moment later.
-    val newest = sessionArchive.active.value.firstOrNull { !sessionArchive.isArchived(it.path) }
-    return if (newest != null) {
-      registry.open(newest.cwd, newest.path)
-    } else {
-      registry.open(graph.preferences.lastProjectCwd.value ?: home, null)
-    }
+  private fun mostRecent(cwd: String? = null): AgentProcess {
+    val newest = newestIn(cwd) ?: return registry.open(cwd ?: graph.preferences.lastProjectCwd.value ?: home, null)
+    return registry.open(newest.cwd, newest.path)
   }
+
+  /** The newest chat that is not archived, in [cwd] when given. */
+  private fun newestIn(cwd: String?): SessionInfo? =
+    // The archive marks are the source of truth; the active list catches up with them a moment later.
+    sessionArchive.active.value.firstOrNull {
+      !sessionArchive.isArchived(it.path) && (cwd == null || sameFolder(it.cwd, cwd))
+    }
 
   /** On entering the main screen without a chat: waits for the session list, then [openMostRecent]. */
   suspend fun openAtStartup() {
@@ -108,7 +134,7 @@ internal class ShellActions(private val graph: AppGraph) {
   /** Archives [session], stopping its run if one is going, and offers Undo. */
   fun archive(session: SessionInfo) {
     sessionArchive.archive(listOf(session.path), listOf(session.cwd))
-    stop(listOfNotNull(processFor(session.path)))
+    stop(listOfNotNull(processFor(session.path)), replaceIn = session.cwd)
     notify(ShellNotice.Archived(listOf(session.path)))
   }
 
@@ -116,7 +142,7 @@ internal class ShellActions(private val graph: AppGraph) {
   fun archive(process: AgentProcess) {
     val path = process.sessionFile.value ?: return
     sessionArchive.archive(listOf(path), listOf(process.cwd))
-    stop(listOf(process))
+    stop(listOf(process), replaceIn = process.cwd)
     notify(ShellNotice.Archived(listOf(path)))
   }
 
@@ -132,7 +158,7 @@ internal class ShellActions(private val graph: AppGraph) {
     val paths = sessionArchive.active.value.filter { sameFolder(it.cwd, cwd) }.map { it.path } +
       open.mapNotNull { it.sessionFile.value }
     sessionArchive.removeWorkspace(cwd, paths.distinct())
-    stop(open)
+    stop(open, replaceIn = null)
   }
 
   /** Restores the archived [sessions] whose folder still exists; returns those restored. */
@@ -156,9 +182,9 @@ internal class ShellActions(private val graph: AppGraph) {
 
   /**
    * Stops [processes]: a working run is aborted first so Pi saves what it has, then Pi ends. A shown chat among them
-   * is replaced by the most recent one that is not archived.
+   * is replaced by the most recent one that is not archived, in the workspace [replaceIn] when given.
    */
-  private fun stop(processes: List<AgentProcess>) {
+  private fun stop(processes: List<AgentProcess>, replaceIn: String?) {
     if (processes.isEmpty()) return
     val shown = registry.visible.value
     val closing = processes.map { process ->
@@ -175,24 +201,28 @@ internal class ShellActions(private val graph: AppGraph) {
     }
     if (processes.none { it === shown }) return
     try {
-      registry.setVisible(mostRecent())
+      registry.setVisible(mostRecent(replaceIn))
     } catch (_: TooManyRunning) {
       // The working chats being stopped still hold every slot; the replacement opens once they have closed, unless
       // another chat was opened meanwhile.
       registry.setVisible(null)
       graph.scope.launch {
         closing.joinAll()
-        if (registry.visible.value == null) openMostRecent()
+        if (registry.visible.value == null) openMostRecent(replaceIn)
       }
     }
   }
 
-  private inline fun show(open: () -> AgentProcess): Boolean = try {
-    registry.setVisible(open())
-    true
-  } catch (error: TooManyRunning) {
-    notify(ShellNotice.Failure(error.message))
-    false
+  private inline fun show(open: () -> AgentProcess): Boolean {
+    // Recorded before opening: making room for the next chat can close the shown one when it is the only idle chat.
+    registry.visible.value?.let { shown -> shown.sessionFile.value?.let { lastShownIn[folderKey(shown.cwd)] = it } }
+    return try {
+      registry.setVisible(open())
+      true
+    } catch (error: TooManyRunning) {
+      notify(ShellNotice.Failure(error.message))
+      false
+    }
   }
 
   private fun notify(notice: ShellNotice) {

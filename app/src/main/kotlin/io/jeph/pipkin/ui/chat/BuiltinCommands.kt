@@ -20,7 +20,8 @@ internal interface ChatNavigator {
   /** A new chat in this chat's project. */
   fun newChat()
 
-  fun openSidebar()
+  /** The tab menu of the chats in this chat's workspace. */
+  fun openTabs()
 
   fun openSettings()
 }
@@ -78,7 +79,7 @@ internal class BuiltinCommands(private val controller: ChatController, private v
 
       BuiltinCommand.Compact -> compact(argument)
 
-      BuiltinCommand.Resume -> navigator.openSidebar()
+      BuiltinCommand.Resume -> navigator.openTabs()
 
       BuiltinCommand.Reload ->
         if (process.busy.value) navigator.openSheet(ChatSheet.ConfirmReload) else controller.reload()

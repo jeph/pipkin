@@ -2,7 +2,7 @@
 <resources>
     <!-- Header and actions sheet -->
     <string name="chat_new_chat">New chat</string>
-    <string name="chat_toggle_sidebar">Agents</string>
+    <string name="chat_toggle_sidebar">Workspaces</string>
     <string name="chat_actions">Chat actions</string>
     <string name="chat_action_rename">Rename</string>
     <string name="chat_action_reload">Reload agent</string>

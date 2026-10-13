@@ -200,17 +200,16 @@ private fun AnchoredDraggableState<Panel>.offsetOr(width: Float): Float =
   offset.takeUnless { it.isNaN() } ?: if (currentValue == Panel.Chat) width else 0f
 
 /**
- * The layer beside the sidebar. It holds only the chat; Paseo's Changes, Files and Terminal tabs
- * become a tab switcher here without changing [MobilePanels].
+ * The layer beside the sidebar: the shown chat, whose header's tab menu switches between the chats in its workspace.
+ * Paseo's Changes, Files and Terminal tabs would join that menu without changing [MobilePanels].
  */
 @Composable
 private fun WorkspacePanel(actions: ShellActions, onToggleSidebar: () -> Unit, onOpenSettings: () -> Unit) {
   val process by LocalContext.current.appGraph.registry.visible.collectAsStateWithLifecycle()
   ChatScreen(
     process = process,
+    actions = actions,
     onToggleSidebar = onToggleSidebar,
-    onNewChat = { cwd -> actions.newChat(cwd) },
     onOpenSettings = onOpenSettings,
-    onArchive = actions::archive,
   )
 }

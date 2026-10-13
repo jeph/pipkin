@@ -1,7 +1,9 @@
 package io.jeph.pipkin.ui.sidebar
 
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,7 +33,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -39,27 +43,27 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
-import io.jeph.pipkin.agent.ChatKey
+import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.data.Workspace
-import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.data.sameFolder
 import io.jeph.pipkin.data.workspaces
-import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
+import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.components.SwipeToArchive
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 
 /**
- * Paseo's mobile sidebar: chats grouped by workspace folder, each group collapsible, with a
- * health/actions footer. A chat is archived by swiping it right or from its actions sheet; a
- * workspace is removed, archiving its chats, from its own sheet.
+ * The mobile sidebar: the workspace folders, with a health/actions footer. Tapping a workspace shows its chat; the
+ * chats in it are in the chat header's tab menu. A workspace is removed, archiving its chats, from its own sheet.
  */
 @Composable
 internal fun Sidebar(
@@ -73,15 +77,20 @@ internal fun Sidebar(
   val graph = LocalContext.current.appGraph
   val sessions by graph.sessionArchive.active.collectAsStateWithLifecycle()
   val added by graph.preferences.workspaces.collectAsStateWithLifecycle()
-  val collapsed by graph.preferences.collapsedWorkspaces.collectAsStateWithLifecycle()
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
   val workspaces = remember(sessions, added) { workspaces(sessions, added) }
-  val archiving = remember(actions) { SidebarArchiving(actions) }
-  val menus = remember { SidebarMenus() }
+  val removal = remember(actions) { WorkspaceRemoval(actions) }
+  var menuFor by remember { mutableStateOf<Workspace?>(null) }
   var pickerOpen by rememberSaveable { mutableStateOf(false) }
-  // Rows that left the list forget that they were leaving, so one that comes back (Undo) shows in place.
-  LaunchedEffect(workspaces) { archiving.forgetGone(workspaces) }
+  // Rows that left the list forget that they were leaving, so a workspace added back shows in place.
+  LaunchedEffect(workspaces) { removal.forgetGone(workspaces) }
+  val showThen = { cwd: String, open: () -> Boolean ->
+    if (open()) {
+      graph.preferences.setLastProjectCwd(cwd)
+      onClose()
+    }
+  }
   Column(
     modifier = modifier
       .fillMaxSize()
@@ -91,19 +100,11 @@ internal fun Sidebar(
     SidebarHeader(onClose)
     WorkspaceList(
       workspaces = workspaces,
-      collapsed = collapsed,
       home = home,
-      archiving = archiving,
-      onOpen = { if (actions.openSession(it)) onClose() },
-      onNewChatIn = { cwd ->
-        if (actions.newChat(cwd)) {
-          graph.preferences.setLastProjectCwd(cwd)
-          onClose()
-        }
-      },
-      onToggle = { cwd -> graph.preferences.setWorkspaceCollapsed(cwd, cwd !in collapsed) },
-      onActions = { menus.chat = it },
-      onWorkspaceActions = { menus.workspace = it },
+      removal = removal,
+      onOpen = { cwd -> showThen(cwd) { actions.openWorkspace(cwd) } },
+      onNewChatIn = { cwd -> showThen(cwd) { actions.newChat(cwd) } },
+      onActions = { menuFor = it },
       modifier = Modifier.weight(1f),
     )
     SidebarFooter(
@@ -113,7 +114,14 @@ internal fun Sidebar(
       onOpenOnboarding = onOpenOnboarding,
     )
   }
-  SidebarMenuSheets(menus, actions, archiving, home)
+  menuFor?.let { workspace ->
+    WorkspaceActions(
+      path = tildePath(workspace.cwd, home),
+      onDismiss = { menuFor = null },
+      onRemove = { removal.askToRemove(workspace) },
+    )
+  }
+  RemoveWorkspaceDialog(removal, home)
   if (pickerOpen) {
     AddWorkspaceSheet(
       home = home,
@@ -127,112 +135,64 @@ internal fun Sidebar(
   }
 }
 
-/** Which of the sidebar's action sheets is open: a chat's or a workspace's. */
-private class SidebarMenus {
-  var chat by mutableStateOf<SessionInfo?>(null)
-  var workspace by mutableStateOf<Workspace?>(null)
-}
-
+/** The sidebar's icon buttons: a 36dp target around a 20dp icon. */
 @Composable
-private fun SidebarMenuSheets(menus: SidebarMenus, actions: ShellActions, archiving: SidebarArchiving, home: String) {
-  menus.chat?.let { session ->
-    SessionActions(
-      session = session,
-      onDismiss = { menus.chat = null },
-      onRename = { actions.rename(session, it) },
-      onArchive = { archiving.archive(session) },
-    )
-  }
-  menus.workspace?.let { workspace ->
-    WorkspaceActions(
-      name = projectName(workspace.cwd, home),
-      onDismiss = { menus.workspace = null },
-      onRemove = { archiving.askToRemove(workspace) },
-    )
-  }
-  SidebarArchiveDialogs(archiving, home)
+internal fun SidebarIconButton(
+  @DrawableRes icon: Int,
+  contentDescription: String,
+  onClick: () -> Unit,
+  tint: Color = pipkinColors.foreground,
+) {
+  IconButton28(
+    icon = icon,
+    contentDescription = contentDescription,
+    onClick = onClick,
+    modifier = Modifier.size(36.dp),
+    tint = tint,
+    iconSize = PipkinTokens.IconSize.lg,
+  )
 }
-
-/** The sidebar's lazy-list keys: a workspace's folder row, and a chat's row by its session file. */
-private fun workspaceKey(cwd: String) = "workspace:$cwd"
 
 /**
- * Archiving from the sidebar. A row first slides out; once it is gone the chat is archived, or, when Pi is working
- * in it, the user is asked first and a cancelled row slides back. Removing a workspace asks first, then slides its
- * folder row and chats out together and removes it once they are gone.
+ * Removing a workspace from the sidebar asks first, then slides its row out and removes it, archiving its chats, once
+ * the row is gone.
  */
-private class SidebarArchiving(private val actions: ShellActions) {
-  /** Keys of rows sliding out, or out and waiting for the user. */
+private class WorkspaceRemoval(private val actions: ShellActions) {
+  /** Folders of rows sliding out. */
   var leaving by mutableStateOf(emptySet<String>())
     private set
 
-  /** A slid-out chat Pi is working in, waiting for "Stop and archive". */
-  var confirmingChat by mutableStateOf<SessionInfo?>(null)
-    private set
-
   /** A workspace waiting for "Remove", with how many of its chats are working. */
-  var confirmingWorkspace by mutableStateOf<Pair<Workspace, Int>?>(null)
+  var confirming by mutableStateOf<Pair<Workspace, Int>?>(null)
     private set
-
-  fun archive(session: SessionInfo) {
-    leaving += session.path
-  }
-
-  fun onChatLeft(session: SessionInfo) {
-    // A workspace removal slides its chats out too; it archives them once its folder row is gone.
-    if (workspaceKey(folderKey(session.cwd)) in leaving) return
-    if (actions.isWorking(session.path)) confirmingChat = session else actions.archive(session)
-  }
-
-  fun confirmChat() {
-    confirmingChat?.let(actions::archive)
-    confirmingChat = null
-  }
-
-  fun cancelChat() {
-    confirmingChat?.let { leaving -= it.path }
-    confirmingChat = null
-  }
 
   fun askToRemove(workspace: Workspace) {
-    confirmingWorkspace = workspace to actions.workingIn(workspace.cwd)
+    confirming = workspace to actions.workingIn(workspace.cwd)
   }
 
-  fun confirmRemove() {
-    val (workspace, _) = confirmingWorkspace ?: return
-    confirmingWorkspace = null
-    leaving += workspace.chats.map { it.path } + workspaceKey(workspace.cwd)
+  fun confirm() {
+    val (workspace, _) = confirming ?: return
+    confirming = null
+    leaving += workspace.cwd
   }
 
-  fun cancelRemove() {
-    confirmingWorkspace = null
+  fun cancel() {
+    confirming = null
   }
 
-  fun onWorkspaceLeft(cwd: String) {
+  fun onLeft(cwd: String) {
     actions.removeWorkspace(cwd)
   }
 
   fun forgetGone(workspaces: List<Workspace>) {
-    val shown = workspaces.flatMap { workspace ->
-      workspace.chats.map { it.path } + workspaceKey(workspace.cwd)
-    }.toSet()
+    val shown = workspaces.mapTo(HashSet()) { it.cwd }
     if (leaving.any { it !in shown }) leaving = leaving intersect shown
   }
 }
 
 @Composable
-private fun SidebarArchiveDialogs(archiving: SidebarArchiving, home: String) {
-  if (archiving.confirmingChat != null) {
-    ConfirmDialog(
-      title = stringResource(R.string.archive_stop_title),
-      text = stringResource(R.string.archive_stop_text),
-      confirmLabel = stringResource(R.string.archive_stop_confirm),
-      onConfirm = archiving::confirmChat,
-      onDismiss = archiving::cancelChat,
-      destructive = true,
-    )
-  }
-  val (workspace, working) = archiving.confirmingWorkspace ?: return
+private fun RemoveWorkspaceDialog(removal: WorkspaceRemoval, home: String) {
+  val (workspace, working) = removal.confirming ?: return
   val chats = workspace.chats.size
   val archived = if (chats == 0) {
     stringResource(R.string.archive_remove_text_empty)
@@ -249,24 +209,25 @@ private fun SidebarArchiveDialogs(archiving: SidebarArchiving, home: String) {
     title = stringResource(R.string.archive_remove_title, projectName(workspace.cwd, home)),
     text = text,
     confirmLabel = stringResource(R.string.archive_remove_confirm),
-    onConfirm = archiving::confirmRemove,
-    onDismiss = archiving::cancelRemove,
+    onConfirm = removal::confirm,
+    onDismiss = removal::cancel,
     destructive = true,
   )
 }
 
-/** A workspace's sheet: Remove workspace. */
+/** A workspace's sheet under its path: Remove workspace. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun WorkspaceActions(name: String, onDismiss: () -> Unit, onRemove: () -> Unit) {
+private fun WorkspaceActions(path: String, onDismiss: () -> Unit, onRemove: () -> Unit) {
   PipkinSheet(onDismissRequest = onDismiss) {
+    // A long path keeps its end, the folder that tells workspaces apart.
     Text(
-      text = name,
+      text = path,
       modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s8),
       color = pipkinColors.foregroundMuted,
       fontSize = PipkinTokens.FontSize.sm,
       maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
+      overflow = TextOverflow.StartEllipsis,
     )
     SheetRow(
       label = stringResource(R.string.archive_remove_workspace),
@@ -290,18 +251,17 @@ private fun SidebarHeader(onClose: () -> Unit) {
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
-    LucideIcon(icon = R.drawable.ic_lucide_bot, contentDescription = null)
+    LucideIcon(icon = R.drawable.ic_lucide_bot, contentDescription = null, size = PipkinTokens.IconSize.lg)
     Text(
       text = stringResource(R.string.shell_sidebar_title),
       modifier = Modifier.weight(1f),
       color = pipkinColors.foreground,
-      fontSize = PipkinTokens.FontSize.base,
+      fontSize = PipkinTokens.FontSize.lg,
     )
-    IconButton28(
+    SidebarIconButton(
       icon = R.drawable.ic_lucide_x,
       contentDescription = stringResource(R.string.shell_sidebar_close),
       onClick = onClose,
-      modifier = Modifier.size(32.dp),
     )
   }
 }
@@ -309,138 +269,119 @@ private fun SidebarHeader(onClose: () -> Unit) {
 @Composable
 private fun WorkspaceList(
   workspaces: List<Workspace>,
-  collapsed: Set<String>,
   home: String,
-  archiving: SidebarArchiving,
-  onOpen: (SessionInfo) -> Unit,
+  removal: WorkspaceRemoval,
+  onOpen: (cwd: String) -> Unit,
   onNewChatIn: (cwd: String) -> Unit,
-  onToggle: (cwd: String) -> Unit,
-  onActions: (SessionInfo) -> Unit,
-  onWorkspaceActions: (Workspace) -> Unit,
+  onActions: (Workspace) -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val registry = LocalContext.current.appGraph.registry
   val processes by registry.processes.collectAsStateWithLifecycle()
   val visible by registry.visible.collectAsStateWithLifecycle()
-  val visiblePath by remember(visible) { visible?.sessionFile ?: MutableStateFlow(null) }
-    .collectAsStateWithLifecycle()
   if (workspaces.isEmpty()) {
     Text(
       text = stringResource(R.string.shell_sidebar_empty),
       modifier = modifier.fillMaxWidth().wrapContentHeight(),
       color = pipkinColors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.base,
+      fontSize = PipkinTokens.FontSize.lg,
       textAlign = TextAlign.Center,
     )
     return
   }
   LazyColumn(modifier = modifier.fillMaxWidth()) {
-    for (workspace in workspaces) {
+    items(workspaces, key = { it.cwd }) { workspace ->
       val cwd = workspace.cwd
-      val isCollapsed = cwd in collapsed
-      item(key = workspaceKey(cwd), contentType = "workspace") {
-        SwipeToArchive(
-          leaving = workspaceKey(cwd) in archiving.leaving,
-          onSwiped = {},
-          onLeft = { archiving.onWorkspaceLeft(cwd) },
-          containerColor = pipkinColors.sidebar,
-          modifier = Modifier.animateItem(),
-          swipeEnabled = false,
-        ) {
-          WorkspaceHeader(
-            name = projectName(cwd, home),
-            chatCount = workspace.chats.size,
-            collapsed = isCollapsed,
-            onToggle = { onToggle(cwd) },
-            onNewChat = { onNewChatIn(cwd) },
-            onActions = { onWorkspaceActions(workspace) },
-          )
-        }
-      }
-      if (isCollapsed) continue
-      items(workspace.chats, key = { it.path }, contentType = { "session" }) { session ->
-        SwipeToArchive(
-          leaving = session.path in archiving.leaving,
-          onSwiped = { archiving.archive(session) },
-          onLeft = { archiving.onChatLeft(session) },
-          containerColor = pipkinColors.sidebar,
-          modifier = Modifier.animateItem(),
-        ) {
-          SessionRow(
-            session = session,
-            process = processes[ChatKey.session(session.path)],
-            selected = session.path == visiblePath,
-            onOpen = { onOpen(session) },
-            onActions = { onActions(session) },
-          )
-        }
+      SwipeToArchive(
+        leaving = cwd in removal.leaving,
+        onSwiped = {},
+        onLeft = { removal.onLeft(cwd) },
+        containerColor = pipkinColors.sidebar,
+        modifier = Modifier.animateItem(),
+        swipeEnabled = false,
+      ) {
+        WorkspaceRow(
+          name = projectName(cwd, home),
+          shown = visible?.let { sameFolder(it.cwd, cwd) } == true,
+          working = anyWorking(remember(processes, cwd) { processes.values.filter { sameFolder(it.cwd, cwd) } }),
+          onOpen = { onOpen(cwd) },
+          onNewChat = { onNewChatIn(cwd) },
+          onActions = { onActions(workspace) },
+        )
       }
     }
   }
 }
 
-/**
- * A workspace's folder row. Tapping the name hides or shows its chats. The chevron points down while
- * they show and right while they are hidden, when the number of hidden chats follows the name.
- */
+/** Whether any of [processes] has a Pi run going. */
 @Composable
-private fun WorkspaceHeader(
+private fun anyWorking(processes: List<AgentProcess>): Boolean {
+  val working = remember(processes) {
+    if (processes.isEmpty()) flowOf(false) else combine(processes.map { it.busy }) { busy -> busy.any { it } }
+  }
+  return working.collectAsStateWithLifecycle(initialValue = false).value
+}
+
+/**
+ * A workspace's row: its folder (the simmering pot while Pi works in one of its chats) and name, highlighted while
+ * its chat is shown, with its actions and New chat. Tapping it shows its chat; long-press opens its actions.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun WorkspaceRow(
   name: String,
-  chatCount: Int,
-  collapsed: Boolean,
-  onToggle: () -> Unit,
+  shown: Boolean,
+  working: Boolean,
+  onOpen: () -> Unit,
   onNewChat: () -> Unit,
   onActions: () -> Unit,
 ) {
   val colors = pipkinColors
-  val toggleLabel = stringResource(
-    if (collapsed) R.string.shell_workspace_expand else R.string.shell_workspace_collapse,
-    name,
-  )
+  // The light sidebar is surface2 itself, so its highlight steps up one surface.
+  val highlight = if (colors.isDark) colors.surface2 else colors.surface3
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .heightIn(min = 44.dp)
-      .padding(end = PipkinTokens.Spacing.s12, top = PipkinTokens.Spacing.s8),
+      .padding(horizontal = PipkinTokens.Spacing.s8, vertical = PipkinTokens.Spacing.s2)
+      .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
+      .background(if (shown) highlight else Color.Transparent)
+      .combinedClickable(
+        onClickLabel = stringResource(R.string.shell_workspace_open, name),
+        onClick = onOpen,
+        onLongClick = onActions,
+      )
+      .heightIn(min = 56.dp)
+      .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
-    Row(
-      modifier = Modifier
-        .weight(1f)
-        .heightIn(min = 36.dp)
-        .clickable(onClickLabel = toggleLabel, onClick = onToggle)
-        .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s8),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
-    ) {
-      LucideIcon(
-        icon = R.drawable.ic_lucide_chevron_down,
-        contentDescription = null,
-        modifier = Modifier.rotate(if (collapsed) -90f else 0f),
-        size = PipkinTokens.IconSize.sm,
-        tint = colors.foregroundMuted,
-      )
-      LucideIcon(icon = R.drawable.ic_lucide_folder, contentDescription = null, tint = colors.foregroundMuted)
-      Text(
-        text = name,
-        modifier = Modifier.weight(1f, fill = false),
-        color = colors.foreground,
-        fontSize = PipkinTokens.FontSize.base,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
-      if (collapsed && chatCount > 0) {
-        Text(text = chatCount.toString(), color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm)
+    Box(modifier = Modifier.size(PipkinTokens.IconSize.lg), contentAlignment = Alignment.Center) {
+      if (working) {
+        SimmeringPot(size = PipkinTokens.IconSize.lg)
+      } else {
+        LucideIcon(
+          icon = R.drawable.ic_lucide_folder,
+          contentDescription = null,
+          size = PipkinTokens.IconSize.lg,
+          tint = colors.foregroundMuted,
+        )
       }
     }
-    IconButton28(
+    Text(
+      text = name,
+      modifier = Modifier.weight(1f),
+      color = colors.foreground,
+      fontSize = PipkinTokens.FontSize.content,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+    )
+    SidebarIconButton(
       icon = R.drawable.ic_lucide_ellipsis,
       contentDescription = stringResource(R.string.archive_workspace_actions, name),
       onClick = onActions,
       tint = colors.foregroundMuted,
     )
-    IconButton28(
+    SidebarIconButton(
       icon = R.drawable.ic_lucide_plus,
       contentDescription = stringResource(R.string.shell_new_chat_in_project, name),
       onClick = onNewChat,

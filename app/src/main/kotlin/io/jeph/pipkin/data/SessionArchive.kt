@@ -11,9 +11,9 @@ import kotlinx.coroutines.flow.stateIn
 internal data class ArchivedSession(val session: SessionInfo, val archivedAt: Long)
 
 /**
- * Which chats are archived. An archived chat leaves the sidebar and opens only as a read-only transcript until it is
- * restored; its session file stays until it is deleted from the archive, the only place chats are deleted. Archive
- * marks live in [Preferences] by session path, so Pi and its files know nothing of them.
+ * Which chats are archived. An archived chat leaves its workspace's tab menu and opens only as a read-only transcript
+ * until it is restored; its session file stays until it is deleted from the archive, the only place chats are deleted.
+ * Archive marks live in [Preferences] by session path, so Pi and its files know nothing of them.
  */
 internal class SessionArchive(
   private val repository: SessionRepository,
@@ -21,7 +21,7 @@ internal class SessionArchive(
   scope: CoroutineScope,
   private val clock: () -> Long = System::currentTimeMillis,
 ) {
-  /** Sessions that are not archived, newest first: the sidebar's chats. */
+  /** Sessions that are not archived, newest first: the chats of the workspaces' tab menus. */
   val active: StateFlow<List<SessionInfo>> =
     combine(repository.sessions, preferences.archivedSessions, ::activeOf)
       .stateIn(scope, SharingStarted.Eagerly, activeOf(repository.sessions.value, preferences.archivedSessions.value))

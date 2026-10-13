@@ -1,4 +1,4 @@
-package io.jeph.pipkin.ui.sidebar
+package io.jeph.pipkin.ui.workspace
 
 import android.text.format.DateUtils
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -30,59 +30,69 @@ import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** One chat in the sidebar: activity mark, title, age and an actions button (long-press opens the same). */
+/**
+ * One chat in the tab menu: what Pi is doing in it, its title and age, highlighted while it is the one shown, and an
+ * actions button that long-press also opens. A chat with no saved history yet has no age and no actions.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun SessionRow(
-  session: SessionInfo,
+internal fun ChatTabRow(
+  title: String,
+  modified: Long?,
   process: AgentProcess?,
-  selected: Boolean,
+  shown: Boolean,
   onOpen: () -> Unit,
-  onActions: () -> Unit,
+  onActions: (() -> Unit)?,
   modifier: Modifier = Modifier,
 ) {
   val colors = pipkinColors
   Row(
     modifier = modifier
       .fillMaxWidth()
-      .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s8)
+      .padding(horizontal = PipkinTokens.Spacing.s8)
       .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
-      .background(if (selected) colors.surface2 else Color.Transparent)
+      .background(if (shown) colors.surface2 else Color.Transparent)
       .combinedClickable(onClick = onOpen, onLongClick = onActions)
-      .heightIn(min = 44.dp)
-      .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s4),
+      .heightIn(min = 52.dp)
+      .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
-    Box(modifier = Modifier.size(PipkinTokens.IconSize.md), contentAlignment = Alignment.Center) {
-      process?.let { ActivityMark(it) }
+    Box(modifier = Modifier.size(PipkinTokens.IconSize.lg), contentAlignment = Alignment.Center) {
+      if (process != null) ActivityMark(process) else IdleMark()
     }
     Column(modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s6)) {
       Text(
-        text = sessionTitle(session),
+        text = title,
         color = colors.foreground,
         fontSize = PipkinTokens.FontSize.base,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      Text(
-        text = relativeTime(session.modified),
-        color = colors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.sm,
-        maxLines = 1,
+      if (modified != null) {
+        Text(
+          text = relativeTime(modified),
+          color = colors.foregroundMuted,
+          fontSize = PipkinTokens.FontSize.sm,
+          maxLines = 1,
+        )
+      }
+    }
+    if (onActions != null) {
+      IconButton28(
+        icon = R.drawable.ic_lucide_ellipsis,
+        contentDescription = stringResource(R.string.shell_session_actions),
+        onClick = onActions,
+        modifier = Modifier.size(36.dp),
+        tint = colors.foregroundMuted,
       )
     }
-    IconButton28(
-      icon = R.drawable.ic_lucide_ellipsis,
-      contentDescription = stringResource(R.string.shell_session_actions),
-      onClick = onActions,
-      tint = colors.foregroundMuted,
-    )
   }
 }
 
@@ -92,7 +102,7 @@ internal fun sessionTitle(session: SessionInfo): String = session.name?.takeIf {
   ?: session.firstMessage.takeIf { it.isNotBlank() }
   ?: stringResource(R.string.shell_session_untitled)
 
-/** The simmering pot while Pi works; a danger dot after Pi exited with a failure; nothing otherwise. */
+/** The simmering pot while Pi works, a danger dot after Pi exited with a failure, otherwise [IdleMark]. */
 @Composable
 private fun ActivityMark(process: AgentProcess) {
   val busy by process.busy.collectAsStateWithLifecycle()
@@ -101,7 +111,13 @@ private fun ActivityMark(process: AgentProcess) {
   when {
     busy -> SimmeringPot()
     crashed -> StatusDot(pipkinColors.dotDanger)
+    else -> IdleMark()
   }
+}
+
+@Composable
+private fun IdleMark() {
+  LucideIcon(icon = R.drawable.ic_lucide_bot, contentDescription = null, tint = pipkinColors.foregroundMuted)
 }
 
 /** `now`, `5m`, `2h`, `3d`, then a short date. */

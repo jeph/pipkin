@@ -46,10 +46,10 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
-import io.jeph.pipkin.ui.sidebar.sessionTitle
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.ui.workspace.sessionTitle
 import java.io.IOException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch

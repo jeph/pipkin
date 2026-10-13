@@ -1,4 +1,4 @@
-package io.jeph.pipkin.ui.sidebar
+package io.jeph.pipkin.ui.workspace
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,7 +19,7 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 
 private enum class Stage { Menu, Rename }
 
-/** The sidebar's per-chat sheet (Rename, Archive) and the rename dialog it leads to. */
+/** A chat's sheet in the tab menu (Rename, Archive) and the rename dialog it leads to. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SessionActions(
