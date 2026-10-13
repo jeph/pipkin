@@ -6,11 +6,17 @@ Several agents work on this repository at once, so make every change in its own 
 
 Documentation changes are the exception. Edit Markdown files such as `AGENTS.md` and `README.md` directly in the main checkout on `main`; they don't need a worktree. The exception covers documentation only: changes to the build system or toolchain, such as the Gradle build files, `gradle/`, `config/detekt.yml`, or the host's `package.json`, `pnpm-lock.yaml`, and lint, type-check, and test configs, go in a worktree like any code change, even though they aren't application logic.
 
-Development is trunk-based: `main` is the trunk, and work reaches it in small, frequent pushes. There's one installed copy of Pipkin on the test phone, and any agent may replace it with a build from its worktree to test changes. Always pull `main` into the worktree before building, with `git fetch origin && git rebase origin/main`. Resolve any conflicts, and if changes other agents landed on `main` break yours or don't work with them, fix that in your branch before you build. That way every build tested on the phone is the current `main` plus your work, so changes on `main` get integrated and tested together as they land.
+Development is trunk-based: `main` is the trunk, and work reaches it in small, frequent pushes. Always pull `main` into the worktree before building, with `git fetch origin && git rebase origin/main`. Resolve any conflicts, and if changes other agents landed on `main` break yours or don't work with them, fix that in your branch before you build. That way every build you test is the current `main` plus your work, so changes on `main` get integrated and tested together as they land.
 
 Finished work goes directly to `main`, and this project doesn't use pull requests, but only push once the user has explicitly told you to; until then, commit locally and ask. From a worktree, rebase the branch onto `origin/main` and run `git push origin HEAD:main`. Never force push, to any branch, with `--force`, `--force-with-lease`, or a `+` refspec. If the push is rejected because `main` moved, fetch, rebase onto `origin/main` again, fix any conflicts or breakage, and push again. Worktree branches stay local: never push them to the repository under their own names.
 
 Once the push has landed, remove the worktree and its branch so they don't pile up on this machine. Confirm the work is on `main` with `git fetch origin && git merge-base --is-ancestor HEAD origin/main`, then from the main checkout run `git worktree remove ../pipkin-<branch>` and `git branch -D <branch>`. Finally, bring the main checkout up to date with `git pull --ff-only origin main`, so it matches `main`.
+
+## Testing on devices
+
+Test changes on the Android emulator. It has one shared copy of Pipkin, and any agent may replace it with a build from its worktree.
+
+The user's phone is sometimes reachable over `adb`, but it's their own phone, not a test device. Ask the user before you install a build on it, run commands on it, or test on it, and do only what they agreed to. Never change settings on the phone, whether in Android, Termux, Pipkin, or any other app, without asking first.
 
 ## Code you touch
 
