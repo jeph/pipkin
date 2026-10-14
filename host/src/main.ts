@@ -9,6 +9,7 @@ import { defaultModel } from "./modes/default-model.js";
 import { deleteSessions } from "./modes/delete-sessions.js";
 import { ensure } from "./modes/ensure.js";
 import { files } from "./modes/files.js";
+import { git } from "./modes/git.js";
 import { login } from "./modes/login.js";
 import { logout } from "./modes/logout.js";
 import { modelDefaults } from "./modes/model-defaults.js";
@@ -114,6 +115,8 @@ async function main(): Promise<void> {
       return respond(ctx, deleteSessions);
     case "files":
       return respond(ctx, files);
+    case "git":
+      return respond(ctx, git);
     case "browse":
       return respond(ctx, browse);
     case "save_attachments":
