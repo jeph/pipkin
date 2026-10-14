@@ -256,9 +256,8 @@ private class TabListCallbacks(
 )
 
 /**
- * The tab menu's rows: the workspace's terminals, open files and open commits, the shown chat while it has no saved
- * history, then the saved chats. The shown chat is highlighted only while no other tab is shown in its place; what the
- * other pane shows is marked and doesn't open.
+ * The tab menu's rows: the workspace's terminals, open files and open commits, then the saved chats. The shown chat is
+ * highlighted only while no other tab is shown in its place; what the other pane shows is marked and doesn't open.
  */
 @Composable
 private fun TabList(
@@ -279,20 +278,6 @@ private fun TabList(
     terminalRows(tabs, terminalClosing, callbacks)
     fileRows(tabs, closing, callbacks)
     commitRows(tabs, commitClosing, callbacks)
-    if (tabs.shownUnsaved) {
-      item(key = UNSAVED_KEY) {
-        val name by process.sessionName.collectAsStateWithLifecycle()
-        ChatTabRow(
-          title = name ?: stringResource(R.string.chat_new_chat),
-          modified = null,
-          process = process,
-          shown = if (chatShown) TabShown.Here else TabShown.Nowhere,
-          onOpen = { callbacks.onShow(null) },
-          onActions = null,
-          modifier = Modifier.animateItem(),
-        )
-      }
-    }
     items(tabs.chats, key = { it.path }) { session ->
       val current = session.path == shownPath
       SwipeAway(
@@ -384,9 +369,6 @@ private fun LazyListScope.commitRows(tabs: WorkspaceTabs, closing: CommitClosing
     }
   }
 }
-
-/** The lazy-list key of the shown chat's row while it has no saved history. */
-private const val UNSAVED_KEY = "unsaved"
 
 /** Closing files from the tab menu: a row first slides out, then its file closes. */
 private class FileClosing(private val files: FileTabRegistry) {

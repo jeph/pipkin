@@ -2,6 +2,7 @@ package io.jeph.pipkin.agent
 
 import android.os.SystemClock
 import android.util.Log
+import io.jeph.pipkin.data.SessionRepository
 import io.jeph.pipkin.host.HostChannel
 import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.host.HostFailure
@@ -76,7 +77,7 @@ internal class AgentProcess(
   override val cwd: String,
   sessionPath: String?,
   scope: CoroutineScope,
-  private val onSessionChanged: () -> Unit = {},
+  private val sessions: SessionRepository,
 ) : ManagedProcess {
   private class Connection(val channel: HostChannel) {
     val rpc = RpcClient(channel::send)
@@ -230,7 +231,7 @@ internal class AgentProcess(
   suspend fun setSessionName(name: String) {
     call("set_session_name", JSONObject().put("name", name))
     sessionNameState.value = name
-    onSessionChanged()
+    sessions.refresh()
   }
 
   /** Empties Pi's steering and follow-up queues and returns their texts. */
@@ -262,7 +263,7 @@ internal class AgentProcess(
     applyState(call("get_state"))
     timeline.seed(getMessages())
     refreshContextUsage()
-    onSessionChanged()
+    sessions.refresh()
   }
 
   /**
@@ -296,7 +297,7 @@ internal class AgentProcess(
     if (messages == null || !timeline.seed(messages, ifNoEventsSince = eventsBefore)) return
     Log.w(TAG, "Pi was idle but the chat still showed a run; reloaded its history")
     refreshContextUsage()
-    onSessionChanged()
+    sessions.refresh()
   }
 
   /** Connects; a `pi_version` refusal installs the pinned Pi once and retries once. */
@@ -417,14 +418,19 @@ internal class AgentProcess(
       // Each turn adds a response and tool results to the context; compaction shrinks it.
       "turn_end", "compaction_end" -> refreshContextUsage()
 
+      // Pi saves each message as its message_end goes out; a new chat's first one creates its session file.
+      "message_end" -> if (event.optJSONObject("message")?.optString("role") == "user") {
+        sessionFileState.value?.let(sessions::refreshIfUnlisted)
+      }
+
       "agent_settled" -> {
         refreshContextUsage()
-        onSessionChanged()
+        sessions.refresh()
       }
 
       "session_info_changed" -> {
         sessionNameState.value = event.opt("name") as? String
-        onSessionChanged()
+        sessions.refresh()
       }
 
       "thinking_level_changed" -> timeline.setThinkingLevel(event.opt("level") as? String)

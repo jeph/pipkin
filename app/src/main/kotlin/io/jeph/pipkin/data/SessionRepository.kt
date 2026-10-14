@@ -16,9 +16,9 @@ import org.json.JSONArray
 import org.json.JSONException
 
 /**
- * Pi's session list, newest first. Refreshed on app foreground, when the sidebar or a tab menu opens, after a run
- * settles and after renames and deletes. A failed refresh keeps the previous list; the host failure is
- * reported through [HostClient.lastFailure].
+ * Pi's session list, newest first. Refreshed on app foreground, when the sidebar or a tab menu opens, when a new
+ * chat's first message creates its session file, after a run settles and after renames and deletes. A failed refresh
+ * keeps the previous list; the host failure is reported through [HostClient.lastFailure].
  */
 internal class SessionRepository(private val hostClient: HostClient, scope: CoroutineScope) {
   private val sessionsState = MutableStateFlow<List<SessionInfo>>(emptyList())
@@ -37,6 +37,11 @@ internal class SessionRepository(private val hostClient: HostClient, scope: Coro
   /** Requests a refresh; requests made while one runs coalesce into a single follow-up refresh. */
   fun refresh() {
     requests.trySend(Unit)
+  }
+
+  /** Refreshes when [path], a session Pi just saved a message to, isn't listed yet. */
+  fun refreshIfUnlisted(path: String) {
+    if (sessionsState.value.none { it.path == path }) refresh()
   }
 
   /** Deletes the session files; throws [HostFailure][io.jeph.pipkin.host.HostFailure] or [HostRejected]. */

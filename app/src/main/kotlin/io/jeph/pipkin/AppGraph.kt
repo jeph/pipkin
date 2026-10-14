@@ -45,7 +45,7 @@ internal class AppGraph(private val application: Application) {
   private val turnNotifications = TurnNotifications(application)
   val registry: AgentRegistry<AgentProcess> =
     AgentRegistry(scope, onRunEnded = turnNotifications::runEnded) { cwd, sessionPath ->
-      AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, onSessionChanged = sessionRepository::refresh)
+      AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository)
     }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
   val modelDefaults = ModelDefaults(hostClient)

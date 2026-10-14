@@ -45,23 +45,22 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 
 /**
  * One chat in the tab menu: what Pi is doing in it, its title and age, highlighted while it is the one shown, and an
- * actions button that long-press also opens. A chat with no saved history yet has no age and no actions. One the
- * other pane shows says so instead of its age and doesn't open.
+ * actions button that long-press also opens. One the other pane shows says so instead of its age and doesn't open.
  */
 @Composable
 internal fun ChatTabRow(
   title: String,
-  modified: Long?,
+  modified: Long,
   process: AgentProcess?,
   shown: TabShown,
   onOpen: () -> Unit,
-  onActions: (() -> Unit)?,
+  onActions: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   TabRow(
     mark = { if (process != null) ActivityMark(process) else IdleMark() },
     title = title,
-    detail = modified?.let { relativeTime(it) },
+    detail = relativeTime(modified),
     shown = shown,
     onOpen = onOpen,
     onActions = onActions,
@@ -168,7 +167,7 @@ private fun TabRow(
   detail: String?,
   shown: TabShown,
   onOpen: () -> Unit,
-  onActions: (() -> Unit)?,
+  onActions: () -> Unit,
   actionsDescription: String,
   modifier: Modifier,
 ) {
@@ -206,15 +205,13 @@ private fun TabRow(
         )
       }
     }
-    if (onActions != null) {
-      IconButton28(
-        icon = R.drawable.ic_lucide_ellipsis,
-        contentDescription = actionsDescription,
-        onClick = onActions,
-        modifier = Modifier.size(36.dp),
-        tint = colors.foregroundMuted,
-      )
-    }
+    IconButton28(
+      icon = R.drawable.ic_lucide_ellipsis,
+      contentDescription = actionsDescription,
+      onClick = onActions,
+      modifier = Modifier.size(36.dp),
+      tint = colors.foregroundMuted,
+    )
   }
 }
 

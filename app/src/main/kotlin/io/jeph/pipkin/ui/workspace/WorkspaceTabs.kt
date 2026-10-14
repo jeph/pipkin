@@ -20,18 +20,17 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The tab menu's tabs for the workspace of a pane's shown chat: its terminals, open files and open commits, oldest
- * first; its saved chats, newest first; whether the shown chat has no saved history yet, which gives it a row of its
- * own; and what the panes show.
+ * first; its saved chats, newest first, which leaves out a new chat until Pi saved its first message; and what the
+ * panes show.
  */
 internal class WorkspaceTabs(
   val terminals: List<TerminalSession>,
   val files: List<FileTab>,
   val commits: List<CommitTab>,
   val chats: List<SessionInfo>,
-  val shownUnsaved: Boolean,
   val shown: PanesShow,
 ) {
-  val count: Int get() = terminals.size + files.size + commits.size + chats.size + if (shownUnsaved) 1 else 0
+  val count: Int get() = terminals.size + files.size + commits.size + chats.size
 }
 
 /** Where a tab menu row's tab shows: in no pane, in the menu's own pane, or in the other pane, which keeps it. */
@@ -59,17 +58,14 @@ internal fun rememberWorkspaceTabs(pane: Pane, process: AgentProcess): Workspace
   val commits by graph.commits.tabs.collectAsStateWithLifecycle()
   val shown by graph.shownTabs.shown.collectAsStateWithLifecycle()
   val panes by graph.registry.shown.collectAsStateWithLifecycle()
-  val shownPath by process.sessionFile.collectAsStateWithLifecycle()
   val elsewhere = panes[pane.other]
   val elsewherePath by remember(elsewhere) { elsewhere?.sessionFile ?: NO_SESSION }.collectAsStateWithLifecycle()
-  return remember(sessions, terminals, files, commits, shown, panes, shownPath, elsewherePath, pane, process) {
-    val chats = sessions.filter { sameFolder(it.cwd, process.cwd) }
+  return remember(sessions, terminals, files, commits, shown, panes, elsewherePath, pane, process) {
     WorkspaceTabs(
       terminals = terminals.filter { sameFolder(it.cwd, process.cwd) },
       files = files.filter { sameFolder(it.cwd, process.cwd) },
       commits = commits.filter { sameFolder(it.cwd, process.cwd) },
-      chats = chats,
-      shownUnsaved = chats.none { it.path == shownPath },
+      chats = sessions.filter { sameFolder(it.cwd, process.cwd) },
       shown = PanesShow(
         tab = shown[pane]?.takeIf { it.chat === process }?.tab,
         elsewhereChat = elsewherePath,
