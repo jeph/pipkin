@@ -18,6 +18,8 @@
     <string name="file_binary">Binary preview unavailable</string>
     <string name="file_too_large">This file is too large to display</string>
     <string name="file_failed">Failed to load file</string>
+    <string name="file_preview">Preview</string>
+    <string name="file_source">Source</string>
     <plurals name="file_lines">
         <item quantity="one">%1$d line</item>
         <item quantity="other">%1$d lines</item>

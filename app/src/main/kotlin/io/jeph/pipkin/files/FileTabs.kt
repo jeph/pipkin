@@ -1,5 +1,8 @@
 package io.jeph.pipkin.files
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.host.FileContent
@@ -31,6 +34,9 @@ internal class FileTab(val id: Int, val cwd: String, val path: String, private v
   val folder: String get() = path.substringBeforeLast('/', "")
 
   val state: StateFlow<FileState> = stateFlow.asStateFlow()
+
+  /** Whether a markdown file shows rendered rather than as its source; Paseo opens markdown rendered. */
+  var showsPreview by mutableStateOf(true)
 
   /** Reads the file again, since Pi may have changed it; what was read before stays shown until then. */
   suspend fun reload() {

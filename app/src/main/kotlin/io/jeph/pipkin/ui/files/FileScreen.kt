@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -61,6 +62,7 @@ import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.fileLanguage
 import io.jeph.pipkin.ui.components.rememberHighlightedCode
 import io.jeph.pipkin.ui.components.splitLines
+import io.jeph.pipkin.ui.settings.SegmentedControl
 import io.jeph.pipkin.ui.settings.copyToClipboard
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -126,7 +128,7 @@ internal fun FileScreen(
 
       is FileState.Loaded -> {
         // A fresh list per file, so switching files never carries the old one's scroll position over.
-        key(file) { LoadedFile(file.name, shown.content, Modifier.weight(1f)) }
+        key(file) { LoadedFile(file, shown.content, Modifier.weight(1f)) }
       }
     }
   }
@@ -137,20 +139,36 @@ internal fun FileScreen(
 }
 
 @Composable
-private fun LoadedFile(name: String, content: FileContent, modifier: Modifier) {
-  val lines = (content as? FileContent.Text)?.let { rememberSourceLines(it.text, name) }
-  FileBar(size = content.size, lineCount = lines?.size)
+private fun LoadedFile(file: FileTab, content: FileContent, modifier: Modifier) {
+  val lines = (content as? FileContent.Text)?.let { rememberSourceLines(it.text, file.name) }
+  val previewable = content is FileContent.Text && isMarkdownFile(file.name) && content.size <= PREVIEW_LIMIT
+  FileBar(
+    size = content.size,
+    lineCount = lines?.size,
+    showsPreview = file.showsPreview.takeIf { previewable },
+    onShowPreview = { file.showsPreview = it },
+  )
   when (content) {
-    is FileContent.Text -> SourceView(lines.orEmpty(), modifier)
+    is FileContent.Text -> if (previewable && file.showsPreview) {
+      MarkdownPreview(content.text, modifier)
+    } else {
+      SourceView(lines.orEmpty(), modifier)
+    }
+
     is FileContent.Image -> ImageView(content.bytes, modifier)
+
     is FileContent.Binary -> FileNote(modifier) { NoteText(stringResource(R.string.file_binary)) }
+
     is FileContent.TooLarge -> FileNote(modifier) { NoteText(stringResource(R.string.file_too_large)) }
   }
 }
 
-/** Paseo's file bar: the file's size and, for text, its line count, in the whisper style. */
+/**
+ * Paseo's file bar: the file's size and, for text, its line count, in the whisper style; for markdown, the
+ * Preview and Source switch at its end, [showsPreview] saying which is selected.
+ */
 @Composable
-private fun FileBar(size: Long, lineCount: Int?) {
+private fun FileBar(size: Long, lineCount: Int?, showsPreview: Boolean?, onShowPreview: (Boolean) -> Unit) {
   val colors = pipkinColors
   val context = LocalContext.current
   Row(
@@ -169,6 +187,19 @@ private fun FileBar(size: Long, lineCount: Int?) {
         color = colors.foregroundMuted,
         fontSize = PipkinTokens.FontSize.sm,
       )
+    }
+    if (showsPreview != null) {
+      Spacer(Modifier.weight(1f))
+      SegmentedControl(options = listOf(true, false), selected = showsPreview, onSelect = onShowPreview) {
+          preview,
+          selected,
+        ->
+        Text(
+          text = stringResource(if (preview) R.string.file_preview else R.string.file_source),
+          color = if (selected) colors.foreground else colors.foregroundMuted,
+          fontSize = PipkinTokens.FontSize.sm,
+        )
+      }
     }
   }
   HorizontalDivider(thickness = 1.dp, color = colors.border)
@@ -314,6 +345,12 @@ private fun NoteText(text: String, color: Color = pipkinColors.foregroundMuted) 
 
 /** Paseo highlights files up to 1 MiB on phones and shows bigger ones plain. */
 private const val HIGHLIGHT_LIMIT = 1024 * 1024
+
+/**
+ * Markdown up to this size can be previewed; bigger files show only their source. The renderer composes a whole
+ * document at once, and a table of 64 KiB already takes half the app's heap, so a bigger one could crash it.
+ */
+private const val PREVIEW_LIMIT = 64 * 1024
 
 private const val MAX_IMAGE_SIDE = 2048
 
