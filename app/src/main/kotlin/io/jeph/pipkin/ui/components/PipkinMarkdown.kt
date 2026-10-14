@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -12,6 +13,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.compose.components.markdownComponents
@@ -20,13 +22,17 @@ import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
+import com.mikepenz.markdown.model.MarkdownAnnotator
 import com.mikepenz.markdown.model.MarkdownTypography
 import com.mikepenz.markdown.model.markdownAnimations
+import com.mikepenz.markdown.model.markdownAnnotator
 import com.mikepenz.markdown.model.markdownDimens
 import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.model.rememberMarkdownState
+import com.mikepenz.markdown.utils.resolveImageAlt
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import org.intellij.markdown.MarkdownElementTypes
 
 /** Assistant markdown styled to Paseo's message tokens: 15/21sp body, bordered horizontally scrolling code. */
 @Composable
@@ -67,9 +73,30 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
       // The library animates each text block's size by default, which relayouts every frame a streamed
       // block grows and leaves the chat's end moving after the text has landed.
       animations = markdownAnimations(animateTextSize = { this }),
+      annotator = imageAltAnnotator(),
     )
   }
 }
+
+/**
+ * Pipkin has no image loader, so an image shows as Paseo shows one that failed to load: its alt text, small and muted
+ * on surface2, or nothing without alt. Left to the library, each image reserves an empty box the size of a picture.
+ */
+@Composable
+private fun imageAltAnnotator(): MarkdownAnnotator {
+  val colors = pipkinColors
+  val style = SpanStyle(color = colors.foregroundMuted, background = colors.surface2, fontSize = IMAGE_ALT_FONT_SIZE)
+  return remember(style) {
+    markdownAnnotator { content, node ->
+      if (node.type != MarkdownElementTypes.IMAGE) return@markdownAnnotator false
+      val alt = node.resolveImageAlt(content)
+      if (!alt.isNullOrBlank()) withStyle(style) { append(alt) }
+      true
+    }
+  }
+}
+
+private val IMAGE_ALT_FONT_SIZE = 10.sp
 
 @Composable
 private fun typography(body: TextStyle): MarkdownTypography {
