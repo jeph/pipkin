@@ -634,6 +634,36 @@ describe("git mode", () => {
     expect(await git(workspace, "status", "--porcelain")).toBe("?? new.txt\n");
   });
 
+  describe("git that runs past the time limit", () => {
+    beforeEach(async () => {
+      run.socket.destroy();
+      await run.exited;
+      ({ run } = await startHost("git", dirs, { ...ISOLATED, TMPDIR: tmp, PIPKIN_GIT_TIMEOUT_MS: "500" }));
+      await run.next();
+      run.send({ type: "pipkin_request", params: {} });
+    });
+
+    // The sleep is a separate process git's wrapper waits on, like a textconv filter, holding git's output open.
+    it("reports a diff git can't produce in time as too large and drops the temporary index", async () => {
+      await initRepo();
+      await write("README.md", "changed\n");
+      await wrapGit(`case " $* " in *" --numstat "*) sleep 30; exit 1;; esac`);
+      expect(await changes()).toMatchObject({ tooLarge: true, files: [] });
+      expect(await readdir(tmp)).toEqual([]);
+    });
+
+    it("still fails a slow command that isn't a diff", async () => {
+      await initRepo();
+      await git(workspace, "checkout", "-q", "-b", "feature");
+      await write("feature.txt", "f\n");
+      await commitAll(workspace, "feature");
+      await wrapGit(`case " $* " in *" log "*) sleep 30; exit 1;; esac`);
+      const reply = await commits();
+      expect(reply).toMatchObject({ code: "failed" });
+      expect(reply).not.toHaveProperty("commits");
+    });
+  });
+
   it("ignores malformed requests", async () => {
     await initRepo();
     run.send({ type: "pipkin_git_changes", id: "1", root: workspace, mode: "uncommitted", ignoreWhitespace: false });

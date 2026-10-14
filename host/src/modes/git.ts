@@ -17,7 +17,8 @@ const NUMSTAT_LIMIT = 2 * 1024 * 1024;
 const COMMITS_LIMIT = 500;
 /** Keeps a reply well under the app's 16 MiB line limit. */
 const REPLY_LIMIT = 8 * 1024 * 1024;
-const GIT_TIMEOUT_MS = 30_000;
+/** How long one git run may take; tests shorten it so they needn't wait. */
+const GIT_TIMEOUT_MS = Number(process.env.PIPKIN_GIT_TIMEOUT_MS ?? 30_000);
 /** Enough of git's stderr to explain a failure. */
 const STDERR_LIMIT = 64 * 1024;
 
@@ -53,7 +54,7 @@ class TooLarge extends Error {}
 /** Git ran past [GIT_TIMEOUT_MS]. A diff that slow is reported as `tooLarge`; anything else as a failure. */
 class TimedOut extends GitError {
   constructor(command: string | undefined) {
-    super("failed", `git ${command ?? ""} took longer than 30 seconds.`);
+    super("failed", `git ${command ?? ""} took longer than ${String(GIT_TIMEOUT_MS / 1000)} seconds.`);
   }
 }
 
@@ -94,7 +95,11 @@ async function isExecutable(path: string): Promise<boolean> {
   }
 }
 
-/** Runs git in [repo], killed after [GIT_TIMEOUT_MS] or when the app hangs up. */
+/**
+ * Runs git in [repo], killed after [GIT_TIMEOUT_MS] or when the app hangs up. Git runs in a process group of its
+ * own and the whole group is killed, since a helper it started, such as a textconv filter, would otherwise outlive
+ * it and keep its output open, so the run would never end.
+ */
 function run(repo: Repo, args: string[], options: RunOptions = {}): Promise<RunResult> {
   const { promise, resolve: done, reject } = Promise.withResolvers<RunResult>();
   if (repo.signal.aborted) {
@@ -105,11 +110,17 @@ function run(repo: Repo, args: string[], options: RunOptions = {}): Promise<RunR
     cwd: repo.root,
     env: { ...process.env, ...GIT_ENV, ...options.env },
     stdio: ["ignore", "pipe", "pipe"],
+    detached: true,
   });
   let killedFor: "abort" | "timeout" | "overflow" | "truncated" | undefined;
   const kill = (reason: NonNullable<typeof killedFor>): void => {
     killedFor ??= reason;
-    child.kill("SIGKILL");
+    if (child.pid === undefined) return;
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch {
+      // The whole group has already exited.
+    }
   };
   const timer = setTimeout(() => kill("timeout"), GIT_TIMEOUT_MS);
   const onAbort = (): void => kill("abort");
