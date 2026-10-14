@@ -12,12 +12,15 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -117,7 +120,10 @@ internal fun ConfirmDialog(
   )
 }
 
-/** A dialog asking for one line, or several when [multiline]; confirm is disabled while the text is blank. */
+/**
+ * A dialog asking for one line, or several when [multiline], with the cursor after [initial] and the keyboard up;
+ * confirm is disabled while the text is blank.
+ */
 @Composable
 internal fun TextInputDialog(
   title: String,
@@ -142,10 +148,16 @@ internal fun TextInputDialog(
     },
     title = { Text(text = title, fontSize = PipkinTokens.FontSize.xl) },
     text = {
+      // In the dialog's own composition, so the field is attached when the effect runs.
+      val focusRequester = remember { FocusRequester() }
+      LaunchedEffect(Unit) { focusRequester.requestFocus() }
       OutlinedTextField(
         value = value,
         onValueChange = { value = it },
-        modifier = Modifier.fillMaxWidth().then(if (multiline) Modifier.heightIn(min = 160.dp) else Modifier),
+        modifier = Modifier
+          .fillMaxWidth()
+          .then(if (multiline) Modifier.heightIn(min = 160.dp) else Modifier)
+          .focusRequester(focusRequester),
         placeholder = placeholder?.let { { Text(text = it, color = colors.foregroundMuted) } },
         singleLine = !multiline,
       )
