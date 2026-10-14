@@ -10,7 +10,7 @@ import io.jeph.pipkin.host.GitFile
 import io.jeph.pipkin.host.GitFileKind
 import io.jeph.pipkin.host.GitHunk
 
-internal enum class DiffLineKind { Context, Added, Removed, NoNewline }
+internal enum class DiffLineKind { Context, Added, Removed }
 
 /** One row of a file's diff body, in the order the document shows them. */
 internal sealed interface DiffRow {
@@ -121,13 +121,13 @@ private fun addLines(hunk: GitHunk, sides: Sides, rows: MutableList<DiffRow>) {
   var oldNumber = hunk.oldStart
   var newNumber = hunk.newStart
   for (line in hunk.lines) {
+    // Paseo leaves out git's `\ No newline at end of file` markers.
+    if (line.startsWith('\\')) continue
     val text = if (line.isEmpty()) "" else line.substring(1)
     val row = when (line.firstOrNull()) {
       '+' -> DiffRow.Line(DiffLineKind.Added, newNumber++, text, sides.new.add(text))
 
       '-' -> DiffRow.Line(DiffLineKind.Removed, oldNumber++, text, sides.old.add(text))
-
-      '\\' -> DiffRow.Line(DiffLineKind.NoNewline, null, line, -1)
 
       // A context line is on both sides; it's coloured from the new one. An empty line has lost its space prefix.
       else -> {

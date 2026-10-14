@@ -46,28 +46,27 @@ class DiffDocumentTest {
   }
 
   @Test
-  fun `a no-newline marker has no number, keeps its text and doesn't advance either side`() {
+  fun `no-newline markers are left out without advancing either side`() {
     val hunk = GitHunk(
-      "@@ -1 +1 @@",
+      "@@ -1,2 +1,2 @@",
       oldStart = 1,
       newStart = 1,
-      lines = listOf("-old", "\\ No newline at end of file", "+new", "\\ No newline at end of file"),
+      lines = listOf(" same", "-old", "\\ No newline at end of file", "+new", "\\ No newline at end of file"),
     )
 
     val section = document(file("f.txt", hunk)).sections.single()
 
     assertEquals(
       listOf(
-        "@@ -1 +1 @@",
-        "Removed 1 old 0",
-        "NoNewline null \\ No newline at end of file -1",
-        "Added 1 new 0",
-        "NoNewline null \\ No newline at end of file -1",
+        "@@ -1,2 +1,2 @@",
+        "Context 1 same 0",
+        "Removed 2 old 1",
+        "Added 2 new 1",
       ),
       rows(section),
     )
-    assertEquals("old", section.oldSide)
-    assertEquals("new", section.newSide)
+    assertEquals("same\nold", section.oldSide)
+    assertEquals("same\nnew", section.newSide)
   }
 
   @Test

@@ -180,7 +180,7 @@ private fun LineRow(line: DiffRow.Line, highlight: SideHighlight?, style: DiffRo
   val (background, numberColor) = when (line.kind) {
     DiffLineKind.Added -> colors.dotSuccess.copy(alpha = ADDED_ALPHA) to colors.dotSuccess
     DiffLineKind.Removed -> colors.dotDanger.copy(alpha = REMOVED_ALPHA) to colors.dotDanger
-    DiffLineKind.Context, DiffLineKind.NoNewline -> Color.Transparent to colors.foregroundMuted
+    DiffLineKind.Context -> Color.Transparent to colors.foregroundMuted
   }
   Row(modifier = Modifier.fillMaxWidth().background(background)) {
     Text(
@@ -195,7 +195,7 @@ private fun LineRow(line: DiffRow.Line, highlight: SideHighlight?, style: DiffRo
     CodeText(
       text = text,
       style = style,
-      color = if (line.kind == DiffLineKind.NoNewline) colors.foregroundMuted else colors.foreground,
+      color = colors.foreground,
       modifier = Modifier.weight(1f),
     )
   }
@@ -206,7 +206,6 @@ private fun highlightedLine(line: DiffRow.Line, highlight: SideHighlight?): Anno
   val lines = when (line.kind) {
     DiffLineKind.Removed -> highlight?.oldLines
     DiffLineKind.Added, DiffLineKind.Context -> highlight?.newLines
-    DiffLineKind.NoNewline -> null
   }
   // A line holding a lone carriage return splits in two when highlighted, so later lines would get the wrong colours.
   return lines?.getOrNull(line.sideLine)?.takeIf { it.text == line.text } ?: AnnotatedString(line.text)
