@@ -13,15 +13,15 @@ import io.jeph.pipkin.git.CommitTab
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.workspace.Pane
-import io.jeph.pipkin.workspace.ShownTabs
+import io.jeph.pipkin.workspace.PaneItem
+import io.jeph.pipkin.workspace.Panes
 import io.jeph.pipkin.workspace.WorkspaceTab
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The tab menu's tabs for the workspace of a pane's shown chat: its terminals, open files and open commits, oldest
- * first; its saved chats, newest first, which leaves out a new chat until Pi saved its first message; and what the
- * panes show.
+ * The tab menu's tabs for a workspace: its terminals, open files and open commits, oldest first; its saved chats,
+ * newest first, which leaves out a new chat until Pi saved its first message; and what the panes show.
  */
 internal class WorkspaceTabs(
   val terminals: List<TerminalSession>,
@@ -37,10 +37,15 @@ internal class WorkspaceTabs(
 internal enum class TabShown { Nowhere, Here, OtherPane }
 
 /**
- * What the panes show, from one pane's side: the [tab] it shows in place of its chat, if any, and the session file of
- * the chat and the tab the other pane shows, which this pane can't show too.
+ * What the panes show, from one pane's side: the session file of the chat or the [tab] it shows, and the session file
+ * of the chat or the tab the other pane shows, which this pane can't show too.
  */
-internal class PanesShow(val tab: WorkspaceTab?, val elsewhereChat: String?, val elsewhereTab: WorkspaceTab?) {
+internal class PanesShow(
+  val chat: String?,
+  val tab: WorkspaceTab?,
+  val elsewhereChat: String?,
+  val elsewhereTab: WorkspaceTab?,
+) {
   fun of(tab: WorkspaceTab): TabShown = when (tab) {
     this.tab -> TabShown.Here
     elsewhereTab -> TabShown.OtherPane
@@ -48,31 +53,49 @@ internal class PanesShow(val tab: WorkspaceTab?, val elsewhereChat: String?, val
   }
 }
 
-/** The [WorkspaceTabs] of the workspace [process] works in, with [process] as the chat [pane] shows. */
+/** By pane, what it shows. */
 @Composable
-internal fun rememberWorkspaceTabs(pane: Pane, process: AgentProcess): WorkspaceTabs {
+internal fun rememberPaneItems(): Map<Pane, PaneItem<AgentProcess>> {
+  val graph = LocalContext.current.appGraph
+  val tabs by graph.panes.tabs.collectAsStateWithLifecycle()
+  val chats by graph.registry.shown.collectAsStateWithLifecycle()
+  return remember(tabs, chats) {
+    Pane.entries.mapNotNull { pane -> Panes.itemIn(tabs, chats, pane)?.let { pane to it } }.toMap()
+  }
+}
+
+/** The [WorkspaceTabs] of the workspace folder [cwd], seen from [pane]. */
+@Composable
+internal fun rememberWorkspaceTabs(pane: Pane, cwd: String): WorkspaceTabs {
   val graph = LocalContext.current.appGraph
   val sessions by graph.sessionArchive.active.collectAsStateWithLifecycle()
   val terminals by graph.terminals.sessions.collectAsStateWithLifecycle()
   val files by graph.files.tabs.collectAsStateWithLifecycle()
   val commits by graph.commits.tabs.collectAsStateWithLifecycle()
-  val shown by graph.shownTabs.shown.collectAsStateWithLifecycle()
-  val panes by graph.registry.shown.collectAsStateWithLifecycle()
-  val elsewhere = panes[pane.other]
-  val elsewherePath by remember(elsewhere) { elsewhere?.sessionFile ?: NO_SESSION }.collectAsStateWithLifecycle()
-  return remember(sessions, terminals, files, commits, shown, panes, elsewherePath, pane, process) {
+  val items = rememberPaneItems()
+  val here = items[pane]
+  val elsewhere = items[pane.other]
+  val herePath by sessionFileOf(here).collectAsStateWithLifecycle()
+  val elsewherePath by sessionFileOf(elsewhere).collectAsStateWithLifecycle()
+  return remember(sessions, terminals, files, commits, here, elsewhere, herePath, elsewherePath, cwd) {
     WorkspaceTabs(
-      terminals = terminals.filter { sameFolder(it.cwd, process.cwd) },
-      files = files.filter { sameFolder(it.cwd, process.cwd) },
-      commits = commits.filter { sameFolder(it.cwd, process.cwd) },
-      chats = sessions.filter { sameFolder(it.cwd, process.cwd) },
+      terminals = terminals.filter { sameFolder(it.cwd, cwd) },
+      files = files.filter { sameFolder(it.cwd, cwd) },
+      commits = commits.filter { sameFolder(it.cwd, cwd) },
+      chats = sessions.filter { sameFolder(it.cwd, cwd) },
       shown = PanesShow(
-        tab = shown[pane]?.takeIf { it.chat === process }?.tab,
+        chat = herePath,
+        tab = (here as? PaneItem.Tab)?.tab,
         elsewhereChat = elsewherePath,
-        elsewhereTab = ShownTabs.shownIn(shown, panes, pane.other),
+        elsewhereTab = (elsewhere as? PaneItem.Tab)?.tab,
       ),
     )
   }
 }
+
+/** The session file of [item]'s chat; null for a tab or nothing. */
+@Composable
+private fun sessionFileOf(item: PaneItem<AgentProcess>?): StateFlow<String?> =
+  remember(item) { (item as? PaneItem.Chat)?.process?.sessionFile ?: NO_SESSION }
 
 private val NO_SESSION: StateFlow<String?> = MutableStateFlow(null)

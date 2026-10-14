@@ -9,7 +9,7 @@ import io.jeph.pipkin.host.FileContent
 import io.jeph.pipkin.host.FileHost
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.workspace.Pane
-import io.jeph.pipkin.workspace.ShownTabs
+import io.jeph.pipkin.workspace.Panes
 import io.jeph.pipkin.workspace.WorkspaceTab
 import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -55,7 +55,7 @@ internal class FileTab(val id: Int, val cwd: String, val path: String, private v
  * The open files, which belong to a folder rather than a chat, like terminals: every chat in a folder shows the same
  * ones. A file has at most one tab per folder. Main-thread confined.
  */
-internal class FileTabRegistry(private val files: FileHost, private val shownTabs: ShownTabs) {
+internal class FileTabRegistry(private val files: FileHost, private val panes: Panes<AgentProcess>) {
   private val tabsFlow = MutableStateFlow<List<FileTab>>(emptyList())
   private var nextId = 1
 
@@ -63,18 +63,18 @@ internal class FileTabRegistry(private val files: FileHost, private val shownTab
   val tabs: StateFlow<List<FileTab>> = tabsFlow.asStateFlow()
 
   /**
-   * Shows [path]'s tab in [chat]'s folder in place of the chat in [pane], opening one when the file has none. Returns
-   * false, showing nothing, when the other pane shows the file.
+   * Shows [path]'s tab in the folder [cwd] in [pane], opening one when the file has none. Returns false, showing
+   * nothing, when the other pane shows the file.
    */
-  fun open(pane: Pane, chat: AgentProcess, path: String): Boolean {
-    val folder = folderKey(chat.cwd)
+  fun open(pane: Pane, cwd: String, path: String): Boolean {
+    val folder = folderKey(cwd)
     val tab = tabsFlow.value.firstOrNull { it.cwd == folder && it.path == path }
       ?: FileTab(nextId++, folder, path, files).also { opened -> tabsFlow.update { it + opened } }
-    return shownTabs.show(pane, chat, WorkspaceTab.File(tab))
+    return panes.showTab(pane, WorkspaceTab.File(tab))
   }
 
   fun close(tab: FileTab) {
     tabsFlow.update { it - tab }
-    shownTabs.forget(WorkspaceTab.File(tab))
+    panes.forget(WorkspaceTab.File(tab))
   }
 }

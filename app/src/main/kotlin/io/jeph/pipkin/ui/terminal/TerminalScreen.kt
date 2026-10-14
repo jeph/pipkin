@@ -55,20 +55,15 @@ import io.jeph.pipkin.ui.workspace.TabCountButton
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 
 /**
- * One terminal tab, shown in place of [chat]: a header with the terminal's name over its folder, the workspace's tab
+ * One terminal tab in a pane: a header with the terminal's name over its folder, the workspace's tab
  * button, the terminal's actions and the explorer toggle, which act through [controls]; libghostty's terminal; and
  * Paseo's key bar above the keyboard. An ended shell shows a bar to start another.
  */
 @Composable
-internal fun TerminalScreen(
-  session: TerminalSession,
-  chat: AgentProcess,
-  controls: PaneControls,
-  modifier: Modifier = Modifier,
-) {
+internal fun TerminalScreen(session: TerminalSession, controls: PaneControls, modifier: Modifier = Modifier) {
   val graph = LocalContext.current.appGraph
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(controls.pane, chat)
+  val tabs = rememberWorkspaceTabs(controls.pane, session.cwd)
   var actionsOpen by remember(session) { mutableStateOf(false) }
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
@@ -94,7 +89,7 @@ internal fun TerminalScreen(
   if (actionsOpen) {
     TerminalActionsSheet(
       session = session,
-      onNewTerminal = { graph.terminals.open(controls.pane, chat) },
+      onNewTerminal = { graph.terminals.open(controls.pane, session.cwd) },
       onRestart = session::start,
       onClose = { graph.terminals.close(session) },
       onDismiss = { actionsOpen = false },

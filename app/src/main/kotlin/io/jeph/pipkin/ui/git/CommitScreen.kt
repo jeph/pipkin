@@ -39,22 +39,17 @@ import io.jeph.pipkin.ui.workspace.TabCountButton
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 
 /**
- * One open commit, shown in place of [chat]: the workspace header with the commit's title, the workspace's tab
+ * One open commit in a pane: the workspace header with the commit's title, the workspace's tab
  * button, the commit's actions and the explorer toggle, which act through [controls], then just what the commit
  * changed, every file unfolded, as the Changes tab draws a diff. It follows the global Wrap lines and Hide whitespace
  * settings; hiding whitespace reads the commit again with git's `-w`. A commit never changes, so it's read once per
  * whitespace setting.
  */
 @Composable
-internal fun CommitScreen(
-  commit: CommitTab,
-  chat: AgentProcess,
-  controls: PaneControls,
-  modifier: Modifier = Modifier,
-) {
+internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: Modifier = Modifier) {
   val graph = LocalContext.current.appGraph
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(controls.pane, chat)
+  val tabs = rememberWorkspaceTabs(controls.pane, commit.cwd)
   val state by commit.state.collectAsStateWithLifecycle()
   val hideWhitespace by graph.preferences.diffHideWhitespace.collectAsStateWithLifecycle()
   val wrapLines by graph.preferences.diffWrapLines.collectAsStateWithLifecycle()

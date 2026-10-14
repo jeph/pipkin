@@ -98,20 +98,19 @@ internal fun TabCountButton(count: Int, onClick: () -> Unit) {
 }
 
 /**
- * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace of the chat [process]
- * that [pane] shows, its terminals, its open files, its open commits and then its chats, the shown one highlighted.
- * Tapping a tab shows it in [pane] and closes the sheet; tapping one the other pane shows calls [onSwapPanes] instead,
- * so that pane comes to this side, showing its chat rather than its tab when the chat was tapped. A chat is archived
- * by swiping it right or from its actions sheet, which also renames it and, when [onShownInSplit] is given, opens it in
- * split screen, calling that once the second pane shows it; the sheet stays open and shows the shell's [snackbar], so
- * the archive's Undo is in reach. A terminal, a file or a commit closes by swiping it right or from its actions sheet,
- * which also renames a terminal.
+ * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace folder [cwd] of what
+ * [pane] shows, its terminals, its open files, its open commits and then its chats, the shown one highlighted. Tapping
+ * a tab shows it in [pane] instead and closes the sheet; tapping one the other pane shows calls [onSwapPanes], so
+ * that pane comes to this side. A chat is archived by swiping it right or from its actions sheet, which also renames it
+ * and, when [onShownInSplit] is given, opens it in split screen, calling that once the second pane shows it; the sheet
+ * stays open and shows the shell's [snackbar], so the archive's Undo is in reach. A terminal, a file or a commit
+ * closes by swiping it right or from its actions sheet, which also renames a terminal.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WorkspaceTabsSheet(
   pane: Pane,
-  process: AgentProcess,
+  cwd: String,
   actions: ShellActions,
   snackbar: SnackbarStackState,
   onShownInSplit: (() -> Unit)?,
@@ -119,27 +118,23 @@ internal fun WorkspaceTabsSheet(
   onDismiss: () -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
-  val tabs = rememberWorkspaceTabs(pane, process)
+  val tabs = rememberWorkspaceTabs(pane, cwd)
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
   val archiving = remember(actions) { TabArchiving(actions) }
   val terminalClosing = remember(graph) { TerminalClosing(graph.terminals) }
   var menu by remember { mutableStateOf<TabMenu?>(null) }
-  val show = { tab: WorkspaceTab? ->
-    if (!graph.shownTabs.show(pane, process, tab)) onSwapPanes()
-    onDismiss()
-  }
-  val showOtherChat = {
-    graph.registry.shown.value[pane.other]?.let { graph.shownTabs.show(pane.other, it, null) }
+  val swapPanes = {
     onSwapPanes()
     onDismiss()
   }
+  val show = { tab: WorkspaceTab -> if (graph.panes.showTab(pane, tab)) onDismiss() else swapPanes() }
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
   LaunchedEffect(tabs.chats) { archiving.forgetGone(tabs.chats) }
   PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = 0.85f) {
     // A long path keeps its end, the folder that tells workspaces apart.
     Text(
-      text = tildePath(process.cwd, home),
+      text = tildePath(cwd, home),
       modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s8),
       color = pipkinColors.foreground,
       fontSize = PipkinTokens.FontSize.lg,
@@ -147,22 +142,19 @@ internal fun WorkspaceTabsSheet(
       overflow = TextOverflow.StartEllipsis,
     )
     TabList(
-      process = process,
       tabs = tabs,
       archiving = archiving,
       terminalClosing = terminalClosing,
       callbacks = TabListCallbacks(
-        // The chat shown next starts on its own tab, not on a terminal or file shown with this one.
-        onOpenChat = { session -> if (actions.openChat(pane, session.cwd, session.path)) show(null) },
+        onOpenChat = { session -> if (actions.openChat(pane, session.cwd, session.path)) onDismiss() },
         onShow = show,
-        onShowOtherChat = showOtherChat,
+        onSwapPanes = swapPanes,
         onActions = { menu = it },
       ),
       modifier = Modifier.weight(1f, fill = false),
     )
     SnackbarStackOverlay(snackbar)
   }
-  val shownPath by process.sessionFile.collectAsStateWithLifecycle()
   menu?.let { shownMenu ->
     // Only chats no pane shows open in split screen: the second pane's own rows already show there.
     val path = (shownMenu as? TabMenu.Chat)?.session?.path
@@ -173,7 +165,7 @@ internal fun WorkspaceTabsSheet(
           onDismiss()
         }
       }
-    }?.takeIf { path != shownPath && path != tabs.shown.elsewhereChat }
+    }?.takeIf { path != tabs.shown.chat && path != tabs.shown.elsewhereChat }
     TabMenuSheet(shownMenu, actions, archiving, openInSplit, onDismiss = { menu = null })
   }
   ConfirmArchive(archiving)
@@ -260,18 +252,17 @@ private fun TabMenuSheet(
 /** What the tab menu's rows do. */
 private class TabListCallbacks(
   val onOpenChat: (SessionInfo) -> Unit,
-  val onShow: (WorkspaceTab?) -> Unit,
-  val onShowOtherChat: () -> Unit,
+  val onShow: (WorkspaceTab) -> Unit,
+  val onSwapPanes: () -> Unit,
   val onActions: (TabMenu) -> Unit,
 )
 
 /**
- * The tab menu's rows: the workspace's terminals, open files and open commits, then the saved chats. The shown chat is
- * highlighted only while no other tab is shown in its place; what the other pane shows is marked.
+ * The tab menu's rows: the workspace's terminals, open files and open commits, then the saved chats. What the pane
+ * shows is highlighted, and what the other pane shows is marked.
  */
 @Composable
 private fun TabList(
-  process: AgentProcess,
   tabs: WorkspaceTabs,
   archiving: TabArchiving,
   terminalClosing: TerminalClosing,
@@ -280,16 +271,13 @@ private fun TabList(
 ) {
   val graph = LocalContext.current.appGraph
   val processes by graph.registry.processes.collectAsStateWithLifecycle()
-  val shownPath by process.sessionFile.collectAsStateWithLifecycle()
   val closing = remember(graph) { FileClosing(graph.files) }
   val commitClosing = remember(graph) { CommitClosing(graph.commits) }
-  val chatShown = tabs.shown.tab == null
   LazyColumn(modifier = modifier) {
     terminalRows(tabs, terminalClosing, callbacks)
     fileRows(tabs, closing, callbacks)
     commitRows(tabs, commitClosing, callbacks)
     items(tabs.chats, key = { it.path }) { session ->
-      val current = session.path == shownPath
       val elsewhere = session.path == tabs.shown.elsewhereChat
       SwipeAway(
         leaving = session.path in archiving.leaving,
@@ -302,18 +290,12 @@ private fun TabList(
           title = sessionTitle(session),
           modified = session.modified,
           process = processes[ChatKey.session(session.path)],
-          shown = when {
-            current && chatShown -> TabShown.Here
-            elsewhere -> TabShown.OtherPane
+          shown = when (session.path) {
+            tabs.shown.chat -> TabShown.Here
+            tabs.shown.elsewhereChat -> TabShown.OtherPane
             else -> TabShown.Nowhere
           },
-          onOpen = {
-            when {
-              current -> callbacks.onShow(null)
-              elsewhere -> callbacks.onShowOtherChat()
-              else -> callbacks.onOpenChat(session)
-            }
-          },
+          onOpen = { if (elsewhere) callbacks.onSwapPanes() else callbacks.onOpenChat(session) },
           onActions = { callbacks.onActions(TabMenu.Chat(session)) },
         )
       }

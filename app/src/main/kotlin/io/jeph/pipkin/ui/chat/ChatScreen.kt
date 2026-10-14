@@ -99,7 +99,7 @@ internal fun ChatScreen(
       sheet,
       onSheet = { sheet = it },
       onNewChat = { actions.newChat(controls.pane, it) },
-      onNewTerminal = { context.appGraph.terminals.open(controls.pane, process) },
+      onNewTerminal = { context.appGraph.terminals.open(controls.pane, process.cwd) },
       onArchive = actions::archive,
     )
     ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive = actions::archive)
@@ -237,7 +237,7 @@ private fun ChatHeader(
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
   val sessions by graph.sessionRepository.sessions.collectAsStateWithLifecycle()
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(controls.pane, process)
+  val tabs = rememberWorkspaceTabs(controls.pane, process.cwd)
   val firstMessage = sessions.firstOrNull { it.path == sessionFile }?.firstMessage?.takeIf { it.isNotBlank() }
   HeaderBar(
     title = sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),

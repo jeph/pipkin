@@ -58,6 +58,7 @@ import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SwipeAway
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.ui.workspace.rememberPaneItems
 import io.jeph.pipkin.workspace.Pane
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
@@ -304,7 +305,7 @@ private fun WorkspaceList(
 ) {
   val registry = LocalContext.current.appGraph.registry
   val processes by registry.processes.collectAsStateWithLifecycle()
-  val panes by registry.shown.collectAsStateWithLifecycle()
+  val items = rememberPaneItems()
   if (workspaces.isEmpty()) {
     Text(
       text = stringResource(R.string.shell_sidebar_empty),
@@ -328,7 +329,7 @@ private fun WorkspaceList(
       ) {
         WorkspaceRow(
           name = projectName(cwd, home),
-          shown = panes[pane]?.let { sameFolder(it.cwd, cwd) } == true,
+          shown = items[pane]?.let { sameFolder(it.cwd, cwd) } == true,
           working = anyWorking(remember(processes, cwd) { processes.values.filter { sameFolder(it.cwd, cwd) } }),
           onOpen = { onOpen(cwd) },
           onNewChat = { onNewChatIn(cwd) },
@@ -350,8 +351,8 @@ private fun anyWorking(processes: List<AgentProcess>): Boolean {
 
 /**
  * A workspace's row: its folder (the simmering pot while Pi works in one of its chats) and name, highlighted while
- * the sidebar's pane shows one of its chats, with its actions and New chat. Tapping it shows its chat; long-press opens
- * its actions.
+ * the sidebar's pane shows one of its chats or tabs, with its actions and New chat. Tapping it shows the workspace;
+ * long-press opens its actions.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

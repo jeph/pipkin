@@ -76,16 +76,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * One open file, shown in place of [chat]: a header with the file's name over its folder, the workspace's tab button,
+ * One open file in a pane: a header with the file's name over its folder, the workspace's tab button,
  * the file's actions and the explorer toggle, which act through [controls]; Paseo's bar with the file's size and line
  * count; and the file itself, read again each time its tab shows, since Pi may have changed it. Text shows with line
  * numbers, coloured when a grammar knows the extension; images show fitted to the width.
  */
 @Composable
-internal fun FileScreen(file: FileTab, chat: AgentProcess, controls: PaneControls, modifier: Modifier = Modifier) {
+internal fun FileScreen(file: FileTab, controls: PaneControls, modifier: Modifier = Modifier) {
   val graph = LocalContext.current.appGraph
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(controls.pane, chat)
+  val tabs = rememberWorkspaceTabs(controls.pane, file.cwd)
   val state by file.state.collectAsStateWithLifecycle()
   var actionsOpen by remember(file) { mutableStateOf(false) }
   val folder = if (file.folder.isEmpty()) file.cwd else "${file.cwd}/${file.folder}"
