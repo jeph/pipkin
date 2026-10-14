@@ -20,7 +20,8 @@ class ExplorerRowsTest {
   )
 
   private fun rows(expanded: Set<String>, showHidden: Boolean) =
-    explorerRows(directories, expanded, showHidden).map { "${"  ".repeat(it.depth)}${it.entry.name}" }
+    explorerRows(directories, expanded, showHidden, ExplorerSort.Default)
+      .map { "${"  ".repeat(it.depth)}${it.entry.name}" }
 
   @Test
   fun anExpandedFolderListsItsEntriesRightUnderItOneLevelDeeper() {
@@ -48,6 +49,9 @@ class ExplorerRowsTest {
 
   @Test
   fun nothingShowsBeforeTheTopFolderIsListed() {
-    assertEquals(emptyList<ExplorerRow.Entry>(), explorerRows(emptyMap(), setOf("src"), showHidden = true))
+    assertEquals(
+      emptyList<ExplorerRow.Entry>(),
+      explorerRows(emptyMap(), setOf("src"), showHidden = true, ExplorerSort.Default),
+    )
   }
 }

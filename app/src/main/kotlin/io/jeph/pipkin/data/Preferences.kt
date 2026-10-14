@@ -2,6 +2,8 @@ package io.jeph.pipkin.data
 
 import android.content.Context
 import androidx.core.content.edit
+import io.jeph.pipkin.ui.files.ExplorerSort
+import io.jeph.pipkin.ui.files.SortKey
 import io.jeph.pipkin.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +22,7 @@ internal class Preferences(context: Context) {
   private val workspacesState = MutableStateFlow(readWorkspaces())
   private val archivedState = MutableStateFlow(readArchived())
   private val showHiddenFilesState = MutableStateFlow(prefs.getBoolean(SHOW_HIDDEN_FILES, true))
+  private val explorerSortState = MutableStateFlow(readExplorerSort())
 
   /** Onboarding finished or was skipped. */
   val setupComplete: StateFlow<Boolean> = setupCompleteState.asStateFlow()
@@ -37,6 +40,9 @@ internal class Preferences(context: Context) {
 
   /** Whether the file explorer lists dot files and folders; Paseo shows them unless asked not to. */
   val showHiddenFiles: StateFlow<Boolean> = showHiddenFilesState.asStateFlow()
+
+  /** How the file explorer orders each folder; names A to Z until changed, as in Paseo. */
+  val explorerSort: StateFlow<ExplorerSort> = explorerSortState.asStateFlow()
 
   fun setSetupComplete(complete: Boolean) {
     prefs.edit { putBoolean(SETUP_COMPLETE, complete) }
@@ -83,9 +89,23 @@ internal class Preferences(context: Context) {
     showHiddenFilesState.value = show
   }
 
+  fun setExplorerSort(sort: ExplorerSort) {
+    prefs.edit {
+      putString(EXPLORER_SORT_KEY, sort.key.name)
+      putBoolean(EXPLORER_SORT_DESCENDING, sort.descending)
+    }
+    explorerSortState.value = sort
+  }
+
   private fun readWorkspaces(): List<String> {
     val array = JSONArray(prefs.getString(WORKSPACES, null) ?: return emptyList())
     return List(array.length()) { array.getString(it) }
+  }
+
+  private fun readExplorerSort(): ExplorerSort {
+    val key = SortKey.entries.firstOrNull { it.name == prefs.getString(EXPLORER_SORT_KEY, null) }
+      ?: return ExplorerSort.Default
+    return ExplorerSort(key, prefs.getBoolean(EXPLORER_SORT_DESCENDING, key.descendingFirst))
   }
 
   private fun writeArchived(archived: Map<String, Long>) {
@@ -106,5 +126,7 @@ internal class Preferences(context: Context) {
     const val WORKSPACES = "workspaces"
     const val ARCHIVED_SESSIONS = "archivedSessions"
     const val SHOW_HIDDEN_FILES = "showHiddenFiles"
+    const val EXPLORER_SORT_KEY = "explorerSortKey"
+    const val EXPLORER_SORT_DESCENDING = "explorerSortDescending"
   }
 }

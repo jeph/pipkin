@@ -9,6 +9,12 @@
     <string name="files_hide_hidden">Hide hidden files</string>
     <string name="files_refresh">Refresh files</string>
     <string name="files_refreshing">Refreshing files</string>
+    <string name="files_sort_name">Name</string>
+    <string name="files_sort_size">Size</string>
+    <string name="files_sort_date">Date</string>
+    <string name="files_sort_by">Sort by %1$s</string>
+    <string name="files_sort_ascending">Ascending order</string>
+    <string name="files_sort_descending">Descending order</string>
     <string name="files_loading">Loading files…</string>
     <string name="files_empty">No files</string>
     <string name="files_empty_visible">No visible files</string>

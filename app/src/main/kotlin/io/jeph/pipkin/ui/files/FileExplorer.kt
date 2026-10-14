@@ -43,6 +43,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
@@ -53,6 +54,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -109,6 +111,7 @@ internal fun FileExplorerPanel(
     folderKey(it)
   }?.let { root -> trees.getOrPut(root) { FileExplorerState(root, graph.fileHost) } }
   val showHidden by graph.preferences.showHiddenFiles.collectAsStateWithLifecycle()
+  val sort by graph.preferences.explorerSort.collectAsStateWithLifecycle()
   val scope = rememberCoroutineScope()
   val report = { error: String? -> if (error != null) scope.launch { snackbar.show(error) } }
   LaunchedEffect(state, open) { if (open) state?.refresh() }
@@ -121,17 +124,22 @@ internal fun FileExplorerPanel(
   ) {
     ExplorerHeader(onClose)
     ExplorerToolbar(
+      sort = sort,
       showHidden = showHidden,
       refreshing = state?.refreshing == true,
       enabled = state?.directories?.isNotEmpty() == true,
+      onSort = graph.preferences::setExplorerSort,
       onNewFolder = { state?.creatingFolder = true },
       onToggleHidden = { graph.preferences.setShowHiddenFiles(!showHidden) },
       onRefresh = { scope.launch { state?.refresh() } },
     )
     if (state != null) {
+      val entries = remember(state.directories, state.expanded, showHidden, sort) {
+        explorerRows(state.directories, state.expanded, showHidden, sort)
+      }
       ExplorerTree(
         state = state,
-        showHidden = showHidden,
+        entries = entries,
         selectedPath = selectedPath,
         onToggle = { folder -> scope.launch { report(state.toggle(folder)) } },
         onOpenFile = onOpenFile,
@@ -175,22 +183,40 @@ private fun ExplorerHeader(onClose: () -> Unit) {
   HorizontalDivider(thickness = 1.dp, color = colors.border)
 }
 
-/** Paseo's Files toolbar: New folder, the dot-file toggle (highlighted while they're hidden) and Refresh. */
+/**
+ * Paseo's Files toolbar: the sort key, which a tap moves to the next one, and beside it the direction, which a tap
+ * reverses; then New folder, the dot-file toggle (highlighted while they're hidden) and Refresh.
+ */
 @Composable
 private fun ExplorerToolbar(
+  sort: ExplorerSort,
   showHidden: Boolean,
   refreshing: Boolean,
   enabled: Boolean,
+  onSort: (ExplorerSort) -> Unit,
   onNewFolder: () -> Unit,
   onToggleHidden: () -> Unit,
   onRefresh: () -> Unit,
 ) {
   val colors = pipkinColors
   Row(
-    modifier = Modifier.fillMaxWidth().height(36.dp).padding(end = PipkinTokens.Spacing.s8),
+    modifier = Modifier
+      .fillMaxWidth()
+      .height(36.dp)
+      .padding(start = PipkinTokens.Spacing.s8, end = PipkinTokens.Spacing.s8),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(1.dp, Alignment.End),
+    horizontalArrangement = Arrangement.spacedBy(1.dp),
   ) {
+    SortKeyButton(sort.key, onClick = { onSort(sort.next()) })
+    IconButton28(
+      icon = if (sort.descending) R.drawable.ic_lucide_arrow_down else R.drawable.ic_lucide_arrow_up,
+      contentDescription = stringResource(
+        if (sort.descending) R.string.files_sort_descending else R.string.files_sort_ascending,
+      ),
+      onClick = { onSort(sort.reversed()) },
+      tint = colors.foregroundExtraMuted,
+    )
+    Spacer(modifier = Modifier.weight(1f))
     IconButton28(
       icon = R.drawable.ic_lucide_folder_plus,
       contentDescription = stringResource(R.string.files_new_folder),
@@ -221,3 +247,41 @@ private fun ExplorerToolbar(
   }
   HorizontalDivider(thickness = 1.dp, color = colors.border)
 }
+
+/**
+ * Paseo's sort trigger: the current key's name, small and muted, in a 24dp pill that a tap moves to the next key. The
+ * pill is as wide as the longest key name, so the direction arrow beside it stays put as the key changes.
+ */
+@Composable
+private fun SortKeyButton(key: SortKey, onClick: () -> Unit) {
+  val label = sortKeyLabel(key)
+  val description = stringResource(R.string.files_sort_by, label)
+  Box(
+    modifier = Modifier
+      .height(24.dp)
+      .clip(RoundedCornerShape(PipkinTokens.Radius.base))
+      .clickable(onClick = onClick)
+      .semantics { contentDescription = description }
+      .padding(horizontal = PipkinTokens.Spacing.s4),
+    contentAlignment = Alignment.Center,
+  ) {
+    for (other in SortKey.entries) {
+      if (other != key) SortKeyLabel(sortKeyLabel(other), Modifier.alpha(0f).clearAndSetSemantics {})
+    }
+    SortKeyLabel(label)
+  }
+}
+
+@Composable
+private fun SortKeyLabel(text: String, modifier: Modifier = Modifier) {
+  Text(text = text, modifier = modifier, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm)
+}
+
+@Composable
+private fun sortKeyLabel(key: SortKey): String = stringResource(
+  when (key) {
+    SortKey.Name -> R.string.files_sort_name
+    SortKey.Size -> R.string.files_sort_size
+    SortKey.Date -> R.string.files_sort_date
+  },
+)

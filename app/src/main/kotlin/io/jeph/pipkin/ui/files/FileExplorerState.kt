@@ -23,17 +23,18 @@ internal sealed interface ExplorerRow {
 }
 
 /**
- * The visible tree, depth first as Paseo's `flattenExplorerTree` builds it: each listed folder's entries in the host's
- * order (folders first), an expanded folder's entries right under it. Dot entries show only with [showHidden].
+ * The visible tree, depth first as Paseo's `flattenExplorerTree` builds it: each listed folder's entries in [sort]'s
+ * order, an expanded folder's entries right under it. Dot entries show only with [showHidden].
  */
 internal fun explorerRows(
   directories: Map<String, List<FileEntry>>,
   expanded: Set<String>,
   showHidden: Boolean,
+  sort: ExplorerSort,
 ): List<ExplorerRow.Entry> {
   val rows = mutableListOf<ExplorerRow.Entry>()
   fun addFolder(path: String, depth: Int) {
-    for (entry in directories[path].orEmpty()) {
+    for (entry in sortEntries(directories[path].orEmpty(), sort)) {
       if (!showHidden && entry.name.startsWith('.')) continue
       rows += ExplorerRow.Entry(entry, depth)
       if (entry.isDirectory && entry.path in expanded) addFolder(entry.path, depth + 1)

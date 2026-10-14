@@ -57,10 +57,14 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
+/**
+ * [state]'s tree as [entries], the rows [explorerRows] gives for it: its failure or a spinner until the top folder is
+ * listed, then the rows under the new folder's name field while one is being created.
+ */
 @Composable
 internal fun ExplorerTree(
   state: FileExplorerState,
-  showHidden: Boolean,
+  entries: List<ExplorerRow.Entry>,
   selectedPath: String?,
   onToggle: (FileEntry) -> Unit,
   onOpenFile: (path: String) -> Unit,
@@ -85,12 +89,12 @@ internal fun ExplorerTree(
     }
     return
   }
-  val entries = explorerRows(state.directories, state.expanded, showHidden)
   val rows = if (state.creatingFolder) listOf(ExplorerRow.NewFolder) + entries else entries
   if (rows.isEmpty()) {
+    val folderEmpty = state.directories[ROOT_FOLDER].isNullOrEmpty()
     CenterNote(modifier) {
       Text(
-        text = stringResource(if (showHidden) R.string.files_empty else R.string.files_empty_visible),
+        text = stringResource(if (folderEmpty) R.string.files_empty else R.string.files_empty_visible),
         color = pipkinColors.foregroundMuted,
         fontSize = PipkinTokens.FontSize.base,
       )
