@@ -64,6 +64,8 @@ class MarkdownDocumentTest {
       |single: 'it''s #2'
       |escaped: "say \"hi\" #3"
       |plain: issue#4 # trailing
+      |apostrophe: don't panic # note
+      |list: [it's, 'a #b'] # tags
       |---
       |body
     """.trimMargin()
@@ -74,6 +76,8 @@ class MarkdownDocumentTest {
           "single" to "it's #2",
           "escaped" to "say \\\"hi\\\" #3",
           "plain" to "issue#4",
+          "apostrophe" to "don't panic",
+          "list" to "it's, a #b",
         ),
         "body",
       ),

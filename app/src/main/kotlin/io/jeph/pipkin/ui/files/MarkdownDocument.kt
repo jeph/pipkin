@@ -79,18 +79,24 @@ private fun scalar(raw: String): String {
   }
 }
 
-/** [raw] up to a YAML comment: a `#` at its start or after whitespace, outside quotes. */
+/**
+ * [raw] up to a YAML comment: a `#` at its start or after whitespace, outside quotes. A quote opens only where a value
+ * or inline-list item starts, so the apostrophe in `don't` is plain text; `''` inside single quotes is one quote.
+ */
 private fun withoutComment(raw: String): String {
   var quote: Char? = null
+  var previous: Char? = null
   var index = 0
   while (index < raw.length) {
     val char = raw[index]
     when {
       quote == '"' && char == '\\' -> index++
+      quote == '\'' && char == '\'' && raw.getOrNull(index + 1) == '\'' -> index++
       quote != null -> if (char == quote) quote = null
-      char == '"' || char == '\'' -> quote = char
+      (char == '"' || char == '\'') && (previous == null || previous == '[' || previous == ',') -> quote = char
       char == '#' && (index == 0 || raw[index - 1].isWhitespace()) -> return raw.substring(0, index)
     }
+    if (!char.isWhitespace()) previous = char
     index++
   }
   return raw
