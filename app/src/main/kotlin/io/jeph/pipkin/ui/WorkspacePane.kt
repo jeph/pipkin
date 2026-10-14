@@ -8,10 +8,8 @@ import io.jeph.pipkin.ui.chat.ChatScreen
 import io.jeph.pipkin.ui.chat.ChatViews
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.files.ExplorerPanel
-import io.jeph.pipkin.ui.files.FileScreen
-import io.jeph.pipkin.ui.git.CommitScreen
-import io.jeph.pipkin.ui.terminal.TerminalScreen
 import io.jeph.pipkin.ui.workspace.PaneControls
+import io.jeph.pipkin.ui.workspace.WorkspaceTabScreen
 import io.jeph.pipkin.workspace.Pane
 import io.jeph.pipkin.workspace.PaneItem
 import io.jeph.pipkin.workspace.WorkspaceTab
@@ -25,14 +23,9 @@ internal fun WorkspacePane(
   controls: PaneControls,
   onOpenSettings: () -> Unit,
 ) {
-  if (item !is PaneItem.Tab) {
-    ChatScreen((item as? PaneItem.Chat)?.process, actions, views, controls, onOpenSettings)
-    return
-  }
-  when (val tab = item.tab) {
-    is WorkspaceTab.Terminal -> TerminalScreen(tab.session, controls)
-    is WorkspaceTab.File -> FileScreen(tab.file, controls)
-    is WorkspaceTab.Commit -> CommitScreen(tab.commit, controls)
+  when (item) {
+    is PaneItem.Tab -> WorkspaceTabScreen(item.tab, controls)
+    is PaneItem.Chat, null -> ChatScreen(item?.process, actions, views, controls, onOpenSettings)
   }
 }
 

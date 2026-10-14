@@ -37,6 +37,7 @@ import io.jeph.pipkin.ui.workspace.CloseSplitButton
 import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.TabCountButton
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
+import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
  * One open commit in a pane: the workspace header with the commit's title, the workspace's tab
@@ -103,7 +104,9 @@ internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: M
   }
 
   if (actionsOpen) {
-    CommitActionsSheet(onClose = { graph.commits.close(commit) }, onDismiss = { actionsOpen = false })
+    CommitActionsSheet(onClose = {
+      graph.tabs.close(WorkspaceTab.Commit(commit))
+    }, onDismiss = { actionsOpen = false })
   }
 }
 

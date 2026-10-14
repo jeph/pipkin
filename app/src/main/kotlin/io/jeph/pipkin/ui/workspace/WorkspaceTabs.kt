@@ -8,10 +8,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.data.sameFolder
-import io.jeph.pipkin.files.FileTab
-import io.jeph.pipkin.git.CommitTab
 import io.jeph.pipkin.host.SessionInfo
-import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.workspace.Pane
 import io.jeph.pipkin.workspace.PaneItem
 import io.jeph.pipkin.workspace.Panes
@@ -20,17 +17,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * The tab menu's tabs for a workspace: its terminals, open files and open commits, oldest first; its saved chats,
- * newest first, which leaves out a new chat until Pi saved its first message; and what the panes show.
+ * The tab menu's tabs for a workspace: its open tabs, by [menuGroup] and then oldest first; its saved chats, newest
+ * first, which leaves out a new chat until Pi saved its first message; and what the panes show.
  */
-internal class WorkspaceTabs(
-  val terminals: List<TerminalSession>,
-  val files: List<FileTab>,
-  val commits: List<CommitTab>,
-  val chats: List<SessionInfo>,
-  val shown: PanesShow,
-) {
-  val count: Int get() = terminals.size + files.size + commits.size + chats.size
+internal class WorkspaceTabs(val tabs: List<WorkspaceTab>, val chats: List<SessionInfo>, val shown: PanesShow) {
+  val count: Int get() = tabs.size + chats.size
 }
 
 /** Where a tab menu row's tab shows: in no pane, in the menu's own pane, or in the other pane, which keeps it. */
@@ -69,19 +60,15 @@ internal fun rememberPaneItems(): Map<Pane, PaneItem<AgentProcess>> {
 internal fun rememberWorkspaceTabs(pane: Pane, cwd: String): WorkspaceTabs {
   val graph = LocalContext.current.appGraph
   val sessions by graph.sessionArchive.active.collectAsStateWithLifecycle()
-  val terminals by graph.terminals.sessions.collectAsStateWithLifecycle()
-  val files by graph.files.tabs.collectAsStateWithLifecycle()
-  val commits by graph.commits.tabs.collectAsStateWithLifecycle()
+  val open by graph.tabs.tabs.collectAsStateWithLifecycle()
   val items = rememberPaneItems()
   val here = items[pane]
   val elsewhere = items[pane.other]
   val herePath by sessionFileOf(here).collectAsStateWithLifecycle()
   val elsewherePath by sessionFileOf(elsewhere).collectAsStateWithLifecycle()
-  return remember(sessions, terminals, files, commits, here, elsewhere, herePath, elsewherePath, cwd) {
+  return remember(sessions, open, here, elsewhere, herePath, elsewherePath, cwd) {
     WorkspaceTabs(
-      terminals = terminals.filter { sameFolder(it.cwd, cwd) },
-      files = files.filter { sameFolder(it.cwd, cwd) },
-      commits = commits.filter { sameFolder(it.cwd, cwd) },
+      tabs = open.filter { sameFolder(it.cwd, cwd) }.sortedBy { it.menuGroup },
       chats = sessions.filter { sameFolder(it.cwd, cwd) },
       shown = PanesShow(
         chat = herePath,

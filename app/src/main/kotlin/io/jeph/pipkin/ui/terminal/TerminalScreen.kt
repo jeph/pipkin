@@ -53,6 +53,7 @@ import io.jeph.pipkin.ui.workspace.CloseSplitButton
 import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.TabCountButton
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
+import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
  * One terminal tab in a pane: a header with the terminal's name over its folder, the workspace's tab
@@ -91,7 +92,7 @@ internal fun TerminalScreen(session: TerminalSession, controls: PaneControls, mo
       session = session,
       onNewTerminal = { graph.terminals.open(controls.pane, session.cwd) },
       onRestart = session::start,
-      onClose = { graph.terminals.close(session) },
+      onClose = { graph.tabs.close(WorkspaceTab.Terminal(session)) },
       onDismiss = { actionsOpen = false },
     )
   }

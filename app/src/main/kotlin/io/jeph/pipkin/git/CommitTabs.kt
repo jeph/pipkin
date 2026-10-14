@@ -1,6 +1,5 @@
 package io.jeph.pipkin.git
 
-import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.host.GitCommit
 import io.jeph.pipkin.host.GitErrorCode
@@ -8,8 +7,8 @@ import io.jeph.pipkin.host.GitHost
 import io.jeph.pipkin.host.GitReply
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.git.DiffDocument
+import io.jeph.pipkin.workspace.OpenTabs
 import io.jeph.pipkin.workspace.Pane
-import io.jeph.pipkin.workspace.Panes
 import io.jeph.pipkin.workspace.WorkspaceTab
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
@@ -78,28 +77,26 @@ internal class CommitTab(val id: Int, val cwd: String, val commit: GitCommit, pr
 }
 
 /**
- * The open commits, which belong to a folder rather than a chat, like files: every chat in a folder shows the same
- * ones. A commit has at most one tab per folder. Tabs live in memory only, so they're gone after a restart. A folder
- * that stops being one of the [trusted] ones, as removing its workspace makes it, loses its tabs, so none of them
- * runs git there again. Main-thread confined.
+ * Opens commits, which belong to a folder rather than a chat, like files: every chat in a folder shows the same ones.
+ * A commit has at most one tab per folder. Tabs live in memory only, so they're gone after a restart. [tabs] holds and
+ * closes them; a folder that stops being one of the [trusted] ones, as removing its workspace makes it, loses its
+ * commit tabs, so none of them runs git there again. Main-thread confined.
  */
 internal class CommitTabRegistry(
   private val git: GitHost,
-  private val panes: Panes<AgentProcess>,
+  private val tabs: OpenTabs,
   trusted: StateFlow<Set<String>>,
   scope: CoroutineScope,
 ) {
-  private val tabsFlow = MutableStateFlow<List<CommitTab>>(emptyList())
   private var nextId = 1
 
   init {
     scope.launch {
-      trusted.collect { folders -> tabsFlow.value.filterNot { it.cwd in folders }.forEach(::close) }
+      trusted.collect { folders ->
+        tabs.tabs.value.filter { it is WorkspaceTab.Commit && it.cwd !in folders }.forEach(tabs::close)
+      }
     }
   }
-
-  /** Oldest first. */
-  val tabs: StateFlow<List<CommitTab>> = tabsFlow.asStateFlow()
 
   /**
    * Shows [commit]'s tab in the folder [cwd] in [pane], opening one when the commit has none. Returns false, showing
@@ -107,13 +104,9 @@ internal class CommitTabRegistry(
    */
   fun open(pane: Pane, cwd: String, commit: GitCommit): Boolean {
     val folder = folderKey(cwd)
-    val tab = tabsFlow.value.firstOrNull { it.cwd == folder && it.commit.sha == commit.sha }
-      ?: CommitTab(nextId++, folder, commit, git).also { opened -> tabsFlow.update { it + opened } }
-    return panes.showTab(pane, WorkspaceTab.Commit(tab))
-  }
-
-  fun close(tab: CommitTab) {
-    tabsFlow.update { it - tab }
-    panes.forget(WorkspaceTab.Commit(tab))
+    val open = tabs.tabs.value.firstOrNull {
+      it is WorkspaceTab.Commit && it.cwd == folder && it.commit.commit.sha == commit.sha
+    }
+    return tabs.show(pane, open ?: WorkspaceTab.Commit(CommitTab(nextId++, folder, commit, git)))
   }
 }

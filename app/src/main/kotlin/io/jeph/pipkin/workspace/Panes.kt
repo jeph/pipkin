@@ -12,21 +12,40 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-/** A workspace tab other than a chat, which a pane shows instead of a chat. */
+/**
+ * A workspace tab other than a chat, which a pane shows instead of a chat. [OpenTabs] holds the open ones, so a new kind
+ * lists, counts, swaps, goes back and closes like the others; the UI asks for its row, screen and actions through
+ * exhaustive `when`s over this interface.
+ */
 internal sealed interface WorkspaceTab {
   /** The tab's workspace folder. */
   val cwd: String
 
+  /** Unique among open tabs and saveable, for list keys. */
+  val key: String
+
+  /** Lets go of what the tab holds, once it has closed. */
+  fun release()
+
   data class Terminal(val session: TerminalSession) : WorkspaceTab {
     override val cwd: String get() = session.cwd
+    override val key: String get() = "terminal-${session.id}"
+
+    override fun release() = session.close()
   }
 
   data class File(val file: FileTab) : WorkspaceTab {
     override val cwd: String get() = file.cwd
+    override val key: String get() = "file-${file.id}"
+
+    override fun release() = Unit
   }
 
   data class Commit(val commit: CommitTab) : WorkspaceTab {
     override val cwd: String get() = commit.cwd
+    override val key: String get() = "commit-${commit.id}"
+
+    override fun release() = Unit
   }
 }
 

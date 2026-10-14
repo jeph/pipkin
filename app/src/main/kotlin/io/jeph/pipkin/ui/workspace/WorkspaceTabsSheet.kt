@@ -39,25 +39,17 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.ChatKey
 import io.jeph.pipkin.appGraph
-import io.jeph.pipkin.files.FileTab
-import io.jeph.pipkin.files.FileTabRegistry
-import io.jeph.pipkin.git.CommitTab
-import io.jeph.pipkin.git.CommitTabRegistry
 import io.jeph.pipkin.host.SessionInfo
-import io.jeph.pipkin.terminal.TerminalRegistry
-import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SnackbarStackOverlay
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.components.SwipeAway
-import io.jeph.pipkin.ui.files.FileActionsSheet
-import io.jeph.pipkin.ui.git.CommitActionsSheet
 import io.jeph.pipkin.ui.sidebar.tildePath
-import io.jeph.pipkin.ui.terminal.TerminalActionsSheet
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.workspace.OpenTabs
 import io.jeph.pipkin.workspace.Pane
 import io.jeph.pipkin.workspace.WorkspaceTab
 
@@ -122,13 +114,13 @@ internal fun WorkspaceTabsSheet(
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
   val archiving = remember(actions) { TabArchiving(actions) }
-  val terminalClosing = remember(graph) { TerminalClosing(graph.terminals) }
+  val closing = remember(graph) { TabClosing(graph.tabs) }
   var menu by remember { mutableStateOf<TabMenu?>(null) }
   val swapPanes = {
     onSwapPanes()
     onDismiss()
   }
-  val show = { tab: WorkspaceTab -> if (graph.panes.showTab(pane, tab)) onDismiss() else swapPanes() }
+  val show = { tab: WorkspaceTab -> if (graph.tabs.show(pane, tab)) onDismiss() else swapPanes() }
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
   LaunchedEffect(tabs.chats) { archiving.forgetGone(tabs.chats) }
   PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = 0.85f) {
@@ -144,7 +136,7 @@ internal fun WorkspaceTabsSheet(
     TabList(
       tabs = tabs,
       archiving = archiving,
-      terminalClosing = terminalClosing,
+      closing = closing,
       callbacks = TabListCallbacks(
         onOpenChat = { session -> if (actions.openChat(pane, session.cwd, session.path)) onDismiss() },
         onShow = show,
@@ -169,7 +161,7 @@ internal fun WorkspaceTabsSheet(
     TabMenuSheet(shownMenu, actions, archiving, openInSplit, onDismiss = { menu = null })
   }
   ConfirmArchive(archiving)
-  ConfirmCloseTerminal(terminalClosing)
+  ConfirmCloseTab(closing)
 }
 
 /** "Stop and archive" for a slid-out chat Pi is working in. */
@@ -186,14 +178,14 @@ private fun ConfirmArchive(archiving: TabArchiving) {
   )
 }
 
-/** "Close terminal?" for a slid-out terminal that may have something running. */
+/** The [CloseWarning] of a slid-out tab, such as a terminal that may have something running. */
 @Composable
-private fun ConfirmCloseTerminal(closing: TerminalClosing) {
-  if (closing.confirming == null) return
+private fun ConfirmCloseTab(closing: TabClosing) {
+  val warning = closing.confirming?.warning ?: return
   ConfirmDialog(
-    title = stringResource(R.string.terminal_close_confirm_title),
-    text = stringResource(R.string.terminal_close_confirm_text),
-    confirmLabel = stringResource(R.string.terminal_close_confirm),
+    title = stringResource(warning.title),
+    text = stringResource(warning.text),
+    confirmLabel = stringResource(warning.confirm),
     onConfirm = closing::confirm,
     onDismiss = closing::cancel,
     destructive = true,
@@ -204,16 +196,12 @@ private fun ConfirmCloseTerminal(closing: TerminalClosing) {
 private sealed interface TabMenu {
   data class Chat(val session: SessionInfo) : TabMenu
 
-  data class Terminal(val session: TerminalSession) : TabMenu
-
-  data class File(val file: FileTab) : TabMenu
-
-  data class Commit(val commit: CommitTab) : TabMenu
+  data class Tab(val tab: WorkspaceTab) : TabMenu
 }
 
 /**
  * [menu]'s actions sheet: a chat's renames or archives it, and opens it in split screen through [openInSplit] when
- * given; a terminal's renames or closes it; a file's or a commit's closes it.
+ * given; a tab's are its kind's, with its close.
  */
 @Composable
 private fun TabMenuSheet(
@@ -233,19 +221,9 @@ private fun TabMenuSheet(
       onOpenInSplit = openInSplit?.let { open -> { open(menu.session) } },
     )
 
-    is TabMenu.Terminal -> TerminalActionsSheet(
-      session = menu.session,
-      onNewTerminal = null,
-      onRestart = null,
-      onClose = { graph.terminals.close(menu.session) },
-      onDismiss = onDismiss,
-    )
-
-    is TabMenu.File -> FileActionsSheet(file = menu.file, onClose = {
-      graph.files.close(menu.file)
+    is TabMenu.Tab -> WorkspaceTabActionsSheet(menu.tab, onClose = {
+      graph.tabs.close(menu.tab)
     }, onDismiss = onDismiss)
-
-    is TabMenu.Commit -> CommitActionsSheet(onClose = { graph.commits.close(menu.commit) }, onDismiss = onDismiss)
   }
 }
 
@@ -258,25 +236,21 @@ private class TabListCallbacks(
 )
 
 /**
- * The tab menu's rows: the workspace's terminals, open files and open commits, then the saved chats. What the pane
- * shows is highlighted, and what the other pane shows is marked.
+ * The tab menu's rows: the workspace's open tabs, then the saved chats. What the pane shows is highlighted, and what
+ * the other pane shows is marked.
  */
 @Composable
 private fun TabList(
   tabs: WorkspaceTabs,
   archiving: TabArchiving,
-  terminalClosing: TerminalClosing,
+  closing: TabClosing,
   callbacks: TabListCallbacks,
   modifier: Modifier,
 ) {
   val graph = LocalContext.current.appGraph
   val processes by graph.registry.processes.collectAsStateWithLifecycle()
-  val closing = remember(graph) { FileClosing(graph.files) }
-  val commitClosing = remember(graph) { CommitClosing(graph.commits) }
   LazyColumn(modifier = modifier) {
-    terminalRows(tabs, terminalClosing, callbacks)
-    fileRows(tabs, closing, callbacks)
-    commitRows(tabs, commitClosing, callbacks)
+    tabRows(tabs, closing, callbacks)
     items(tabs.chats, key = { it.path }) { session ->
       val elsewhere = session.path == tabs.shown.elsewhereChat
       SwipeAway(
@@ -303,138 +277,64 @@ private fun TabList(
   }
 }
 
-/** The workspace's terminals; one closes by swiping it right, as a file does. */
-private fun LazyListScope.terminalRows(tabs: WorkspaceTabs, closing: TerminalClosing, callbacks: TabListCallbacks) {
-  items(tabs.terminals, key = { "terminal-${it.id}" }) { terminal ->
-    val tab = WorkspaceTab.Terminal(terminal)
+/** The workspace's open tabs; one closes by swiping it right, as a chat archives. */
+private fun LazyListScope.tabRows(tabs: WorkspaceTabs, closing: TabClosing, callbacks: TabListCallbacks) {
+  items(tabs.tabs, key = { it.key }) { tab ->
     SwipeAway(
-      leaving = terminal.id in closing.leaving,
-      onSwiped = { closing.close(terminal) },
-      onLeft = { closing.onLeft(terminal) },
+      leaving = tab.key in closing.leaving,
+      onSwiped = { closing.close(tab) },
+      onLeft = { closing.onLeft(tab) },
       containerColor = pipkinColors.surface1,
       modifier = Modifier.animateItem(),
       mark = R.drawable.ic_lucide_x,
     ) {
-      TerminalTabRow(
-        session = terminal,
+      WorkspaceTabRow(
+        tab = tab,
         shown = tabs.shown.of(tab),
         onOpen = { callbacks.onShow(tab) },
-        onActions = { callbacks.onActions(TabMenu.Terminal(terminal)) },
+        onActions = { callbacks.onActions(TabMenu.Tab(tab)) },
       )
     }
-  }
-}
-
-/** The workspace's open files; one closes by swiping it right, as a chat archives. */
-private fun LazyListScope.fileRows(tabs: WorkspaceTabs, closing: FileClosing, callbacks: TabListCallbacks) {
-  items(tabs.files, key = { "file-${it.id}" }) { file ->
-    val tab = WorkspaceTab.File(file)
-    SwipeAway(
-      leaving = file.id in closing.leaving,
-      onSwiped = { closing.close(file) },
-      onLeft = { closing.onLeft(file) },
-      containerColor = pipkinColors.surface1,
-      modifier = Modifier.animateItem(),
-      mark = R.drawable.ic_lucide_x,
-    ) {
-      FileTabRow(
-        file = file,
-        shown = tabs.shown.of(tab),
-        onOpen = { callbacks.onShow(tab) },
-        onActions = { callbacks.onActions(TabMenu.File(file)) },
-      )
-    }
-  }
-}
-
-/** The workspace's open commits; one closes by swiping it right, as a file does. */
-private fun LazyListScope.commitRows(tabs: WorkspaceTabs, closing: CommitClosing, callbacks: TabListCallbacks) {
-  items(tabs.commits, key = { "commit-${it.id}" }) { commit ->
-    val tab = WorkspaceTab.Commit(commit)
-    SwipeAway(
-      leaving = commit.id in closing.leaving,
-      onSwiped = { closing.close(commit) },
-      onLeft = { closing.onLeft(commit) },
-      containerColor = pipkinColors.surface1,
-      modifier = Modifier.animateItem(),
-      mark = R.drawable.ic_lucide_x,
-    ) {
-      CommitTabRow(
-        commit = commit,
-        shown = tabs.shown.of(tab),
-        onOpen = { callbacks.onShow(tab) },
-        onActions = { callbacks.onActions(TabMenu.Commit(commit)) },
-      )
-    }
-  }
-}
-
-/** Closing files from the tab menu: a row first slides out, then its file closes. */
-private class FileClosing(private val files: FileTabRegistry) {
-  /** Ids of files whose rows are sliding out. */
-  var leaving by mutableStateOf(emptySet<Int>())
-    private set
-
-  fun close(file: FileTab) {
-    leaving += file.id
-  }
-
-  fun onLeft(file: FileTab) {
-    files.close(file)
-    leaving -= file.id
-  }
-}
-
-/** Closing commits from the tab menu: a row first slides out, then its commit closes. */
-private class CommitClosing(private val commits: CommitTabRegistry) {
-  /** Ids of commits whose rows are sliding out. */
-  var leaving by mutableStateOf(emptySet<Int>())
-    private set
-
-  fun close(commit: CommitTab) {
-    leaving += commit.id
-  }
-
-  fun onLeft(commit: CommitTab) {
-    commits.close(commit)
-    leaving -= commit.id
   }
 }
 
 /**
- * Closing terminals from the tab menu. A row first slides out; once it is gone the terminal closes, or, when it may
- * have something running, the user is asked first and a cancelled row slides back.
+ * Closing tabs from the tab menu. A row first slides out; once it is gone the tab closes, or, when its kind gives a
+ * [CloseWarning], the user is asked first and a cancelled row slides back.
  */
-private class TerminalClosing(private val terminals: TerminalRegistry) {
-  /** Ids of terminals whose rows are sliding out, or out and waiting for the user. */
-  var leaving by mutableStateOf(emptySet<Int>())
+private class TabClosing(private val tabs: OpenTabs) {
+  /** A slid-out tab and the warning the user is asked to confirm, kept while asking even if the tab calms down. */
+  class Confirming(val tab: WorkspaceTab, val warning: CloseWarning)
+
+  /** Keys of tabs whose rows are sliding out, or out and waiting for the user. */
+  var leaving by mutableStateOf(emptySet<String>())
     private set
 
-  /** A slid-out terminal that may have something running, waiting for "Close". */
-  var confirming by mutableStateOf<TerminalSession?>(null)
+  var confirming by mutableStateOf<Confirming?>(null)
     private set
 
-  fun close(session: TerminalSession) {
-    leaving += session.id
+  fun close(tab: WorkspaceTab) {
+    leaving += tab.key
   }
 
-  fun onLeft(session: TerminalSession) {
-    if (session.mayHaveWorkRunning()) confirming = session else remove(session)
+  fun onLeft(tab: WorkspaceTab) {
+    val warning = tab.closeWarning()
+    if (warning != null) confirming = Confirming(tab, warning) else remove(tab)
   }
 
   fun confirm() {
-    confirming?.let(::remove)
+    confirming?.let { remove(it.tab) }
     confirming = null
   }
 
   fun cancel() {
-    confirming?.let { leaving -= it.id }
+    confirming?.let { leaving -= it.tab.key }
     confirming = null
   }
 
-  private fun remove(session: TerminalSession) {
-    terminals.close(session)
-    leaving -= session.id
+  private fun remove(tab: WorkspaceTab) {
+    tabs.close(tab)
+    leaving -= tab.key
   }
 }
 

@@ -71,6 +71,7 @@ import io.jeph.pipkin.ui.workspace.CloseSplitButton
 import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.TabCountButton
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
+import io.jeph.pipkin.workspace.WorkspaceTab
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -130,7 +131,11 @@ internal fun FileScreen(file: FileTab, controls: PaneControls, modifier: Modifie
   }
 
   if (actionsOpen) {
-    FileActionsSheet(file = file, onClose = { graph.files.close(file) }, onDismiss = { actionsOpen = false })
+    FileActionsSheet(
+      file = file,
+      onClose = { graph.tabs.close(WorkspaceTab.File(file)) },
+      onDismiss = { actionsOpen = false },
+    )
   }
 }
 

@@ -3,19 +3,17 @@ package io.jeph.pipkin.files
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.host.FileContent
 import io.jeph.pipkin.host.FileHost
 import io.jeph.pipkin.host.HostRejected
+import io.jeph.pipkin.workspace.OpenTabs
 import io.jeph.pipkin.workspace.Pane
-import io.jeph.pipkin.workspace.Panes
 import io.jeph.pipkin.workspace.WorkspaceTab
 import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 
 internal sealed interface FileState {
   data object Loading : FileState
@@ -52,15 +50,11 @@ internal class FileTab(val id: Int, val cwd: String, val path: String, private v
 }
 
 /**
- * The open files, which belong to a folder rather than a chat, like terminals: every chat in a folder shows the same
- * ones. A file has at most one tab per folder. Main-thread confined.
+ * Opens files, which belong to a folder rather than a chat, like terminals: every chat in a folder shows the same ones.
+ * A file has at most one tab per folder. [tabs] holds and closes them. Main-thread confined.
  */
-internal class FileTabRegistry(private val files: FileHost, private val panes: Panes<AgentProcess>) {
-  private val tabsFlow = MutableStateFlow<List<FileTab>>(emptyList())
+internal class FileTabRegistry(private val files: FileHost, private val tabs: OpenTabs) {
   private var nextId = 1
-
-  /** Oldest first. */
-  val tabs: StateFlow<List<FileTab>> = tabsFlow.asStateFlow()
 
   /**
    * Shows [path]'s tab in the folder [cwd] in [pane], opening one when the file has none. Returns false, showing
@@ -68,13 +62,7 @@ internal class FileTabRegistry(private val files: FileHost, private val panes: P
    */
   fun open(pane: Pane, cwd: String, path: String): Boolean {
     val folder = folderKey(cwd)
-    val tab = tabsFlow.value.firstOrNull { it.cwd == folder && it.path == path }
-      ?: FileTab(nextId++, folder, path, files).also { opened -> tabsFlow.update { it + opened } }
-    return panes.showTab(pane, WorkspaceTab.File(tab))
-  }
-
-  fun close(tab: FileTab) {
-    tabsFlow.update { it - tab }
-    panes.forget(WorkspaceTab.File(tab))
+    val open = tabs.tabs.value.firstOrNull { it is WorkspaceTab.File && it.cwd == folder && it.file.path == path }
+    return tabs.show(pane, open ?: WorkspaceTab.File(FileTab(nextId++, folder, path, files)))
   }
 }
