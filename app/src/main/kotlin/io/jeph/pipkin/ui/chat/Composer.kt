@@ -58,7 +58,6 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -76,6 +75,7 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.components.atMostHalfTall
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import org.json.JSONObject
@@ -288,12 +288,7 @@ private fun ComposerField(controller: ChatController, acceptsImages: Boolean, on
     state = controller.draft,
     modifier = modifier
       .fillMaxWidth()
-      .layout { measurable, constraints ->
-        // As a weighted child, maxHeight is what the composer has after its tray and toolbar.
-        val cap = if (constraints.hasBoundedHeight) constraints.maxHeight / 2 else constraints.maxHeight
-        val placeable = measurable.measure(constraints.copy(maxHeight = cap.coerceAtLeast(constraints.minHeight)))
-        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-      }
+      .atMostHalfTall()
       .heightIn(min = 30.dp)
       .onFocusChanged { controller.composerFocused = it.isFocused }
       .onPreviewKeyEvent { controller.slash.onKey(it, onRan) }

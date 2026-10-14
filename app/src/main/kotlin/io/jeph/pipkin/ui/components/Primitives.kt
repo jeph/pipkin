@@ -258,3 +258,13 @@ private fun Modifier.sheetHeight(fraction: Float, windowHeight: Int, fill: Boole
     )
     layout(placeable.width, placeable.height) { placeable.place(0, 0) }
   }
+
+/**
+ * Caps the height at half of what the parent offers: the room left after the composer's tray and toolbar for its
+ * field, or after the header for a dialog card. Taller content scrolls instead of crowding out the chat stream.
+ */
+fun Modifier.atMostHalfTall(): Modifier = layout { measurable, constraints ->
+  val cap = if (constraints.hasBoundedHeight) constraints.maxHeight / 2 else constraints.maxHeight
+  val placeable = measurable.measure(constraints.copy(maxHeight = cap.coerceAtLeast(constraints.minHeight)))
+  layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+}

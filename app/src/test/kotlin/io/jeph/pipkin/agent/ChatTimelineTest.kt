@@ -458,6 +458,38 @@ class ChatTimelineTest {
   }
 
   @Test
+  fun dialogCounterCountsTheDialogsAskedSinceNoneWaited() {
+    fun counter() = timeline.state.value.let { "${it.pendingUi?.id} ${it.pendingUiNumber} of ${it.pendingUiCount}" }
+    fun ask(id: String) = apply("""{"type":"extension_ui_request","id":"$id","method":"confirm","title":"?"}""")
+    ask("a")
+    ask("b")
+    ask("c")
+    assertEquals("a 1 of 3", counter())
+    timeline.dismissDialog("a")
+    assertEquals("b 2 of 3", counter())
+    // A dialog asked while the user answers adds to the count.
+    ask("d")
+    assertEquals("b 2 of 4", counter())
+    // One Pi stops waiting on before it showed was never seen, so it leaves the count.
+    timeline.dismissDialog("c")
+    assertEquals("b 2 of 3", counter())
+    timeline.dismissDialog("b")
+    assertEquals("d 3 of 3", counter())
+    timeline.dismissDialog("d")
+    assertEquals("null 0 of 0", counter())
+
+    // Once none wait, the next dialog starts a new count, as it does after Pi stopped.
+    ask("e")
+    ask("f")
+    assertEquals("e 1 of 2", counter())
+    timeline.clearDialogs()
+    // Pi answers a negative timeout before the user could see it, so it neither shows nor counts.
+    apply("""{"type":"extension_ui_request","id":"x","method":"confirm","title":"?","timeout":-1}""")
+    ask("g")
+    assertEquals("g 1 of 1", counter())
+  }
+
+  @Test
   fun piExitingDropsEveryDialog() {
     apply("""{"type":"extension_ui_request","id":"a","method":"confirm","title":"First?"}""")
     apply("""{"type":"extension_ui_request","id":"b","method":"confirm","title":"Second?"}""")

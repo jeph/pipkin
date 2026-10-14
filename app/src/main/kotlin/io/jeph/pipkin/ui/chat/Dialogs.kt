@@ -1,20 +1,14 @@
 package io.jeph.pipkin.ui.chat
 
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -26,67 +20,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
-import io.jeph.pipkin.agent.ExtensionUiRequest
-import io.jeph.pipkin.agent.UiAnswer
-import io.jeph.pipkin.ui.components.PipkinSheet
-import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-
-/** A blocking Pi extension dialog (`docs/rpc.md` "Extension UI"); dismissing it answers `cancelled`. */
-@Composable
-internal fun ExtensionUiDialog(request: ExtensionUiRequest, onAnswer: (UiAnswer) -> Unit) {
-  val cancel = { onAnswer(UiAnswer.Cancelled) }
-  key(request.id) {
-    when (request.method) {
-      "select" -> SelectSheet(request, onAnswer, cancel)
-
-      "confirm" -> ConfirmDialog(
-        title = request.title ?: stringResource(R.string.chat_confirm_title),
-        text = request.message,
-        confirmLabel = stringResource(R.string.chat_yes),
-        dismissLabel = stringResource(R.string.chat_no),
-        onConfirm = { onAnswer(UiAnswer.Confirmed(true)) },
-        onDismiss = { onAnswer(UiAnswer.Confirmed(false)) },
-        onCancel = cancel,
-      )
-
-      "input", "editor" -> TextInputDialog(
-        title = request.title ?: stringResource(R.string.chat_input_title),
-        initial = request.prefill.orEmpty(),
-        placeholder = request.placeholder ?: request.message,
-        confirmLabel = stringResource(R.string.chat_ok),
-        multiline = request.method == "editor",
-        onConfirm = { onAnswer(UiAnswer.Value(it)) },
-        onDismiss = cancel,
-      )
-    }
-  }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SelectSheet(request: ExtensionUiRequest, onAnswer: (UiAnswer) -> Unit, onCancel: () -> Unit) {
-  PipkinSheet(onDismissRequest = onCancel) {
-    Text(
-      text = request.title ?: stringResource(R.string.chat_choose),
-      modifier = Modifier.padding(PipkinTokens.Spacing.s16, 0.dp, PipkinTokens.Spacing.s16, PipkinTokens.Spacing.s8),
-      color = pipkinColors.foreground,
-      fontSize = PipkinTokens.FontSize.lg,
-    )
-    request.message?.let {
-      Text(
-        text = it,
-        modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s16).padding(bottom = PipkinTokens.Spacing.s8),
-        color = pipkinColors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.base,
-      )
-    }
-    Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-      request.options.forEach { option -> SheetRow(label = option, onClick = { onAnswer(UiAnswer.Value(option)) }) }
-    }
-  }
-}
 
 /**
  * An [AlertDialog] with a confirm and a dismiss button. [onCancel] (back or outside tap) defaults to

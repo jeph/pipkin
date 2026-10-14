@@ -26,6 +26,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
+import io.jeph.pipkin.agent.TimelineState
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.components.HeaderBar
@@ -175,6 +176,7 @@ private fun ChatContent(
       SnackbarStack(snackbar, Modifier.align(Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16))
       SlashMenuHost(controller, ready = processState == AgentProcessState.Ready, Modifier.align(Alignment.BottomCenter))
     }
+    PendingDialogCard(controller, timeline)
     if (timeline.queue.isNotEmpty()) {
       SteeringBox(
         summary = controller.steering.summary(timeline.queue),
@@ -194,6 +196,19 @@ private fun ChatContent(
       onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
     )
   }
+}
+
+/** The first extension dialog Pi waits on, between the stream and the composer. */
+@Composable
+private fun PendingDialogCard(controller: ChatController, timeline: TimelineState) {
+  val request = timeline.pendingUi ?: return
+  ExtensionUiCard(
+    request = request,
+    number = timeline.pendingUiNumber,
+    count = timeline.pendingUiCount,
+    onAnswer = { controller.respondUi(request.id, it) },
+    modifier = Modifier.padding(bottom = PipkinTokens.Spacing.s8),
+  )
 }
 
 /** The slash menu while the draft starts with `/`, 12dp above the composer and as wide as it. */
@@ -337,7 +352,6 @@ private fun ChatDialogs(
   onArchive: (AgentProcess) -> Unit,
 ) {
   val process = controller.process
-  val timeline by process.screenTimeline.collectAsStateWithLifecycle()
   val sessionName by process.sessionName.collectAsStateWithLifecycle()
   val dismiss = { onSheet(null) }
   when (sheet) {
@@ -379,5 +393,4 @@ private fun ChatDialogs(
 
     else -> Unit
   }
-  timeline.pendingUi?.let { request -> ExtensionUiDialog(request) { controller.respondUi(request.id, it) } }
 }

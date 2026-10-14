@@ -56,6 +56,9 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   /** Dialogs Pi waits on, oldest first; the screen shows the first. Extensions can ask several at once. */
   private val dialogs = ArrayDeque<ExtensionUiRequest>()
 
+  /** How many dialogs left the front of [dialogs] since it was last empty: the ones the user saw go. */
+  private var dialogsDone = 0
+
   private var model: JSONObject? = null
   private var thinkingLevel: String? = null
   private var appliedCount = 0L
@@ -187,7 +190,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       finishRun()
       compacting = false
       queueInFlight = false
-      dialogs.clear()
+      clearDialogQueue()
       items += ExitBanner("x${itemSeq++}", code, stderr)
       publish()
     }
@@ -196,7 +199,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   /** Drops every dialog, as Pi stopped and nothing waits on them any more. */
   fun clearDialogs() {
     synchronized(lock) {
-      dialogs.clear()
+      clearDialogQueue()
       publish()
     }
   }
@@ -204,8 +207,16 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   /** Drops dialog [id] once it is answered, or once Pi stopped waiting on it; other dialogs stay queued. */
   fun dismissDialog(id: String) {
     synchronized(lock) {
-      if (dialogs.removeAll { it.id == id }) publish()
+      if (dialogs.firstOrNull()?.id == id) dialogsDone++
+      if (!dialogs.removeAll { it.id == id }) return
+      if (dialogs.isEmpty()) dialogsDone = 0
+      publish()
     }
+  }
+
+  private fun clearDialogQueue() {
+    dialogs.clear()
+    dialogsDone = 0
   }
 
   /**
@@ -432,6 +443,9 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private fun extensionUi(event: JSONObject) {
     when (val method = event.optString("method")) {
       "select", "confirm", "input", "editor" -> {
+        val timeout = dialogTimeoutMillis(event)
+        // Pi answers a dialog with a negative timeout at once, so it never waits on the user.
+        if (timeout == 0L) return
         dialogs +=
           ExtensionUiRequest(
             id = event.optString("id"),
@@ -441,7 +455,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
             options = event.optJSONArray("options").strings(),
             placeholder = event.optStringOrNull("placeholder"),
             prefill = event.optStringOrNull("prefill"),
-            expiresAt = dialogTimeoutMillis(event)?.let { clock() + it },
+            expiresAt = timeout?.let { clock() + it },
           )
       }
 
@@ -487,8 +501,17 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private fun publish() {
     val snapshot = footer?.let { items + it } ?: items.toList()
     // A manual compaction runs outside any agent run, but it is work Stop can end and keep-alive must cover.
-    mutableState.value =
-      TimelineState(snapshot, busy || compacting, queue, dialogs.firstOrNull(), model, thinkingLevel, queueInFlight)
+    mutableState.value = TimelineState(
+      items = snapshot,
+      busy = busy || compacting,
+      queue = queue,
+      pendingUi = dialogs.firstOrNull(),
+      pendingUiNumber = if (dialogs.isEmpty()) 0 else dialogsDone + 1,
+      pendingUiCount = dialogsDone + dialogs.size,
+      model = model,
+      thinkingLevel = thinkingLevel,
+      queueInFlight = queueInFlight,
+    )
   }
 
   private data class LiveMessage(val key: String, val role: String, val timestamp: Long)

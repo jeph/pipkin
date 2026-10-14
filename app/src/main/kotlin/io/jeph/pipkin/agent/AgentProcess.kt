@@ -437,7 +437,7 @@ internal class AgentProcess(
       "thinking_level_changed" -> timeline.setThinkingLevel(event.opt("level") as? String)
 
       // Pi answers a timed-out dialog itself and says nothing, so the dialog goes when Pi stops waiting on it.
-      "extension_ui_request" -> dialogTimeoutMillis(event)?.let { timeout ->
+      "extension_ui_request" -> dialogTimeoutMillis(event)?.takeIf { it > 0 }?.let { timeout ->
         val id = event.optString("id")
         processScope.launch {
           delay(timeout)

@@ -132,9 +132,12 @@
     <string name="chat_choose">Choose an option</string>
     <string name="chat_confirm_title">Confirm</string>
     <string name="chat_input_title">Pipkin needs input</string>
-    <string name="chat_ok">OK</string>
+    <string name="chat_submit">Submit</string>
+    <string name="chat_dismiss">Dismiss</string>
     <string name="chat_yes">Yes</string>
     <string name="chat_no">No</string>
+    <string name="chat_dialog_counter">%1$d of %2$d</string>
+    <string name="chat_dialog_seconds_left">%1$ds</string>
 
     <!-- Context window meter -->
     <string name="context_window_title">Context window</string>

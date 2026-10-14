@@ -9,6 +9,12 @@ data class TimelineState(
   val queue: List<String> = emptyList(),
   /** The first of the dialogs Pi waits on; the next shows once this one is answered or expires. */
   val pendingUi: ExtensionUiRequest? = null,
+  /**
+   * [pendingUi]'s place among the dialogs asked since none were waiting, counting from 1, and how many of those
+   * were shown or still wait, so "2 of 3" grows as more come in while the user answers.
+   */
+  val pendingUiNumber: Int = 0,
+  val pendingUiCount: Int = 0,
   val model: JSONObject? = null,
   val thinkingLevel: String? = null,
   /**
