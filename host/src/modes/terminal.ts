@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { readdir, readFile, rm, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import { HostError } from "../env.js";
@@ -42,6 +42,8 @@ function isPositiveInt(value: unknown): value is number {
 /** The fields of `/proc/<pid>/stat` the busy check uses. */
 export interface ProcStat {
   pid: number;
+  /** The file name of the program the process runs, cut to the kernel's 15 characters. */
+  comm: string;
   ppid: number;
   session: number;
 }
@@ -59,17 +61,53 @@ export function parseProcStat(text: string): ProcStat | undefined {
   const ppid = Number(fields[1]);
   const session = Number(fields[3]);
   if (![pid, ppid, session].every(Number.isInteger)) return undefined;
-  return { pid, ppid, session };
+  return { pid, comm: text.slice(open + 1, close), ppid, session };
+}
+
+/** The kernel keeps this many characters of a program's file name as a process's `comm`. */
+const COMM_LENGTH = 15;
+
+/**
+ * Shells that may lead the session while it waits for commands, besides the login shell: `sh` running `login` as the
+ * session starts, and shells an rc file or the user `exec`s in place of the login shell.
+ */
+const SHELLS: Record<string, true> = {
+  sh: true,
+  login: true,
+  ash: true,
+  bash: true,
+  dash: true,
+  zsh: true,
+  fish: true,
+  ksh: true,
+  mksh: true,
+  oksh: true,
+  loksh: true,
+  yash: true,
+};
+
+/** The `comm` of the login shell Termux's `login` started with the environment [environ] (`/proc/<pid>/environ`). */
+export function loginShellComm(environ: string): string | undefined {
+  const shell = environ
+    .split("\0")
+    .find((it) => it.startsWith("SHELL="))
+    ?.slice("SHELL=".length);
+  return shell ? basename(shell).slice(0, COMM_LENGTH) : undefined;
+}
+
+/** The process that leads the session `script`'s child started: the shell once it has started. */
+export function sessionLeader(processes: ProcStat[], scriptPid: number): ProcStat | undefined {
+  return processes.find((it) => it.ppid === scriptPid && it.session === it.pid);
 }
 
 /**
- * Whether anything besides the shell runs in the session `script`'s child leads: foreground commands, background jobs,
- * a `wait`ed job and whatever they start. A shell builtin looping on its own, or a program that started a session of
- * its own, doesn't count.
+ * Whether anything besides the shell runs in the session [leader] leads: foreground commands, background jobs, a
+ * `wait`ed job and whatever they start, or a program the user `exec`ed, which replaces the shell in the leader's own
+ * process, so the leader no longer runs a shell or [loginShell] (the `comm` of the user's login shell). A shell builtin
+ * looping on its own, or a program that started a session of its own, doesn't count.
  */
-export function sessionHasWork(processes: ProcStat[], scriptPid: number): boolean {
-  const leader = processes.find((it) => it.ppid === scriptPid && it.session === it.pid);
-  if (leader === undefined) return false;
+export function sessionHasWork(processes: ProcStat[], leader: ProcStat, loginShell: string | undefined): boolean {
+  if (leader.comm !== loginShell && SHELLS[leader.comm] !== true) return true;
   return processes.some((it) => it.session === leader.session && it.pid !== leader.pid);
 }
 
@@ -94,9 +132,9 @@ function watchBusy(scriptPid: number, onChange: (busy: boolean) => void): () => 
   const timer = setInterval(() => {
     if (polling) return;
     polling = true;
-    void listProcesses()
-      .then((processes) => {
-        streak = sessionHasWork(processes, scriptPid) === busy ? 0 : streak + 1;
+    void hasWork(scriptPid)
+      .then((work) => {
+        streak = work === busy ? 0 : streak + 1;
         if (streak < (busy ? IDLE_POLLS : BUSY_POLLS)) return;
         busy = !busy;
         streak = 0;
@@ -108,6 +146,15 @@ function watchBusy(scriptPid: number, onChange: (busy: boolean) => void): () => 
       });
   }, BUSY_POLL_MS);
   return () => clearInterval(timer);
+}
+
+/** One poll of [watchBusy]: whether the shell under `script` ([scriptPid]) has work running now. */
+async function hasWork(scriptPid: number): Promise<boolean> {
+  const processes = await listProcesses();
+  const leader = sessionLeader(processes, scriptPid);
+  if (leader === undefined) return false;
+  const environ = await readFile(`/proc/${leader.pid}/environ`, "utf8").catch(() => "");
+  return sessionHasWork(processes, leader, loginShellComm(environ));
 }
 
 /**
