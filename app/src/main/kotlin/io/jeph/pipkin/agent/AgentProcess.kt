@@ -170,7 +170,7 @@ internal class AgentProcess(
     startJob?.cancel()
     connection?.close()
     connection = null
-    timeline.clearPendingUi()
+    timeline.clearDialogs()
     stateFlow.value = AgentProcessState.Starting
   }
 
@@ -182,24 +182,25 @@ internal class AgentProcess(
   }
 
   /**
-   * Returns Pi's `disposition`: `started`, `queued` or `handled`. Pi answers a slash command only once an
-   * extension command finished, which can wait on the user's answers, so those wait without a deadline.
+   * Returns Pi's `disposition`: `started`, `queued` or `handled`. Pi answers only after the extensions' `input` and
+   * `before_agent_start` handlers, a slash command's whole run, and any compaction due first; handlers can wait on the
+   * user's answers, so this waits without a deadline. A Pi that stops answering is caught by [resync].
    */
   suspend fun prompt(message: String, images: List<ImagePart> = emptyList()): String {
     val params = messageParams(message, images)
       // Pi only reads streamingBehavior while a run is streaming, so steering is safe to always request
       // and avoids a rejection when a run starts between the UI's busy check and this command.
       .put("streamingBehavior", "steer")
-    val timeout = if (message.startsWith("/")) null else RpcClient.TIMEOUT_MILLIS
-    return call("prompt", params, timeout).optString("disposition")
+    return call("prompt", params, timeoutMillis = null).optString("disposition")
   }
 
   /**
    * Queues [message] as a steer, even while Pi is idle, since the next run Pi starts takes the queued steers into
-   * its first turn. Returns Pi's `disposition`: `queued`, or `handled` when an extension consumed it.
+   * its first turn. Returns Pi's `disposition`: `queued`, or `handled` when an extension consumed it. Pi answers after
+   * the extensions' `input` handlers, which can wait on the user, so this waits without a deadline.
    */
   suspend fun steer(message: String, images: List<ImagePart> = emptyList()): String =
-    call("steer", messageParams(message, images)).optString("disposition")
+    call("steer", messageParams(message, images), timeoutMillis = null).optString("disposition")
 
   override suspend fun abort() {
     call("abort")
@@ -240,9 +241,9 @@ internal class AgentProcess(
     return data.optJSONArray("steering").strings() + data.optJSONArray("followUp").strings()
   }
 
-  /** Answers an `extension_ui_request` dialog and clears it from the timeline. False when Pi is no longer reachable. */
+  /** Answers dialog [id] and drops it from the timeline. False when Pi is no longer reachable. */
   suspend fun respondUi(id: String, answer: UiAnswer): Boolean {
-    timeline.clearPendingUi()
+    timeline.dismissDialog(id)
     val response = JSONObject().put("type", "extension_ui_response").put("id", id)
     when (answer) {
       is UiAnswer.Value -> response.put("value", answer.value)
@@ -385,7 +386,7 @@ internal class AgentProcess(
     if (exit == null && stateFlow.value == AgentProcessState.Ready && !recentlyReconnected) {
       Log.w(TAG, "Connection to Pi dropped without an exit record; reconnecting")
       lastAutoReconnectAt = now
-      timeline.clearPendingUi()
+      timeline.clearDialogs()
       processScope.launch(Dispatchers.Main) { restart() }
       return
     }
@@ -434,6 +435,15 @@ internal class AgentProcess(
       }
 
       "thinking_level_changed" -> timeline.setThinkingLevel(event.opt("level") as? String)
+
+      // Pi answers a timed-out dialog itself and says nothing, so the dialog goes when Pi stops waiting on it.
+      "extension_ui_request" -> dialogTimeoutMillis(event)?.let { timeout ->
+        val id = event.optString("id")
+        processScope.launch {
+          delay(timeout)
+          timeline.dismissDialog(id)
+        }
+      }
     }
   }
 

@@ -414,15 +414,16 @@ class ChatTimelineTest {
           "timeout":10000}""",
     )
     assertEquals(
-      ExtensionUiRequest("u1", "select", "Allow?", null, listOf("Allow", "Block"), null, null),
+      ExtensionUiRequest("u1", "select", "Allow?", null, listOf("Allow", "Block"), null, null, expiresAt = 11_000),
       timeline.state.value.pendingUi,
     )
-    timeline.clearPendingUi()
+    timeline.dismissDialog("u1")
     assertNull(timeline.state.value.pendingUi)
 
     apply("""{"type":"extension_ui_request","id":"u2","method":"editor","title":"Edit","prefill":"x\ny"}""")
     assertEquals("x\ny", timeline.state.value.pendingUi?.prefill)
-    timeline.clearPendingUi()
+    assertNull(timeline.state.value.pendingUi?.expiresAt)
+    timeline.dismissDialog("u2")
 
     apply("""{"type":"extension_ui_request","id":"u3","method":"setStatus","statusKey":"k","statusText":"s"}""")
     apply("""{"type":"extension_ui_request","id":"u4","method":"notify","message":"Nope","notifyType":"warning"}""")
@@ -433,6 +434,45 @@ class ChatTimelineTest {
       listOf(TimelineEffect.Notify("Nope", "warning"), TimelineEffect.SetEditorText("draft")),
       effects,
     )
+  }
+
+  @Test
+  fun dialogsAskedTogetherQueueUntilEachIsDismissed() {
+    apply("""{"type":"extension_ui_request","id":"a","method":"confirm","title":"First?","message":"one"}""")
+    apply("""{"type":"extension_ui_request","id":"b","method":"select","title":"Second?","options":["x"]}""")
+    apply("""{"type":"extension_ui_request","id":"c","method":"input","title":"Third?"}""")
+    assertEquals("a", timeline.state.value.pendingUi?.id)
+
+    // Pi can stop waiting on a later dialog first, as when its timeout runs out; the shown one stays.
+    timeline.dismissDialog("b")
+    assertEquals("a", timeline.state.value.pendingUi?.id)
+    timeline.dismissDialog("a")
+    assertEquals("c", timeline.state.value.pendingUi?.id)
+    // An answer that comes after the dialog already went changes nothing.
+    timeline.dismissDialog("a")
+    assertEquals("c", timeline.state.value.pendingUi?.id)
+
+    apply("""{"type":"extension_ui_request","id":"d","method":"confirm","title":"Fourth?"}""")
+    timeline.clearDialogs()
+    assertNull(timeline.state.value.pendingUi)
+  }
+
+  @Test
+  fun piExitingDropsEveryDialog() {
+    apply("""{"type":"extension_ui_request","id":"a","method":"confirm","title":"First?"}""")
+    apply("""{"type":"extension_ui_request","id":"b","method":"confirm","title":"Second?"}""")
+    timeline.showExit(1, "")
+    assertNull(timeline.state.value.pendingUi)
+  }
+
+  @Test
+  fun dialogTimeoutFollowsPi() {
+    fun timeout(json: String) = dialogTimeoutMillis(JSONObject(json))
+    assertEquals(5_000L, timeout("""{"timeout":5000}"""))
+    // Pi only arms a timer for a truthy timeout, and a negative one fires at once.
+    assertNull(timeout("""{"timeout":0}"""))
+    assertNull(timeout("""{}"""))
+    assertEquals(0L, timeout("""{"timeout":-5}"""))
   }
 
   @Test

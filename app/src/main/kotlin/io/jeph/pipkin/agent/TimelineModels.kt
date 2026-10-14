@@ -7,6 +7,7 @@ data class TimelineState(
   val items: List<TimelineItem> = emptyList(),
   val busy: Boolean = false,
   val queue: List<String> = emptyList(),
+  /** The first of the dialogs Pi waits on; the next shows once this one is answered or expires. */
   val pendingUi: ExtensionUiRequest? = null,
   val model: JSONObject? = null,
   val thinkingLevel: String? = null,
@@ -84,7 +85,10 @@ data class ImagePart(val data: String, val mimeType: String)
 
 enum class ToolStatus { Pending, Running, Done }
 
-/** A blocking `extension_ui_request` dialog (`select`, `confirm`, `input` or `editor`) awaiting an answer. */
+/**
+ * A blocking `extension_ui_request` dialog (`select`, `confirm`, `input` or `editor`) awaiting an answer. [expiresAt]
+ * is when Pi stops waiting and answers with its default ([System.currentTimeMillis]); null when it waits for good.
+ */
 data class ExtensionUiRequest(
   val id: String,
   val method: String,
@@ -93,7 +97,15 @@ data class ExtensionUiRequest(
   val options: List<String>,
   val placeholder: String?,
   val prefill: String?,
+  val expiresAt: Long? = null,
 )
+
+/**
+ * How long Pi waits on dialog `extension_ui_request` [event] before answering it with its default, or null when it waits
+ * for the answer. Pi treats a `timeout` of 0 as none and answers a negative one at once.
+ */
+internal fun dialogTimeoutMillis(event: JSONObject): Long? =
+  (event.opt("timeout") as? Number)?.toLong()?.takeIf { it != 0L }?.coerceAtLeast(0)
 
 /** One-shot UI actions requested by Pi extensions. */
 sealed interface TimelineEffect {

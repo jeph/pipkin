@@ -24,6 +24,7 @@ import org.json.JSONObject
  * streamed through `message_update` keeps its key when `message_end` rebuilds the authoritative message. The open
  * run's [TurnFooter] is held apart and always rendered last.
  */
+@Suppress("TooManyFunctions") // Owns everything the chat renders from Pi's stream, extension dialogs included.
 class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private val lock = Any()
   private val mutableState = MutableStateFlow(TimelineState())
@@ -51,7 +52,10 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private var compacting = false
   private var queue = emptyList<String>()
   private var queueInFlight = false
-  private var pendingUi: ExtensionUiRequest? = null
+
+  /** Dialogs Pi waits on, oldest first; the screen shows the first. Extensions can ask several at once. */
+  private val dialogs = ArrayDeque<ExtensionUiRequest>()
+
   private var model: JSONObject? = null
   private var thinkingLevel: String? = null
   private var appliedCount = 0L
@@ -183,16 +187,24 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       finishRun()
       compacting = false
       queueInFlight = false
-      pendingUi = null
+      dialogs.clear()
       items += ExitBanner("x${itemSeq++}", code, stderr)
       publish()
     }
   }
 
-  fun clearPendingUi() {
+  /** Drops every dialog, as Pi stopped and nothing waits on them any more. */
+  fun clearDialogs() {
     synchronized(lock) {
-      pendingUi = null
+      dialogs.clear()
       publish()
+    }
+  }
+
+  /** Drops dialog [id] once it is answered, or once Pi stopped waiting on it; other dialogs stay queued. */
+  fun dismissDialog(id: String) {
+    synchronized(lock) {
+      if (dialogs.removeAll { it.id == id }) publish()
     }
   }
 
@@ -419,8 +431,8 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
 
   private fun extensionUi(event: JSONObject) {
     when (val method = event.optString("method")) {
-      "select", "confirm", "input", "editor" ->
-        pendingUi =
+      "select", "confirm", "input", "editor" -> {
+        dialogs +=
           ExtensionUiRequest(
             id = event.optString("id"),
             method = method,
@@ -429,7 +441,9 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
             options = event.optJSONArray("options").strings(),
             placeholder = event.optStringOrNull("placeholder"),
             prefill = event.optStringOrNull("prefill"),
+            expiresAt = dialogTimeoutMillis(event)?.let { clock() + it },
           )
+      }
 
       "notify" ->
         effectChannel.trySend(
@@ -474,7 +488,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
     val snapshot = footer?.let { items + it } ?: items.toList()
     // A manual compaction runs outside any agent run, but it is work Stop can end and keep-alive must cover.
     mutableState.value =
-      TimelineState(snapshot, busy || compacting, queue, pendingUi, model, thinkingLevel, queueInFlight)
+      TimelineState(snapshot, busy || compacting, queue, dialogs.firstOrNull(), model, thinkingLevel, queueInFlight)
   }
 
   private data class LiveMessage(val key: String, val role: String, val timestamp: Long)
