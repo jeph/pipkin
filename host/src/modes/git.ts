@@ -280,27 +280,15 @@ async function defaultBranch(repo: Repo): Promise<string | null> {
   return hasMaster ? "master" : null;
 }
 
-/** The ref Paseo diffs committed changes against: `origin/<base>` whenever it exists, else the local branch. */
-async function diffComparisonRef(repo: Repo, base: string): Promise<string | null> {
+/**
+ * The ref committed changes are compared with, both the diff, as in Paseo, and the commits list: `origin/<base>`
+ * whenever it exists, else the local branch.
+ */
+async function comparisonRef(repo: Repo, base: string): Promise<string | null> {
   const name = branchNameFromRef(base);
   const [hasLocal, hasOrigin] = await Promise.all([refExists(repo, `refs/heads/${name}`), refExists(repo, `refs/remotes/origin/${name}`)]);
   if (hasOrigin) return `origin/${name}`;
   return hasLocal ? name : null;
-}
-
-/**
- * The ref Paseo lists commits against: whichever of the local branch and `origin/<base>` exists, and when
- * both do, origin only if it has more commits the other lacks than the other way round.
- */
-async function commitsComparisonRef(repo: Repo, base: string): Promise<string | null> {
-  const name = branchNameFromRef(base);
-  const [hasLocal, hasOrigin] = await Promise.all([refExists(repo, `refs/heads/${name}`), refExists(repo, `refs/remotes/origin/${name}`)]);
-  if (!hasOrigin) return hasLocal ? name : null;
-  if (!hasLocal) return `origin/${name}`;
-  const { stdout } = await run(repo, ["rev-list", "--left-right", "--count", `${name}...origin/${name}`]);
-  const [localOnly, originOnly] = stdout.trim().split(/\s+/).map(Number);
-  if (localOnly === undefined || originOnly === undefined || Number.isNaN(localOnly) || Number.isNaN(originOnly)) return name;
-  return originOnly > localOnly ? `origin/${name}` : name;
 }
 
 async function mergeBase(repo: Repo, ref: string): Promise<string | null> {
@@ -629,7 +617,7 @@ async function workTreeDiff(repo: Repo, paths: GitPaths, ignoreWhitespace: boole
  * while HEAD is unborn.
  */
 async function branchDiff(repo: Repo, base: string | null, ignoreWhitespace: boolean): Promise<DiffBody> {
-  const comparison = base === null ? null : await diffComparisonRef(repo, base);
+  const comparison = base === null ? null : await comparisonRef(repo, base);
   if (comparison === null || (await headCommit(repo)) === null) return { files: [] };
   return diffFiles(repo, [(await mergeBase(repo, comparison)) ?? comparison, "HEAD"], ignoreWhitespace);
 }
@@ -675,15 +663,16 @@ async function changes(ctx: ModeContext, root: string, mode: string, ignoreWhite
 }
 
 /**
- * Paseo's workspace commits: `git log <base>..HEAD`, the newest [COMMITS_LIMIT] of `total`; none while
- * detached (outside a rebase) or unborn, or on the base branch itself.
+ * The commits ahead of the ref the committed diff compares with, on any branch including the base one:
+ * `git log <comparison>..HEAD`, the newest [COMMITS_LIMIT] of `total`. None while detached (outside a rebase)
+ * or unborn.
  */
 async function commits(ctx: ModeContext, root: string, known: unknown): Promise<JsonObject> {
   try {
     const repo = await openRepo(ctx, root);
     await requireRepo(repo);
     const [branch, head, base] = await Promise.all([currentBranch(repo), headCommit(repo), defaultBranch(repo)]);
-    const comparison = branch === null || head === null || base === null || branchNameFromRef(base) === branch ? null : await commitsComparisonRef(repo, base);
+    const comparison = branch === null || head === null || base === null ? null : await comparisonRef(repo, base);
     if (comparison === null) return fingerprinted({ baseRef: comparison, total: 0, commits: [] }, known);
     const range = `${comparison}..HEAD`;
     const [log, count] = await Promise.all([

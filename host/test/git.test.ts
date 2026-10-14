@@ -504,24 +504,19 @@ describe("git mode", () => {
       expect(pathsOf(await committed())).toEqual(["feature.txt", "unpushed.txt"]);
     });
 
-    it("lists commits against whichever of local and origin is further ahead", async () => {
+    it("lists the commits ahead of origin's branch, on the base branch itself too", async () => {
       await cloneUpstream();
-      await commitAll(workspace, "unpushed on main");
-      await git(workspace, "checkout", "-q", "-b", "feature");
-      const feature = await commitAll(workspace, "feature work");
-      const local = await commits();
-      expect(local).toMatchObject({ baseRef: "main" });
-      expect(local?.commits).toEqual([{ sha: feature, subject: "feature work", authorTime: clock }]);
+      const unpushed = await commitAll(workspace, "unpushed on main");
+      expect(await commits()).toMatchObject({ baseRef: "origin/main", total: 1, commits: [{ sha: unpushed, subject: "unpushed on main", authorTime: clock }] });
 
-      await commitAll(upstream, "upstream one");
-      await commitAll(upstream, "upstream two");
-      await git(workspace, "fetch", "-q");
-      const remote = await commits();
-      expect(remote).toMatchObject({ baseRef: "origin/main" });
-      expect((remote?.commits as { subject: string }[] | undefined)?.map((commit) => commit.subject)).toEqual(["feature work", "unpushed on main"]);
+      await git(workspace, "checkout", "-q", "-b", "feature");
+      await commitAll(workspace, "feature work");
+      const feature = await commits();
+      expect(feature).toMatchObject({ baseRef: "origin/main", total: 2 });
+      expect((feature?.commits as { subject: string }[] | undefined)?.map((commit) => commit.subject)).toEqual(["feature work", "unpushed on main"]);
     });
 
-    it("lists the branch's commits newest first, none on the base branch, detached or unborn", async () => {
+    it("lists the branch's commits newest first, none ahead on a base branch without origin, detached or unborn", async () => {
       await initRepo();
       await git(workspace, "checkout", "-q", "-b", "feature");
       const first = await commitAll(workspace, "first: with \"quotes\" and ünïcode");
@@ -544,7 +539,7 @@ describe("git mode", () => {
       await git(workspace, "checkout", "-q", "--detach");
       expect(await commits()).toMatchObject({ baseRef: null, total: 0, commits: [] });
       await git(workspace, "checkout", "-q", "main");
-      expect(await commits()).toMatchObject({ baseRef: null, total: 0, commits: [] });
+      expect(await commits()).toMatchObject({ baseRef: "main", total: 0, commits: [] });
       await git(workspace, "checkout", "-q", "--orphan", "fresh");
       expect(await commits()).toMatchObject({ baseRef: null, total: 0, commits: [] });
     });
