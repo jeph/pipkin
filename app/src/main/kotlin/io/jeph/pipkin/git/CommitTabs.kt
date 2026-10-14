@@ -78,14 +78,14 @@ internal class CommitTab(val id: Int, val cwd: String, val commit: GitCommit, pr
 
 /**
  * Opens commits, which belong to a folder rather than a chat, like files: every chat in a folder shows the same ones.
- * A commit has at most one tab per folder. Tabs live in memory only, so they're gone after a restart. [tabs] holds and
- * closes them; a folder that stops being one of the [trusted] ones, as removing its workspace makes it, loses its
- * commit tabs, so none of them runs git there again. Main-thread confined.
+ * A commit has at most one tab per folder. [tabs] holds and closes them; a folder that stops being one of the
+ * [trusted] ones, as removing its workspace makes it, loses its commit tabs, so none of them runs git there again.
+ * Main-thread confined.
  */
 internal class CommitTabRegistry(
   private val git: GitHost,
   private val tabs: OpenTabs,
-  trusted: StateFlow<Set<String>>,
+  private val trusted: StateFlow<Set<String>>,
   scope: CoroutineScope,
 ) {
   private var nextId = 1
@@ -102,11 +102,19 @@ internal class CommitTabRegistry(
    * Shows [commit]'s tab in the folder [cwd] in [pane], opening one when the commit has none. Returns false, showing
    * nothing, when the other pane shows the commit.
    */
-  fun open(pane: Pane, cwd: String, commit: GitCommit): Boolean {
+  fun open(pane: Pane, cwd: String, commit: GitCommit): Boolean = tabs.show(pane, tabFor(cwd, commit))
+
+  /**
+   * [commit]'s tab in the folder [cwd]: the open one, else a new one, which isn't open until [OpenTabs] holds it. Null
+   * when the folder isn't one of the trusted ones, where no commit tab may run git.
+   */
+  fun restoredTab(cwd: String, commit: GitCommit): WorkspaceTab? =
+    tabFor(cwd, commit).takeIf { folderKey(cwd) in trusted.value }
+
+  private fun tabFor(cwd: String, commit: GitCommit): WorkspaceTab {
     val folder = folderKey(cwd)
-    val open = tabs.tabs.value.firstOrNull {
+    return tabs.tabs.value.firstOrNull {
       it is WorkspaceTab.Commit && it.cwd == folder && it.commit.commit.sha == commit.sha
-    }
-    return tabs.show(pane, open ?: WorkspaceTab.Commit(CommitTab(nextId++, folder, commit, git)))
+    } ?: WorkspaceTab.Commit(CommitTab(nextId++, folder, commit, git))
   }
 }

@@ -7,6 +7,9 @@ import io.jeph.pipkin.ui.files.ExplorerSort
 import io.jeph.pipkin.ui.files.SortKey
 import io.jeph.pipkin.ui.git.ExplorerTab
 import io.jeph.pipkin.ui.theme.ThemeMode
+import io.jeph.pipkin.workspace.SavedLayout
+import io.jeph.pipkin.workspace.savedLayoutOf
+import io.jeph.pipkin.workspace.toJson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -164,6 +167,13 @@ internal class Preferences(context: Context) {
     commitsCollapsedState.value = collapsed
   }
 
+  /** The tabs and panes last shown, for a restarted Pipkin to show again; null before any were saved. */
+  fun savedLayout(): SavedLayout? = prefs.getString(LAYOUT, null)?.let(::savedLayoutOf)
+
+  fun setSavedLayout(layout: SavedLayout) {
+    prefs.edit { putString(LAYOUT, layout.toJson()) }
+  }
+
   private fun readWorkspaces(): List<String> {
     val array = JSONArray(prefs.getString(WORKSPACES, null) ?: return emptyList())
     return List(array.length()) { array.getString(it) }
@@ -214,5 +224,6 @@ internal class Preferences(context: Context) {
     const val DIFF_WRAP_LINES = "diffWrapLines"
     const val DIFF_HIDE_WHITESPACE = "diffHideWhitespace"
     const val COMMITS_COLLAPSED = "commitsCollapsed"
+    const val LAYOUT = "layout"
   }
 }

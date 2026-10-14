@@ -24,6 +24,7 @@ import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.terminal.TerminalRegistry
 import io.jeph.pipkin.workspace.OpenTabs
 import io.jeph.pipkin.workspace.Panes
+import io.jeph.pipkin.workspace.WorkspaceLayout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -57,6 +58,7 @@ internal class AppGraph(private val application: Application) {
   val files = FileTabRegistry(fileHost, tabs)
   val gitHost = GitHost(hostClient, scope)
   val commits = CommitTabRegistry(gitHost, tabs, preferences.trustedRepositories, scope)
+  val layout = WorkspaceLayout(this)
 
   init {
     holdWhileWorking()

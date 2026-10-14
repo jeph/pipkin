@@ -124,11 +124,13 @@ internal class ShellActions(private val graph: AppGraph) {
       it.path != except && !sessionArchive.isArchived(it.path) && (cwd == null || sameFolder(it.cwd, cwd))
     }
 
-  /** While the main pane shows nothing, as on entering the main screen: waits for the chat list, then shows one. */
+  /**
+   * While the main pane shows nothing, as on entering the main screen: waits for the chat list, then shows the layout
+   * from before a restart, the first time, and a chat when the main pane still shows nothing.
+   */
   suspend fun openAtStartup() {
-    if (graph.panes.itemIn(Pane.Primary) != null) return
     if (!sessions.loaded.value) sessions.refresh()
-    sessions.loaded.first { it }
+    graph.layout.restore()
     if (graph.panes.itemIn(Pane.Primary) == null) openMostRecent()
   }
 

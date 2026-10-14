@@ -20,6 +20,11 @@ internal class OpenTabs(private val panes: Panes<*>) {
     return panes.showTab(pane, tab)
   }
 
+  /** Opens [restored] tabs from before a restart, without showing them, ahead of any opened since. */
+  fun restore(restored: List<WorkspaceTab>) {
+    tabsFlow.update { open -> restored.filterNot { it in open } + open }
+  }
+
   /**
    * Closes [tab]: the pane showing it goes back, every history forgets it, and it lets go of what it holds. The UI
    * closes through `ShellActions.closeTab`, which also gives a pane left with nothing a chat.

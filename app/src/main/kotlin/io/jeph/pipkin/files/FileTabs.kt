@@ -65,9 +65,12 @@ internal class FileTabRegistry(private val files: FileHost, private val tabs: Op
    * Shows [path]'s tab in the folder [cwd] in [pane], opening one when the file has none. Returns false, showing
    * nothing, when the other pane shows the file.
    */
-  fun open(pane: Pane, cwd: String, path: String): Boolean {
+  fun open(pane: Pane, cwd: String, path: String): Boolean = tabs.show(pane, tabFor(cwd, path))
+
+  /** [path]'s tab in the folder [cwd]: the open one, else a new one, which isn't open until [OpenTabs] holds it. */
+  fun tabFor(cwd: String, path: String): WorkspaceTab {
     val folder = folderKey(cwd)
-    val open = tabs.tabs.value.firstOrNull { it is WorkspaceTab.File && it.cwd == folder && it.file.path == path }
-    return tabs.show(pane, open ?: WorkspaceTab.File(FileTab(nextId++, folder, path, files::read)))
+    return tabs.tabs.value.firstOrNull { it is WorkspaceTab.File && it.cwd == folder && it.file.path == path }
+      ?: WorkspaceTab.File(FileTab(nextId++, folder, path, files::read))
   }
 }

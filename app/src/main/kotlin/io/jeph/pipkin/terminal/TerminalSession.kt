@@ -38,7 +38,8 @@ internal sealed interface TerminalState {
 
 /**
  * One login shell in [cwd], run by the host's `terminal` mode and shown by libghostty's [terminal]. It lives in
- * [parentScope] until [close], so the shell keeps running while its tab is hidden.
+ * [parentScope] until [close], so the shell keeps running while its tab is hidden; it starts once its screen first
+ * shows it.
  */
 internal class TerminalSession(
   context: Context,
@@ -108,6 +109,11 @@ internal class TerminalSession(
     }
     stateFlow.value = TerminalState.Starting
     connection = scope.launch { connect() }
+  }
+
+  /** Starts the shell unless one was started before, as when a screen first shows this terminal. */
+  fun startOnce() {
+    if (connection == null) start()
   }
 
   /** Ends the shell and frees the terminal; the session cannot start again. */

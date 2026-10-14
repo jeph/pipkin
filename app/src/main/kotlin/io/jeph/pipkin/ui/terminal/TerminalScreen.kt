@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -86,6 +87,7 @@ internal fun TerminalScreen(session: TerminalSession, controls: PaneControls, mo
     // The terminal view and its key state are per session; a new session starts fresh.
     key(session) { TerminalPane(session, Modifier.weight(1f)) }
   }
+  LaunchedEffect(session) { session.startOnce() }
 
   if (actionsOpen) {
     TerminalActionsSheet(

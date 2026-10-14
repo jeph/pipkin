@@ -159,10 +159,13 @@ internal fun MainScreen(
 ) {
   val snackbar = remember { SnackbarStackState() }
   ShellNotices(actions, snackbar)
-  val primaryEmpty = rememberPaneItems()[Pane.Primary] == null
+  val items = rememberPaneItems()
+  val primaryEmpty = items[Pane.Primary] == null
   LaunchedEffect(actions, primaryEmpty) { if (primaryEmpty) actions.openAtStartup() }
   val splitAvailable = splitScreenAvailable()
-  LaunchedEffect(splitAvailable) { if (!splitAvailable) actions.closeSplit() }
+  // Also when a restored layout fills the second pane after the window was found too narrow.
+  val secondaryShown = items[Pane.Secondary] != null
+  LaunchedEffect(splitAvailable, secondaryShown) { if (!splitAvailable && secondaryShown) actions.closeSplit() }
   val panels = rememberPanePanels()
   RequestedChatEffect(actions, requestedChat, onOpenArchivedChat, onShown = {
     for (pane in Pane.entries) panels.show(pane, Panel.Chat)
@@ -339,6 +342,7 @@ private fun WorkspacePanes(
   // Not shown for the frame before a narrowed window closes split screen.
   val split = splitAvailable && items[Pane.Secondary] != null
   LaunchedEffect(split) { if (!split) panels.resetSecondary() }
+  LaunchedEffect(panels.swapped) { graph.layout.setPanesSwapped(panels.swapped) }
   val shownPanes = if (split) Pane.entries else listOf(Pane.Primary)
   ClearFocusWhenTerminalLeaves(
     shownPanes.mapNotNullTo(HashSet()) { ((items[it] as? PaneItem.Tab)?.tab as? WorkspaceTab.Terminal)?.session },

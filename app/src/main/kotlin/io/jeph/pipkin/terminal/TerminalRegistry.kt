@@ -36,13 +36,21 @@ internal class TerminalRegistry(
     }
     .stateIn(scope, SharingStarted.Eagerly, false)
 
-  /** Starts a shell in the folder [cwd] and shows it in [pane]. */
+  /** Opens a terminal in the folder [cwd] and shows it in [pane], whose screen starts its shell. */
   fun open(pane: Pane, cwd: String) {
     val folder = folderKey(cwd)
     val number = (tabs.tabs.value.terminals().filter { it.cwd == folder }.maxOfOrNull { it.number } ?: 0) + 1
-    val session = TerminalSession(context, nextId++, number, folder, hostClient, scope)
-    session.start()
-    tabs.show(pane, WorkspaceTab.Terminal(session))
+    tabs.show(pane, WorkspaceTab.Terminal(TerminalSession(context, nextId++, number, folder, hostClient, scope)))
+  }
+
+  /**
+   * A terminal from before a restart, "Terminal [number]" in the folder [cwd] or the [name] the user gave it. It isn't
+   * open until [OpenTabs] holds it, and its shell starts once a screen shows it.
+   */
+  fun restoredTab(cwd: String, number: Int, name: String?): WorkspaceTab {
+    val session = TerminalSession(context, nextId++, number, folderKey(cwd), hostClient, scope)
+    name?.let(session::rename)
+    return WorkspaceTab.Terminal(session)
   }
 
   private fun List<WorkspaceTab>.terminals(): List<TerminalSession> =
