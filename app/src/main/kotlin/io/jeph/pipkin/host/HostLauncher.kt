@@ -131,7 +131,7 @@ internal object HostLauncher {
     command -v npm >/dev/null 2>&1 || exit 74
     [ -d "$HOME/storage/shared" ] && [ -w "$HOME/storage/shared" ] || exit 75
     export PIPKIN_ROOT="$HOME/.local/share/pipkin"
-    PI_CODING_AGENT_DIR="$(realpath "$HOME/storage/shared")/Pipkin/pi"
+    PI_CODING_AGENT_DIR="$(realpath "$HOME/storage/shared")/.pipkin/pi"
     export PI_CODING_AGENT_DIR
     mkdir -p "$PIPKIN_ROOT" "$PI_CODING_AGENT_DIR"
     host="$PIPKIN_ROOT/host.mjs"

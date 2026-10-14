@@ -5,7 +5,7 @@
 # (service pipkin-codex-lb) and reaches the emulator through stdin, never a command line.
 set -euo pipefail
 
-readonly CONFIG_DIR=/sdcard/Pipkin/pi
+readonly CONFIG_DIR=/sdcard/.pipkin/pi
 readonly PROVIDER=codex-lb
 readonly MODEL=gpt-6-astra
 

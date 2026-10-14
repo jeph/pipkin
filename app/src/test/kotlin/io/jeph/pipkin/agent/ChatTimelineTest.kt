@@ -267,7 +267,7 @@ class ChatTimelineTest {
 
   @Test
   fun expandedSkillShowsAsTheTypedCommand() {
-    val block = "<skill name=\"haiku\" location=\"/sdcard/Pipkin/pi/skills/haiku/SKILL.md\">\nWrite one.\n</skill>"
+    val block = "<skill name=\"haiku\" location=\"/sdcard/.pipkin/pi/skills/haiku/SKILL.md\">\nWrite one.\n</skill>"
     val messages = JSONArray()
       .put(JSONObject().put("role", "user").put("timestamp", 5).put("content", "$block\n\nthe sea\nat dawn"))
       .put(JSONObject().put("role", "user").put("timestamp", 6).put("content", block))
