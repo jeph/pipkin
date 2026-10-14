@@ -68,18 +68,23 @@ internal class FileExplorerState(val root: String, private val files: FileHost) 
 
   /**
    * Lists the top folder and every expanded one again, together, since Pi may have changed any of them. An expanded
-   * folder that can't be listed any more (deleted or renamed) collapses.
+   * folder that can't be listed any more (deleted or renamed) collapses; when the top folder itself can't be, the
+   * whole tree goes, so its failure shows instead of files that may no longer be there.
    */
   suspend fun refresh() {
     if (refreshing) return
     refreshing = true
     try {
       val paths = listOf(ROOT_FOLDER) + expanded
-      val failures = coroutineScope { paths.map { async { it to fetch(it) } }.awaitAll() }
-      for ((path, error) in failures) {
-        if (error == null) continue
-        if (path == ROOT_FOLDER) failure = error else collapse(path)
+      val failures = coroutineScope { paths.map { async { it to fetch(it) } }.awaitAll() }.toMap()
+      val rootFailure = failures[ROOT_FOLDER]
+      if (rootFailure != null) {
+        failure = rootFailure
+        expanded = emptySet()
+        directories = emptyMap()
+        return
       }
+      for ((path, error) in failures) if (error != null) collapse(path)
     } finally {
       refreshing = false
     }
