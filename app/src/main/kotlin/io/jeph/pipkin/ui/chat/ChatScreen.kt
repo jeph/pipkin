@@ -57,7 +57,7 @@ internal fun ChatScreen(
   // Outlive a process swap, so a message about the closed chat (delete failed) still shows.
   val snackbar = remember { SnackbarStackState() }
   val scope = rememberCoroutineScope()
-  val scrolls = remember { ChatScrolls() }
+  val views = remember { ChatViews() }
   if (process == null) {
     PlaceholderChat(onToggleSidebar, modifier)
     return
@@ -81,7 +81,7 @@ internal fun ChatScreen(
       onOpenSettings = onOpenSettings,
     )
     val controller = remember {
-      ChatController(process, scrolls[process], context.applicationContext, scope, snackbar, navigator)
+      ChatController(process, views[process], context.applicationContext, scope, snackbar, navigator)
     }
     LaunchedEffect(controller) { controller.collectEffects() }
     LaunchedEffect(controller) { controller.steering.collectQueue() }
@@ -170,7 +170,7 @@ private fun ChatContent(
       ChatStream(
         timeline = timeline,
         processState = processState,
-        scroll = controller.scroll,
+        view = controller.view,
         onOpenTool = { onSheet(ChatSheet.Tool(it)) },
         onOpenSettings = onOpenSettings,
         onRestart = process::restart,

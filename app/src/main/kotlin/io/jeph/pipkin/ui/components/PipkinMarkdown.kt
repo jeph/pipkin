@@ -5,7 +5,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -24,19 +30,26 @@ import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
 import com.mikepenz.markdown.model.MarkdownAnnotator
 import com.mikepenz.markdown.model.MarkdownTypography
+import com.mikepenz.markdown.model.State
 import com.mikepenz.markdown.model.markdownAnimations
 import com.mikepenz.markdown.model.markdownAnnotator
 import com.mikepenz.markdown.model.markdownDimens
 import com.mikepenz.markdown.model.markdownPadding
-import com.mikepenz.markdown.model.rememberMarkdownState
+import com.mikepenz.markdown.model.parseMarkdown
 import com.mikepenz.markdown.utils.resolveImageAlt
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.conflate
+import kotlinx.coroutines.withContext
 import org.intellij.markdown.MarkdownElementTypes
 
-/** Assistant markdown styled to Paseo's message tokens: 15/21sp body, bordered horizontally scrolling code. */
+/**
+ * Assistant markdown styled to Paseo's message tokens: 15/21sp body, bordered horizontally scrolling code. With a
+ * [cache], markdown it has parsed before shows from the first frame, and each parse of it is kept there.
+ */
 @Composable
-fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
+fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier, cache: MarkdownCache? = null) {
   val colors = pipkinColors
   val body = TextStyle(
     color = colors.foreground,
@@ -47,12 +60,10 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
   val codeBlock: @Composable (String, String?, TextStyle) -> Unit = { text, language, _ ->
     CodeBox(modifier = Modifier.padding(vertical = PipkinTokens.Spacing.s6)) { CodeText(text, language) }
   }
-  // Parsing runs off the main thread; without retaining, each streamed delta would show the empty
-  // loading box until the new parse lands, collapsing and re-growing the message.
-  val state = rememberMarkdownState(markdown, retainState = true)
+  val state = rememberParsedMarkdown(markdown, cache)
   SelectionContainer(modifier = modifier) {
     Markdown(
-      markdownState = state,
+      state = state,
       modifier = Modifier.fillMaxWidth(),
       colors =
         markdownColor(
@@ -76,6 +87,30 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier) {
       annotator = imageAltAnnotator(),
     )
   }
+}
+
+/**
+ * [markdown] parsed off the main thread, one parse at a time with the latest text. Until the current text's parse
+ * lands the last result stays, so a streamed reply doesn't collapse to the empty loading box between deltas. A text
+ * [cache] holds needs no parse, and each result is kept in [cache].
+ */
+@Composable
+private fun rememberParsedMarkdown(markdown: String, cache: MarkdownCache?): State {
+  var parsed by remember { mutableStateOf<State>(cache?.get(markdown) ?: State.Loading()) }
+  val latest by rememberUpdatedState(markdown to cache)
+  LaunchedEffect(Unit) {
+    // Conflated, so text that changes faster than it parses skips to the latest instead of queueing every delta.
+    snapshotFlow { latest }.conflate().collect { (text, latestCache) ->
+      val shown = parsed
+      val next = when {
+        shown is State.Success && shown.content == text -> shown
+        else -> latestCache?.get(text) ?: withContext(Dispatchers.Default) { parseMarkdown(text) }
+      }
+      parsed = next
+      if (next is State.Success) latestCache?.put(next)
+    }
+  }
+  return parsed
 }
 
 /**

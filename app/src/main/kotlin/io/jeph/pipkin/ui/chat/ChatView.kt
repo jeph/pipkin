@@ -4,6 +4,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import io.jeph.pipkin.agent.AgentProcess
+import io.jeph.pipkin.ui.components.MarkdownCache
 import java.util.WeakHashMap
 
 /** The item at the top of the stream's viewport, by its list key, and how far it is scrolled past. */
@@ -23,9 +24,18 @@ internal class ChatScroll {
   var top: StreamTop? = null
 }
 
-/** Each chat's [ChatScroll], kept as long as its process: a parked chat keeps its own, a closed one's is dropped. */
-internal class ChatScrolls {
-  private val scrolls = WeakHashMap<AgentProcess, ChatScroll>()
+/**
+ * What the chat screen keeps of one chat while another one shows: its [scroll] position and its replies' parsed
+ * [markdown], so switching back draws the chat as it was from the first frame.
+ */
+internal class ChatView {
+  val scroll = ChatScroll()
+  val markdown = MarkdownCache()
+}
 
-  operator fun get(process: AgentProcess): ChatScroll = scrolls.getOrPut(process) { ChatScroll() }
+/** Each chat's [ChatView], kept as long as its process: a parked chat keeps its own, a closed one's is dropped. */
+internal class ChatViews {
+  private val views = WeakHashMap<AgentProcess, ChatView>()
+
+  operator fun get(process: AgentProcess): ChatView = views.getOrPut(process) { ChatView() }
 }

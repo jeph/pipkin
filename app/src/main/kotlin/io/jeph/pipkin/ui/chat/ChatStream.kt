@@ -33,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +52,7 @@ import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.TimelineState
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.MarkdownCache
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
@@ -66,15 +68,16 @@ private const val LAUNCHER_MASK_SCALE = 1.5f
 
 /**
  * The chat stream: process banner, timeline items, the empty state and Paseo's scroll-to-bottom button.
- * Keeps the end in view while the user is at the bottom; dragging away stops following. Opens where [scroll] says the
- * chat was left, and records where it is when it leaves. While Pi starts under a history already shown, a pinned
- * [LoadingPill] replaces the banner. [onRestart] retries a failed start and restarts an exited Pi.
+ * Keeps the end in view while the user is at the bottom; dragging away stops following. Opens where [view] says the
+ * chat was left, with the replies it has parsed, and records where it is when it leaves. While Pi starts under a
+ * history already shown, a pinned [LoadingPill] replaces the banner. [onRestart] retries a failed start and restarts
+ * an exited Pi.
  */
 @Composable
 internal fun ChatStream(
   timeline: TimelineState,
   processState: AgentProcessState,
-  scroll: ChatScroll,
+  view: ChatView,
   onOpenTool: (key: String) -> Unit,
   onOpenSettings: () -> Unit,
   onRestart: () -> Unit,
@@ -85,8 +88,16 @@ internal fun ChatStream(
   val loadingOverHistory = starting && timeline.items.isNotEmpty()
   val banner = processState.takeIf { !loadingOverHistory && (starting || it is AgentProcessState.Failed) }
   val count = timeline.items.size + if (banner != null) 1 else 0
+  val scroll = view.scroll
   val listState = remember { restoredListState(scroll, timeline.items, banner != null) }
-  DisposableEffect(listState) { onDispose { scroll.top = listState.top() } }
+  val items by rememberUpdatedState(timeline.items)
+  DisposableEffect(listState) {
+    onDispose {
+      scroll.top = listState.top()
+      // Replies the chat no longer has, as after a session switch, needn't stay parsed.
+      view.markdown.retainOnly(items.mapNotNullTo(HashSet()) { (it as? TimelineItem.AssistantText)?.markdown })
+    }
+  }
   val follow = scroll.follow
   val threshold = with(LocalDensity.current) { 120.dp.roundToPx() }
   AutoFollow(listState, follow)
@@ -94,7 +105,7 @@ internal fun ChatStream(
     derivedStateOf { listState.distanceFromBottom() > threshold }
   }
   Box(modifier = modifier.fillMaxSize()) {
-    StreamList(listState, timeline.items, banner, follow, onRestart, onOpenTool)
+    StreamList(listState, timeline.items, banner, follow, view.markdown, onRestart, onOpenTool)
     if (timeline.items.isEmpty() && processState == AgentProcessState.Ready) {
       EmptyState(noModel = timeline.model == null, onOpenSettings, Modifier.align(Alignment.Center))
     }
@@ -160,6 +171,7 @@ private fun StreamList(
   items: List<TimelineItem>,
   banner: AgentProcessState?,
   follow: State<Boolean>,
+  markdownCache: MarkdownCache,
   onRestart: () -> Unit,
   onOpenTool: (key: String) -> Unit,
 ) {
@@ -189,6 +201,7 @@ private fun StreamList(
     itemsIndexed(items, key = { _, item -> item.key }, contentType = { _, item -> item::class }) { index, item ->
       StreamItem(
         item = item,
+        markdownCache = markdownCache,
         onOpenTool = onOpenTool,
         onRestart = onRestart,
         modifier = Modifier.contentWidth().padding(top = gapBefore(items.getOrNull(index - 1), item)),
@@ -247,13 +260,14 @@ private class BottomAnchor(
 @Composable
 private fun StreamItem(
   item: TimelineItem,
+  markdownCache: MarkdownCache,
   onOpenTool: (key: String) -> Unit,
   onRestart: () -> Unit,
   modifier: Modifier,
 ) {
   when (item) {
     is TimelineItem.User -> UserMessage(item, modifier)
-    is TimelineItem.AssistantText -> AssistantMessage(item, modifier)
+    is TimelineItem.AssistantText -> AssistantMessage(item, markdownCache, modifier)
     is TimelineItem.Thinking -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
     is TimelineItem.ToolCall -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
     is TimelineItem.Error -> ErrorRow(item.message, modifier)

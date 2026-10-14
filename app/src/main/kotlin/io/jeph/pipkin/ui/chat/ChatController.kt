@@ -39,12 +39,12 @@ internal class ChatActions(
 
 /**
  * The chat screen's draft and actions for one [process]. Runs work on the screen's [scope] and reports
- * failures as snackbars, so a closed screen cancels its pending calls. [scroll] is the chat's stream position, which
- * outlives the controller.
+ * failures as snackbars, so a closed screen cancels its pending calls. [view] is what the screen keeps of the chat,
+ * such as its stream position, which outlives the controller.
  */
 internal class ChatController(
   val process: AgentProcess,
-  val scroll: ChatScroll,
+  val view: ChatView,
   private val context: Context,
   val scope: CoroutineScope,
   private val snackbar: SnackbarStackState,
@@ -138,7 +138,7 @@ internal class ChatController(
     sending = true
     sendingCommand = command
     stopRequested = false
-    scroll.follow.value = true
+    view.scroll.follow.value = true
     scope.launch {
       try {
         block()

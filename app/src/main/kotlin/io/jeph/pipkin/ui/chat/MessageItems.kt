@@ -36,6 +36,7 @@ import io.jeph.pipkin.agent.ImagePart
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.MarkdownCache
 import io.jeph.pipkin.ui.components.PipkinMarkdown
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -127,11 +128,22 @@ private fun ImageThumbnail(part: ImagePart) {
   )
 }
 
-/** A block of the agent's reply; once it finished streaming, Paseo's copy button and its time sit under it. */
+/**
+ * A block of the agent's reply; once it finished streaming, Paseo's copy button and its time sit under it. Its parse is
+ * kept in [markdownCache] once it has finished, not for every text it streams through.
+ */
 @Composable
-internal fun AssistantMessage(item: TimelineItem.AssistantText, modifier: Modifier = Modifier) {
+internal fun AssistantMessage(
+  item: TimelineItem.AssistantText,
+  markdownCache: MarkdownCache,
+  modifier: Modifier = Modifier,
+) {
   Column(modifier = modifier.fillMaxWidth().padding(top = PipkinTokens.Spacing.s12)) {
-    PipkinMarkdown(markdown = item.markdown, modifier = Modifier.fillMaxWidth())
+    PipkinMarkdown(
+      markdown = item.markdown,
+      modifier = Modifier.fillMaxWidth(),
+      cache = markdownCache.takeUnless { item.streaming },
+    )
     if (item.streaming) {
       Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s12))
       return@Column
