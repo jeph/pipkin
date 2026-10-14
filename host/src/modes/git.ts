@@ -50,6 +50,13 @@ class GitError extends Error {
 /** The diff can't fit in a reply; reported as `tooLarge` rather than an error. */
 class TooLarge extends Error {}
 
+/** Git ran past [GIT_TIMEOUT_MS]. A diff that slow is reported as `tooLarge`; anything else as a failure. */
+class TimedOut extends GitError {
+  constructor(command: string | undefined) {
+    super("failed", `git ${command ?? ""} took longer than 30 seconds.`);
+  }
+}
+
 /** A repository the requests run git in. */
 interface Repo {
   binary: string;
@@ -146,7 +153,7 @@ function run(repo: Repo, args: string[], options: RunOptions = {}): Promise<RunR
   child.on("close", (exitCode) => {
     settle();
     if (killedFor === "abort") return reject(repo.signal.reason);
-    if (killedFor === "timeout") return reject(new GitError("failed", `git ${args[0]} took longer than 30 seconds.`));
+    if (killedFor === "timeout") return reject(new TimedOut(args[0]));
     if (killedFor === "overflow") return reject(new TooLarge());
     const truncated = killedFor === "truncated";
     const result = { exitCode, stdout: Buffer.concat(stdout).toString("utf8"), truncated };
@@ -542,10 +549,12 @@ async function diffFiles(repo: Repo, revisions: string[], ignoreWhitespace: bool
   const patchRun = run(stoppable, ["diff", ...PATCH_FLAGS, ...whitespace, ...revisions, "--"], { env, onStdout: (chunk) => sections.push(chunk) });
   void listRun.catch(() => stop.abort());
   const [list, numstat, patch] = await Promise.allSettled([listRun, numstatRun, patchRun]);
-  if (list.status === "rejected") {
-    if (list.reason instanceof TooLarge) return { tooLarge: true, files: [] };
-    throw list.reason;
-  }
+  // Past a reply's worth, or more than git could produce in time: either way too large to preview.
+  const outsized = [list, numstat, patch].some(
+    (result) => result.status === "rejected" && (result.reason instanceof TooLarge || result.reason instanceof TimedOut),
+  );
+  if (outsized) return { tooLarge: true, files: [] };
+  if (list.status === "rejected") throw list.reason;
   if (numstat.status === "rejected") throw numstat.reason;
   if (patch.status === "rejected") throw patch.reason;
   const stats = parseRaw(list.value.stdout);
