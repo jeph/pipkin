@@ -79,16 +79,23 @@ internal fun AnnotatedString.splitLines(): List<AnnotatedString> {
     open.removeAll { it.end <= end }
     lines += AnnotatedString(text.substring(start, end), lineStyles)
   }
+  // A scan rather than Regex.findAll: on Android each match makes a Matcher that copies the whole text, so a file of
+  // many lines would take its length times its line count.
   var start = 0
-  for (lineBreak in LINE_BREAK.findAll(text)) {
-    addLine(start, lineBreak.range.first)
-    start = lineBreak.range.last + 1
+  var index = 0
+  while (index < length) {
+    val char = text[index]
+    if (char != '\n' && char != '\r') {
+      index++
+      continue
+    }
+    addLine(start, index)
+    index += if (char == '\r' && text.getOrNull(index + 1) == '\n') 2 else 1
+    start = index
   }
   addLine(start, length)
   return lines
 }
-
-private val LINE_BREAK = Regex("\r\n|\r|\n")
 
 /** How Pipkin colours a highlight capture. [Plain] takes the text's own colour, even inside a coloured capture. */
 internal enum class Token { Plain, Keyword, String, Constant, Comment, Function, Type, Tag }
