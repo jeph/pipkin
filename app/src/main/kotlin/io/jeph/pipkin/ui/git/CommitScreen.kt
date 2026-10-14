@@ -33,27 +33,28 @@ import io.jeph.pipkin.ui.files.ExplorerToggle
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.ui.workspace.CloseSplitButton
+import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.TabCountButton
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 
 /**
  * One open commit, shown in place of [chat]: the workspace header with the commit's title, the workspace's tab
- * button, the commit's actions and the explorer toggle, then just what the commit changed, every file unfolded, as
- * the Changes tab draws a diff. It follows the global Wrap lines and Hide whitespace settings; hiding whitespace reads
- * the commit again with git's `-w`. A commit never changes, so it's read once per whitespace setting.
+ * button, the commit's actions and the explorer toggle, which act through [controls], then just what the commit
+ * changed, every file unfolded, as the Changes tab draws a diff. It follows the global Wrap lines and Hide whitespace
+ * settings; hiding whitespace reads the commit again with git's `-w`. A commit never changes, so it's read once per
+ * whitespace setting.
  */
 @Composable
 internal fun CommitScreen(
   commit: CommitTab,
   chat: AgentProcess,
-  onToggleSidebar: () -> Unit,
-  onOpenTabs: () -> Unit,
-  onToggleExplorer: () -> Unit,
+  controls: PaneControls,
   modifier: Modifier = Modifier,
 ) {
   val graph = LocalContext.current.appGraph
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(chat)
+  val tabs = rememberWorkspaceTabs(controls.pane, chat)
   val state by commit.state.collectAsStateWithLifecycle()
   val hideWhitespace by graph.preferences.diffHideWhitespace.collectAsStateWithLifecycle()
   val wrapLines by graph.preferences.diffWrapLines.collectAsStateWithLifecycle()
@@ -66,15 +67,16 @@ internal fun CommitScreen(
     HeaderBar(
       title = commit.title,
       subtitle = hello?.home?.let { tildePath(commit.cwd, it) } ?: commit.cwd,
-      leading = { MenuButton(onToggleSidebar) },
+      leading = { MenuButton(controls.onToggleSidebar) },
       trailing = {
-        TabCountButton(count = tabs.count, onClick = onOpenTabs)
+        TabCountButton(count = tabs.count, onClick = controls.onOpenTabs)
         IconButton28(
           icon = R.drawable.ic_lucide_ellipsis,
           contentDescription = stringResource(R.string.git_commit_actions),
           onClick = { actionsOpen = true },
         )
-        ExplorerToggle(onToggleExplorer)
+        ExplorerToggle(controls.onToggleExplorer)
+        CloseSplitButton(controls)
       },
     )
     val body = Modifier.weight(1f)

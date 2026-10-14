@@ -58,6 +58,7 @@ import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.terminal.TerminalActionsSheet
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.workspace.Pane
 import io.jeph.pipkin.workspace.WorkspaceTab
 
 /** Paseo's compact-header tab switcher trigger: the number of tabs in the workspace in a small outlined square. */
@@ -97,30 +98,33 @@ internal fun TabCountButton(count: Int, onClick: () -> Unit) {
 }
 
 /**
- * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace of the shown chat
- * [process], its terminals, its open files, its open commits and then its chats, the shown one highlighted. Tapping a
- * tab shows it and closes the sheet. A chat is archived by swiping it right or from its actions sheet, which also
- * renames it; the sheet stays open and shows the shell's [snackbar], so the archive's Undo is in reach. A terminal, a
- * file or a commit closes by swiping it right or from its actions sheet, which also renames a terminal.
+ * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace of the chat [process]
+ * that [pane] shows, its terminals, its open files, its open commits and then its chats, the shown one highlighted.
+ * Tapping a tab shows it in [pane] and closes the sheet; a tab the other pane shows can't be tapped. A chat is archived
+ * by swiping it right or from its actions sheet, which also renames it and, when [onShownInSplit] is given, opens it in
+ * split screen, calling that once the second pane shows it; the sheet stays open and shows the shell's [snackbar], so
+ * the archive's Undo is in reach. A terminal, a file or a commit closes by swiping it right or from its actions sheet,
+ * which also renames a terminal.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WorkspaceTabsSheet(
+  pane: Pane,
   process: AgentProcess,
   actions: ShellActions,
   snackbar: SnackbarStackState,
+  onShownInSplit: (() -> Unit)?,
   onDismiss: () -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
-  val tabs = rememberWorkspaceTabs(process)
+  val tabs = rememberWorkspaceTabs(pane, process)
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
   val archiving = remember(actions) { TabArchiving(actions) }
   val terminalClosing = remember(graph) { TerminalClosing(graph.terminals) }
   var menu by remember { mutableStateOf<TabMenu?>(null) }
   val show = { tab: WorkspaceTab? ->
-    graph.shownTab.show(process, tab)
-    onDismiss()
+    if (graph.shownTabs.show(pane, process, tab)) onDismiss()
   }
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
   LaunchedEffect(tabs.chats) { archiving.forgetGone(tabs.chats) }
@@ -141,7 +145,7 @@ internal fun WorkspaceTabsSheet(
       terminalClosing = terminalClosing,
       callbacks = TabListCallbacks(
         // The chat shown next starts on its own tab, not on a terminal or file shown with this one.
-        onOpenChat = { session -> if (actions.openSession(session)) show(null) },
+        onOpenChat = { session -> if (actions.openChat(pane, session.cwd, session.path)) show(null) },
         onShow = show,
         onActions = { menu = it },
       ),
@@ -149,7 +153,20 @@ internal fun WorkspaceTabsSheet(
     )
     SnackbarStackOverlay(snackbar)
   }
-  menu?.let { TabMenuSheet(it, actions, archiving, onDismiss = { menu = null }) }
+  val shownPath by process.sessionFile.collectAsStateWithLifecycle()
+  menu?.let { shownMenu ->
+    // Only chats no pane shows open in split screen: the second pane's own rows already show there.
+    val path = (shownMenu as? TabMenu.Chat)?.session?.path
+    val openInSplit = onShownInSplit?.let { shown ->
+      { session: SessionInfo ->
+        if (actions.openChat(Pane.Secondary, session.cwd, session.path)) {
+          shown()
+          onDismiss()
+        }
+      }
+    }?.takeIf { path != shownPath && path != tabs.shown.elsewhereChat }
+    TabMenuSheet(shownMenu, actions, archiving, openInSplit, onDismiss = { menu = null })
+  }
   ConfirmArchive(archiving)
   ConfirmCloseTerminal(terminalClosing)
 }
@@ -194,11 +211,17 @@ private sealed interface TabMenu {
 }
 
 /**
- * [menu]'s actions sheet: a chat's renames or archives it, a terminal's renames or closes it, a file's or a commit's
- * closes it.
+ * [menu]'s actions sheet: a chat's renames or archives it, and opens it in split screen through [openInSplit] when
+ * given; a terminal's renames or closes it; a file's or a commit's closes it.
  */
 @Composable
-private fun TabMenuSheet(menu: TabMenu, actions: ShellActions, archiving: TabArchiving, onDismiss: () -> Unit) {
+private fun TabMenuSheet(
+  menu: TabMenu,
+  actions: ShellActions,
+  archiving: TabArchiving,
+  openInSplit: ((SessionInfo) -> Unit)?,
+  onDismiss: () -> Unit,
+) {
   val graph = LocalContext.current.appGraph
   when (menu) {
     is TabMenu.Chat -> SessionActions(
@@ -206,6 +229,7 @@ private fun TabMenuSheet(menu: TabMenu, actions: ShellActions, archiving: TabArc
       onDismiss = onDismiss,
       onRename = { actions.rename(menu.session, it) },
       onArchive = { archiving.archive(menu.session) },
+      onOpenInSplit = openInSplit?.let { open -> { open(menu.session) } },
     )
 
     is TabMenu.Terminal -> TerminalActionsSheet(
@@ -233,7 +257,8 @@ private class TabListCallbacks(
 
 /**
  * The tab menu's rows: the workspace's terminals, open files and open commits, the shown chat while it has no saved
- * history, then the saved chats. The shown chat is highlighted only while no other tab is shown in its place.
+ * history, then the saved chats. The shown chat is highlighted only while no other tab is shown in its place; what the
+ * other pane shows is marked and doesn't open.
  */
 @Composable
 private fun TabList(
@@ -249,7 +274,7 @@ private fun TabList(
   val shownPath by process.sessionFile.collectAsStateWithLifecycle()
   val closing = remember(graph) { FileClosing(graph.files) }
   val commitClosing = remember(graph) { CommitClosing(graph.commits) }
-  val chatShown = tabs.shownTab == null
+  val chatShown = tabs.shown.tab == null
   LazyColumn(modifier = modifier) {
     terminalRows(tabs, terminalClosing, callbacks)
     fileRows(tabs, closing, callbacks)
@@ -261,7 +286,7 @@ private fun TabList(
           title = name ?: stringResource(R.string.chat_new_chat),
           modified = null,
           process = process,
-          shown = chatShown,
+          shown = if (chatShown) TabShown.Here else TabShown.Nowhere,
           onOpen = { callbacks.onShow(null) },
           onActions = null,
           modifier = Modifier.animateItem(),
@@ -281,7 +306,11 @@ private fun TabList(
           title = sessionTitle(session),
           modified = session.modified,
           process = processes[ChatKey.session(session.path)],
-          shown = current && chatShown,
+          shown = when {
+            current && chatShown -> TabShown.Here
+            session.path == tabs.shown.elsewhereChat -> TabShown.OtherPane
+            else -> TabShown.Nowhere
+          },
           onOpen = { if (current) callbacks.onShow(null) else callbacks.onOpenChat(session) },
           onActions = { callbacks.onActions(TabMenu.Chat(session)) },
         )
@@ -304,7 +333,7 @@ private fun LazyListScope.terminalRows(tabs: WorkspaceTabs, closing: TerminalClo
     ) {
       TerminalTabRow(
         session = terminal,
-        shown = tab == tabs.shownTab,
+        shown = tabs.shown.of(tab),
         onOpen = { callbacks.onShow(tab) },
         onActions = { callbacks.onActions(TabMenu.Terminal(terminal)) },
       )
@@ -326,7 +355,7 @@ private fun LazyListScope.fileRows(tabs: WorkspaceTabs, closing: FileClosing, ca
     ) {
       FileTabRow(
         file = file,
-        shown = tab == tabs.shownTab,
+        shown = tabs.shown.of(tab),
         onOpen = { callbacks.onShow(tab) },
         onActions = { callbacks.onActions(TabMenu.File(file)) },
       )
@@ -348,7 +377,7 @@ private fun LazyListScope.commitRows(tabs: WorkspaceTabs, closing: CommitClosing
     ) {
       CommitTabRow(
         commit = commit,
-        shown = tab == tabs.shownTab,
+        shown = tabs.shown.of(tab),
         onOpen = { callbacks.onShow(tab) },
         onActions = { callbacks.onActions(TabMenu.Commit(commit)) },
       )

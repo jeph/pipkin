@@ -36,32 +36,30 @@ import io.jeph.pipkin.ui.files.ExplorerToggle
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.ui.workspace.CloseSplitButton
+import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.TabCountButton
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 
 /**
- * One chat: header, stream and composer for [process]; a null process shows a starting placeholder. The header's tab
- * button, and `/resume`, open the workspace's tab menu through [onOpenTabs]; its explorer toggle calls
- * [onToggleExplorer].
+ * One chat in a pane: header, stream and composer for [process]; a null process shows a starting placeholder. What
+ * the screen keeps of each chat comes from [views]. The header's buttons, and `/resume`, act through [controls]: the
+ * tab menu, the explorer, the sidebar and, in the second pane, closing split screen.
  */
 @Composable
 internal fun ChatScreen(
   process: AgentProcess?,
   actions: ShellActions,
-  onOpenTabs: () -> Unit,
-  onToggleSidebar: () -> Unit,
-  onToggleExplorer: () -> Unit,
+  views: ChatViews,
+  controls: PaneControls,
   onOpenSettings: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   // Outlive a process swap, so a message about the closed chat (delete failed) still shows.
   val snackbar = remember { SnackbarStackState() }
   val scope = rememberCoroutineScope()
-  val views = remember { ChatViews() }
-  val registry = LocalContext.current.appGraph.registry
-  LaunchedEffect(views, registry) { views.warmHidden(registry) }
   if (process == null) {
-    PlaceholderChat(onToggleSidebar, modifier)
+    PlaceholderChat(controls, modifier)
     return
   }
   // Everything below is per chat. Collecting a chat's flows outside this key would show the previous chat's
@@ -73,12 +71,12 @@ internal fun ChatScreen(
     val openTabs = {
       keyboard?.hide()
       focus.clearFocus()
-      onOpenTabs()
+      controls.onOpenTabs()
     }
     var sheet by remember { mutableStateOf<ChatSheet?>(null) }
     val navigator = rememberNavigator(
       onSheet = { sheet = it },
-      onNewChat = { actions.newChat(process.cwd) },
+      onNewChat = { actions.newChat(controls.pane, process.cwd) },
       onOpenTabs = openTabs,
       onOpenSettings = onOpenSettings,
     )
@@ -90,9 +88,8 @@ internal fun ChatScreen(
     ChatContent(
       controller,
       snackbar,
-      onToggleSidebar,
+      controls,
       openTabs,
-      onToggleExplorer,
       onOpenSettings,
       onSheet = { sheet = it },
       modifier,
@@ -101,8 +98,8 @@ internal fun ChatScreen(
       controller,
       sheet,
       onSheet = { sheet = it },
-      onNewChat = { actions.newChat(it) },
-      onNewTerminal = { context.appGraph.terminals.open(process) },
+      onNewChat = { actions.newChat(controls.pane, it) },
+      onNewTerminal = { context.appGraph.terminals.open(controls.pane, process) },
       onArchive = actions::archive,
     )
     ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive = actions::archive)
@@ -138,9 +135,8 @@ private fun rememberNavigator(
 private fun ChatContent(
   controller: ChatController,
   snackbar: SnackbarStackState,
-  onToggleSidebar: () -> Unit,
+  controls: PaneControls,
   onOpenTabs: () -> Unit,
-  onToggleExplorer: () -> Unit,
   onOpenSettings: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
   modifier: Modifier,
@@ -162,10 +158,9 @@ private fun ChatContent(
   ) {
     ChatHeader(
       process,
-      onToggleSidebar,
+      controls,
       onOpenTabs,
       onActions = { onSheet(ChatSheet.Actions) },
-      onToggleExplorer = onToggleExplorer,
       Modifier.onUnhandledTap(dismissKeyboard),
     )
     Box(modifier = Modifier.weight(1f).fillMaxWidth().onUnhandledTap(dismissKeyboard)) {
@@ -226,15 +221,15 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
 
 /**
  * Session name (or the first message) over the project path, with `~` for the Termux home; the tab button with the
- * number of tabs in the workspace sits before the actions button, and the file explorer's toggle ends the row.
+ * number of tabs in the workspace sits before the actions button, and the file explorer's toggle ends the row, before
+ * the second pane's button that closes split screen.
  */
 @Composable
 private fun ChatHeader(
   process: AgentProcess,
-  onToggleSidebar: () -> Unit,
+  controls: PaneControls,
   onOpenTabs: () -> Unit,
   onActions: () -> Unit,
-  onToggleExplorer: () -> Unit,
   modifier: Modifier,
 ) {
   val graph = LocalContext.current.appGraph
@@ -242,13 +237,13 @@ private fun ChatHeader(
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
   val sessions by graph.sessionRepository.sessions.collectAsStateWithLifecycle()
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(process)
+  val tabs = rememberWorkspaceTabs(controls.pane, process)
   val firstMessage = sessions.firstOrNull { it.path == sessionFile }?.firstMessage?.takeIf { it.isNotBlank() }
   HeaderBar(
     title = sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),
     subtitle = hello?.home?.let { tildePath(process.cwd, it) } ?: process.cwd,
     modifier = modifier,
-    leading = { MenuButton(onToggleSidebar) },
+    leading = { MenuButton(controls.onToggleSidebar) },
     trailing = {
       TabCountButton(count = tabs.count, onClick = onOpenTabs)
       IconButton28(
@@ -256,7 +251,8 @@ private fun ChatHeader(
         contentDescription = stringResource(R.string.chat_actions),
         onClick = onActions,
       )
-      ExplorerToggle(onToggleExplorer)
+      ExplorerToggle(controls.onToggleExplorer)
+      CloseSplitButton(controls)
     },
   )
 }
@@ -270,11 +266,15 @@ internal fun MenuButton(onToggleSidebar: () -> Unit) {
   )
 }
 
-/** Shown while the shell has no process for the chat panel yet. */
+/** Shown while the shell has no process for the pane yet. */
 @Composable
-private fun PlaceholderChat(onToggleSidebar: () -> Unit, modifier: Modifier) {
+private fun PlaceholderChat(controls: PaneControls, modifier: Modifier) {
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    HeaderBar(title = stringResource(R.string.chat_new_chat), leading = { MenuButton(onToggleSidebar) })
+    HeaderBar(
+      title = stringResource(R.string.chat_new_chat),
+      leading = { MenuButton(controls.onToggleSidebar) },
+      trailing = { CloseSplitButton(controls) },
+    )
     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
       StatusBanner(AgentProcessState.Starting, onRetry = {})
     }

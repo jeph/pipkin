@@ -58,16 +58,20 @@ import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SwipeAway
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.workspace.Pane
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 
 /**
- * The mobile sidebar: the workspace folders, with a health/actions footer. Tapping a workspace shows its chat; the
- * chats in it are in the chat header's tab menu. A workspace is removed, archiving its chats, from its own sheet.
+ * [pane]'s sidebar: the workspace folders, with a health/actions footer. Tapping a workspace shows its chat in [pane];
+ * the chats in it are in the chat header's tab menu. A workspace is removed, archiving its chats, from its own sheet,
+ * which also opens it in split screen when [onShownInSplit] is given, calling it once the second pane shows it.
  */
 @Composable
 internal fun Sidebar(
+  pane: Pane,
   actions: ShellActions,
+  onShownInSplit: (() -> Unit)?,
   onClose: () -> Unit,
   onOpenSettings: () -> Unit,
   onOpenArchive: () -> Unit,
@@ -99,11 +103,12 @@ internal fun Sidebar(
   ) {
     SidebarHeader(onClose)
     WorkspaceList(
+      pane = pane,
       workspaces = workspaces,
       home = home,
       removal = removal,
-      onOpen = { cwd -> showThen(cwd) { actions.openWorkspace(cwd) } },
-      onNewChatIn = { cwd -> showThen(cwd) { actions.newChat(cwd) } },
+      onOpen = { cwd -> showThen(cwd) { actions.openWorkspace(pane, cwd) } },
+      onNewChatIn = { cwd -> showThen(cwd) { actions.newChat(pane, cwd) } },
       onActions = { menuFor = it },
       modifier = Modifier.weight(1f),
     )
@@ -118,21 +123,31 @@ internal fun Sidebar(
     WorkspaceActions(
       path = tildePath(workspace.cwd, home),
       onDismiss = { menuFor = null },
+      onOpenInSplit = onShownInSplit?.let { shown ->
+        {
+          showThen(workspace.cwd) { actions.openWorkspace(Pane.Secondary, workspace.cwd).also { if (it) shown() } }
+        }
+      },
       onRemove = { removal.askToRemove(workspace) },
     )
   }
   RemoveWorkspaceDialog(removal, home)
-  if (pickerOpen) {
-    AddWorkspaceSheet(
-      home = home,
-      isWorkspace = { cwd -> workspaces.any { sameFolder(it.cwd, cwd) } },
-      onAdd = { cwd ->
-        graph.preferences.addWorkspace(cwd)
-        pickerOpen = false
-      },
-      onDismiss = { pickerOpen = false },
-    )
-  }
+  if (pickerOpen) AddWorkspacePicker(home, workspaces, onDismiss = { pickerOpen = false })
+}
+
+/** The add-workspace sheet over the sidebar, which adds the folder picked as a workspace. */
+@Composable
+private fun AddWorkspacePicker(home: String, workspaces: List<Workspace>, onDismiss: () -> Unit) {
+  val preferences = LocalContext.current.appGraph.preferences
+  AddWorkspaceSheet(
+    home = home,
+    isWorkspace = { cwd -> workspaces.any { sameFolder(it.cwd, cwd) } },
+    onAdd = { cwd ->
+      preferences.addWorkspace(cwd)
+      onDismiss()
+    },
+    onDismiss = onDismiss,
+  )
 }
 
 /** The sidebar's icon buttons: a 36dp target around a 20dp icon. */
@@ -215,10 +230,10 @@ private fun RemoveWorkspaceDialog(removal: WorkspaceRemoval, home: String) {
   )
 }
 
-/** A workspace's sheet under its path: Remove workspace. */
+/** A workspace's sheet under its path: Open in split screen when [onOpenInSplit] is given, and Remove workspace. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun WorkspaceActions(path: String, onDismiss: () -> Unit, onRemove: () -> Unit) {
+private fun WorkspaceActions(path: String, onDismiss: () -> Unit, onOpenInSplit: (() -> Unit)?, onRemove: () -> Unit) {
   PipkinSheet(onDismissRequest = onDismiss) {
     // A long path keeps its end, the folder that tells workspaces apart.
     Text(
@@ -229,6 +244,16 @@ private fun WorkspaceActions(path: String, onDismiss: () -> Unit, onRemove: () -
       maxLines = 1,
       overflow = TextOverflow.StartEllipsis,
     )
+    if (onOpenInSplit != null) {
+      SheetRow(
+        label = stringResource(R.string.shell_split_open),
+        icon = R.drawable.ic_lucide_columns_2,
+        onClick = {
+          onDismiss()
+          onOpenInSplit()
+        },
+      )
+    }
     SheetRow(
       label = stringResource(R.string.archive_remove_workspace),
       icon = R.drawable.ic_lucide_folder_minus,
@@ -268,6 +293,7 @@ private fun SidebarHeader(onClose: () -> Unit) {
 
 @Composable
 private fun WorkspaceList(
+  pane: Pane,
   workspaces: List<Workspace>,
   home: String,
   removal: WorkspaceRemoval,
@@ -278,7 +304,7 @@ private fun WorkspaceList(
 ) {
   val registry = LocalContext.current.appGraph.registry
   val processes by registry.processes.collectAsStateWithLifecycle()
-  val visible by registry.visible.collectAsStateWithLifecycle()
+  val panes by registry.shown.collectAsStateWithLifecycle()
   if (workspaces.isEmpty()) {
     Text(
       text = stringResource(R.string.shell_sidebar_empty),
@@ -302,7 +328,7 @@ private fun WorkspaceList(
       ) {
         WorkspaceRow(
           name = projectName(cwd, home),
-          shown = visible?.let { sameFolder(it.cwd, cwd) } == true,
+          shown = panes[pane]?.let { sameFolder(it.cwd, cwd) } == true,
           working = anyWorking(remember(processes, cwd) { processes.values.filter { sameFolder(it.cwd, cwd) } }),
           onOpen = { onOpen(cwd) },
           onNewChat = { onNewChatIn(cwd) },
@@ -324,7 +350,8 @@ private fun anyWorking(processes: List<AgentProcess>): Boolean {
 
 /**
  * A workspace's row: its folder (the simmering pot while Pi works in one of its chats) and name, highlighted while
- * its chat is shown, with its actions and New chat. Tapping it shows its chat; long-press opens its actions.
+ * the sidebar's pane shows one of its chats, with its actions and New chat. Tapping it shows its chat; long-press opens
+ * its actions.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable

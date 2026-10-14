@@ -8,7 +8,8 @@ import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.host.FileContent
 import io.jeph.pipkin.host.FileHost
 import io.jeph.pipkin.host.HostRejected
-import io.jeph.pipkin.workspace.ShownTab
+import io.jeph.pipkin.workspace.Pane
+import io.jeph.pipkin.workspace.ShownTabs
 import io.jeph.pipkin.workspace.WorkspaceTab
 import java.io.IOException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,23 +55,26 @@ internal class FileTab(val id: Int, val cwd: String, val path: String, private v
  * The open files, which belong to a folder rather than a chat, like terminals: every chat in a folder shows the same
  * ones. A file has at most one tab per folder. Main-thread confined.
  */
-internal class FileTabRegistry(private val files: FileHost, private val shownTab: ShownTab) {
+internal class FileTabRegistry(private val files: FileHost, private val shownTabs: ShownTabs) {
   private val tabsFlow = MutableStateFlow<List<FileTab>>(emptyList())
   private var nextId = 1
 
   /** Oldest first. */
   val tabs: StateFlow<List<FileTab>> = tabsFlow.asStateFlow()
 
-  /** Shows [path]'s tab in [chat]'s folder in place of the chat, opening one when the file has none. */
-  fun open(chat: AgentProcess, path: String) {
+  /**
+   * Shows [path]'s tab in [chat]'s folder in place of the chat in [pane], opening one when the file has none. Returns
+   * false, showing nothing, when the other pane shows the file.
+   */
+  fun open(pane: Pane, chat: AgentProcess, path: String): Boolean {
     val folder = folderKey(chat.cwd)
     val tab = tabsFlow.value.firstOrNull { it.cwd == folder && it.path == path }
       ?: FileTab(nextId++, folder, path, files).also { opened -> tabsFlow.update { it + opened } }
-    shownTab.show(chat, WorkspaceTab.File(tab))
+    return shownTabs.show(pane, chat, WorkspaceTab.File(tab))
   }
 
   fun close(tab: FileTab) {
     tabsFlow.update { it - tab }
-    shownTab.forget(WorkspaceTab.File(tab))
+    shownTabs.forget(WorkspaceTab.File(tab))
   }
 }

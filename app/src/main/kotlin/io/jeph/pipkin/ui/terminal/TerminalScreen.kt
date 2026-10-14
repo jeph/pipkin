@@ -49,41 +49,42 @@ import io.jeph.pipkin.ui.files.ExplorerToggle
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.ui.workspace.CloseSplitButton
+import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.TabCountButton
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 
 /**
  * One terminal tab, shown in place of [chat]: a header with the terminal's name over its folder, the workspace's tab
- * button, which calls [onOpenTabs], the terminal's actions and the explorer toggle; libghostty's terminal; and Paseo's
- * key bar above the keyboard. An ended shell shows a bar to start another.
+ * button, the terminal's actions and the explorer toggle, which act through [controls]; libghostty's terminal; and
+ * Paseo's key bar above the keyboard. An ended shell shows a bar to start another.
  */
 @Composable
 internal fun TerminalScreen(
   session: TerminalSession,
   chat: AgentProcess,
-  onToggleSidebar: () -> Unit,
-  onOpenTabs: () -> Unit,
-  onToggleExplorer: () -> Unit,
+  controls: PaneControls,
   modifier: Modifier = Modifier,
 ) {
   val graph = LocalContext.current.appGraph
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(chat)
+  val tabs = rememberWorkspaceTabs(controls.pane, chat)
   var actionsOpen by remember(session) { mutableStateOf(false) }
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
     HeaderBar(
       title = terminalTitle(session),
       subtitle = hello?.home?.let { tildePath(session.cwd, it) } ?: session.cwd,
-      leading = { MenuButton(onToggleSidebar) },
+      leading = { MenuButton(controls.onToggleSidebar) },
       trailing = {
-        TabCountButton(count = tabs.count, onClick = onOpenTabs)
+        TabCountButton(count = tabs.count, onClick = controls.onOpenTabs)
         IconButton28(
           icon = R.drawable.ic_lucide_ellipsis,
           contentDescription = stringResource(R.string.terminal_actions),
           onClick = { actionsOpen = true },
         )
-        ExplorerToggle(onToggleExplorer)
+        ExplorerToggle(controls.onToggleExplorer)
+        CloseSplitButton(controls)
       },
     )
     // The terminal view and its key state are per session; a new session starts fresh.
@@ -93,7 +94,7 @@ internal fun TerminalScreen(
   if (actionsOpen) {
     TerminalActionsSheet(
       session = session,
-      onNewTerminal = { graph.terminals.open(chat) },
+      onNewTerminal = { graph.terminals.open(controls.pane, chat) },
       onRestart = session::start,
       onClose = { graph.terminals.close(session) },
       onDismiss = { actionsOpen = false },

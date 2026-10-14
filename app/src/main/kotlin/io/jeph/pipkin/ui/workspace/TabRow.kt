@@ -45,14 +45,15 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 
 /**
  * One chat in the tab menu: what Pi is doing in it, its title and age, highlighted while it is the one shown, and an
- * actions button that long-press also opens. A chat with no saved history yet has no age and no actions.
+ * actions button that long-press also opens. A chat with no saved history yet has no age and no actions. One the
+ * other pane shows says so instead of its age and doesn't open.
  */
 @Composable
 internal fun ChatTabRow(
   title: String,
   modified: Long?,
   process: AgentProcess?,
-  shown: Boolean,
+  shown: TabShown,
   onOpen: () -> Unit,
   onActions: (() -> Unit)?,
   modifier: Modifier = Modifier,
@@ -69,11 +70,14 @@ internal fun ChatTabRow(
   )
 }
 
-/** One terminal in the tab menu: the terminal icon and its name, highlighted while it is the one shown. */
+/**
+ * One terminal in the tab menu: the terminal icon and its name, highlighted while it is the one shown. One the other
+ * pane shows says so and doesn't open.
+ */
 @Composable
 internal fun TerminalTabRow(
   session: TerminalSession,
-  shown: Boolean,
+  shown: TabShown,
   onOpen: () -> Unit,
   onActions: () -> Unit,
   modifier: Modifier = Modifier,
@@ -96,11 +100,14 @@ internal fun TerminalTabRow(
   )
 }
 
-/** One open file in the tab menu: its file-type icon, its name over its folder, highlighted while it is the one shown. */
+/**
+ * One open file in the tab menu: its file-type icon, its name over its folder, highlighted while it is the one shown.
+ * One the other pane shows says so instead of its folder and doesn't open.
+ */
 @Composable
 internal fun FileTabRow(
   file: FileTab,
-  shown: Boolean,
+  shown: TabShown,
   onOpen: () -> Unit,
   onActions: () -> Unit,
   modifier: Modifier = Modifier,
@@ -123,11 +130,14 @@ internal fun FileTabRow(
   )
 }
 
-/** One open commit in the tab menu: the commit icon and its short SHA and subject, highlighted while it's shown. */
+/**
+ * One open commit in the tab menu: the commit icon and its short SHA and subject, highlighted while it's shown. One the
+ * other pane shows says so and doesn't open.
+ */
 @Composable
 internal fun CommitTabRow(
   commit: CommitTab,
-  shown: Boolean,
+  shown: TabShown,
   onOpen: () -> Unit,
   onActions: () -> Unit,
   modifier: Modifier = Modifier,
@@ -156,20 +166,22 @@ private fun TabRow(
   mark: @Composable () -> Unit,
   title: String,
   detail: String?,
-  shown: Boolean,
+  shown: TabShown,
   onOpen: () -> Unit,
   onActions: (() -> Unit)?,
   actionsDescription: String,
   modifier: Modifier,
 ) {
   val colors = pipkinColors
+  val elsewhere = shown == TabShown.OtherPane
+  val shownDetail = if (elsewhere) stringResource(R.string.shell_split_other_pane) else detail
   Row(
     modifier = modifier
       .fillMaxWidth()
       .padding(horizontal = PipkinTokens.Spacing.s8)
       .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
-      .background(if (shown) colors.surface2 else Color.Transparent)
-      .combinedClickable(onClick = onOpen, onLongClick = onActions)
+      .background(if (shown == TabShown.Here) colors.surface2 else Color.Transparent)
+      .combinedClickable(onClick = { if (!elsewhere) onOpen() }, onLongClick = onActions)
       .heightIn(min = 52.dp)
       .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4),
     verticalAlignment = Alignment.CenterVertically,
@@ -179,14 +191,14 @@ private fun TabRow(
     Column(modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s6)) {
       Text(
         text = title,
-        color = colors.foreground,
+        color = if (elsewhere) colors.foregroundMuted else colors.foreground,
         fontSize = PipkinTokens.FontSize.base,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      if (detail != null) {
+      if (shownDetail != null) {
         Text(
-          text = detail,
+          text = shownDetail,
           color = colors.foregroundMuted,
           fontSize = PipkinTokens.FontSize.sm,
           maxLines = 1,

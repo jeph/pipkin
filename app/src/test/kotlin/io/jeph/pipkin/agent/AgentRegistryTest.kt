@@ -1,5 +1,6 @@
 package io.jeph.pipkin.agent
 
+import io.jeph.pipkin.workspace.Pane
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -64,7 +65,7 @@ class AgentRegistryTest {
   @Test
   fun newChatIsRekeyedToItsSessionFile() = registryTest { registry ->
     val chat = registry.open(CWD, null)
-    registry.setVisible(chat)
+    registry.show(Pane.Primary, chat)
     settle()
 
     chat.sessionFile.value = "/s/new.jsonl"
@@ -79,23 +80,46 @@ class AgentRegistryTest {
   fun hiddenIdleProcessesParkAfterTheIdleDelay() = registryTest(idleCloseMillis = 50) { registry ->
     val hidden = registry.open(CWD, "/s/hidden.jsonl")
     val shown = registry.open(CWD, "/s/shown.jsonl")
+    val split = registry.open(CWD, "/s/split.jsonl")
     val working = registry.open(CWD, "/s/working.jsonl")
     working.busy.value = true
-    registry.setVisible(shown)
+    registry.show(Pane.Primary, shown)
+    registry.show(Pane.Secondary, split)
     delay(300)
 
     assertTrue(hidden.parked)
     assertFalse(hidden.closed)
     assertNull(registry.keyOf(hidden))
     assertFalse(shown.parked)
+    assertFalse(split.parked)
     assertFalse(working.parked)
 
     working.busy.value = false
+    registry.show(Pane.Secondary, null)
     delay(300)
 
     assertTrue(working.parked)
+    assertTrue(split.parked)
     assertFalse(shown.parked)
     assertEquals(setOf(ChatKey("/s/shown.jsonl")), registry.processes.value.keys)
+  }
+
+  @Test
+  fun aProcessShowsInOnePaneAtATime() = registryTest { registry ->
+    val a = registry.open(CWD, "/s/a.jsonl")
+    val b = registry.open(CWD, "/s/b.jsonl")
+    registry.show(Pane.Primary, a)
+    registry.show(Pane.Secondary, b)
+
+    assertFalse(registry.show(Pane.Secondary, a))
+    assertEquals(mapOf(Pane.Primary to a, Pane.Secondary to b), registry.shown.value)
+
+    registry.close(b)
+
+    assertEquals(mapOf(Pane.Primary to a), registry.shown.value)
+    registry.show(Pane.Primary, null)
+    assertTrue(registry.show(Pane.Secondary, a))
+    assertEquals(Pane.Secondary, registry.paneOf(a))
   }
 
   @Test
@@ -166,7 +190,7 @@ class AgentRegistryTest {
   @Test
   fun fifthProcessEvictsTheLeastRecentlyVisibleIdleOne() = registryTest { registry ->
     val processes = List(4) { registry.open(CWD, "/s/$it.jsonl") }
-    processes.forEach(registry::setVisible)
+    processes.forEach { registry.show(Pane.Primary, it) }
     processes[1].busy.value = true
 
     val fifth = registry.open(CWD, null)
@@ -175,19 +199,29 @@ class AgentRegistryTest {
     assertTrue(processes.drop(1).none { it.parked || it.closed })
     assertFalse(fifth.closed)
     assertEquals(4, registry.processes.value.size)
-    assertSame(processes[3], registry.visible.value)
+    assertSame(processes[3], registry.shown.value[Pane.Primary])
   }
 
   @Test
-  fun visibleIdleProcessIsEvictedLast() = registryTest { registry ->
-    val processes = List(4) { registry.open(CWD, "/s/$it.jsonl") }
-    processes.take(3).forEach { it.busy.value = true }
-    registry.setVisible(processes[3])
+  fun shownIdleProcessesAreNeverEvicted() = registryTest { registry ->
+    val main = registry.open(CWD, "/s/main.jsonl")
+    val split = registry.open(CWD, "/s/split.jsonl")
+    val hidden = registry.open(CWD, "/s/hidden.jsonl")
+    val working = registry.open(CWD, "/s/working.jsonl")
+    working.busy.value = true
+    registry.show(Pane.Primary, hidden)
+    registry.show(Pane.Primary, main)
+    registry.show(Pane.Secondary, split)
 
     registry.open(CWD, null)
 
-    assertTrue(processes[3].parked)
-    assertNull(registry.visible.value)
+    assertTrue(hidden.parked)
+    assertFalse(main.parked || split.parked)
+    assertEquals(mapOf(Pane.Primary to main, Pane.Secondary to split), registry.shown.value)
+
+    registry.processes.value.values.filter { it !== main && it !== split }.forEach { it.busy.value = true }
+    assertThrows(TooManyRunning::class.java) { registry.open(CWD, null) }
+    assertFalse(main.parked || split.parked)
   }
 
   @Test
@@ -201,9 +235,9 @@ class AgentRegistryTest {
   }
 
   @Test
-  fun reloadReplacesTheProcessUnderItsKeyAndKeepsItVisible() = registryTest { registry ->
+  fun reloadReplacesTheProcessUnderItsKeyAndKeepsItsPane() = registryTest { registry ->
     val old = registry.open(CWD, "/s/a.jsonl")
-    registry.setVisible(old)
+    registry.show(Pane.Secondary, old)
 
     val replacement = registry.reload(old)
 
@@ -212,27 +246,33 @@ class AgentRegistryTest {
     assertEquals(CWD, replacement.cwd)
     assertEquals("/s/a.jsonl", replacement.sessionFile.value)
     assertSame(replacement, registry.processes.value[ChatKey("/s/a.jsonl")])
-    assertSame(replacement, registry.visible.value)
+    assertEquals(mapOf(Pane.Secondary to replacement), registry.shown.value)
   }
 
   @Test
-  fun reloadIdleReloadsTheVisibleAndParksHiddenIdleProcesses() = registryTest { registry ->
+  fun reloadIdleReloadsShownAndParksHiddenIdleProcesses() = registryTest { registry ->
     val shown = registry.open(CWD, "/s/shown.jsonl")
+    val split = registry.open(CWD, "/s/split.jsonl")
     val hidden = registry.open(CWD, "/s/hidden.jsonl")
     val working = registry.open(CWD, "/s/working.jsonl")
     working.busy.value = true
-    registry.setVisible(shown)
+    registry.show(Pane.Primary, shown)
+    registry.show(Pane.Secondary, split)
 
     registry.reloadIdle()
 
-    assertTrue(shown.closed)
+    assertTrue(shown.closed && split.closed)
     assertTrue(hidden.parked)
     assertFalse(hidden.closed)
     assertFalse(working.closed)
-    val reloaded = registry.visible.value
-    assertNotSame(shown, reloaded)
-    assertEquals("/s/shown.jsonl", reloaded?.sessionFile?.value)
-    assertEquals(setOf(ChatKey("/s/shown.jsonl"), ChatKey("/s/working.jsonl")), registry.processes.value.keys)
+    val panes = registry.shown.value
+    assertEquals("/s/shown.jsonl", panes[Pane.Primary]?.sessionFile?.value)
+    assertEquals("/s/split.jsonl", panes[Pane.Secondary]?.sessionFile?.value)
+    assertTrue(panes.values.none { it === shown || it === split })
+    assertEquals(
+      setOf(ChatKey("/s/shown.jsonl"), ChatKey("/s/split.jsonl"), ChatKey("/s/working.jsonl")),
+      registry.processes.value.keys,
+    )
   }
 
   @Test
@@ -299,7 +339,7 @@ class AgentRegistryTest {
     listOf(worker, stuckHidden, stuckShown).forEach { it.busy.value = true }
     stuckHidden.abortFails = true
     stuckShown.abortFails = true
-    registry.setVisible(stuckShown)
+    registry.show(Pane.Secondary, stuckShown)
 
     registry.abortAll()
     settle()
@@ -310,7 +350,7 @@ class AgentRegistryTest {
     assertTrue(stuckHidden.closed)
     assertNull(registry.keyOf(stuckHidden))
     assertTrue(stuckShown.closed)
-    val restarted = registry.visible.value
+    val restarted = registry.shown.value[Pane.Secondary]
     assertNotSame(stuckShown, restarted)
     assertEquals("/s/stuck-shown.jsonl", restarted?.sessionFile?.value)
   }

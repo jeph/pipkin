@@ -67,6 +67,8 @@ import io.jeph.pipkin.ui.settings.copyToClipboard
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.ui.workspace.CloseSplitButton
+import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.TabCountButton
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
 import kotlin.math.max
@@ -75,22 +77,15 @@ import kotlinx.coroutines.withContext
 
 /**
  * One open file, shown in place of [chat]: a header with the file's name over its folder, the workspace's tab button,
- * the file's actions and the explorer toggle; Paseo's bar with the file's size and line count; and the file itself,
- * read again each time its tab shows, since Pi may have changed it. Text shows with line numbers, coloured when a
- * grammar knows the extension; images show fitted to the width.
+ * the file's actions and the explorer toggle, which act through [controls]; Paseo's bar with the file's size and line
+ * count; and the file itself, read again each time its tab shows, since Pi may have changed it. Text shows with line
+ * numbers, coloured when a grammar knows the extension; images show fitted to the width.
  */
 @Composable
-internal fun FileScreen(
-  file: FileTab,
-  chat: AgentProcess,
-  onToggleSidebar: () -> Unit,
-  onOpenTabs: () -> Unit,
-  onToggleExplorer: () -> Unit,
-  modifier: Modifier = Modifier,
-) {
+internal fun FileScreen(file: FileTab, chat: AgentProcess, controls: PaneControls, modifier: Modifier = Modifier) {
   val graph = LocalContext.current.appGraph
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(chat)
+  val tabs = rememberWorkspaceTabs(controls.pane, chat)
   val state by file.state.collectAsStateWithLifecycle()
   var actionsOpen by remember(file) { mutableStateOf(false) }
   val folder = if (file.folder.isEmpty()) file.cwd else "${file.cwd}/${file.folder}"
@@ -100,15 +95,16 @@ internal fun FileScreen(
     HeaderBar(
       title = file.name,
       subtitle = hello?.home?.let { tildePath(folder, it) } ?: folder,
-      leading = { MenuButton(onToggleSidebar) },
+      leading = { MenuButton(controls.onToggleSidebar) },
       trailing = {
-        TabCountButton(count = tabs.count, onClick = onOpenTabs)
+        TabCountButton(count = tabs.count, onClick = controls.onOpenTabs)
         IconButton28(
           icon = R.drawable.ic_lucide_ellipsis,
           contentDescription = stringResource(R.string.file_actions),
           onClick = { actionsOpen = true },
         )
-        ExplorerToggle(onToggleExplorer)
+        ExplorerToggle(controls.onToggleExplorer)
+        CloseSplitButton(controls)
       },
     )
     when (val shown = state) {

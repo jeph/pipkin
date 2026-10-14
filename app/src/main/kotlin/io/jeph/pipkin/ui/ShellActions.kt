@@ -11,7 +11,9 @@ import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.data.sameFolder
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.SessionInfo
+import io.jeph.pipkin.workspace.Pane
 import java.io.IOException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -30,8 +32,9 @@ internal sealed interface ShellNotice {
 }
 
 /**
- * The shell's chat operations: which chat the chat panel shows, workspaces and new chats, the tab menu's rename, and
- * archiving, restoring and deleting chats. Notices surface as [notices] for the shell's snackbar. Main thread only.
+ * The shell's chat operations: which chat each pane shows, split screen, workspaces and new chats, the tab menu's
+ * rename, and archiving, restoring and deleting chats. A chat shows in one pane at most, so opening a chat the other
+ * pane shows leaves it there. Notices surface as [notices] for the shell's snackbar. Main thread only.
  */
 internal class ShellActions(private val graph: AppGraph) {
   private val noticeChannel = Channel<ShellNotice>(Channel.BUFFERED)
@@ -47,58 +50,72 @@ internal class ShellActions(private val graph: AppGraph) {
   /** Termux's home from the last host hello; upstream Termux always uses [TERMUX_HOME] before any host ran. */
   val home: String get() = graph.hostClient.lastHello.value?.home?.takeIf { it.isNotEmpty() } ?: TERMUX_HOME
 
-  /** Shows [session]'s chat; false (with a notice) when four chats are working. */
-  fun openSession(session: SessionInfo): Boolean = openChat(session.cwd, session.path)
+  /** Shows the chat in session file [sessionPath] in [pane]; false (with a notice) when four chats are working. */
+  fun openChat(pane: Pane, cwd: String, sessionPath: String): Boolean = show(pane) { registry.open(cwd, sessionPath) }
 
-  /** Shows the chat in session file [sessionPath]; false (with a notice) when four chats are working. */
-  fun openChat(cwd: String, sessionPath: String): Boolean = show { registry.open(cwd, sessionPath) }
-
-  /** Shows a new chat in [cwd]; false (with a notice) when four chats are working. */
-  fun newChat(cwd: String): Boolean = show { registry.open(cwd, null) }
+  /** Shows a new chat in [cwd] in [pane]; false (with a notice) when four chats are working. */
+  fun newChat(pane: Pane, cwd: String): Boolean = show(pane) { registry.open(cwd, null) }
 
   /**
-   * Shows the workspace [cwd]: the chat last shown there while it is still open or listed, else its newest chat, else
-   * a new one; false (with a notice) when four chats are working.
+   * Shows the workspace [cwd] in [pane]: the chat last shown there while it is still open or listed, else its newest
+   * chat, else a new one, skipping the chat the other pane shows; false (with a notice) when four chats are working.
    */
-  fun openWorkspace(cwd: String): Boolean = show { workspaceChat(cwd) }
+  fun openWorkspace(pane: Pane, cwd: String): Boolean =
+    show(pane) { previous -> workspaceChat(cwd, previous, except = registry.shown.value[pane.other]) }
 
-  /** The process for [openWorkspace]; throws [TooManyRunning] when it needs a slot and all four chats are working. */
-  private fun workspaceChat(cwd: String): AgentProcess {
-    registry.visible.value?.takeIf { sameFolder(it.cwd, cwd) }?.let { return it }
+  /** Closes split screen: the second pane's chat leaves the screen, with any tab shown in its place. */
+  fun closeSplit() {
+    registry.shown.value[Pane.Secondary]?.let(::rememberShown)
+    registry.show(Pane.Secondary, null)
+    graph.shownTabs.clear(Pane.Secondary)
+  }
+
+  /**
+   * The process for [openWorkspace], given the pane's [previous] chat; throws [TooManyRunning] when it needs a slot and
+   * all four chats are working.
+   */
+  private fun workspaceChat(cwd: String, previous: AgentProcess?, except: AgentProcess?): AgentProcess {
+    previous?.takeIf { sameFolder(it.cwd, cwd) }?.let { return it }
+    val skipped = except?.sessionFile?.value
     val last = lastShownIn[folderKey(cwd)]?.takeIf { path ->
-      !sessionArchive.isArchived(path) &&
+      path != skipped &&
+        !sessionArchive.isArchived(path) &&
         (ChatKey.session(path) in registry.processes.value || sessionArchive.active.value.any { it.path == path })
     }
-    return registry.open(cwd, last ?: newestIn(cwd)?.path)
+    return registry.open(cwd, last ?: newestIn(cwd, skipped)?.path)
   }
 
   /**
-   * Shows the most recent chat that is not archived, in [cwd] when given, or a new one there; without [cwd], in the
-   * last project (or home) when there is none.
+   * Shows the most recent chat that is not archived in the main pane, in [cwd] when given, or a new one there; without
+   * [cwd], in the last project (or home) when there is none.
    */
   private fun openMostRecent(cwd: String? = null) {
-    show { mostRecent(cwd) }
+    show(Pane.Primary) { mostRecent(cwd, except = registry.shown.value[Pane.Secondary]) }
   }
 
-  /** The process for [openMostRecent]; throws [TooManyRunning] when it needs a slot and all four chats are working. */
-  private fun mostRecent(cwd: String? = null): AgentProcess {
-    val newest = newestIn(cwd) ?: return registry.open(cwd ?: graph.preferences.lastProjectCwd.value ?: home, null)
+  /**
+   * The process for [openMostRecent], other than [except]; throws [TooManyRunning] when it needs a slot and all four
+   * chats are working.
+   */
+  private fun mostRecent(cwd: String?, except: AgentProcess?): AgentProcess {
+    val newest = newestIn(cwd, except?.sessionFile?.value)
+      ?: return registry.open(cwd ?: graph.preferences.lastProjectCwd.value ?: home, null)
     return registry.open(newest.cwd, newest.path)
   }
 
-  /** The newest chat that is not archived, in [cwd] when given. */
-  private fun newestIn(cwd: String?): SessionInfo? =
+  /** The newest chat that is not archived, other than the one in session file [except], in [cwd] when given. */
+  private fun newestIn(cwd: String?, except: String? = null): SessionInfo? =
     // The archive marks are the source of truth; the active list catches up with them a moment later.
     sessionArchive.active.value.firstOrNull {
-      !sessionArchive.isArchived(it.path) && (cwd == null || sameFolder(it.cwd, cwd))
+      it.path != except && !sessionArchive.isArchived(it.path) && (cwd == null || sameFolder(it.cwd, cwd))
     }
 
   /** On entering the main screen without a chat: waits for the session list, then [openMostRecent]. */
   suspend fun openAtStartup() {
-    if (registry.visible.value != null) return
+    if (registry.shown.value[Pane.Primary] != null) return
     if (!sessions.loaded.value) sessions.refresh()
     sessions.loaded.first { it }
-    if (registry.visible.value == null) openMostRecent()
+    if (registry.shown.value[Pane.Primary] == null) openMostRecent()
   }
 
   /** Renames [session] through its Pi process, starting one in the background if it is not open. */
@@ -183,12 +200,14 @@ internal class ShellActions(private val graph: AppGraph) {
     registry.processes.value.values.filter { sameFolder(it.cwd, cwd) }
 
   /**
-   * Stops [processes]: a working run is aborted first so Pi saves what it has, then Pi ends. A shown chat among them
-   * is replaced by the most recent one that is not archived, in the workspace [replaceIn] when given.
+   * Stops [processes]: a working run is aborted first so Pi saves what it has, then Pi ends. A chat among them in the
+   * main pane is replaced by the most recent one that is not archived, in the workspace [replaceIn] when given; one in
+   * the second pane is replaced by the most recent one in [replaceIn], or closes split screen when there is no
+   * [replaceIn] or no slot for it.
    */
   private fun stop(processes: List<AgentProcess>, replaceIn: String?) {
     if (processes.isEmpty()) return
-    val shown = registry.visible.value
+    val panes = registry.shown.value.filterValues { shown -> processes.any { it === shown } }.keys
     val closing = processes.map { process ->
       graph.scope.launch {
         if (process.busy.value) {
@@ -201,30 +220,52 @@ internal class ShellActions(private val graph: AppGraph) {
         registry.close(process)
       }
     }
-    if (processes.none { it === shown }) return
+    // The main pane first, so the second pane's replacement skips the main pane's.
+    for (pane in Pane.entries) if (pane in panes) replace(pane, replaceIn, closing)
+  }
+
+  /** The replacing step of [stop] for [pane], whose chat is [closing] among others. */
+  private fun replace(pane: Pane, replaceIn: String?, closing: List<Job>) {
+    // Emptied first, so the stopping chat leaves the pane even when no replacement can open yet.
+    registry.show(pane, null)
+    if (pane == Pane.Secondary && replaceIn == null) return closeSplit()
     try {
-      registry.setVisible(mostRecent(replaceIn))
+      registry.show(pane, mostRecent(replaceIn, except = registry.shown.value[pane.other]))
     } catch (_: TooManyRunning) {
+      if (pane == Pane.Secondary) return closeSplit()
       // The working chats being stopped still hold every slot; the replacement opens once they have closed, unless
       // another chat was opened meanwhile.
-      registry.setVisible(null)
       graph.scope.launch {
         closing.joinAll()
-        if (registry.visible.value == null) openMostRecent(replaceIn)
+        if (registry.shown.value[Pane.Primary] == null) openMostRecent(replaceIn)
       }
     }
   }
 
-  private inline fun show(open: () -> AgentProcess): Boolean {
-    // Recorded before opening: making room for the next chat can close the shown one when it is the only idle chat.
-    registry.visible.value?.let { shown -> shown.sessionFile.value?.let { lastShownIn[folderKey(shown.cwd)] = it } }
-    return try {
-      registry.setVisible(open())
-      true
+  /**
+   * Shows the process [open] returns, given [pane]'s current chat, in [pane]; when the other pane shows it, it stays
+   * there and [pane] keeps its chat. False (with a notice) when four chats are working.
+   */
+  private inline fun show(pane: Pane, open: (previous: AgentProcess?) -> AgentProcess): Boolean {
+    val previous = registry.shown.value[pane]
+    // Recorded before opening: making room for the next chat can park the shown one when it is the only idle chat.
+    previous?.let(::rememberShown)
+    // Hidden while the next one opens, so making room for it can park it but never the other pane's chat.
+    registry.show(pane, null)
+    val next = try {
+      open(previous)
     } catch (error: TooManyRunning) {
+      registry.show(pane, previous)
       notify(ShellNotice.Failure(error.message))
-      false
+      return false
     }
+    if (!registry.show(pane, next)) registry.show(pane, previous)
+    return true
+  }
+
+  /** Records [process] as the chat last shown in its workspace. */
+  private fun rememberShown(process: AgentProcess) {
+    process.sessionFile.value?.let { lastShownIn[folderKey(process.cwd)] = it }
   }
 
   private fun notify(notice: ShellNotice) {

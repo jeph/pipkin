@@ -4,7 +4,8 @@ import android.content.Context
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.host.HostClient
-import io.jeph.pipkin.workspace.ShownTab
+import io.jeph.pipkin.workspace.Pane
+import io.jeph.pipkin.workspace.ShownTabs
 import io.jeph.pipkin.workspace.WorkspaceTab
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -26,7 +27,7 @@ internal class TerminalRegistry(
   private val context: Context,
   private val hostClient: HostClient,
   private val scope: CoroutineScope,
-  private val shownTab: ShownTab,
+  private val shownTabs: ShownTabs,
 ) {
   private val sessionsFlow = MutableStateFlow<List<TerminalSession>>(emptyList())
   private var nextId = 1
@@ -41,19 +42,19 @@ internal class TerminalRegistry(
     }
     .stateIn(scope, SharingStarted.Eagerly, false)
 
-  /** Starts a shell in [chat]'s folder and shows it in place of the chat. */
-  fun open(chat: AgentProcess) {
+  /** Starts a shell in [chat]'s folder and shows it in place of the chat in [pane]. */
+  fun open(pane: Pane, chat: AgentProcess) {
     val folder = folderKey(chat.cwd)
     val number = (sessionsFlow.value.filter { it.cwd == folder }.maxOfOrNull { it.number } ?: 0) + 1
     val session = TerminalSession(context, nextId++, number, folder, hostClient, scope)
     session.start()
     sessionsFlow.update { it + session }
-    shownTab.show(chat, WorkspaceTab.Terminal(session))
+    shownTabs.show(pane, chat, WorkspaceTab.Terminal(session))
   }
 
   fun close(session: TerminalSession) {
     session.close()
     sessionsFlow.update { it - session }
-    shownTab.forget(WorkspaceTab.Terminal(session))
+    shownTabs.forget(WorkspaceTab.Terminal(session))
   }
 }

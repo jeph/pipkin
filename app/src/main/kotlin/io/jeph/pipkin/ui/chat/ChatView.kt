@@ -54,12 +54,14 @@ internal class ChatViews {
   operator fun get(process: AgentProcess): ChatView = views.getOrPut(process) { ChatView() }
 
   /**
-   * Parses the finished replies at the end of every chat [registry] has open but doesn't show, as they finish or as a
+   * Parses the finished replies at the end of every chat [registry] has open but no pane shows, as they finish or as a
    * reloaded history brings them, so switching to one of those chats draws its end from the first frame. Runs on the
    * main thread until cancelled; the parsing itself runs off it.
    */
   suspend fun warmHidden(registry: AgentRegistry<AgentProcess>) {
-    combine(registry.processes, registry.visible) { processes, visible -> processes.values.filter { it !== visible } }
+    combine(registry.processes, registry.shown) { processes, shown ->
+      processes.values.filter { process -> shown.values.none { it === process } }
+    }
       .distinctUntilChanged()
       .collectLatest { hidden ->
         coroutineScope {

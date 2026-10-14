@@ -19,7 +19,10 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 
 private enum class Stage { Menu, Rename }
 
-/** A chat's sheet in the tab menu (Rename, Archive) and the rename dialog it leads to. */
+/**
+ * A chat's sheet in the tab menu (Open in split screen when [onOpenInSplit] is given, Rename, Archive) and the rename
+ * dialog it leads to.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SessionActions(
@@ -27,10 +30,21 @@ internal fun SessionActions(
   onDismiss: () -> Unit,
   onRename: (String) -> Unit,
   onArchive: () -> Unit,
+  onOpenInSplit: (() -> Unit)?,
 ) {
   var stage by rememberSaveable(session.path) { mutableStateOf(Stage.Menu) }
   when (stage) {
     Stage.Menu -> PipkinSheet(onDismissRequest = onDismiss) {
+      if (onOpenInSplit != null) {
+        SheetRow(
+          label = stringResource(R.string.shell_split_open),
+          icon = R.drawable.ic_lucide_columns_2,
+          onClick = {
+            onDismiss()
+            onOpenInSplit()
+          },
+        )
+      }
       SheetRow(
         label = stringResource(R.string.shell_session_rename),
         icon = R.drawable.ic_lucide_pencil,

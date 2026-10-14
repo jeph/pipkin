@@ -8,7 +8,8 @@ import io.jeph.pipkin.host.GitHost
 import io.jeph.pipkin.host.GitReply
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.git.DiffDocument
-import io.jeph.pipkin.workspace.ShownTab
+import io.jeph.pipkin.workspace.Pane
+import io.jeph.pipkin.workspace.ShownTabs
 import io.jeph.pipkin.workspace.WorkspaceTab
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
@@ -84,7 +85,7 @@ internal class CommitTab(val id: Int, val cwd: String, val commit: GitCommit, pr
  */
 internal class CommitTabRegistry(
   private val git: GitHost,
-  private val shownTab: ShownTab,
+  private val shownTabs: ShownTabs,
   trusted: StateFlow<Set<String>>,
   scope: CoroutineScope,
 ) {
@@ -100,16 +101,19 @@ internal class CommitTabRegistry(
   /** Oldest first. */
   val tabs: StateFlow<List<CommitTab>> = tabsFlow.asStateFlow()
 
-  /** Shows [commit]'s tab in [chat]'s folder in place of the chat, opening one when the commit has none. */
-  fun open(chat: AgentProcess, commit: GitCommit) {
+  /**
+   * Shows [commit]'s tab in [chat]'s folder in place of the chat in [pane], opening one when the commit has none.
+   * Returns false, showing nothing, when the other pane shows the commit.
+   */
+  fun open(pane: Pane, chat: AgentProcess, commit: GitCommit): Boolean {
     val folder = folderKey(chat.cwd)
     val tab = tabsFlow.value.firstOrNull { it.cwd == folder && it.commit.sha == commit.sha }
       ?: CommitTab(nextId++, folder, commit, git).also { opened -> tabsFlow.update { it + opened } }
-    shownTab.show(chat, WorkspaceTab.Commit(tab))
+    return shownTabs.show(pane, chat, WorkspaceTab.Commit(tab))
   }
 
   fun close(tab: CommitTab) {
     tabsFlow.update { it - tab }
-    shownTab.forget(WorkspaceTab.Commit(tab))
+    shownTabs.forget(WorkspaceTab.Commit(tab))
   }
 }

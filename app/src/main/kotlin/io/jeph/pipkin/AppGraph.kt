@@ -22,7 +22,7 @@ import io.jeph.pipkin.host.FileHost
 import io.jeph.pipkin.host.GitHost
 import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.terminal.TerminalRegistry
-import io.jeph.pipkin.workspace.ShownTab
+import io.jeph.pipkin.workspace.ShownTabs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -49,12 +49,12 @@ internal class AppGraph(private val application: Application) {
     }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
   val modelDefaults = ModelDefaults(hostClient)
-  val shownTab = ShownTab()
-  val terminals = TerminalRegistry(application, hostClient, scope, shownTab)
+  val shownTabs = ShownTabs(registry.shown)
+  val terminals = TerminalRegistry(application, hostClient, scope, shownTabs)
   val fileHost = FileHost(hostClient, scope)
-  val files = FileTabRegistry(fileHost, shownTab)
+  val files = FileTabRegistry(fileHost, shownTabs)
   val gitHost = GitHost(hostClient, scope)
-  val commits = CommitTabRegistry(gitHost, shownTab, preferences.trustedRepositories, scope)
+  val commits = CommitTabRegistry(gitHost, shownTabs, preferences.trustedRepositories, scope)
 
   init {
     holdWhileWorking()

@@ -9,16 +9,21 @@ import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
+import androidx.compose.foundation.gestures.snapTo
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -36,11 +41,15 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
+import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.ChatLocation
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.chat.ChatScreen
+import io.jeph.pipkin.ui.chat.ChatViews
 import io.jeph.pipkin.ui.components.LocalPotsSimmer
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
@@ -50,8 +59,14 @@ import io.jeph.pipkin.ui.git.CommitScreen
 import io.jeph.pipkin.ui.sidebar.Sidebar
 import io.jeph.pipkin.ui.terminal.TerminalScreen
 import io.jeph.pipkin.ui.theme.PipkinTokens
+import io.jeph.pipkin.ui.theme.pipkinColors
+import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.WorkspaceTabsSheet
+import io.jeph.pipkin.ui.workspace.splitScreenAvailable
+import io.jeph.pipkin.workspace.Pane
+import io.jeph.pipkin.workspace.ShownTabs
 import io.jeph.pipkin.workspace.WorkspaceTab
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.launch
@@ -62,9 +77,48 @@ private enum class Panel { Sidebar, Chat, Explorer }
 private val PanelAnimation = tween<Float>(durationMillis = 220, easing = FastOutSlowInEasing)
 
 /**
- * The main screen: the sidebar, the chat and the explorer as full-width sliding panels. Opens a chat on entry
- * when none is shown, and shows [requestedChat] when a notification asks for it (an archived one opens as its
- * transcript instead); one-shot shell notices show as snackbars.
+ * Each pane's sliding panels: its sidebar, its screen and its explorer, which slide within that pane's width. Main
+ * thread only.
+ */
+@Stable
+private class PanePanels(
+  private val primary: AnchoredDraggableState<Panel>,
+  private val secondary: AnchoredDraggableState<Panel>,
+  private val scope: CoroutineScope,
+) {
+  operator fun get(pane: Pane): AnchoredDraggableState<Panel> = if (pane == Pane.Primary) primary else secondary
+
+  /** Whether a pane shows its sidebar or explorer, which then takes Back before any pane's tab does. */
+  val sideOpen: Boolean get() = Pane.entries.any { get(it).targetValue != Panel.Chat }
+
+  fun show(pane: Pane, panel: Panel) {
+    val state = get(pane)
+    if (state.targetValue != panel) scope.launch { state.animateTo(panel, PanelAnimation) }
+  }
+
+  /** Shows [panel] in [pane], or the pane's screen when [panel] already shows. */
+  fun toggle(pane: Pane, panel: Panel) = show(pane, if (get(pane).targetValue == panel) Panel.Chat else panel)
+
+  /** Puts [pane] back on its screen at once, as when it closes. */
+  fun reset(pane: Pane) {
+    val state = get(pane)
+    if (state.currentValue != Panel.Chat) scope.launch { state.snapTo(Panel.Chat) }
+  }
+}
+
+@Composable
+private fun rememberPanePanels(): PanePanels {
+  val primary = rememberSaveable(saver = AnchoredDraggableState.Saver()) { AnchoredDraggableState(Panel.Chat) }
+  val secondary = rememberSaveable(saver = AnchoredDraggableState.Saver()) { AnchoredDraggableState(Panel.Chat) }
+  val scope = rememberCoroutineScope()
+  return remember(primary, secondary, scope) { PanePanels(primary, secondary, scope) }
+}
+
+/**
+ * The main screen: the workspace's panes, each with its own sidebar and explorer sliding within it. Opens a chat on
+ * entry when none is shown, and shows [requestedChat] in the main pane when a notification asks for it (an archived
+ * one opens as its transcript instead); one-shot shell notices show as snackbars. A window too narrow for split screen,
+ * such as a folded phone's, closes it.
  */
 @Composable
 internal fun MainScreen(
@@ -78,52 +132,30 @@ internal fun MainScreen(
   val snackbar = remember { SnackbarStackState() }
   ShellNotices(actions, snackbar)
   LaunchedEffect(actions) { actions.openAtStartup() }
-
-  val panels = rememberSaveable(saver = AnchoredDraggableState.Saver()) { AnchoredDraggableState(Panel.Chat) }
-  val scope = rememberCoroutineScope()
-  val showPanel: (Panel) -> Unit = { panel -> scope.launch { panels.animateTo(panel, PanelAnimation) } }
-  val sidebarOpen = panels.targetValue == Panel.Sidebar
-  val explorerOpen = panels.targetValue == Panel.Explorer
-  BackHandler(enabled = sidebarOpen || explorerOpen) { showPanel(Panel.Chat) }
-  SidePanelOpenedEffect(panels.targetValue)
-  val sessionArchive = LocalContext.current.appGraph.sessionArchive
-  LaunchedEffect(requestedChat) {
-    requestedChat.filterNotNull().collect { chat ->
-      requestedChat.value = null
-      when {
-        sessionArchive.isArchived(chat.sessionPath) -> onOpenArchivedChat(chat.sessionPath)
-        actions.openChat(chat.cwd, chat.sessionPath) -> showPanel(Panel.Chat)
-      }
-    }
-  }
+  val splitAvailable = splitScreenAvailable()
+  LaunchedEffect(splitAvailable) { if (!splitAvailable) actions.closeSplit() }
+  val panels = rememberPanePanels()
+  RequestedChatEffect(actions, requestedChat, onOpenArchivedChat, onShown = {
+    for (pane in Pane.entries) panels.show(pane, Panel.Chat)
+  })
 
   Box(modifier = Modifier.fillMaxSize()) {
-    MobilePanels(
-      state = panels,
-      sidebar = {
-        // The sidebar stays composed behind the chat, where its working chats' pots would redraw for nothing.
-        CompositionLocalProvider(LocalPotsSimmer provides sidebarOpen) {
-          Sidebar(
-            actions = actions,
-            onClose = { showPanel(Panel.Chat) },
-            onOpenSettings = onOpenSettings,
-            onOpenArchive = onOpenArchive,
-            onOpenOnboarding = onOpenOnboarding,
-          )
-        }
-      },
-      workspace = {
-        WorkspacePanel(
+    WorkspacePanes(
+      actions = actions,
+      splitAvailable = splitAvailable,
+      panels = panels,
+      snackbar = snackbar,
+      onOpenSettings = onOpenSettings,
+      sidebar = { pane, onShownInSplit ->
+        Sidebar(
+          pane = pane,
           actions = actions,
-          sidePanelOpen = sidebarOpen || explorerOpen,
-          snackbar = snackbar,
-          onToggleSidebar = { showPanel(if (sidebarOpen) Panel.Chat else Panel.Sidebar) },
-          onToggleExplorer = { showPanel(if (explorerOpen) Panel.Chat else Panel.Explorer) },
+          onShownInSplit = onShownInSplit,
+          onClose = { panels.show(pane, Panel.Chat) },
           onOpenSettings = onOpenSettings,
+          onOpenArchive = onOpenArchive,
+          onOpenOnboarding = onOpenOnboarding,
         )
-      },
-      explorer = {
-        ShownChatExplorer(open = explorerOpen, snackbar = snackbar, onClose = { showPanel(Panel.Chat) })
       },
     )
     SnackbarStack(
@@ -133,6 +165,29 @@ internal fun MainScreen(
         .windowInsetsPadding(WindowInsets.safeDrawing)
         .padding(PipkinTokens.Spacing.s16),
     )
+  }
+}
+
+/**
+ * Shows [requestedChat] in the main pane as a notification asks for it, then [onShown]; an archived one opens as its
+ * transcript through [onOpenArchivedChat] instead.
+ */
+@Composable
+private fun RequestedChatEffect(
+  actions: ShellActions,
+  requestedChat: MutableStateFlow<ChatLocation?>,
+  onOpenArchivedChat: (path: String) -> Unit,
+  onShown: () -> Unit,
+) {
+  val sessionArchive = LocalContext.current.appGraph.sessionArchive
+  LaunchedEffect(requestedChat) {
+    requestedChat.filterNotNull().collect { chat ->
+      requestedChat.value = null
+      when {
+        sessionArchive.isArchived(chat.sessionPath) -> onOpenArchivedChat(chat.sessionPath)
+        actions.openChat(Pane.Primary, chat.cwd, chat.sessionPath) -> onShown()
+      }
+    }
   }
 }
 
@@ -177,9 +232,9 @@ private fun SidePanelOpenedEffect(panel: Panel) {
 }
 
 /**
- * Three full-width layers that slide together: the sidebar at offset 0, the workspace at the panel's width and the
- * file explorer at twice it. A horizontal drag anywhere moves between neighbours; children with their own horizontal
- * scroll see the drag first and consume it.
+ * Three layers as wide as the pane that slide together: the sidebar at offset 0, the pane's screen at its width and
+ * the file explorer at twice it. A horizontal drag anywhere in the pane moves between neighbours; children with their
+ * own horizontal scroll see the drag first and consume it.
  */
 @Composable
 private fun MobilePanels(
@@ -187,10 +242,11 @@ private fun MobilePanels(
   sidebar: @Composable () -> Unit,
   workspace: @Composable () -> Unit,
   explorer: @Composable () -> Unit,
+  modifier: Modifier = Modifier,
 ) {
   val fling = AnchoredDraggableDefaults.flingBehavior(state, animationSpec = PanelAnimation)
   Box(
-    modifier = Modifier
+    modifier = modifier
       .fillMaxSize()
       .clipToBounds()
       .onSizeChanged { size ->
@@ -232,103 +288,158 @@ private fun AnchoredDraggableState<Panel>.offsetOr(width: Float): Float = offset
   }
 
 /**
- * The layer beside the sidebar: the shown chat, or a terminal, file or commit of its workspace shown in its place,
- * whose header's tab menu switches between the tabs in that workspace. Back from one of those returns to the chat,
- * unless a side panel is open and takes it. The tab menu belongs to the panel rather than either screen, so it stays
- * open when archiving from it replaces the shown chat and with it the tab shown in its place; it shows [snackbar] over
- * itself.
+ * The main pane and, in split screen, the second pane beside it, each half as wide, each with its own [sidebar] and
+ * explorer. Only the main pane opens chats in split screen, and the second pane slides back to its chat when it does.
+ * The main pane keeps its place in the composition as split screen opens and closes, so its chat's draft survives that.
  */
 @Composable
-private fun WorkspacePanel(
+private fun WorkspacePanes(
   actions: ShellActions,
-  sidePanelOpen: Boolean,
+  splitAvailable: Boolean,
+  panels: PanePanels,
   snackbar: SnackbarStackState,
-  onToggleSidebar: () -> Unit,
-  onToggleExplorer: () -> Unit,
+  onOpenSettings: () -> Unit,
+  sidebar: @Composable (pane: Pane, onShownInSplit: (() -> Unit)?) -> Unit,
+) {
+  val graph = LocalContext.current.appGraph
+  val panes by graph.registry.shown.collectAsStateWithLifecycle()
+  val shown by graph.shownTabs.shown.collectAsStateWithLifecycle()
+  // Shared by both panes, so a chat that moves to the other pane keeps its scroll position and parsed replies.
+  val views = remember { ChatViews() }
+  LaunchedEffect(views, graph.registry) { views.warmHidden(graph.registry) }
+  // Not shown for the frame before a narrowed window closes split screen.
+  val split = splitAvailable && panes[Pane.Secondary] != null
+  // The second pane opens on its screen, whichever panel it showed when split screen last closed.
+  LaunchedEffect(split) { if (!split) panels.reset(Pane.Secondary) }
+  val shownPanes = if (split) Pane.entries else listOf(Pane.Primary)
+  ClearFocusWhenTerminalLeaves(
+    shownPanes.mapNotNullTo(HashSet()) { (ShownTabs.shownIn(shown, panes, it) as? WorkspaceTab.Terminal)?.session },
+  )
+  Row(modifier = Modifier.fillMaxSize()) {
+    for (pane in shownPanes) {
+      if (pane == Pane.Secondary) VerticalDivider(thickness = 1.dp, color = pipkinColors.border)
+      // Keyed, so each pane keeps its own state whichever panes show.
+      key(pane) {
+        val chat = panes[pane]
+        val panel = panels[pane].targetValue
+        // The tab menu belongs to the pane rather than either of its screens, so it stays open when archiving from it
+        // replaces the shown chat and with it the tab shown in its place; it shows the shell's snackbar over itself.
+        var tabsOpen by rememberSaveable { mutableStateOf(false) }
+        val controls = PaneControls(
+          pane = pane,
+          onToggleSidebar = { panels.toggle(pane, Panel.Sidebar) },
+          onOpenTabs = { tabsOpen = true },
+          onToggleExplorer = { panels.toggle(pane, Panel.Explorer) },
+          onCloseSplit = if (pane == Pane.Secondary) actions::closeSplit else null,
+        )
+        val onShownInSplit = {
+          panels.show(Pane.Secondary, Panel.Chat)
+        }.takeIf { pane == Pane.Primary && splitAvailable }
+        BackHandler(enabled = panel != Panel.Chat) { panels.show(pane, Panel.Chat) }
+        SidePanelOpenedEffect(panel)
+        MobilePanels(
+          state = panels[pane],
+          sidebar = {
+            // The sidebar stays composed behind the pane, where its working chats' pots would redraw for nothing.
+            CompositionLocalProvider(LocalPotsSimmer provides (panel == Panel.Sidebar)) {
+              sidebar(pane, onShownInSplit)
+            }
+          },
+          workspace = {
+            val tab = ShownTabs.shownIn(shown, panes, pane)
+            WorkspacePane(chat, tab, actions, views, controls, panels.sideOpen, onOpenSettings)
+          },
+          explorer = {
+            PaneExplorer(pane, panel == Panel.Explorer, snackbar, onClose = { panels.show(pane, Panel.Chat) })
+          },
+          modifier = Modifier.weight(1f),
+        )
+        if (tabsOpen && chat != null) {
+          WorkspaceTabsSheet(pane, chat, actions, snackbar, onShownInSplit, onDismiss = { tabsOpen = false })
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Removing a focused terminal view hands focus to the first text field, a chat's composer, raising the keyboard; so
+ * focus is cleared whenever a terminal leaves a pane.
+ */
+@Composable
+private fun ClearFocusWhenTerminalLeaves(terminals: Set<TerminalSession>) {
+  val focus = LocalFocusManager.current
+  var previous by remember { mutableStateOf(emptySet<TerminalSession>()) }
+  LaunchedEffect(terminals) {
+    if (!terminals.containsAll(previous)) focus.clearFocus()
+    previous = terminals
+  }
+}
+
+/**
+ * One pane's screen: its [chat], or a terminal, file or commit of its workspace shown in its place as [tab], whose
+ * header's tab menu switches between the tabs in that workspace. Back from one of those returns to the chat, unless a
+ * side panel is open and takes it.
+ */
+@Composable
+private fun WorkspacePane(
+  chat: AgentProcess?,
+  tab: WorkspaceTab?,
+  actions: ShellActions,
+  views: ChatViews,
+  controls: PaneControls,
+  sidePanelOpen: Boolean,
   onOpenSettings: () -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
-  val process by graph.registry.visible.collectAsStateWithLifecycle()
-  val shown by graph.shownTab.shown.collectAsStateWithLifecycle()
-  var tabsOpen by rememberSaveable { mutableStateOf(false) }
-  val openTabs = { tabsOpen = true }
-  val chat = process
-  val tab = shown?.takeIf { it.chat == chat }?.tab
-  val focus = LocalFocusManager.current
-  val terminalShown = tab is WorkspaceTab.Terminal
-  // Removing the focused terminal view hands focus to the first text field, the chat's composer, raising the keyboard.
-  LaunchedEffect(terminalShown) { if (!terminalShown) focus.clearFocus() }
   Box(modifier = Modifier.fillMaxSize()) {
     // The chat stays composed under its other tabs, so its draft and scroll position survive a visit to them.
     ChatScreen(
       process = chat,
       actions = actions,
-      onOpenTabs = openTabs,
-      onToggleSidebar = onToggleSidebar,
-      onToggleExplorer = onToggleExplorer,
+      views = views,
+      controls = controls,
       onOpenSettings = onOpenSettings,
       modifier = if (tab != null) Modifier.clearAndSetSemantics {} else Modifier,
     )
+    // Always composed, so handlers register in pane order and Back closes the second pane's tab before the main pane's.
+    BackHandler(enabled = chat != null && tab != null && !sidePanelOpen) {
+      chat?.let { graph.shownTabs.show(controls.pane, it, null) }
+    }
     if (chat != null && tab != null) {
-      BackHandler(enabled = !sidePanelOpen) { graph.shownTab.show(chat, null) }
       // A pointer input makes the tab a hit target, so touches between its controls don't reach the chat.
       val hitTarget = Modifier.pointerInput(Unit) {}
       when (tab) {
-        is WorkspaceTab.Terminal -> TerminalScreen(
-          session = tab.session,
-          chat = chat,
-          onToggleSidebar = onToggleSidebar,
-          onOpenTabs = openTabs,
-          onToggleExplorer = onToggleExplorer,
-          modifier = hitTarget,
-        )
-
-        is WorkspaceTab.File -> FileScreen(
-          file = tab.file,
-          chat = chat,
-          onToggleSidebar = onToggleSidebar,
-          onOpenTabs = openTabs,
-          onToggleExplorer = onToggleExplorer,
-          modifier = hitTarget,
-        )
-
-        is WorkspaceTab.Commit -> CommitScreen(
-          commit = tab.commit,
-          chat = chat,
-          onToggleSidebar = onToggleSidebar,
-          onOpenTabs = openTabs,
-          onToggleExplorer = onToggleExplorer,
-          modifier = hitTarget,
-        )
+        is WorkspaceTab.Terminal -> TerminalScreen(tab.session, chat, controls, hitTarget)
+        is WorkspaceTab.File -> FileScreen(tab.file, chat, controls, hitTarget)
+        is WorkspaceTab.Commit -> CommitScreen(tab.commit, chat, controls, hitTarget)
       }
     }
   }
-  if (tabsOpen && chat != null) WorkspaceTabsSheet(chat, actions, snackbar, onDismiss = { tabsOpen = false })
 }
 
 /**
- * The explorer beside the workspace, for the shown chat's folder. Opening a file or a commit shows it in place of the
- * chat and slides back to it, as Paseo's compact explorer does; the shown file's row is highlighted.
+ * [pane]'s explorer, for the folder of the chat it shows. Opening a file or a commit shows it in place of that chat and
+ * slides back to it, as Paseo's compact explorer does; the shown file's row is highlighted. One the other pane shows
+ * stays there, with a snackbar saying so.
  */
 @Composable
-private fun ShownChatExplorer(open: Boolean, snackbar: SnackbarStackState, onClose: () -> Unit) {
+private fun PaneExplorer(pane: Pane, open: Boolean, snackbar: SnackbarStackState, onClose: () -> Unit) {
   val graph = LocalContext.current.appGraph
-  val chat by graph.registry.visible.collectAsStateWithLifecycle()
-  val shown by graph.shownTab.shown.collectAsStateWithLifecycle()
-  val shownFile = (shown?.takeIf { it.chat == chat }?.tab as? WorkspaceTab.File)?.file
+  val panes by graph.registry.shown.collectAsStateWithLifecycle()
+  val shown by graph.shownTabs.shown.collectAsStateWithLifecycle()
+  val scope = rememberCoroutineScope()
+  val elsewhere = stringResource(R.string.shell_split_shown_elsewhere)
+  val chat = panes[pane]
+  val shownFile = (ShownTabs.shownIn(shown, panes, pane) as? WorkspaceTab.File)?.file
+  val closeIfShown = { opened: Boolean -> if (opened) onClose() else scope.launch { snackbar.show(elsewhere) } }
   ExplorerPanel(
     cwd = chat?.cwd,
     open = open,
     selectedPath = shownFile?.path,
     snackbar = snackbar,
     onClose = onClose,
-    onOpenFile = { path ->
-      chat?.let { graph.files.open(it, path) }
-      onClose()
-    },
-    onOpenCommit = { commit ->
-      chat?.let { graph.commits.open(it, commit) }
-      onClose()
-    },
+    onOpenFile = { path -> chat?.let { closeIfShown(graph.files.open(pane, it, path)) } },
+    onOpenCommit = { commit -> chat?.let { closeIfShown(graph.commits.open(pane, it, commit)) } },
   )
 }

@@ -40,4 +40,9 @@
     <string name="shell_browse_searching">Searching…</string>
     <string name="shell_browse_no_matches">No matching folders</string>
     <string name="shell_browse_added_badge">Added</string>
+
+    <string name="shell_split_open">Open in split screen</string>
+    <string name="shell_split_close">Close split screen</string>
+    <string name="shell_split_other_pane">Open in the other pane</string>
+    <string name="shell_split_shown_elsewhere">Already open in the other pane</string>
 </resources>
