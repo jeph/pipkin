@@ -186,8 +186,9 @@ internal class ShellActions(private val graph: AppGraph) {
   fun unarchive(paths: List<String>) = sessionArchive.unarchive(paths)
 
   /**
-   * Removes the workspace [cwd] from the sidebar and archives every chat in it, including ones open in Pi that have
-   * no saved history yet; their runs stop.
+   * Removes the workspace [cwd] from the sidebar, archives every chat in it, including ones open in Pi that have no
+   * saved history yet, whose runs stop, and closes its tabs, whose shells end. A pane left with nothing shows the most
+   * recent other chat, or closes split screen.
    */
   fun removeWorkspace(cwd: String) {
     val open = processesIn(cwd)
@@ -196,8 +197,16 @@ internal class ShellActions(private val graph: AppGraph) {
     sessionArchive.removeWorkspace(cwd, paths.distinct())
     registry.discardParked(paths)
     graph.panes.forgetChats(paths)
+    // Not through closeTab, which would show the workspace being removed in the pane a tab leaves.
+    graph.tabs.tabs.value.filter { sameFolder(it.cwd, cwd) }.forEach(graph.tabs::close)
+    if (graph.panes.itemIn(Pane.Secondary) == null) closeSplit()
+    if (graph.panes.itemIn(Pane.Primary) == null) openMostRecent()
     stop(open, replaceIn = null)
   }
+
+  /** How many terminals are open in the workspace [cwd]. */
+  fun terminalsIn(cwd: String): Int =
+    graph.tabs.tabs.value.count { it is WorkspaceTab.Terminal && sameFolder(it.cwd, cwd) }
 
   /** Restores the archived [sessions] whose folder still exists; returns those restored. */
   fun restore(sessions: Collection<SessionInfo>): List<SessionInfo> = sessionArchive.restore(sessions)

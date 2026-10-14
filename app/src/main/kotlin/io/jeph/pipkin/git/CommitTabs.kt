@@ -109,7 +109,7 @@ internal class CommitTabRegistry(
    * when the folder isn't one of the trusted ones, where no commit tab may run git.
    */
   fun restoredTab(cwd: String, commit: GitCommit): WorkspaceTab? =
-    tabFor(cwd, commit).takeIf { folderKey(cwd) in trusted.value }
+    if (folderKey(cwd) in trusted.value) tabFor(cwd, commit) else null
 
   private fun tabFor(cwd: String, commit: GitCommit): WorkspaceTab {
     val folder = folderKey(cwd)

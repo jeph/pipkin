@@ -178,16 +178,16 @@ private class WorkspaceRemoval(private val actions: ShellActions) {
   var leaving by mutableStateOf(emptySet<String>())
     private set
 
-  /** A workspace waiting for "Remove", with how many of its chats are working. */
-  var confirming by mutableStateOf<Pair<Workspace, Int>?>(null)
+  /** A workspace waiting for "Remove". */
+  var confirming by mutableStateOf<RemovalRequest?>(null)
     private set
 
   fun askToRemove(workspace: Workspace) {
-    confirming = workspace to actions.workingIn(workspace.cwd)
+    confirming = RemovalRequest(workspace, actions.workingIn(workspace.cwd), actions.terminalsIn(workspace.cwd))
   }
 
   fun confirm() {
-    val (workspace, _) = confirming ?: return
+    val workspace = confirming?.workspace ?: return
     confirming = null
     leaving += workspace.cwd
   }
@@ -206,23 +206,31 @@ private class WorkspaceRemoval(private val actions: ShellActions) {
   }
 }
 
+/** A workspace to remove, with how many of its chats are working and how many terminals it has open. */
+private class RemovalRequest(val workspace: Workspace, val working: Int, val terminals: Int)
+
 @Composable
 private fun RemoveWorkspaceDialog(removal: WorkspaceRemoval, home: String) {
-  val (workspace, working) = removal.confirming ?: return
-  val chats = workspace.chats.size
+  val request = removal.confirming ?: return
+  val chats = request.workspace.chats.size
+  val working = request.working
   val archived = if (chats == 0) {
     stringResource(R.string.archive_remove_text_empty)
   } else {
     pluralStringResource(R.plurals.archive_remove_text, chats, chats)
   }
   // A chat Pi just started may be working before its session file is listed, so working can exceed chats.
-  val text = when {
-    working == 0 -> archived
-    working == 1 && chats <= 1 -> archived + " " + stringResource(R.string.archive_remove_working_single)
-    else -> archived + " " + pluralStringResource(R.plurals.archive_remove_working, working, working)
+  val stopping = when {
+    working == 0 -> null
+    working == 1 && chats <= 1 -> stringResource(R.string.archive_remove_working_single)
+    else -> pluralStringResource(R.plurals.archive_remove_working, working, working)
   }
+  val closing = request.terminals.takeIf { it > 0 }?.let {
+    pluralStringResource(R.plurals.archive_remove_terminals, it, it)
+  }
+  val text = listOfNotNull(archived, stopping, closing).joinToString(" ")
   ConfirmDialog(
-    title = stringResource(R.string.archive_remove_title, projectName(workspace.cwd, home)),
+    title = stringResource(R.string.archive_remove_title, projectName(request.workspace.cwd, home)),
     text = text,
     confirmLabel = stringResource(R.string.archive_remove_confirm),
     onConfirm = removal::confirm,

@@ -27,6 +27,10 @@
         <item quantity="one">One of them is working; its run stops.</item>
         <item quantity="other">%1$d of them are working; their runs stop.</item>
     </plurals>
+    <plurals name="archive_remove_terminals">
+        <item quantity="one">Its terminal closes too, stopping anything running in it.</item>
+        <item quantity="other">Its %1$d terminals close too, stopping anything running in them.</item>
+    </plurals>
     <string name="archive_remove_confirm">Remove</string>
 
     <string name="archive_search">Search by title or folder</string>
