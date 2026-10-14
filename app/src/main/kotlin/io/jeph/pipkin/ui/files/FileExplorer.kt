@@ -74,8 +74,9 @@ internal fun ExplorerToggle(onClick: () -> Unit) {
  * button. Files has a toolbar to collapse every folder, create a folder at the top of the workspace, show or hide dot
  * files and refresh, and the tree of the workspace folder [cwd]. Folders expand in place, listed as they open; tapping
  * a file calls [onOpenFile] with its workspace-relative path. Each workspace keeps its own expanded folders and scroll
- * position, saved as [ExplorerTrees] says. The tree is listed when the panel [open]s, and again on each later opening,
- * since Pi may have changed the files meanwhile; failures other than the top folder's show on [snackbar].
+ * position, saved as [ExplorerTrees] says. The tree is listed each time Files comes into view: when the panel [open]s
+ * on it and whenever the panel switches to it, by a tap or because Changes went away, since Pi or git may have changed
+ * the files meanwhile; failures other than the top folder's show on [snackbar].
  *
  * Changes is there only while the workspace root is a git repository and Termux has git, which is detected when the
  * panel opens or moves to another workspace and on either tab's refresh; nothing polls. The tab last chosen in each
@@ -105,7 +106,9 @@ internal fun ExplorerPanel(
   val shownTab = shownExplorerTab(explorerTabs[folder], changesAvailable)
   val scope = rememberCoroutineScope()
   val detect = rememberDetection(repository, trusted, snackbar)
-  LaunchedEffect(state, open) { if (open) state?.refresh() }
+  val filesShown = repository == null || shownTab == ExplorerTab.Files
+  // Launched in the panel's scope, so switching back to Changes mid-listing doesn't abort it.
+  LaunchedEffect(state, open, filesShown) { if (open && filesShown) scope.launch { state?.refresh() } }
   LaunchedEffect(repository, open) { if (open) detect() }
   Column(
     modifier = modifier
