@@ -17,7 +17,9 @@ import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.data.SessionArchive
 import io.jeph.pipkin.data.SessionRepository
 import io.jeph.pipkin.files.FileTabRegistry
+import io.jeph.pipkin.git.CommitTabRegistry
 import io.jeph.pipkin.host.FileHost
+import io.jeph.pipkin.host.GitHost
 import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.terminal.TerminalRegistry
 import io.jeph.pipkin.workspace.ShownTab
@@ -51,6 +53,8 @@ internal class AppGraph(private val application: Application) {
   val terminals = TerminalRegistry(application, hostClient, scope, shownTab)
   val fileHost = FileHost(hostClient, scope)
   val files = FileTabRegistry(fileHost, shownTab)
+  val gitHost = GitHost(hostClient, scope)
+  val commits = CommitTabRegistry(gitHost, shownTab, preferences.trustedRepositories, scope)
 
   init {
     holdWhileWorking()

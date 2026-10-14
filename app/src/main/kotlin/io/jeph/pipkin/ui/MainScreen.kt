@@ -44,8 +44,9 @@ import io.jeph.pipkin.ui.chat.ChatScreen
 import io.jeph.pipkin.ui.components.LocalPotsSimmer
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
-import io.jeph.pipkin.ui.files.FileExplorerPanel
+import io.jeph.pipkin.ui.files.ExplorerPanel
 import io.jeph.pipkin.ui.files.FileScreen
+import io.jeph.pipkin.ui.git.CommitScreen
 import io.jeph.pipkin.ui.sidebar.Sidebar
 import io.jeph.pipkin.ui.terminal.TerminalScreen
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -61,7 +62,7 @@ private enum class Panel { Sidebar, Chat, Explorer }
 private val PanelAnimation = tween<Float>(durationMillis = 220, easing = FastOutSlowInEasing)
 
 /**
- * The main screen: the sidebar, the chat and the file explorer as full-width sliding panels. Opens a chat on entry
+ * The main screen: the sidebar, the chat and the explorer as full-width sliding panels. Opens a chat on entry
  * when none is shown, and shows [requestedChat] when a notification asks for it (an archived one opens as its
  * transcript instead); one-shot shell notices show as snackbars.
  */
@@ -122,7 +123,7 @@ internal fun MainScreen(
         )
       },
       explorer = {
-        ExplorerPanel(open = explorerOpen, snackbar = snackbar, onClose = { showPanel(Panel.Chat) })
+        ShownChatExplorer(open = explorerOpen, snackbar = snackbar, onClose = { showPanel(Panel.Chat) })
       },
     )
     SnackbarStack(
@@ -231,8 +232,8 @@ private fun AnchoredDraggableState<Panel>.offsetOr(width: Float): Float = offset
   }
 
 /**
- * The layer beside the sidebar: the shown chat, or a terminal or file of its workspace shown in its place, whose
- * header's tab menu switches between the tabs in that workspace. Back from a terminal or file returns to the chat,
+ * The layer beside the sidebar: the shown chat, or a terminal, file or commit of its workspace shown in its place,
+ * whose header's tab menu switches between the tabs in that workspace. Back from one of those returns to the chat,
  * unless a side panel is open and takes it. The tab menu belongs to the panel rather than either screen, so it stays
  * open when archiving from it replaces the shown chat and with it the tab shown in its place; it shows [snackbar] over
  * itself.
@@ -290,6 +291,15 @@ private fun WorkspacePanel(
           onToggleExplorer = onToggleExplorer,
           modifier = hitTarget,
         )
+
+        is WorkspaceTab.Commit -> CommitScreen(
+          commit = tab.commit,
+          chat = chat,
+          onToggleSidebar = onToggleSidebar,
+          onOpenTabs = openTabs,
+          onToggleExplorer = onToggleExplorer,
+          modifier = hitTarget,
+        )
       }
     }
   }
@@ -297,16 +307,16 @@ private fun WorkspacePanel(
 }
 
 /**
- * The file explorer beside the workspace, for the shown chat's folder. Opening a file shows it in place of the chat
- * and slides back to it, as Paseo's compact explorer does; the shown file's row is highlighted.
+ * The explorer beside the workspace, for the shown chat's folder. Opening a file or a commit shows it in place of the
+ * chat and slides back to it, as Paseo's compact explorer does; the shown file's row is highlighted.
  */
 @Composable
-private fun ExplorerPanel(open: Boolean, snackbar: SnackbarStackState, onClose: () -> Unit) {
+private fun ShownChatExplorer(open: Boolean, snackbar: SnackbarStackState, onClose: () -> Unit) {
   val graph = LocalContext.current.appGraph
   val chat by graph.registry.visible.collectAsStateWithLifecycle()
   val shown by graph.shownTab.shown.collectAsStateWithLifecycle()
   val shownFile = (shown?.takeIf { it.chat == chat }?.tab as? WorkspaceTab.File)?.file
-  FileExplorerPanel(
+  ExplorerPanel(
     cwd = chat?.cwd,
     open = open,
     selectedPath = shownFile?.path,
@@ -314,6 +324,10 @@ private fun ExplorerPanel(open: Boolean, snackbar: SnackbarStackState, onClose: 
     onClose = onClose,
     onOpenFile = { path ->
       chat?.let { graph.files.open(it, path) }
+      onClose()
+    },
+    onOpenCommit = { commit ->
+      chat?.let { graph.commits.open(it, commit) }
       onClose()
     },
   )

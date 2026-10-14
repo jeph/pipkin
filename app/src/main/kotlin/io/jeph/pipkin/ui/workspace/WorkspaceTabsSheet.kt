@@ -41,6 +41,8 @@ import io.jeph.pipkin.agent.ChatKey
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.files.FileTab
 import io.jeph.pipkin.files.FileTabRegistry
+import io.jeph.pipkin.git.CommitTab
+import io.jeph.pipkin.git.CommitTabRegistry
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.terminal.TerminalRegistry
 import io.jeph.pipkin.terminal.TerminalSession
@@ -51,6 +53,7 @@ import io.jeph.pipkin.ui.components.SnackbarStackOverlay
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.components.SwipeAway
 import io.jeph.pipkin.ui.files.FileActionsSheet
+import io.jeph.pipkin.ui.git.CommitActionsSheet
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.terminal.TerminalActionsSheet
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -95,10 +98,10 @@ internal fun TabCountButton(count: Int, onClick: () -> Unit) {
 
 /**
  * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace of the shown chat
- * [process], its terminals, its open files and then its chats, the shown one highlighted. Tapping a tab shows it and
- * closes the sheet. A chat is archived by swiping it right or from its actions sheet, which also renames it; the sheet
- * stays open and shows the shell's [snackbar], so the archive's Undo is in reach. A terminal or a file closes by
- * swiping it right or from its actions sheet, which also renames a terminal.
+ * [process], its terminals, its open files, its open commits and then its chats, the shown one highlighted. Tapping a
+ * tab shows it and closes the sheet. A chat is archived by swiping it right or from its actions sheet, which also
+ * renames it; the sheet stays open and shows the shell's [snackbar], so the archive's Undo is in reach. A terminal, a
+ * file or a commit closes by swiping it right or from its actions sheet, which also renames a terminal.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -186,9 +189,14 @@ private sealed interface TabMenu {
   data class Terminal(val session: TerminalSession) : TabMenu
 
   data class File(val file: FileTab) : TabMenu
+
+  data class Commit(val commit: CommitTab) : TabMenu
 }
 
-/** [menu]'s actions sheet: a chat's renames or archives it, a terminal's renames or closes it, a file's closes it. */
+/**
+ * [menu]'s actions sheet: a chat's renames or archives it, a terminal's renames or closes it, a file's or a commit's
+ * closes it.
+ */
 @Composable
 private fun TabMenuSheet(menu: TabMenu, actions: ShellActions, archiving: TabArchiving, onDismiss: () -> Unit) {
   val graph = LocalContext.current.appGraph
@@ -211,6 +219,8 @@ private fun TabMenuSheet(menu: TabMenu, actions: ShellActions, archiving: TabArc
     is TabMenu.File -> FileActionsSheet(file = menu.file, onClose = {
       graph.files.close(menu.file)
     }, onDismiss = onDismiss)
+
+    is TabMenu.Commit -> CommitActionsSheet(onClose = { graph.commits.close(menu.commit) }, onDismiss = onDismiss)
   }
 }
 
@@ -222,8 +232,8 @@ private class TabListCallbacks(
 )
 
 /**
- * The tab menu's rows: the workspace's terminals and open files, the shown chat while it has no saved history, then
- * the saved chats. The shown chat is highlighted only while no other tab is shown in its place.
+ * The tab menu's rows: the workspace's terminals, open files and open commits, the shown chat while it has no saved
+ * history, then the saved chats. The shown chat is highlighted only while no other tab is shown in its place.
  */
 @Composable
 private fun TabList(
@@ -238,10 +248,12 @@ private fun TabList(
   val processes by graph.registry.processes.collectAsStateWithLifecycle()
   val shownPath by process.sessionFile.collectAsStateWithLifecycle()
   val closing = remember(graph) { FileClosing(graph.files) }
+  val commitClosing = remember(graph) { CommitClosing(graph.commits) }
   val chatShown = tabs.shownTab == null
   LazyColumn(modifier = modifier) {
     terminalRows(tabs, terminalClosing, callbacks)
     fileRows(tabs, closing, callbacks)
+    commitRows(tabs, commitClosing, callbacks)
     if (tabs.shownUnsaved) {
       item(key = UNSAVED_KEY) {
         val name by process.sessionName.collectAsStateWithLifecycle()
@@ -322,6 +334,28 @@ private fun LazyListScope.fileRows(tabs: WorkspaceTabs, closing: FileClosing, ca
   }
 }
 
+/** The workspace's open commits; one closes by swiping it right, as a file does. */
+private fun LazyListScope.commitRows(tabs: WorkspaceTabs, closing: CommitClosing, callbacks: TabListCallbacks) {
+  items(tabs.commits, key = { "commit-${it.id}" }) { commit ->
+    val tab = WorkspaceTab.Commit(commit)
+    SwipeAway(
+      leaving = commit.id in closing.leaving,
+      onSwiped = { closing.close(commit) },
+      onLeft = { closing.onLeft(commit) },
+      containerColor = pipkinColors.surface1,
+      modifier = Modifier.animateItem(),
+      mark = R.drawable.ic_lucide_x,
+    ) {
+      CommitTabRow(
+        commit = commit,
+        shown = tab == tabs.shownTab,
+        onOpen = { callbacks.onShow(tab) },
+        onActions = { callbacks.onActions(TabMenu.Commit(commit)) },
+      )
+    }
+  }
+}
+
 /** The lazy-list key of the shown chat's row while it has no saved history. */
 private const val UNSAVED_KEY = "unsaved"
 
@@ -338,6 +372,22 @@ private class FileClosing(private val files: FileTabRegistry) {
   fun onLeft(file: FileTab) {
     files.close(file)
     leaving -= file.id
+  }
+}
+
+/** Closing commits from the tab menu: a row first slides out, then its commit closes. */
+private class CommitClosing(private val commits: CommitTabRegistry) {
+  /** Ids of commits whose rows are sliding out. */
+  var leaving by mutableStateOf(emptySet<Int>())
+    private set
+
+  fun close(commit: CommitTab) {
+    leaving += commit.id
+  }
+
+  fun onLeft(commit: CommitTab) {
+    commits.close(commit)
+    leaving -= commit.id
   }
 }
 

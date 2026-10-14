@@ -31,6 +31,7 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.files.FileTab
+import io.jeph.pipkin.git.CommitTab
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.components.IconButton28
@@ -118,6 +119,33 @@ internal fun FileTabRow(
     onOpen = onOpen,
     onActions = onActions,
     actionsDescription = stringResource(R.string.file_actions),
+    modifier = modifier,
+  )
+}
+
+/** One open commit in the tab menu: the commit icon and its short SHA and subject, highlighted while it's shown. */
+@Composable
+internal fun CommitTabRow(
+  commit: CommitTab,
+  shown: Boolean,
+  onOpen: () -> Unit,
+  onActions: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  TabRow(
+    mark = {
+      LucideIcon(
+        icon = R.drawable.ic_lucide_git_commit_horizontal,
+        contentDescription = null,
+        tint = pipkinColors.foregroundMuted,
+      )
+    },
+    title = commit.title,
+    detail = null,
+    shown = shown,
+    onOpen = onOpen,
+    onActions = onActions,
+    actionsDescription = stringResource(R.string.git_commit_actions),
     modifier = modifier,
   )
 }

@@ -72,7 +72,6 @@ internal fun ToolCallSheet(item: TimelineItem, streamingArguments: (key: String)
   val copyText = when (item) {
     is TimelineItem.Thinking -> item.text
     is TimelineItem.ToolCall -> remember(item) { item.cardText() }
-    else -> ""
   }.takeUnless { presentation.running || it.isBlank() }
   PipkinSheet(onDismissRequest = onDismiss) {
     SheetTitle(presentation, subtitle, copyText)

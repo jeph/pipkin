@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="git_explorer_changes">Changes</string>
+    <string name="git_no_longer_repository">No longer a git repository</string>
+    <string name="git_no_longer_installed">git is no longer installed</string>
+
+    <string name="git_trust_title">Trust this repository?</string>
+    <string name="git_trust_text">To show its changes, Pipkin runs git in this repository with the repository\'s own configuration, which can run programs. Trust it only if you trust its files.</string>
+    <string name="git_trust">Trust this repository</string>
+    <string name="git_not_now">Not now</string>
+
+    <string name="git_diff_mode">Diff mode</string>
+    <string name="git_uncommitted">Uncommitted</string>
+    <string name="git_committed">Committed</string>
+    <string name="git_refresh">Refresh</string>
+    <string name="git_refreshing">Refreshing</string>
+    <string name="git_refresh_failed">Failed to refresh git state.</string>
+    <string name="git_options">Diff options</string>
+    <string name="git_hide_whitespace">Hide whitespace</string>
+    <string name="git_show_whitespace">Show whitespace</string>
+    <string name="git_wrap_long_lines">Wrap long lines</string>
+    <string name="git_scroll_long_lines">Scroll long lines</string>
+    <string name="git_collapse_all">Collapse all files</string>
+    <string name="git_expand_all">Expand all files</string>
+
+    <string name="git_checking_repository">Checking repository…</string>
+    <string name="git_empty">No changes to display</string>
+    <string name="git_binary">Binary file</string>
+    <string name="git_file_too_large">Diff too large to display</string>
+    <string name="git_diff_too_large_title">This diff is too large to preview</string>
+    <string name="git_diff_too_large_description">Narrow the comparison to preview it here</string>
+    <string name="git_file_added">New</string>
+    <string name="git_file_deleted">Deleted</string>
+    <string name="git_file_modified">Modified</string>
+
+    <string name="git_commits">Commits</string>
+    <plurals name="git_commits_count">
+        <item quantity="one">%1$d workspace commit</item>
+        <item quantity="other">%1$d workspace commits</item>
+    </plurals>
+    <string name="git_commits_loading">Loading commits…</string>
+    <string name="git_commits_failed">Failed to load commits</string>
+    <string name="git_commits_none_ahead">No commits ahead of %1$s yet</string>
+    <plurals name="git_commits_truncated">
+        <item quantity="one">Showing the first %1$d of %2$d commit</item>
+        <item quantity="other">Showing the first %1$d of %2$d commits</item>
+    </plurals>
+    <string name="git_base">base</string>
+
+    <string name="git_commit_not_found">Commit not found</string>
+    <string name="git_commit_actions">Commit actions</string>
+    <string name="git_commit_close">Close commit</string>
+</resources>

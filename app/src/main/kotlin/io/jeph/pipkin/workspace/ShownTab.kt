@@ -2,6 +2,7 @@ package io.jeph.pipkin.workspace
 
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.files.FileTab
+import io.jeph.pipkin.git.CommitTab
 import io.jeph.pipkin.terminal.TerminalSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,10 +14,13 @@ internal sealed interface WorkspaceTab {
   data class Terminal(val session: TerminalSession) : WorkspaceTab
 
   data class File(val file: FileTab) : WorkspaceTab
+
+  data class Commit(val commit: CommitTab) : WorkspaceTab
 }
 
 /**
- * The one tab the workspace shows in place of a chat, so a terminal and a file can't both claim the chat's place.
+ * The one tab the workspace shows in place of a chat, so no two of its terminals, files and commits can claim the
+ * chat's place at once.
  * Main-thread confined.
  */
 internal class ShownTab {

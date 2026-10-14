@@ -15,6 +15,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import io.jeph.pipkin.syntax.CaptureSpan
 import io.jeph.pipkin.syntax.Grammar
+import io.jeph.pipkin.syntax.LoadedGrammar
 import io.jeph.pipkin.syntax.SyntaxSession
 import io.jeph.pipkin.syntax.loadGrammar
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -37,7 +38,7 @@ internal fun rememberHighlightedCode(code: String, language: String?): Annotated
   var highlighted by remember(grammar, palette) { mutableStateOf<AnnotatedString?>(null) }
   LaunchedEffect(grammar, palette) {
     val loaded = withContext(Dispatchers.Default) { loadGrammar(grammar, assets) }
-    val colors = loaded.captureNames.map { name -> tokenFor(name)?.let(palette::getValue) }
+    val colors = captureColors(loaded, palette)
     // Cancelling waits for a running parse to return, so the session is never closed under one.
     SyntaxSession(loaded).use { session ->
       snapshotFlow { latestCode }.conflate().collect { text ->
@@ -49,6 +50,21 @@ internal fun rememberHighlightedCode(code: String, language: String?): Annotated
   }
   return withPlainTail(highlighted, code)
 }
+
+/**
+ * [code] coloured by [grammar] for the [dark] palette or the light one, in one parse on the calling thread, for callers
+ * that colour many texts off the main thread themselves.
+ */
+internal fun highlightCode(code: String, grammar: LoadedGrammar, dark: Boolean): AnnotatedString {
+  val colors = captureColors(grammar, if (dark) DarkPalette else LightPalette)
+  return SyntaxSession(grammar).use { session ->
+    paint(code, session.captures(code) { colors[it] != null }, colors::get)
+  }
+}
+
+/** Each of [grammar]'s captures' colour in [palette], by capture index; null for one that colours nothing. */
+private fun captureColors(grammar: LoadedGrammar, palette: Map<Token, Color>): List<Color?> =
+  grammar.captureNames.map { name -> tokenFor(name)?.let(palette::getValue) }
 
 /** [highlighted] extended with the rest of [code] when [code] continues it; otherwise [code] unstyled. */
 internal fun withPlainTail(highlighted: AnnotatedString?, code: String): AnnotatedString = when {

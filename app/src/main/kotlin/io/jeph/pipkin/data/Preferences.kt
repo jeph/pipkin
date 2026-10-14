@@ -2,8 +2,10 @@ package io.jeph.pipkin.data
 
 import android.content.Context
 import androidx.core.content.edit
+import io.jeph.pipkin.host.GitDiffMode
 import io.jeph.pipkin.ui.files.ExplorerSort
 import io.jeph.pipkin.ui.files.SortKey
+import io.jeph.pipkin.ui.git.ExplorerTab
 import io.jeph.pipkin.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +25,12 @@ internal class Preferences(context: Context) {
   private val archivedState = MutableStateFlow(readArchived())
   private val showHiddenFilesState = MutableStateFlow(prefs.getBoolean(SHOW_HIDDEN_FILES, true))
   private val explorerSortState = MutableStateFlow(readExplorerSort())
+  private val explorerTabsState = MutableStateFlow(readEnumMap(EXPLORER_TABS, ExplorerTab.entries))
+  private val diffModesState = MutableStateFlow(readEnumMap(DIFF_MODES, GitDiffMode.entries))
+  private val trustedRepositoriesState = MutableStateFlow(readTrustedRepositories())
+  private val diffWrapLinesState = MutableStateFlow(prefs.getBoolean(DIFF_WRAP_LINES, false))
+  private val diffHideWhitespaceState = MutableStateFlow(prefs.getBoolean(DIFF_HIDE_WHITESPACE, false))
+  private val commitsCollapsedState = MutableStateFlow(prefs.getBoolean(COMMITS_COLLAPSED, true))
 
   /** Onboarding finished or was skipped. */
   val setupComplete: StateFlow<Boolean> = setupCompleteState.asStateFlow()
@@ -43,6 +51,24 @@ internal class Preferences(context: Context) {
 
   /** How the file explorer orders each folder; names A to Z until changed, as in Paseo. */
   val explorerSort: StateFlow<ExplorerSort> = explorerSortState.asStateFlow()
+
+  /** The Explorer tab last chosen in each workspace, by [folderKey]; a workspace without one shows Changes. */
+  val explorerTabs: StateFlow<Map<String, ExplorerTab>> = explorerTabsState.asStateFlow()
+
+  /** The comparison last chosen in each workspace's Changes tab, by [folderKey]; only a user's choice is kept. */
+  val diffModes: StateFlow<Map<String, GitDiffMode>> = diffModesState.asStateFlow()
+
+  /** Workspaces, by [folderKey], whose repository the user trusted git to run in. */
+  val trustedRepositories: StateFlow<Set<String>> = trustedRepositoriesState.asStateFlow()
+
+  /** Whether diffs wrap long lines rather than scroll sideways; Paseo scrolls them until asked to wrap. */
+  val diffWrapLines: StateFlow<Boolean> = diffWrapLinesState.asStateFlow()
+
+  /** Whether diffs leave out whitespace-only changes (git's `-w`). */
+  val diffHideWhitespace: StateFlow<Boolean> = diffHideWhitespaceState.asStateFlow()
+
+  /** Whether the Changes tab's Commits section is folded; Paseo starts it folded. */
+  val commitsCollapsed: StateFlow<Boolean> = commitsCollapsedState.asStateFlow()
 
   fun setSetupComplete(complete: Boolean) {
     prefs.edit { putBoolean(SETUP_COMPLETE, complete) }
@@ -68,11 +94,19 @@ internal class Preferences(context: Context) {
     workspacesState.value = updated
   }
 
-  /** Takes [cwd] off the sidebar's workspaces; it shows again only while it has chats or once added back. */
+  /**
+   * Takes [cwd] off the sidebar's workspaces; it shows again only while it has chats or once added back. Its
+   * repository is no longer trusted, so adding it back asks again.
+   */
   fun removeWorkspace(cwd: String) {
     val updated = workspacesState.value.filterNot { sameFolder(it, cwd) }
-    prefs.edit { putString(WORKSPACES, JSONArray(updated).toString()) }
+    val trusted = trustedRepositoriesState.value - folderKey(cwd)
+    prefs.edit {
+      putString(WORKSPACES, JSONArray(updated).toString())
+      putString(TRUSTED_REPOSITORIES, JSONArray(trusted).toString())
+    }
     workspacesState.value = updated
+    trustedRepositoriesState.value = trusted
   }
 
   /** Marks [paths] archived at [at]; a path already archived keeps its time. */
@@ -97,6 +131,39 @@ internal class Preferences(context: Context) {
     explorerSortState.value = sort
   }
 
+  fun setExplorerTab(cwd: String, tab: ExplorerTab) {
+    val updated = explorerTabsState.value + (folderKey(cwd) to tab)
+    prefs.edit { putString(EXPLORER_TABS, JSONObject(updated.mapValues { it.value.name }).toString()) }
+    explorerTabsState.value = updated
+  }
+
+  fun setDiffMode(cwd: String, mode: GitDiffMode) {
+    val updated = diffModesState.value + (folderKey(cwd) to mode)
+    prefs.edit { putString(DIFF_MODES, JSONObject(updated.mapValues { it.value.name }).toString()) }
+    diffModesState.value = updated
+  }
+
+  fun trustRepository(cwd: String) {
+    val updated = trustedRepositoriesState.value + folderKey(cwd)
+    prefs.edit { putString(TRUSTED_REPOSITORIES, JSONArray(updated).toString()) }
+    trustedRepositoriesState.value = updated
+  }
+
+  fun setDiffWrapLines(wrap: Boolean) {
+    prefs.edit { putBoolean(DIFF_WRAP_LINES, wrap) }
+    diffWrapLinesState.value = wrap
+  }
+
+  fun setDiffHideWhitespace(hide: Boolean) {
+    prefs.edit { putBoolean(DIFF_HIDE_WHITESPACE, hide) }
+    diffHideWhitespaceState.value = hide
+  }
+
+  fun setCommitsCollapsed(collapsed: Boolean) {
+    prefs.edit { putBoolean(COMMITS_COLLAPSED, collapsed) }
+    commitsCollapsedState.value = collapsed
+  }
+
   private fun readWorkspaces(): List<String> {
     val array = JSONArray(prefs.getString(WORKSPACES, null) ?: return emptyList())
     return List(array.length()) { array.getString(it) }
@@ -106,6 +173,19 @@ internal class Preferences(context: Context) {
     val key = SortKey.entries.firstOrNull { it.name == prefs.getString(EXPLORER_SORT_KEY, null) }
       ?: return ExplorerSort.Default
     return ExplorerSort(key, prefs.getBoolean(EXPLORER_SORT_DESCENDING, key.descendingFirst))
+  }
+
+  private fun readTrustedRepositories(): Set<String> {
+    val array = JSONArray(prefs.getString(TRUSTED_REPOSITORIES, null) ?: return emptySet())
+    return List(array.length()) { array.getString(it) }.toSet()
+  }
+
+  /** The JSON object at [key] of folder keys to names of [entries]; names no entry has any more are dropped. */
+  private fun <T : Enum<T>> readEnumMap(key: String, entries: List<T>): Map<String, T> {
+    val json = JSONObject(prefs.getString(key, null) ?: return emptyMap())
+    return json.keys().asSequence()
+      .mapNotNull { folder -> entries.firstOrNull { it.name == json.optString(folder) }?.let { folder to it } }
+      .toMap()
   }
 
   private fun writeArchived(archived: Map<String, Long>) {
@@ -128,5 +208,11 @@ internal class Preferences(context: Context) {
     const val SHOW_HIDDEN_FILES = "showHiddenFiles"
     const val EXPLORER_SORT_KEY = "explorerSortKey"
     const val EXPLORER_SORT_DESCENDING = "explorerSortDescending"
+    const val EXPLORER_TABS = "explorerTabs"
+    const val DIFF_MODES = "diffModes"
+    const val TRUSTED_REPOSITORIES = "trustedRepositories"
+    const val DIFF_WRAP_LINES = "diffWrapLines"
+    const val DIFF_HIDE_WHITESPACE = "diffHideWhitespace"
+    const val COMMITS_COLLAPSED = "commitsCollapsed"
   }
 }
