@@ -28,11 +28,14 @@ internal object TermuxInstall {
   private const val PLAY_STORE_INSTALLER = "com.android.vending"
   private const val MINOR_VERSION_MIN = 118
 
-  // Upstream TermuxConstants signing for detecting supported and unsupported Termux distributions.
+  // Termux's F-Droid signing certificate, from upstream TermuxConstants:
   // https://github.com/termux/termux-app/blob/master/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java
+  // Only F-Droid holds this key, so a match proves an official, unmodified build. Termux's GitHub builds are left out
+  // on purpose: they are signed with app/testkey_untrusted.jks, whose password is public, so anyone can sign with it.
   private const val FDROID_CERTIFICATE = "228FB2CFE90831C1499EC3CCAF61E96E8E1CE70766B9474672CE427334D41C42"
-  private const val GITHUB_CERTIFICATE = "B6DA01480EEFD5FBF2CD3771B8D1021EC791304BDD6C4BF41D3FAABAD48EE5E1"
-  private val versionPattern = Regex("""(\d+)\.(\d+)\.(\d+)""")
+
+  /** The `major.minor` a `versionName` starts with, so prereleases such as `0.119.0-beta.3` parse too. */
+  private val versionPattern = Regex("""^(\d+)\.(\d+)""")
 
   fun status(context: Context): Status {
     val manager = context.packageManager
@@ -47,12 +50,15 @@ internal object TermuxInstall {
     return classify(certificate, info.versionName, installer(manager))
   }
 
-  /** Pure decision over the certificate's SHA-256 (upper-case hex), `versionName` and installer package. */
+  /**
+   * Pure decision over the certificate's SHA-256 (upper-case hex), `versionName` and installer package. Any F-Droid
+   * build from 0.118 on is supported, betas included; one whose version doesn't parse is trusted on its signature.
+   */
   fun classify(certificate: String?, versionName: String?, installer: String?): Status {
-    if (certificate != FDROID_CERTIFICATE && certificate != GITHUB_CERTIFICATE) {
+    if (certificate != FDROID_CERTIFICATE) {
       return if (installer == PLAY_STORE_INSTALLER) Status.PlayStore else Status.UnsupportedBuild
     }
-    val version = versionName?.let(versionPattern::matchEntire) ?: return Status.UnsupportedBuild
+    val version = versionName?.let(versionPattern::find) ?: return Status.Supported
     val major = version.groupValues[1].toInt()
     val minor = version.groupValues[2].toInt()
     return if (major > 0 || minor >= MINOR_VERSION_MIN) Status.Supported else Status.TooOld

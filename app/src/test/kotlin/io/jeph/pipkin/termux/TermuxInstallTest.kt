@@ -11,17 +11,26 @@ class TermuxInstallTest {
   }
 
   @Test
-  fun otherSignaturesAreUnsupported() {
+  fun onlyFDroidsSignatureIsTrusted() {
     assertEquals(Status.UnsupportedBuild, TermuxInstall.classify(UNKNOWN, "0.118.0", "org.fdroid.fdroid"))
     assertEquals(Status.UnsupportedBuild, TermuxInstall.classify(null, "0.118.0", null))
+    // Termux's GitHub builds are signed with a test key whose password is public, so they prove nothing.
+    assertEquals(Status.UnsupportedBuild, TermuxInstall.classify(GITHUB, "0.118.3", null))
   }
 
   @Test
-  fun upstreamSignaturesAreCheckedForVersion() {
+  fun fDroidBuildsAreSupportedFrom0118BetasIncluded() {
     assertEquals(Status.Supported, TermuxInstall.classify(FDROID, "0.118.3", "org.fdroid.fdroid"))
-    assertEquals(Status.Supported, TermuxInstall.classify(GITHUB, "1.0.0", null))
+    assertEquals(Status.Supported, TermuxInstall.classify(FDROID, "0.119.0-beta.3", null))
+    assertEquals(Status.Supported, TermuxInstall.classify(FDROID, "1.0", null))
     assertEquals(Status.TooOld, TermuxInstall.classify(FDROID, "0.117.0", "com.android.vending"))
-    assertEquals(Status.UnsupportedBuild, TermuxInstall.classify(FDROID, "googleplay.2024", null))
+    assertEquals(Status.TooOld, TermuxInstall.classify(FDROID, "0.117.0-beta.1", null))
+  }
+
+  @Test
+  fun anFDroidBuildWithAnUnreadableVersionIsTrustedOnItsSignature() {
+    assertEquals(Status.Supported, TermuxInstall.classify(FDROID, "googleplay.2024", null))
+    assertEquals(Status.Supported, TermuxInstall.classify(FDROID, null, null))
   }
 
   private companion object {

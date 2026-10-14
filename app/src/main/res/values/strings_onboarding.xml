@@ -11,13 +11,15 @@
     <string name="onboarding_termux_title">Termux from F-Droid</string>
     <string name="onboarding_termux_missing">Pipkin runs inside Termux.</string>
     <string name="onboarding_termux_install">Install Termux from F-Droid</string>
-    <string name="onboarding_termux_play">Termux from Google Play can\'t run Pipkin. Uninstall it, then install the F-Droid build (this deletes Termux\'s files).</string>
-    <string name="onboarding_termux_unsupported">This Termux build isn\'t supported. Uninstall it, then install the F-Droid build (this deletes Termux\'s files).</string>
+    <string name="onboarding_termux_play">This copy of Termux came from Google Play, so Pipkin won\'t use it. Uninstall it, then install Termux from F-Droid (uninstalling deletes Termux\'s files).</string>
+    <string name="onboarding_termux_unsupported">Pipkin can\'t confirm this copy of Termux is the official F-Droid build, so it won\'t use it. Uninstall it, then install Termux from F-Droid (uninstalling deletes Termux\'s files).</string>
+    <string name="onboarding_termux_security_title">Only Termux from F-Droid, for your security</string>
+    <string name="onboarding_termux_security_body">Your agent runs inside Termux, where it can reach your code, your files and the API keys you sign in with. A modified copy of Termux could read or change any of them, so before Pipkin runs anything, it checks that F-Droid signed your copy. Termux from Google Play, GitHub or anywhere else isn\'t accepted.</string>
     <string name="onboarding_termux_uninstall">Uninstall</string>
     <string name="onboarding_termux_open_fdroid">Open F-Droid</string>
     <string name="onboarding_termux_too_old">Pipkin needs Termux 0.118 or newer.</string>
     <string name="onboarding_termux_update">Update Termux from F-Droid</string>
-    <string name="onboarding_termux_ready">Termux %1$s is installed.</string>
+    <string name="onboarding_termux_ready">Termux %1$s is installed and verified as the official F-Droid build.</string>
 
     <string name="onboarding_notifications_title">Notifications</string>
     <string name="onboarding_notifications_body">Shows when Pipkin is working in the background and lets you stop it.</string>

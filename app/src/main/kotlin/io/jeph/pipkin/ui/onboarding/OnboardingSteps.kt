@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.onboarding
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -7,14 +8,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
@@ -39,6 +43,7 @@ internal fun TermuxStep(
     when (termux) {
       TermuxInstall.Status.NotInstalled -> {
         StepText(stringResource(R.string.onboarding_termux_missing))
+        TermuxSecurityNote()
         PrimaryButton(stringResource(R.string.onboarding_termux_install), onOpenFDroid)
       }
 
@@ -49,6 +54,7 @@ internal fun TermuxStep(
           R.string.onboarding_termux_unsupported
         }
         StepText(stringResource(text))
+        TermuxSecurityNote()
         Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
           PrimaryButton(stringResource(R.string.onboarding_termux_uninstall), onUninstall)
           SecondaryButton(stringResource(R.string.onboarding_termux_open_fdroid), onOpenFDroid)
@@ -61,6 +67,30 @@ internal fun TermuxStep(
       }
 
       TermuxInstall.Status.Supported -> StepText(stringResource(R.string.onboarding_termux_ready, version.orEmpty()))
+    }
+  }
+}
+
+/** Why Pipkin accepts only F-Droid's Termux, shown until an F-Droid build is installed. */
+@Composable
+private fun TermuxSecurityNote() {
+  val colors = pipkinColors
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .background(colors.surface2, RoundedCornerShape(PipkinTokens.Radius.md))
+      .padding(PipkinTokens.Spacing.s12),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+  ) {
+    LucideIcon(icon = R.drawable.ic_lucide_shield_check, contentDescription = null, tint = colors.foreground)
+    Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4)) {
+      Text(
+        text = stringResource(R.string.onboarding_termux_security_title),
+        color = colors.foreground,
+        fontSize = PipkinTokens.FontSize.base,
+        fontWeight = FontWeight.Medium,
+      )
+      StepText(stringResource(R.string.onboarding_termux_security_body))
     }
   }
 }
