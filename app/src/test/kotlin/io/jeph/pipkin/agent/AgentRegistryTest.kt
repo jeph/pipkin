@@ -20,6 +20,8 @@ class AgentRegistryTest {
     override val sessionFile = MutableStateFlow(sessionPath)
     override val busy = MutableStateFlow(false)
     var closed = false
+    var parked = false
+    var restarts = 0
     var aborts = 0
     var abortFails = false
 
@@ -27,6 +29,15 @@ class AgentRegistryTest {
       aborts += 1
       if (abortFails) throw RpcError("abort", "The agent did not answer abort in time.")
       busy.value = false
+    }
+
+    override fun park() {
+      parked = true
+    }
+
+    override fun restart() {
+      parked = false
+      restarts += 1
     }
 
     override fun close() {
@@ -65,7 +76,7 @@ class AgentRegistryTest {
   }
 
   @Test
-  fun hiddenIdleProcessesCloseAfterTheIdleDelay() = registryTest(idleCloseMillis = 50) { registry ->
+  fun hiddenIdleProcessesParkAfterTheIdleDelay() = registryTest(idleCloseMillis = 50) { registry ->
     val hidden = registry.open(CWD, "/s/hidden.jsonl")
     val shown = registry.open(CWD, "/s/shown.jsonl")
     val working = registry.open(CWD, "/s/working.jsonl")
@@ -73,17 +84,83 @@ class AgentRegistryTest {
     registry.setVisible(shown)
     delay(300)
 
-    assertTrue(hidden.closed)
+    assertTrue(hidden.parked)
+    assertFalse(hidden.closed)
     assertNull(registry.keyOf(hidden))
-    assertFalse(shown.closed)
-    assertFalse(working.closed)
+    assertFalse(shown.parked)
+    assertFalse(working.parked)
 
     working.busy.value = false
     delay(300)
 
-    assertTrue(working.closed)
-    assertFalse(shown.closed)
+    assertTrue(working.parked)
+    assertFalse(shown.parked)
     assertEquals(setOf(ChatKey("/s/shown.jsonl")), registry.processes.value.keys)
+  }
+
+  @Test
+  fun reopeningAParkedSessionRestartsTheSameChat() = registryTest { registry ->
+    val chat = registry.open(CWD, "/s/a.jsonl")
+    registry.reloadIdle()
+
+    val reopened = registry.open(CWD, "/s/a.jsonl")
+
+    assertSame(chat, reopened)
+    assertFalse(chat.parked)
+    assertEquals(1, chat.restarts)
+    assertEquals(ChatKey("/s/a.jsonl"), registry.keyOf(chat))
+    assertEquals(1, created.size)
+  }
+
+  @Test
+  fun discardedParkedChatClosesAndReopensFresh() = registryTest { registry ->
+    val chat = registry.open(CWD, "/s/a.jsonl")
+    registry.reloadIdle()
+
+    registry.discardParked(listOf("/s/a.jsonl", "/s/never-opened.jsonl"))
+
+    assertTrue(chat.closed)
+    assertNotSame(chat, registry.open(CWD, "/s/a.jsonl"))
+  }
+
+  @Test
+  fun newChatWithoutASessionFileClosesInsteadOfParking() = registryTest { registry ->
+    val chat = registry.open(CWD, null)
+
+    registry.reloadIdle()
+
+    assertTrue(chat.closed)
+    assertFalse(chat.parked)
+  }
+
+  @Test
+  fun parkingPastTheLimitClosesTheLeastRecentlyParked() = registryTest { registry ->
+    val chats = List(AgentRegistry.MAX_PARKED) { registry.open(CWD, "/s/$it.jsonl").also { registry.reloadIdle() } }
+    // Reopened and parked again, the first chat becomes the most recently parked.
+    registry.open(CWD, "/s/0.jsonl")
+    registry.reloadIdle()
+
+    registry.open(CWD, "/s/extra.jsonl")
+    registry.reloadIdle()
+
+    assertTrue(chats[1].closed)
+    assertTrue(chats.filter { it !== chats[1] }.none { it.closed })
+    assertSame(chats[0], registry.open(CWD, "/s/0.jsonl"))
+  }
+
+  @Test
+  fun refusedReopenKeepsTheChatParked() = registryTest { registry ->
+    val parkedChat = registry.open(CWD, "/s/parked.jsonl")
+    registry.reloadIdle()
+    val workers = List(4) { registry.open(CWD, "/s/w$it.jsonl") }
+    workers.forEach { it.busy.value = true }
+
+    assertThrows(TooManyRunning::class.java) { registry.open(CWD, "/s/parked.jsonl") }
+    assertEquals(0, parkedChat.restarts)
+
+    workers[0].busy.value = false
+    assertSame(parkedChat, registry.open(CWD, "/s/parked.jsonl"))
+    assertTrue(workers[0].parked)
   }
 
   @Test
@@ -94,8 +171,8 @@ class AgentRegistryTest {
 
     val fifth = registry.open(CWD, null)
 
-    assertTrue(processes[0].closed)
-    assertTrue(processes.drop(1).none { it.closed })
+    assertTrue(processes[0].parked)
+    assertTrue(processes.drop(1).none { it.parked || it.closed })
     assertFalse(fifth.closed)
     assertEquals(4, registry.processes.value.size)
     assertSame(processes[3], registry.visible.value)
@@ -109,7 +186,7 @@ class AgentRegistryTest {
 
     registry.open(CWD, null)
 
-    assertTrue(processes[3].closed)
+    assertTrue(processes[3].parked)
     assertNull(registry.visible.value)
   }
 
@@ -139,7 +216,7 @@ class AgentRegistryTest {
   }
 
   @Test
-  fun reloadIdleReloadsTheVisibleAndClosesHiddenIdleProcesses() = registryTest { registry ->
+  fun reloadIdleReloadsTheVisibleAndParksHiddenIdleProcesses() = registryTest { registry ->
     val shown = registry.open(CWD, "/s/shown.jsonl")
     val hidden = registry.open(CWD, "/s/hidden.jsonl")
     val working = registry.open(CWD, "/s/working.jsonl")
@@ -149,12 +226,30 @@ class AgentRegistryTest {
     registry.reloadIdle()
 
     assertTrue(shown.closed)
-    assertTrue(hidden.closed)
+    assertTrue(hidden.parked)
+    assertFalse(hidden.closed)
     assertFalse(working.closed)
     val reloaded = registry.visible.value
     assertNotSame(shown, reloaded)
     assertEquals("/s/shown.jsonl", reloaded?.sessionFile?.value)
     assertEquals(setOf(ChatKey("/s/shown.jsonl"), ChatKey("/s/working.jsonl")), registry.processes.value.keys)
+  }
+
+  @Test
+  fun aChatTakingOverAParkedSessionClosesTheStaleCopy() = registryTest { registry ->
+    val stale = registry.open(CWD, "/s/a.jsonl")
+    registry.reloadIdle()
+    val takeover = registry.open(CWD, null)
+    takeover.sessionFile.value = "/s/a.jsonl"
+    settle()
+
+    assertTrue(stale.closed)
+    // Forking on to another session leaves nothing under the first one to reopen.
+    takeover.sessionFile.value = "/s/b.jsonl"
+    settle()
+    val reopened = registry.open(CWD, "/s/a.jsonl")
+    assertNotSame(stale, reopened)
+    assertNotSame(takeover, reopened)
   }
 
   @Test

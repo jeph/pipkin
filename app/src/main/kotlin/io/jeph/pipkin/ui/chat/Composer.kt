@@ -86,7 +86,8 @@ private const val MAX_PICKED_IMAGES = 6
 
 /**
  * Paseo's composer: attachment tray, growing text field and a toolbar with attach, model chip, the
- * context meter, [trailingControls] (reserved for voice input) and the primary send/stop button.
+ * context meter, [trailingControls] (reserved for voice input) and the primary send/stop button. Send stays
+ * greyed out while Pi starts.
  */
 @Composable
 internal fun Composer(
@@ -150,7 +151,8 @@ internal fun Composer(
         val contextUsage by controller.process.contextUsage.collectAsStateWithLifecycle()
         ContextMeter(contextUsage, controller.contextDetailsOpen) { controller.contextDetailsOpen = it }
         trailingControls()
-        PrimaryButton(primaryAction(controller, busy), onSend = send, onStop = controller::abort)
+        val processState by controller.process.state.collectAsStateWithLifecycle()
+        PrimaryButton(primaryAction(controller, busy, processState.starting), onSend = send, onStop = controller::abort)
       }
     }
   }
@@ -158,12 +160,13 @@ internal fun Composer(
 
 /**
  * Pi answers a prompt within moments by starting its run, so Stop shows from the press on. A photo-only steer
- * greys out Send rather than showing Stop, which a tap meant as sending would otherwise press.
+ * greys out Send rather than showing Stop, which a tap meant as sending would otherwise press. So does Pi [starting],
+ * which could not take the prompt or most built-in commands yet.
  */
-private fun primaryAction(controller: ChatController, busy: Boolean): PrimaryAction = when {
+private fun primaryAction(controller: ChatController, busy: Boolean, starting: Boolean): PrimaryAction = when {
   controller.sendingCommand -> PrimaryAction.Sending
   controller.sending -> PrimaryAction.Stop
-  controller.canSend -> PrimaryAction.Send
+  controller.canSend && !starting -> PrimaryAction.Send
   controller.photosOnlySteer -> PrimaryAction.Idle
   busy -> PrimaryAction.Stop
   else -> PrimaryAction.Idle

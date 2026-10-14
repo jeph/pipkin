@@ -25,6 +25,12 @@ internal interface ManagedProcess {
 
   suspend fun abort()
 
+  /** Ends Pi but keeps the chat's history on screen, for [restart] to reload once Pi is back. */
+  fun park()
+
+  /** Starts Pi again on the same cwd and session file, keeping the history until Pi has sent it again. */
+  fun restart()
+
   /** Final: ends Pi and releases the process. */
   fun close()
 }
@@ -44,9 +50,11 @@ internal class TooManyRunning :
   IllegalStateException("${AgentRegistry.MAX_PROCESSES} chats are working. Stop one to open another.")
 
 /**
- * The app's open agent processes, at most [MAX_PROCESSES]. A process that is neither busy nor
- * visible is closed after [idleCloseMillis]; opening one more evicts the least-recently-visible idle
- * process. [onRunEnded] hears each time an open process stops being busy. Main thread only.
+ * The app's open agent processes, at most [MAX_PROCESSES]. A process that is neither busy nor visible is parked after
+ * [idleCloseMillis], and opening one more parks the least-recently-visible idle process: its Pi ends, but the chat
+ * and its history are kept, so opening its session again shows the history while Pi restarts. At most [MAX_PARKED]
+ * chats stay parked; the least recently parked is closed for good. [onRunEnded] hears each time an open process
+ * stops being busy. Main thread only.
  */
 internal class AgentRegistry<P : ManagedProcess>(
   private val scope: CoroutineScope,
@@ -64,6 +72,9 @@ internal class AgentRegistry<P : ManagedProcess>(
   private val busyState = MutableStateFlow(false)
   private var tick = 0L
 
+  /** Parked chats by session file, least recently parked first. */
+  private val parked = LinkedHashMap<ChatKey, P>()
+
   /** Open processes by chat; a new chat is rekeyed to its session file once Pi reports it. */
   val processes: StateFlow<Map<ChatKey, P>> = processState.asStateFlow()
 
@@ -76,14 +87,24 @@ internal class AgentRegistry<P : ManagedProcess>(
   fun keyOf(process: P): ChatKey? = processState.value.entries.firstOrNull { it.value === process }?.key
 
   /**
-   * The open process for [sessionPath], or a new one (a new session when [sessionPath] is null).
-   * Throws [TooManyRunning] when all [MAX_PROCESSES] processes are busy.
+   * The open process for [sessionPath], the parked one restarted, or a new one (a new session when [sessionPath] is
+   * null). Throws [TooManyRunning] when all [MAX_PROCESSES] processes are busy.
    */
   fun open(cwd: String, sessionPath: String?): P {
-    sessionPath?.let { processState.value[ChatKey.session(it)] }?.let { return it }
-    if (entries.size >= MAX_PROCESSES) evictOne()
-    val process = factory(cwd, sessionPath)
-    add(if (sessionPath != null) ChatKey.session(sessionPath) else ChatKey.new(), process)
+    val key = sessionPath?.let { ChatKey.session(it) }
+    key?.let { processState.value[it] }?.let { return it }
+    // Taken out first, so making room cannot close it as the least recently parked chat.
+    val resumed = key?.let { parked.remove(it) }
+    if (entries.size >= MAX_PROCESSES) {
+      try {
+        evictOne()
+      } catch (refused: TooManyRunning) {
+        if (key != null && resumed != null) parked[key] = resumed
+        throw refused
+      }
+    }
+    val process = resumed?.also { it.restart() } ?: factory(cwd, sessionPath)
+    add(key ?: ChatKey.new(), process)
     return process
   }
 
@@ -111,13 +132,13 @@ internal class AgentRegistry<P : ManagedProcess>(
   }
 
   /**
-   * Applies changed Pi configuration to every idle process: the visible one is reloaded; hidden
-   * ones are closed, since they reopen with the new configuration when shown. Busy processes are untouched.
+   * Applies changed Pi configuration to every idle process: the visible one is reloaded; hidden ones are parked,
+   * since they restart with the new configuration when shown. Busy processes are untouched.
    */
   fun reloadIdle() {
     for (process in processState.value.values.toList()) {
       if (process.busy.value) continue
-      if (visibleState.value === process) reload(process) else remove(process)
+      if (visibleState.value === process) reload(process) else park(process)
     }
   }
 
@@ -134,6 +155,11 @@ internal class AgentRegistry<P : ManagedProcess>(
   /** Closes and forgets [process] (for example before its session is deleted). */
   fun close(process: P) = remove(process)
 
+  /** Closes the parked chats for [sessionPaths] (for example once they are archived), so none reopens or lingers. */
+  fun discardParked(sessionPaths: Collection<String>) {
+    for (path in sessionPaths) parked.remove(ChatKey.session(path))?.close()
+  }
+
   private suspend fun abortOrEnd(process: P) {
     try {
       process.abort()
@@ -149,7 +175,7 @@ internal class AgentRegistry<P : ManagedProcess>(
       .filter { !it.key.busy.value }
       .minByOrNull { if (it.key === shown) Long.MAX_VALUE else it.value.lastVisible }
       ?: throw TooManyRunning()
-    remove(idle.key)
+    park(idle.key)
   }
 
   private fun add(key: ChatKey, process: P) {
@@ -161,12 +187,31 @@ internal class AgentRegistry<P : ManagedProcess>(
   }
 
   private fun remove(process: P) {
-    val entry = entries.remove(process) ?: return
+    if (detach(process)) process.close()
+  }
+
+  /** Ends [process]'s Pi and keeps the chat for [open]; a chat without its own session file has nothing to keep. */
+  private fun park(process: P) {
+    val key = keyOf(process)
+    if (!detach(process)) return
+    val path = process.sessionFile.value
+    if (key == null || path == null || key != ChatKey.session(path)) {
+      process.close()
+      return
+    }
+    process.park()
+    parked[key] = process
+    if (parked.size > MAX_PARKED) parked.remove(parked.keys.first())?.close()
+  }
+
+  /** Stops tracking [process] without ending it; false when this registry does not hold it. */
+  private fun detach(process: P): Boolean {
+    val entry = entries.remove(process) ?: return false
     processState.value = processState.value.filterValues { it !== process }
     if (visibleState.value === process) visibleState.value = null
     updateBusy()
-    process.close()
     entry.watcher?.cancel()
+    return true
   }
 
   private suspend fun watch(process: P) = coroutineScope {
@@ -186,7 +231,7 @@ internal class AgentRegistry<P : ManagedProcess>(
       .collectLatest { idle ->
         if (idle) {
           delay(idleCloseMillis)
-          remove(process)
+          park(process)
         }
       }
   }
@@ -195,6 +240,8 @@ internal class AgentRegistry<P : ManagedProcess>(
     val current = keyOf(process) ?: return
     if (current == key || processState.value.containsKey(key)) return
     processState.value = processState.value - current + (key to process)
+    // A live chat took over a parked chat's session (Pi's /resume), so that copy's history is stale.
+    parked.remove(key)?.close()
   }
 
   private fun updateBusy() {
@@ -203,6 +250,7 @@ internal class AgentRegistry<P : ManagedProcess>(
 
   companion object {
     const val MAX_PROCESSES = 4
+    const val MAX_PARKED = 12
     const val IDLE_CLOSE_MILLIS = 60_000L
   }
 }

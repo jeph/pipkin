@@ -73,6 +73,9 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       if (ifNoEventsSince != null && appliedCount != ifNoEventsSince) return false
       items.clear()
       live = null
+      // Every message key is cleared above, so numbering restarts: reseeding the same history, as a parked chat's
+      // restart does, gives each row the key it had and the list keeps its scroll position and row state.
+      messageSeq = 0
       streamingArgs.clear()
       // A seed follows a new connection, a session switch or a re-sync with an idle Pi, so neither a run nor a
       // compaction is still going.

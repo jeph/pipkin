@@ -31,6 +31,9 @@ import org.json.JSONException
 import org.json.JSONObject
 
 internal sealed interface AgentProcessState {
+  /** Pi is on its way up: nothing can reach it yet, but it will answer shortly. */
+  val starting: Boolean get() = this == Starting || this is Installing
+
   data object Starting : AgentProcessState
 
   /** Pi is being (re)installed because the host reported `pi_version`; [progressLine] is npm's latest output. */
@@ -153,11 +156,21 @@ internal class AgentProcess(
   }
 
   /** Reconnects with the same cwd and session file, keeping the timeline until the new history arrives. */
-  fun restart() {
+  override fun restart() {
+    park()
+    startJob = processScope.launch { connect() }
+  }
+
+  /**
+   * Ends Pi but keeps the timeline, so [restart] shows the history at once. Starting until then: the timeline is only
+   * a copy of Pi's history while Pi is down, and nothing can be sent to it.
+   */
+  override fun park() {
     startJob?.cancel()
     connection?.close()
     connection = null
-    startJob = processScope.launch { connect() }
+    timeline.clearPendingUi()
+    stateFlow.value = AgentProcessState.Starting
   }
 
   override fun close() {

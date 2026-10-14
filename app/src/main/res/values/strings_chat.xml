@@ -18,6 +18,7 @@
 
     <!-- Stream -->
     <string name="chat_starting">Starting…</string>
+    <string name="chat_loading">Loading…</string>
     <string name="chat_installing">Installing the Pipkin agent…</string>
     <string name="chat_retry">Retry</string>
     <string name="chat_copy_command">Copy command &amp; open Termux</string>

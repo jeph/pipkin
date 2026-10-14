@@ -134,6 +134,7 @@ internal class ShellActions(private val graph: AppGraph) {
   /** Archives [session], stopping its run if one is going, and offers Undo. */
   fun archive(session: SessionInfo) {
     sessionArchive.archive(listOf(session.path), listOf(session.cwd))
+    registry.discardParked(listOf(session.path))
     stop(listOfNotNull(processFor(session.path)), replaceIn = session.cwd)
     notify(ShellNotice.Archived(listOf(session.path)))
   }
@@ -158,6 +159,7 @@ internal class ShellActions(private val graph: AppGraph) {
     val paths = sessionArchive.active.value.filter { sameFolder(it.cwd, cwd) }.map { it.path } +
       open.mapNotNull { it.sessionFile.value }
     sessionArchive.removeWorkspace(cwd, paths.distinct())
+    registry.discardParked(paths)
     stop(open, replaceIn = null)
   }
 

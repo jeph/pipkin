@@ -65,8 +65,9 @@ private const val LAUNCHER_MASK_SCALE = 1.5f
 
 /**
  * The chat stream: process banner, timeline items, the empty state and Paseo's scroll-to-bottom button.
- * Keeps the end in view while the user is at the bottom; dragging away stops following. [onRestart]
- * retries a failed start and restarts an exited Pi.
+ * Keeps the end in view while the user is at the bottom; dragging away stops following. While Pi starts under a
+ * history already shown, a pinned [LoadingPill] replaces the banner. [onRestart] retries a failed start and
+ * restarts an exited Pi.
  */
 @Composable
 internal fun ChatStream(
@@ -80,9 +81,9 @@ internal fun ChatStream(
 ) {
   val listState = remember { LazyListState() }
   val scope = rememberCoroutineScope()
-  val banner = processState.takeIf {
-    it is AgentProcessState.Starting || it is AgentProcessState.Installing || it is AgentProcessState.Failed
-  }
+  val starting = processState is AgentProcessState.Starting || processState is AgentProcessState.Installing
+  val loadingOverHistory = starting && timeline.items.isNotEmpty()
+  val banner = processState.takeIf { !loadingOverHistory && (starting || it is AgentProcessState.Failed) }
   val count = timeline.items.size + if (banner != null) 1 else 0
   val threshold = with(LocalDensity.current) { 120.dp.roundToPx() }
   AutoFollow(listState, follow)
@@ -93,6 +94,14 @@ internal fun ChatStream(
     StreamList(listState, timeline.items, banner, follow, onRestart, onOpenTool)
     if (timeline.items.isEmpty() && processState == AgentProcessState.Ready) {
       EmptyState(noModel = timeline.model == null, onOpenSettings, Modifier.align(Alignment.Center))
+    }
+    AnimatedVisibility(
+      visible = loadingOverHistory,
+      modifier = Modifier.align(Alignment.TopCenter).padding(top = PipkinTokens.Spacing.s8),
+      enter = fadeIn(),
+      exit = fadeOut(),
+    ) {
+      LoadingPill(installing = processState is AgentProcessState.Installing)
     }
     ScrollToBottomButton(
       visible = showScrollButton,

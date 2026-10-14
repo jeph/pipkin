@@ -33,11 +33,11 @@ class ChatTimelineTest {
 
     timeline.seed(JSONArray("""[{"role":"user","content":"go","timestamp":5}]"""))
     assertFalse(timeline.state.value.busy)
-    assertEquals(listOf(User("m1", "go", emptyList(), 5)), items)
+    assertEquals(listOf(User("m0", "go", emptyList(), 5)), items)
 
     // A settle that was still on its way ends nothing more; the next run opens a fresh footer.
     apply("""{"type":"agent_settled","aborted":false}""")
-    assertEquals(listOf(User("m1", "go", emptyList(), 5)), items)
+    assertEquals(listOf(User("m0", "go", emptyList(), 5)), items)
     apply("""{"type":"agent_start"}""")
     assertTrue(timeline.state.value.busy)
     assertEquals(TurnFooter("t1", 1_000, null), items.last())
@@ -57,7 +57,21 @@ class ChatTimelineTest {
 
     assertTrue(timeline.seed(history, ifNoEventsSince = timeline.appliedEvents))
     assertFalse(timeline.state.value.busy)
-    assertEquals(listOf(User("m1", "go", emptyList(), 5)), items)
+    assertEquals(listOf(User("m0", "go", emptyList(), 5)), items)
+  }
+
+  @Test
+  fun reseedingTheSameHistoryKeepsEveryRowKey() {
+    val history = JSONArray(
+      """[{"role":"user","content":"go","timestamp":5},{"role":"assistant","content":"done","timestamp":6}]""",
+    )
+    timeline.seed(history)
+    val keys = items.map { it.key }
+    apply("""{"type":"message_start","message":{"role":"user","content":"next","timestamp":9}}""")
+
+    timeline.seed(history)
+
+    assertEquals(keys, items.map { it.key })
   }
 
   @Test

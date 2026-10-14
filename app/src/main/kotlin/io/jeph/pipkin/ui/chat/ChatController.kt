@@ -97,10 +97,11 @@ internal class ChatController(
 
   /**
    * Sends the draft; Pi steers a working run with it. A built-in command such as `/compact` runs in
-   * Pipkin instead. Returns false when nothing was sent.
+   * Pipkin instead. Returns false when nothing was sent, as while Pi starts: the history shown then is only a copy,
+   * and the prompt or most built-in commands would reach no Pi.
    */
   fun send(): Boolean {
-    if (!canSend) return false
+    if (!canSend || process.state.value.starting) return false
     val builtin = parseBuiltin(draft.text.toString()).takeIf { attachments.isEmpty() }
     if (builtin != null) {
       draft.clearText()
