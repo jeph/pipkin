@@ -60,6 +60,17 @@ sealed interface TimelineItem {
 
   data class Error(override val key: String, val message: String) : TimelineItem
 
+  /**
+   * A message an extension added with `pi.sendMessage` and `display` set: Pi sends its [markdown] and [images] to the
+   * model as user content, and shows them apart from the conversation under the extension's [customType].
+   */
+  data class ExtensionMessage(
+    override val key: String,
+    val customType: String,
+    val markdown: String,
+    val images: List<ImagePart>,
+  ) : TimelineItem
+
   data class Notice(override val key: String, val text: String) : TimelineItem
 
   /** Closes a run that started at [startedAt]; [durationMillis] is null while Pi is still working. */

@@ -141,6 +141,86 @@ class ChatTimelineTest {
   }
 
   @Test
+  fun anExtensionMessageShowsOnlyWhenItsExtensionDisplaysIt() {
+    val shown =
+      """{"role":"custom","customType":"google-account","display":true,"timestamp":5,"content":[
+        {"type":"text","text":"Active Google account: **me**"},{"type":"image","data":"aGk=","mimeType":"image/png"}]}"""
+    val hidden = """{"role":"custom","customType":"state","display":false,"content":"model only","timestamp":6}"""
+    val plain = """{"role":"custom","customType":"note","display":true,"content":"Fetched 3/3 URLs","timestamp":7}"""
+    val blank = """{"role":"custom","customType":"empty","display":true,"content":[],"timestamp":8}"""
+    for (message in listOf(shown, hidden, plain, blank)) {
+      apply("""{"type":"message_start","message":$message}""")
+      apply("""{"type":"message_end","message":$message}""")
+    }
+
+    assertEquals(
+      listOf(
+        TimelineItem.ExtensionMessage(
+          "m0",
+          "google-account",
+          "Active Google account: **me**",
+          listOf(ImagePart("aGk=", "image/png")),
+        ),
+        TimelineItem.ExtensionMessage("m2", "note", "Fetched 3/3 URLs", emptyList()),
+      ),
+      items,
+    )
+  }
+
+  @Test
+  fun seededHistoryKeepsExtensionMessagesAndTheRunsTheyStarted() {
+    val history =
+      JSONArray(
+        """
+        [
+          {"role":"custom","customType":"fetch","display":true,"content":"Fetched","timestamp":1000},
+          {"role":"assistant","stopReason":"stop","timestamp":1500,"durationMs":500,"content":$TEXT},
+          {"role":"custom","customType":"curator","display":true,"content":"Curator disabled","timestamp":3000},
+          {"role":"user","content":"go","timestamp":4000},
+          {"role":"assistant","stopReason":"toolUse","timestamp":4100,"durationMs":100,"content":[
+            {"type":"toolCall","id":"c1","name":"bash","arguments":{"command":"ls"}}
+          ]},
+          {"role":"custom","customType":"steer","display":false,"content":"hidden","timestamp":4300},
+          {"role":"toolResult","toolCallId":"c1","toolName":"bash","isError":false,"content":[],"timestamp":4400},
+          {"role":"assistant","stopReason":"stop","timestamp":4500,"durationMs":500,"content":$TEXT}
+        ]
+        """,
+      )
+    timeline.seed(history)
+
+    // The first extension message started a run of its own; the second got no reply, so the run starts at the user's
+    // message, and a hidden one sent while a tool ran stays inside that run.
+    assertEquals(
+      listOf("m0", "m1.0", "m1.footer", "m2", "m3", "m4.0", "m6.0", "m6.footer"),
+      items.map { it.key },
+    )
+    assertEquals(TurnFooter("m1.footer", 1000, 1000), items[2])
+    assertEquals(TurnFooter("m6.footer", 4000, 1000), items[7])
+
+    val keys = items.map { it.key }
+    timeline.seed(history)
+    assertEquals(keys, items.map { it.key })
+  }
+
+  @Test
+  fun anUnansweredExtensionMessageDoesNotStretchTheRunTheNextOneStarts() {
+    timeline.seed(
+      JSONArray(
+        """
+        [
+          {"role":"custom","customType":"note","display":true,"content":"no reply","timestamp":1000},
+          {"role":"custom","customType":"account","display":true,"content":"reply to this","timestamp":10000},
+          {"role":"assistant","stopReason":"stop","timestamp":10500,"durationMs":500,"content":$TEXT}
+        ]
+        """,
+      ),
+    )
+
+    assertEquals(listOf("m0", "m1", "m2.0", "m2.footer"), items.map { it.key })
+    assertEquals(TurnFooter("m2.footer", 10000, 1000), items.last())
+  }
+
+  @Test
   fun seedMapsEveryRoleAndAttachesToolResults() {
     timeline.seed(
       JSONArray(

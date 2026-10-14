@@ -106,7 +106,7 @@ private fun UserImages(images: List<ImagePart>) {
 }
 
 @Composable
-private fun ImageThumbnail(part: ImagePart) {
+internal fun ImageThumbnail(part: ImagePart) {
   val bitmap by produceState<ImageBitmap?>(null, part) { value = ChatImages.thumbnail(part) }
   val shape = RoundedCornerShape(PipkinTokens.Radius.md)
   val image = bitmap

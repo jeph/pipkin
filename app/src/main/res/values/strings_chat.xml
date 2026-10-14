@@ -36,6 +36,9 @@
     <string name="chat_copy_reply">Copy reply</string>
     <string name="chat_copy_message">Copy message</string>
     <string name="chat_copy_details">Copy</string>
+    <string name="chat_extension_message">Extension message</string>
+    <string name="chat_show_more">Show more</string>
+    <string name="chat_show_less">Show less</string>
     <string name="chat_copied">Copied</string>
     <string name="chat_duration_minutes">%1$dm %2$ds</string>
     <string name="chat_duration_seconds">%1$ds</string>

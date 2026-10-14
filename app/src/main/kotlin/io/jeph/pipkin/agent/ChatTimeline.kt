@@ -20,9 +20,9 @@ import org.json.JSONObject
  * Folds Pi RPC session events (`docs/json.md`) into the items the chat screen renders. Pure state without I/O;
  * every entry point is synchronized, so callers may use any thread.
  *
- * Message items are keyed `m<seq>` (user, bash) or `m<seq>.<contentIndex>` (assistant blocks), so a block streamed
- * through `message_update` keeps its key when `message_end` rebuilds the authoritative message. The open run's
- * [TurnFooter] is held apart and always rendered last.
+ * Message items are keyed `m<seq>` (user, bash, extension) or `m<seq>.<contentIndex>` (assistant blocks), so a block
+ * streamed through `message_update` keeps its key when `message_end` rebuilds the authoritative message. The open
+ * run's [TurnFooter] is held apart and always rendered last.
  */
 class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   private val lock = Any()
@@ -91,14 +91,19 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       for (index in 0 until messages.length()) {
         val message = messages.optJSONObject(index) ?: continue
         val role = message.optString("role")
-        // A user message or `!` command after the run's last reply starts outside that run.
-        if (role == "user" || role == "bashExecution") run = run?.closeIfReplied()
+        run = run?.before(role)
         when (role) {
           "user", "assistant", "bashExecution" -> {
             val key = nextMessageKey()
             items += messageItems(message, key, settled = true, message.piTimestamp ?: clock())
             if (role == "user" && run == null) run = SeededRun(message.piTimestamp)
             if (role == "assistant") run?.replied(key, message)
+          }
+
+          "custom" -> {
+            extensionMessage(message, nextMessageKey())?.let { items += it }
+            // An extension's message can start a run of its own, as `triggerTurn` does.
+            if (run == null) run = SeededRun(message.piTimestamp, openedByExtension = true)
           }
 
           "toolResult" -> attachToolResult(message)
@@ -110,13 +115,29 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
     }
   }
 
-  /** A run [seed] is rebuilding, which started at [startedAt]; null when its user message had no timestamp. */
-  private inner class SeededRun(private val startedAt: Long?) {
+  /**
+   * A run [seed] is rebuilding, which started at [startedAt]; null when its first message had no timestamp. A run
+   * [openedByExtension] began at an extension's message rather than the user's.
+   */
+  private inner class SeededRun(private val startedAt: Long?, private val openedByExtension: Boolean = false) {
     private var replyKey: String? = null
     private var endedAt: Long? = null
+    private var answered = false
+
+    /**
+     * The run still open before a message of [role]: a user message, an extension's message or a `!` command after
+     * the last reply starts outside the run, and an extension message no reply followed started no run, so the next
+     * user or extension message starts it instead.
+     */
+    fun before(role: String): SeededRun? = when (role) {
+      "user", "custom" -> closeIfReplied()?.takeUnless { openedByExtension && !answered }
+      "bashExecution" -> closeIfReplied()
+      else -> this
+    }
 
     /** Takes the message keyed [key] as the run's latest reply; one that calls a tool means the run goes on. */
     fun replied(key: String, message: JSONObject) {
+      answered = true
       val final = message.optString("stopReason") != "toolUse"
       replyKey = key.takeIf { final }
       endedAt = message.piTimestamp?.let { start -> message.durationMs?.let { start + it } }?.takeIf { final }
@@ -323,6 +344,9 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
         replaceMessage(prefix, messageItems(message, prefix, settled = role == "bashExecution", timestamp))
       }
 
+      // Pi sends an extension's message whole, its message_start straight before this.
+      "custom" -> extensionMessage(message, nextMessageKey())?.let { items += it }
+
       "toolResult" -> attachToolResult(message)
     }
   }
@@ -524,13 +548,20 @@ private fun messageItems(message: JSONObject, prefix: String, settled: Boolean, 
 private fun userItem(message: JSONObject, key: String, timestamp: Long): User {
   val blocks = message.optJSONArray("content")
     ?: return User(key, typedText(message.optString("content")), emptyList(), timestamp)
-  val images =
-    (0 until blocks.length()).mapNotNull { index ->
-      blocks.optJSONObject(index)?.takeIf { it.optString("type") == "image" }?.let {
-        ImagePart(it.optString("data"), it.optString("mimeType"))
-      }
-    }
-  return User(key, typedText(blocks.text()), images, timestamp)
+  return User(key, typedText(blocks.text()), blocks.images(), timestamp)
+}
+
+/**
+ * The row for an extension's `custom` message, keyed [key]; null when the extension hid it (`display` unset, as Pi's
+ * terminal UI reads it) or it holds neither text nor images.
+ */
+private fun extensionMessage(message: JSONObject, key: String): TimelineItem.ExtensionMessage? {
+  if (!message.optBoolean("display")) return null
+  val blocks = message.optJSONArray("content")
+  val markdown = blocks?.text() ?: (message.opt("content") as? String).orEmpty()
+  val images = blocks.images()
+  if (markdown.isBlank() && images.isEmpty()) return null
+  return TimelineItem.ExtensionMessage(key, message.optString("customType"), markdown, images)
 }
 
 /** Pi's expansion of `/skill:name args` (its `parseSkillBlock` format): the skill's file wrapped in a tag, then the args. */
@@ -583,14 +614,6 @@ private fun settle(item: TimelineItem): TimelineItem = when {
 }
 
 private fun TimelineItem.belongsTo(prefix: String) = key == prefix || key.startsWith("$prefix.")
-
-/** Text blocks of a content array, joined by newlines; image blocks are skipped. */
-private fun JSONArray?.text(): String {
-  if (this == null) return ""
-  return (0 until length())
-    .mapNotNull { optJSONObject(it)?.takeIf { block -> block.optString("type") == "text" }?.optString("text") }
-    .joinToString("\n")
-}
 
 private fun JSONArray?.strings(): List<String> = if (this == null) emptyList() else List(length()) { optString(it) }
 
