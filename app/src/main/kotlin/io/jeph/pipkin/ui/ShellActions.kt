@@ -12,6 +12,8 @@ import io.jeph.pipkin.data.sameFolder
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.workspace.Pane
+import io.jeph.pipkin.workspace.PaneItem
+import io.jeph.pipkin.workspace.WorkspaceTab
 import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -32,10 +34,12 @@ internal sealed interface ShellNotice {
 }
 
 /**
- * The shell's chat operations: which chat each pane shows, split screen, workspaces and new chats, the tab menu's
- * rename, and archiving, restoring and deleting chats. A chat shows in one pane at most, so opening a chat the other
- * pane shows leaves it there. Notices surface as [notices] for the shell's snackbar. Main thread only.
+ * The shell's chat operations: which chat or tab each pane shows, closing tabs, split screen, workspaces and new chats,
+ * the tab menu's rename, and archiving, restoring and deleting chats. A chat shows in one pane at most, so opening a
+ * chat the other pane shows leaves it there. Notices surface as [notices] for the shell's snackbar. Main thread only.
  */
+// Archiving and closing both refill the panes they empty through the private pane helpers, so they share one class.
+@Suppress("TooManyFunctions")
 internal class ShellActions(private val graph: AppGraph) {
   private val noticeChannel = Channel<ShellNotice>(Channel.BUFFERED)
   private val registry get() = graph.registry
@@ -72,6 +76,16 @@ internal class ShellActions(private val graph: AppGraph) {
     registry.shown.value[Pane.Secondary]?.let(::rememberShown)
     graph.panes.clear(Pane.Secondary)
     registry.show(Pane.Secondary, null)
+  }
+
+  /**
+   * Closes [tab]. A pane it leaves with nothing to go back to shows the tab's workspace instead, as choosing the
+   * workspace does, so the pane doesn't go empty: an empty second pane would close split screen.
+   */
+  fun closeTab(tab: WorkspaceTab) {
+    val pane = Pane.entries.firstOrNull { graph.panes.itemIn(it) == PaneItem.Tab(tab) }
+    graph.tabs.close(tab)
+    if (pane != null && graph.panes.itemIn(pane) == null) openWorkspace(pane, tab.cwd)
   }
 
   /** The process for [openWorkspace]; throws [TooManyRunning] when it needs a slot and all four chats are working. */

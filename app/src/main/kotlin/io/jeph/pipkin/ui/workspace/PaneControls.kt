@@ -8,6 +8,7 @@ import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.workspace.Pane
+import io.jeph.pipkin.workspace.WorkspaceTab
 
 /** What the screens a pane shows do from their headers, for the [pane] they show in. */
 internal class PaneControls(
@@ -15,6 +16,8 @@ internal class PaneControls(
   val onToggleSidebar: () -> Unit,
   val onOpenTabs: () -> Unit,
   val onToggleExplorer: () -> Unit,
+  /** Closes a tab, as from its actions sheet. */
+  val onCloseTab: (WorkspaceTab) -> Unit,
   /** Closes split screen; null in the main pane. */
   val onCloseSplit: (() -> Unit)?,
 )

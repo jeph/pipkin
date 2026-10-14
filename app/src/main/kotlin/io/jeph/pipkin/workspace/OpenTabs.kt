@@ -21,7 +21,8 @@ internal class OpenTabs(private val panes: Panes<*>) {
   }
 
   /**
-   * Closes [tab]: the pane showing it goes back, every history forgets it, and it lets go of what it holds.
+   * Closes [tab]: the pane showing it goes back, every history forgets it, and it lets go of what it holds. The UI
+   * closes through `ShellActions.closeTab`, which also gives a pane left with nothing a chat.
    */
   fun close(tab: WorkspaceTab) {
     if (tab !in tabsFlow.value) return

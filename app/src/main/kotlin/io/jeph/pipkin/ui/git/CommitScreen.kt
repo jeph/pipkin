@@ -105,7 +105,7 @@ internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: M
 
   if (actionsOpen) {
     CommitActionsSheet(onClose = {
-      graph.tabs.close(WorkspaceTab.Commit(commit))
+      controls.onCloseTab(WorkspaceTab.Commit(commit))
     }, onDismiss = { actionsOpen = false })
   }
 }

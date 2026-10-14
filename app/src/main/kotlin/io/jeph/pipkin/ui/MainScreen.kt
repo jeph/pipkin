@@ -359,6 +359,7 @@ private fun WorkspacePanes(
           onToggleSidebar = { panels.toggle(pane, Panel.Sidebar) },
           onOpenTabs = { tabsOpen = true },
           onToggleExplorer = { panels.toggle(pane, Panel.Explorer) },
+          onCloseTab = actions::closeTab,
           onCloseSplit = if (pane == Pane.Secondary) actions::closeSplit else null,
         )
         val onShownInSplit = {

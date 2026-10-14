@@ -92,7 +92,7 @@ internal fun TerminalScreen(session: TerminalSession, controls: PaneControls, mo
       session = session,
       onNewTerminal = { graph.terminals.open(controls.pane, session.cwd) },
       onRestart = session::start,
-      onClose = { graph.tabs.close(WorkspaceTab.Terminal(session)) },
+      onClose = { controls.onCloseTab(WorkspaceTab.Terminal(session)) },
       onDismiss = { actionsOpen = false },
     )
   }

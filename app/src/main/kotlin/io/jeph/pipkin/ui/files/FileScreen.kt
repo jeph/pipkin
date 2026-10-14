@@ -133,7 +133,7 @@ internal fun FileScreen(file: FileTab, controls: PaneControls, modifier: Modifie
   if (actionsOpen) {
     FileActionsSheet(
       file = file,
-      onClose = { graph.tabs.close(WorkspaceTab.File(file)) },
+      onClose = { controls.onCloseTab(WorkspaceTab.File(file)) },
       onDismiss = { actionsOpen = false },
     )
   }

@@ -49,7 +49,6 @@ import io.jeph.pipkin.ui.components.SwipeAway
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import io.jeph.pipkin.workspace.OpenTabs
 import io.jeph.pipkin.workspace.Pane
 import io.jeph.pipkin.workspace.WorkspaceTab
 
@@ -114,7 +113,7 @@ internal fun WorkspaceTabsSheet(
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
   val archiving = remember(actions) { TabArchiving(actions) }
-  val closing = remember(graph) { TabClosing(graph.tabs) }
+  val closing = remember(actions) { TabClosing(actions) }
   var menu by remember { mutableStateOf<TabMenu?>(null) }
   val swapPanes = {
     onSwapPanes()
@@ -211,7 +210,6 @@ private fun TabMenuSheet(
   openInSplit: ((SessionInfo) -> Unit)?,
   onDismiss: () -> Unit,
 ) {
-  val graph = LocalContext.current.appGraph
   when (menu) {
     is TabMenu.Chat -> SessionActions(
       session = menu.session,
@@ -222,7 +220,7 @@ private fun TabMenuSheet(
     )
 
     is TabMenu.Tab -> WorkspaceTabActionsSheet(menu.tab, onClose = {
-      graph.tabs.close(menu.tab)
+      actions.closeTab(menu.tab)
     }, onDismiss = onDismiss)
   }
 }
@@ -302,7 +300,7 @@ private fun LazyListScope.tabRows(tabs: WorkspaceTabs, closing: TabClosing, call
  * Closing tabs from the tab menu. A row first slides out; once it is gone the tab closes, or, when its kind gives a
  * [CloseWarning], the user is asked first and a cancelled row slides back.
  */
-private class TabClosing(private val tabs: OpenTabs) {
+private class TabClosing(private val actions: ShellActions) {
   /** A slid-out tab and the warning the user is asked to confirm, kept while asking even if the tab calms down. */
   class Confirming(val tab: WorkspaceTab, val warning: CloseWarning)
 
@@ -333,7 +331,7 @@ private class TabClosing(private val tabs: OpenTabs) {
   }
 
   private fun remove(tab: WorkspaceTab) {
-    tabs.close(tab)
+    actions.closeTab(tab)
     leaving -= tab.key
   }
 }
