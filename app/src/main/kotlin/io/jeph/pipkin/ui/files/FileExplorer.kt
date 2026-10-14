@@ -143,7 +143,7 @@ internal fun FileExplorerPanel(
       onRefresh = { scope.launch { state?.refresh() } },
     )
     if (state != null) {
-      LaunchedEffect(state, entries, state.refreshing) {
+      LaunchedEffect(state, entries, state.relisted, state.refreshing) {
         if (!state.refreshing) state.restoreScroll(entries)
       }
       ExplorerTree(

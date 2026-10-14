@@ -148,8 +148,12 @@ internal class FileExplorerState(
 
   private var pendingAnchor by mutableStateOf(savedAnchor)
 
-  /** A [refresh] has finished listing every expanded folder, so the rows [restoreScroll] gets are the whole tree. */
-  private var relisted = false
+  /**
+   * A [refresh] has finished listing every expanded folder, so the rows [restoreScroll] gets are the whole tree.
+   * Observable, so the caller hears of it even when the listing leaves its rows as they were (an empty workspace).
+   */
+  var relisted by mutableStateOf(false)
+    private set
 
   /** Restored with a scroll position that [restoreScroll] hasn't applied yet; the list stays hidden until it has. */
   val restoringScroll: Boolean get() = pendingAnchor != null
