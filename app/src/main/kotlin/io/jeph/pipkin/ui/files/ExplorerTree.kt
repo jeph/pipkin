@@ -58,8 +58,9 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
 /**
- * [state]'s tree as [entries], the rows [explorerRows] gives for it: its failure or a spinner until the top folder is
- * listed, then the rows under the new folder's name field while one is being created.
+ * [state]'s tree as [entries], the rows [explorerRows] gives for it: its failure, or a spinner until the top folder is
+ * listed and a restored tree is scrolled back, then the rows under the new folder's name field while one is being
+ * created.
  */
 @Composable
 internal fun ExplorerTree(
@@ -78,7 +79,7 @@ internal fun ExplorerTree(
     TreeFailure(failure, onRetry, modifier)
     return
   }
-  if (!listed) {
+  if (!listed || state.restoringScroll) {
     CenterNote(modifier) {
       Spinner(PipkinTokens.IconSize.md, contentDescription = null)
       Text(
@@ -104,6 +105,7 @@ internal fun ExplorerTree(
   val navigationBar = WindowInsets.navigationBars.asPaddingValues()
   LazyColumn(
     modifier = modifier.fillMaxWidth(),
+    state = state.list,
     contentPadding = PaddingValues(
       top = PipkinTokens.Spacing.s8,
       bottom = PipkinTokens.Spacing.s16 + navigationBar.calculateBottomPadding(),
@@ -128,9 +130,6 @@ internal fun ExplorerTree(
     }
   }
 }
-
-/** The lazy-list key of the new folder's name field, which can't clash with a path. */
-private const val NEW_FOLDER_KEY = "/new-folder"
 
 /** Paseo's tree row: 12dp in plus 12dp a level, a 16dp chevron or file icon, and the name at 76% strength. */
 @Composable

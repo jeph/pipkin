@@ -37,20 +37,28 @@ internal sealed interface FileContent {
 /** The `files` host ran the request and couldn't do it; [message] says why, for the user. */
 internal class FileError(message: String) : IOException(message)
 
+/** A workspace's folders as the file explorer lists and adds to them. */
+internal interface WorkspaceFolders {
+  /** The entries of folder [path] in workspace [root], folders first; hidden ones included. */
+  suspend fun list(root: String, path: String): List<FileEntry>
+
+  /** Creates folder [name] in folder [parent] of workspace [root]; returns its workspace-relative path. */
+  suspend fun createFolder(root: String, parent: String, name: String): String
+}
+
 /**
  * Workspace files through one long-lived `files` host shared by every workspace, so expanding a folder or opening a
  * file doesn't pay for starting Termux each time. The host starts with the first request and ends once none has come
  * for [IDLE_MILLIS]. Requests run concurrently, matched to their replies by id. Main-thread confined.
  */
-internal class FileHost(private val hostClient: HostClient, private val scope: CoroutineScope) {
+internal class FileHost(private val hostClient: HostClient, private val scope: CoroutineScope) : WorkspaceFolders {
   private val openLock = Mutex()
   private var connection: Connection? = null
   private var idleClose: Job? = null
   private var inFlight = 0
   private var nextId = 0L
 
-  /** The entries of folder [path] in workspace [root], folders first; hidden ones included. */
-  suspend fun list(root: String, path: String): List<FileEntry> {
+  override suspend fun list(root: String, path: String): List<FileEntry> {
     val reply = request(JSONObject().put("type", LIST).put("root", root).put("path", path), LIST_TIMEOUT_MILLIS)
     return reply.optJSONArray("entries").objects().map {
       FileEntry(
@@ -74,8 +82,7 @@ internal class FileHost(private val hostClient: HostClient, private val scope: C
     }
   }
 
-  /** Creates folder [name] in folder [parent] of workspace [root]; returns its workspace-relative path. */
-  suspend fun createFolder(root: String, parent: String, name: String): String {
+  override suspend fun createFolder(root: String, parent: String, name: String): String {
     val message = JSONObject().put("type", MKDIR).put("root", root).put("path", parent).put("name", name)
     return request(message, LIST_TIMEOUT_MILLIS).optString("path")
   }

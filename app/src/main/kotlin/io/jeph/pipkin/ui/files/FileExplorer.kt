@@ -40,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -91,9 +92,9 @@ internal fun ExplorerToggle(onClick: () -> Unit) {
  * Paseo's compact file explorer: a full-width panel beside the workspace with a Files header and close button, a
  * toolbar to create a folder at the top of the workspace, show or hide dot files and refresh, and the tree of the
  * workspace folder [cwd]. Folders expand in place, listed as they open; tapping a file calls [onOpenFile] with its
- * workspace-relative path. Each workspace keeps its own tree while the panel stays composed. The tree is listed when
- * the panel [open]s, and again on each later opening, since Pi may have changed the files meanwhile; failures other
- * than the top folder's show on [snackbar].
+ * workspace-relative path. Each workspace keeps its own expanded folders and scroll position, saved as [ExplorerTrees]
+ * says. The tree is listed when the panel [open]s, and again on each later opening, since Pi may have changed the
+ * files meanwhile; failures other than the top folder's show on [snackbar].
  */
 @Composable
 internal fun FileExplorerPanel(
@@ -106,10 +107,8 @@ internal fun FileExplorerPanel(
   modifier: Modifier = Modifier,
 ) {
   val graph = LocalContext.current.appGraph
-  val trees = remember { HashMap<String, FileExplorerState>() }
-  val state = cwd?.let {
-    folderKey(it)
-  }?.let { root -> trees.getOrPut(root) { FileExplorerState(root, graph.fileHost) } }
+  val trees = rememberSaveable(saver = ExplorerTrees.saver(graph.fileHost)) { ExplorerTrees(graph.fileHost) }
+  val state = cwd?.let { trees[folderKey(it)] }
   val showHidden by graph.preferences.showHiddenFiles.collectAsStateWithLifecycle()
   val sort by graph.preferences.explorerSort.collectAsStateWithLifecycle()
   val scope = rememberCoroutineScope()
@@ -136,6 +135,9 @@ internal fun FileExplorerPanel(
     if (state != null) {
       val entries = remember(state.directories, state.expanded, showHidden, sort) {
         explorerRows(state.directories, state.expanded, showHidden, sort)
+      }
+      LaunchedEffect(state, entries, state.refreshing) {
+        if (!state.refreshing) state.restoreScroll(entries)
       }
       ExplorerTree(
         state = state,
