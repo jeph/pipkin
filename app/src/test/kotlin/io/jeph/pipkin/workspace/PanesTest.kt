@@ -2,6 +2,7 @@ package io.jeph.pipkin.workspace
 
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.ManagedProcess
+import io.jeph.pipkin.files.FileTab
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -10,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -140,6 +142,63 @@ class PanesTest {
 
     assertFalse(panes.back(Pane.Secondary))
   }
+
+  @Test
+  fun aChatATabReplacedCanShowInTheOtherPane() = withPanes { registry, panes ->
+    val a = registry.open(WORK, "/s/a.jsonl")
+    val notes = file("notes.txt")
+    panes.show(registry, Pane.Primary, a)
+    OpenTabs(panes).show(Pane.Primary, notes)
+
+    panes.show(registry, Pane.Secondary, a)
+
+    assertEquals(PaneItem.Tab(notes), panes.itemIn(Pane.Primary))
+    assertEquals(PaneItem.Chat(a), panes.itemIn(Pane.Secondary))
+  }
+
+  @Test
+  fun aTabTheOtherPaneShowsDoesNotShowAgain() = withPanes { _, panes ->
+    val tabs = OpenTabs(panes)
+    val notes = file("notes.txt")
+    assertTrue(tabs.show(Pane.Primary, notes))
+
+    assertFalse(tabs.show(Pane.Secondary, notes))
+    assertNull(panes.itemIn(Pane.Secondary))
+    assertEquals(PaneItem.Tab(notes), panes.itemIn(Pane.Primary))
+  }
+
+  @Test
+  fun closingATabLeavesEveryHistoryAndSendsThePaneShowingItBack() = withPanes { registry, panes ->
+    val tabs = OpenTabs(panes)
+    val a = registry.open(WORK, "/s/a.jsonl")
+    val first = file("first.txt")
+    val second = file("second.txt")
+    panes.show(registry, Pane.Primary, a)
+    tabs.show(Pane.Primary, first)
+    tabs.show(Pane.Primary, second)
+
+    tabs.close(first)
+    assertEquals(listOf(PaneItem.Chat(a)), panes.history.value[Pane.Primary])
+
+    tabs.close(second)
+    assertSame(a, registry.shown.value[Pane.Primary])
+    assertEquals(emptyList<WorkspaceTab>(), tabs.tabs.value)
+  }
+
+  @Test
+  fun closingATabWithNothingToGoBackToLeavesItsPaneEmpty() = withPanes { _, panes ->
+    val tabs = OpenTabs(panes)
+    val notes = file("notes.txt")
+    tabs.show(Pane.Secondary, notes)
+
+    tabs.close(notes)
+
+    assertNull(panes.itemIn(Pane.Secondary))
+  }
+
+  private var nextFileId = 1
+
+  private fun file(path: String) = WorkspaceTab.File(FileTab(nextFileId++, WORK, path) { _, _ -> error("not read") })
 
   /** Shows [chat] in [pane] as the shell does: the registry first, then [Panes] records it. */
   private fun Panes<FakeProcess>.show(registry: AgentRegistry<FakeProcess>, pane: Pane, chat: FakeProcess) {

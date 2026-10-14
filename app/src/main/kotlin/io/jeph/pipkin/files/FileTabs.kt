@@ -23,8 +23,13 @@ internal sealed interface FileState {
   data class Failed(val message: String) : FileState
 }
 
-/** One open file of the workspace folder [cwd], at the workspace-relative [path]. */
-internal class FileTab(val id: Int, val cwd: String, val path: String, private val files: FileHost) {
+/** One open file of the workspace folder [cwd], at the workspace-relative [path], which [read] reads from the host. */
+internal class FileTab(
+  val id: Int,
+  val cwd: String,
+  val path: String,
+  private val read: suspend (cwd: String, path: String) -> FileContent,
+) {
   private val stateFlow = MutableStateFlow<FileState>(FileState.Loading)
 
   val name: String get() = path.substringAfterLast('/')
@@ -40,7 +45,7 @@ internal class FileTab(val id: Int, val cwd: String, val path: String, private v
   /** Reads the file again, since Pi may have changed it; what was read before stays shown until then. */
   suspend fun reload() {
     stateFlow.value = try {
-      FileState.Loaded(files.read(cwd, path))
+      FileState.Loaded(read(cwd, path))
     } catch (error: HostRejected) {
       FileState.Failed(error.error)
     } catch (error: IOException) {
@@ -63,6 +68,6 @@ internal class FileTabRegistry(private val files: FileHost, private val tabs: Op
   fun open(pane: Pane, cwd: String, path: String): Boolean {
     val folder = folderKey(cwd)
     val open = tabs.tabs.value.firstOrNull { it is WorkspaceTab.File && it.cwd == folder && it.file.path == path }
-    return tabs.show(pane, open ?: WorkspaceTab.File(FileTab(nextId++, folder, path, files)))
+    return tabs.show(pane, open ?: WorkspaceTab.File(FileTab(nextId++, folder, path, files::read)))
   }
 }
