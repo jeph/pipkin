@@ -67,6 +67,10 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
    * [ifNoEventsSince], it seeds only when no event was applied after [appliedEvents] read that value: the stream is
    * live then and the history may predate it. That check holds [apply]'s lock, so no event lands in between.
    * Returns whether it seeded.
+   *
+   * Each run gets back the [TurnFooter] it had while live. A run starts with a user message and ends with the reply
+   * that calls no tool, as a stop, an error or an abort; Pi times each reply, so the footer spans from the user message
+   * to that reply's end. Replies Pi didn't time, from before it did, get no footer.
    */
   fun seed(messages: JSONArray, ifNoEventsSince: Long? = null): Boolean {
     synchronized(lock) {
@@ -83,17 +87,49 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       footer = null
       compacting = false
       queueInFlight = false
+      var run: SeededRun? = null
       for (index in 0 until messages.length()) {
         val message = messages.optJSONObject(index) ?: continue
-        when (message.optString("role")) {
-          "user", "assistant", "bashExecution" ->
-            items += messageItems(message, nextMessageKey(), settled = true, message.piTimestamp ?: clock())
+        val role = message.optString("role")
+        // A user message or `!` command after the run's last reply starts outside that run.
+        if (role == "user" || role == "bashExecution") run = run?.closeIfReplied()
+        when (role) {
+          "user", "assistant", "bashExecution" -> {
+            val key = nextMessageKey()
+            items += messageItems(message, key, settled = true, message.piTimestamp ?: clock())
+            if (role == "user" && run == null) run = SeededRun(message.piTimestamp)
+            if (role == "assistant") run?.replied(key, message)
+          }
 
           "toolResult" -> attachToolResult(message)
         }
       }
+      run?.closeIfReplied()
       publish()
       return true
+    }
+  }
+
+  /** A run [seed] is rebuilding, which started at [startedAt]; null when its user message had no timestamp. */
+  private inner class SeededRun(private val startedAt: Long?) {
+    private var replyKey: String? = null
+    private var endedAt: Long? = null
+
+    /** Takes the message keyed [key] as the run's latest reply; one that calls a tool means the run goes on. */
+    fun replied(key: String, message: JSONObject) {
+      val final = message.optString("stopReason") != "toolUse"
+      replyKey = key.takeIf { final }
+      endedAt = message.piTimestamp?.let { start -> message.durationMs?.let { start + it } }?.takeIf { final }
+    }
+
+    /** Adds the run's footer once its final reply came, and returns the run still open, or null once it closed. */
+    fun closeIfReplied(): SeededRun? {
+      val key = replyKey ?: return this
+      val start = startedAt
+      val end = endedAt
+      // Keyed by the reply, so reseeding the same history gives the footer the same key.
+      if (start != null && end != null) items += TurnFooter("$key.footer", start, (end - start).coerceAtLeast(0))
+      return null
     }
   }
 
@@ -563,3 +599,6 @@ private fun JSONObject.optStringOrNull(name: String): String? = if (isNull(name)
 
 /** The message's `timestamp`, or null when Pi sent none. */
 private val JSONObject.piTimestamp: Long? get() = optLong("timestamp").takeIf { it > 0 }
+
+/** How long Pi took to send a reply, which it measures from the reply's `timestamp`; null when it didn't. */
+private val JSONObject.durationMs: Long? get() = if (has("durationMs")) optLong("durationMs") else null

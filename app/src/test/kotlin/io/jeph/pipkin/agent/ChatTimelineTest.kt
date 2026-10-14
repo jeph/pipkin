@@ -25,6 +25,11 @@ class ChatTimelineTest {
 
   private val items get() = timeline.state.value.items
 
+  private companion object {
+    /** An assistant message's content: one text block. */
+    const val TEXT = """[{"type":"text","text":"Done"}]"""
+  }
+
   @Test
   fun seedDuringAnOpenRunReplacesItWithTheSettledHistory() {
     apply("""{"type":"agent_start"}""")
@@ -63,7 +68,8 @@ class ChatTimelineTest {
   @Test
   fun reseedingTheSameHistoryKeepsEveryRowKey() {
     val history = JSONArray(
-      """[{"role":"user","content":"go","timestamp":5},{"role":"assistant","content":"done","timestamp":6}]""",
+      """[{"role":"user","content":"go","timestamp":5},
+        {"role":"assistant","stopReason":"stop","content":$TEXT,"timestamp":6,"durationMs":3}]""",
     )
     timeline.seed(history)
     val keys = items.map { it.key }
@@ -72,6 +78,66 @@ class ChatTimelineTest {
     timeline.seed(history)
 
     assertEquals(keys, items.map { it.key })
+  }
+
+  @Test
+  fun seededHistoryEndsEachRunWithTheDurationPiTimed() {
+    timeline.seed(
+      JSONArray(
+        """
+        [
+          {"role":"user","content":"list","timestamp":1000},
+          {"role":"assistant","stopReason":"toolUse","timestamp":2000,"durationMs":500,"content":[
+            {"type":"toolCall","id":"c1","name":"bash","arguments":{"command":"ls"}}
+          ]},
+          {"role":"toolResult","toolCallId":"c1","toolName":"bash","isError":false,"content":[],"timestamp":2600},
+          {"role":"user","content":"and hidden ones","timestamp":2700},
+          {"role":"assistant","stopReason":"stop","timestamp":3000,"durationMs":4000,"content":$TEXT},
+          {"role":"user","content":"thanks","timestamp":10000},
+          {"role":"assistant","stopReason":"stop","timestamp":11000,"durationMs":1500,"content":$TEXT}
+        ]
+        """,
+      ),
+    )
+
+    // A steer sent while a tool ran belongs to the run it steered, so the first run gets one footer.
+    assertEquals(
+      listOf("m0", "m1.0", "m2", "m3.0", "m3.footer", "m4", "m5.0", "m5.footer"),
+      items.map { it.key },
+    )
+    assertEquals(TurnFooter("m3.footer", 1000, 6000), items[4])
+    assertEquals(TurnFooter("m5.footer", 10000, 2500), items[7])
+  }
+
+  @Test
+  fun aRetriedReplyEndsItsRunAtTheRetry() {
+    timeline.seed(
+      JSONArray(
+        """
+        [
+          {"role":"user","content":"go","timestamp":1000},
+          {"role":"assistant","stopReason":"error","errorMessage":"overloaded","timestamp":1100,"durationMs":100,
+            "content":[]},
+          {"role":"assistant","stopReason":"stop","timestamp":5000,"durationMs":2000,"content":$TEXT}
+        ]
+        """,
+      ),
+    )
+
+    assertEquals(listOf("m0", "m1.error", "m2.0", "m2.footer"), items.map { it.key })
+    assertEquals(TurnFooter("m2.footer", 1000, 6000), items.last())
+  }
+
+  @Test
+  fun aReplyPiDidNotTimeGetsNoFooter() {
+    timeline.seed(
+      JSONArray(
+        """[{"role":"user","content":"go","timestamp":1000},
+          {"role":"assistant","stopReason":"stop","timestamp":2000,"content":$TEXT}]""",
+      ),
+    )
+
+    assertEquals(listOf("m0", "m1.0"), items.map { it.key })
   }
 
   @Test
