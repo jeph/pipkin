@@ -49,6 +49,13 @@ internal fun explorerRows(
   return rows
 }
 
+/**
+ * Whether [rows] show an open folder. A folder in [expanded] needn't be: one inside a collapsed folder stays expanded
+ * to open again with it, and a hidden dot folder isn't shown at all.
+ */
+internal fun showsExpandedFolder(rows: List<ExplorerRow.Entry>, expanded: Set<String>): Boolean =
+  rows.any { it.entry.isDirectory && it.entry.path in expanded }
+
 /** The row at the top of the explorer's list, by path, and how far it is scrolled past. */
 internal data class ScrollAnchor(val path: String, val offset: Int)
 
@@ -205,6 +212,19 @@ internal class FileExplorerState(
     }
     expanded += folder.path
     return fetch(folder.path)?.also { collapse(folder.path) }
+  }
+
+  /**
+   * Collapses every folder, including ones inside a collapsed folder, which would otherwise open again with it. The
+   * row at the top of the list stays there when it's still shown, and otherwise its top-level folder takes its place;
+   * [showHidden] and [sort] lay the rows out as the explorer shows them.
+   */
+  fun collapseAll(showHidden: Boolean, sort: ExplorerSort) {
+    val anchor = scrollAnchor()
+    expanded = emptySet()
+    if (anchor == null) return
+    val position = listPosition(explorerRows(directories, expanded, showHidden, sort), anchor)
+    list.requestScrollToItem(position.index, position.offset)
   }
 
   /** Creates folder [name] at the top of the workspace; returns why it couldn't. */

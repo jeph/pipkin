@@ -4,6 +4,7 @@
     <string name="files_explorer_close">Close file explorer</string>
     <string name="files_explorer_title">Files</string>
     <string name="files_new_folder">New folder</string>
+    <string name="files_collapse_all">Collapse all folders</string>
     <string name="files_folder_placeholder">Folder name</string>
     <string name="files_show_hidden">Show hidden files</string>
     <string name="files_hide_hidden">Hide hidden files</string>

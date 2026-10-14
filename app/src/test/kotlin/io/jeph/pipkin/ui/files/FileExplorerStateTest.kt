@@ -165,4 +165,34 @@ class FileExplorerStateTest {
     assertNull(trees["/other"].scrollAnchor())
     assertEquals(saved.toSet(), with(saver) { SaverScope { true }.save(trees) }!!.toSet())
   }
+
+  @Test
+  fun collapsingAllAlsoClosesFoldersInsideACollapsedOneSoTheyDontReopenWithIt() {
+    val state = restored(Folders(workspace), setOf("src", "src/main", "docs"), anchor = null)
+    reopen(state)
+    val src = workspace.getValue(ROOT_FOLDER).first { it.path == "src" }
+    runBlocking { state.toggle(src) }
+
+    state.collapseAll(showHidden = true, ExplorerSort.Default)
+    runBlocking { state.toggle(src) }
+
+    assertEquals(setOf("src"), state.expanded)
+    assertEquals(
+      listOf("src", "src/main", "src/.cache", "src/app.ts", "docs", ".env", "README.md"),
+      explorerRows(state.directories, state.expanded, showHidden = true, ExplorerSort.Default).map { it.entry.path },
+    )
+  }
+
+  @Test
+  fun onlyAnOpenFolderTheTreeShowsCountsAsExpanded() {
+    val directories = workspace + (ROOT_FOLDER to workspace.getValue(ROOT_FOLDER) + folder(".git"))
+    fun shows(expanded: Set<String>, showHidden: Boolean) =
+      showsExpandedFolder(explorerRows(directories, expanded, showHidden, ExplorerSort.Default), expanded)
+
+    assertTrue(shows(setOf("src"), showHidden = true))
+    assertFalse(shows(setOf("src/main"), showHidden = true))
+    assertFalse(shows(setOf(".git"), showHidden = false))
+    assertTrue(shows(setOf(".git"), showHidden = true))
+    assertFalse(shows(emptySet(), showHidden = true))
+  }
 }

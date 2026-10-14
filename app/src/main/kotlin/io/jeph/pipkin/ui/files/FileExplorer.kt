@@ -122,20 +122,27 @@ internal fun FileExplorerPanel(
       .imePadding(),
   ) {
     ExplorerHeader(onClose)
+    val entries = if (state == null) {
+      emptyList()
+    } else {
+      remember(state.directories, state.expanded, showHidden, sort) {
+        explorerRows(state.directories, state.expanded, showHidden, sort)
+      }
+    }
+    val anyShownExpanded = state != null && !state.restoringScroll && showsExpandedFolder(entries, state.expanded)
     ExplorerToolbar(
       sort = sort,
       showHidden = showHidden,
       refreshing = state?.refreshing == true,
       enabled = state?.directories?.isNotEmpty() == true,
+      canCollapseAll = anyShownExpanded,
       onSort = graph.preferences::setExplorerSort,
+      onCollapseAll = { state?.collapseAll(showHidden, sort) },
       onNewFolder = { state?.creatingFolder = true },
       onToggleHidden = { graph.preferences.setShowHiddenFiles(!showHidden) },
       onRefresh = { scope.launch { state?.refresh() } },
     )
     if (state != null) {
-      val entries = remember(state.directories, state.expanded, showHidden, sort) {
-        explorerRows(state.directories, state.expanded, showHidden, sort)
-      }
       LaunchedEffect(state, entries, state.refreshing) {
         if (!state.refreshing) state.restoreScroll(entries)
       }
@@ -187,7 +194,8 @@ private fun ExplorerHeader(onClose: () -> Unit) {
 
 /**
  * Paseo's Files toolbar: the sort key, which a tap moves to the next one, and beside it the direction, which a tap
- * reverses; then New folder, the dot-file toggle (highlighted while they're hidden) and Refresh.
+ * reverses; then Collapse all while [canCollapseAll], New folder, the dot-file toggle (highlighted while they're
+ * hidden) and Refresh. Collapse all comes and goes at the start of that group, so the buttons after it stay put.
  */
 @Composable
 private fun ExplorerToolbar(
@@ -195,7 +203,9 @@ private fun ExplorerToolbar(
   showHidden: Boolean,
   refreshing: Boolean,
   enabled: Boolean,
+  canCollapseAll: Boolean,
   onSort: (ExplorerSort) -> Unit,
+  onCollapseAll: () -> Unit,
   onNewFolder: () -> Unit,
   onToggleHidden: () -> Unit,
   onRefresh: () -> Unit,
@@ -219,6 +229,14 @@ private fun ExplorerToolbar(
       tint = colors.foregroundExtraMuted,
     )
     Spacer(modifier = Modifier.weight(1f))
+    if (canCollapseAll) {
+      IconButton28(
+        icon = R.drawable.ic_lucide_chevrons_down_up,
+        contentDescription = stringResource(R.string.files_collapse_all),
+        onClick = onCollapseAll,
+        tint = colors.foregroundExtraMuted,
+      )
+    }
     IconButton28(
       icon = R.drawable.ic_lucide_folder_plus,
       contentDescription = stringResource(R.string.files_new_folder),
