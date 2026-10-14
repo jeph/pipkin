@@ -1,7 +1,7 @@
 package io.jeph.pipkin.ui.git
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,12 +30,17 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 /**
  * Paseo's document file header: the file's name and, muted, its folder, cut off at the end where they don't fit;
  * its added and removed line counts; and the icon of how it changed. A tap calls [onToggle], when given, to fold or
- * unfold the file.
+ * unfold the file; a long press does nothing, as in Paseo, where it only opens the file menu Pipkin leaves out.
  */
 @Composable
 internal fun FileHeader(section: DiffSection, onToggle: (() -> Unit)?) {
   val colors = pipkinColors
-  val clickable = if (onToggle != null) Modifier.clickable(onClick = onToggle) else Modifier
+  // Without a long-click handler, releasing a long press would count as a tap and fold the file.
+  val clickable = if (onToggle == null) {
+    Modifier
+  } else {
+    Modifier.combinedClickable(onLongClick = {}, hapticFeedbackEnabled = false, onClick = onToggle)
+  }
   Column(modifier = Modifier.fillMaxWidth().background(colors.surface0)) {
     Row(
       modifier = Modifier
