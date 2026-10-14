@@ -1,6 +1,7 @@
 package io.jeph.pipkin.terminal
 
 import android.content.Context
+import android.os.SystemClock
 import android.util.Log
 import io.github.sagernet.libghostty.GhosttyTerminalSession
 import io.jeph.pipkin.host.HostChannel
@@ -57,6 +58,9 @@ internal class TerminalSession(
   private val nameFlow = MutableStateFlow<String?>(null)
   private val busyFlow = MutableStateFlow(false)
 
+  /** When input last went to the shell, in [SystemClock.elapsedRealtime] time; written from any thread. */
+  @Volatile private var lastInputAt = 0L
+
   val state: StateFlow<TerminalState> = stateFlow.asStateFlow()
 
   /** The name the user gave this terminal; null shows "Terminal [number]". */
@@ -64,6 +68,13 @@ internal class TerminalSession(
 
   /** Whether the host sees commands or jobs running in the shell, beyond the shell waiting at its prompt. */
   val busy: StateFlow<Boolean> = busyFlow.asStateFlow()
+
+  /**
+   * Whether closing might stop something: the host sees work running, or input went to the shell so recently that a
+   * command it started may not be reported yet.
+   */
+  fun mayHaveWorkRunning(): Boolean = state.value == TerminalState.Running &&
+    (busy.value || SystemClock.elapsedRealtime() - lastInputAt < UNREPORTED_WORK_MILLIS)
 
   fun rename(name: String) {
     nameFlow.value = name
@@ -76,6 +87,7 @@ internal class TerminalSession(
   val terminal = GhosttyTerminalSession(context, GhosttyTerminalSession.Options(DEFAULT_COLUMNS, DEFAULT_ROWS)).also {
     it.transport = object : GhosttyTerminalSession.Transport {
       override fun sendInput(data: ByteArray) {
+        lastInputAt = SystemClock.elapsedRealtime()
         outbound.trySend(JSONObject().put("type", "input").put("data", Base64.getEncoder().encodeToString(data)))
       }
 
@@ -163,5 +175,8 @@ internal class TerminalSession(
     /** The size a shell starts at before the terminal has been laid out; the first layout resizes it. */
     const val DEFAULT_COLUMNS = 80
     const val DEFAULT_ROWS = 24
+
+    /** How long a command can run before the host reports it busy: two of its one-second polls, plus a margin. */
+    const val UNREPORTED_WORK_MILLIS = 3_000L
   }
 }

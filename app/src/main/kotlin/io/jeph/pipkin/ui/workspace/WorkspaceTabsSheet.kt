@@ -42,6 +42,7 @@ import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.files.FileTab
 import io.jeph.pipkin.files.FileTabRegistry
 import io.jeph.pipkin.host.SessionInfo
+import io.jeph.pipkin.terminal.TerminalRegistry
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
@@ -96,8 +97,8 @@ internal fun TabCountButton(count: Int, onClick: () -> Unit) {
  * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace of the shown chat
  * [process], its terminals, its open files and then its chats, the shown one highlighted. Tapping a tab shows it and
  * closes the sheet. A chat is archived by swiping it right or from its actions sheet, which also renames it; the sheet
- * stays open and shows the shell's [snackbar], so the archive's Undo is in reach. A file closes by swiping it right or
- * from its actions sheet; a terminal's actions sheet renames or closes it.
+ * stays open and shows the shell's [snackbar], so the archive's Undo is in reach. A terminal or a file closes by
+ * swiping it right or from its actions sheet, which also renames a terminal.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -112,6 +113,7 @@ internal fun WorkspaceTabsSheet(
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
   val archiving = remember(actions) { TabArchiving(actions) }
+  val terminalClosing = remember(graph) { TerminalClosing(graph.terminals) }
   var menu by remember { mutableStateOf<TabMenu?>(null) }
   val show = { tab: WorkspaceTab? ->
     graph.shownTab.show(process, tab)
@@ -133,6 +135,7 @@ internal fun WorkspaceTabsSheet(
       process = process,
       tabs = tabs,
       archiving = archiving,
+      terminalClosing = terminalClosing,
       callbacks = TabListCallbacks(
         // The chat shown next starts on its own tab, not on a terminal or file shown with this one.
         onOpenChat = { session -> if (actions.openSession(session)) show(null) },
@@ -145,6 +148,7 @@ internal fun WorkspaceTabsSheet(
   }
   menu?.let { TabMenuSheet(it, actions, archiving, onDismiss = { menu = null }) }
   ConfirmArchive(archiving)
+  ConfirmCloseTerminal(terminalClosing)
 }
 
 /** "Stop and archive" for a slid-out chat Pi is working in. */
@@ -157,6 +161,20 @@ private fun ConfirmArchive(archiving: TabArchiving) {
     confirmLabel = stringResource(R.string.archive_stop_confirm),
     onConfirm = archiving::confirm,
     onDismiss = archiving::cancel,
+    destructive = true,
+  )
+}
+
+/** "Close terminal?" for a slid-out terminal that may have something running. */
+@Composable
+private fun ConfirmCloseTerminal(closing: TerminalClosing) {
+  if (closing.confirming == null) return
+  ConfirmDialog(
+    title = stringResource(R.string.terminal_close_confirm_title),
+    text = stringResource(R.string.terminal_close_confirm_text),
+    confirmLabel = stringResource(R.string.terminal_close_confirm),
+    onConfirm = closing::confirm,
+    onDismiss = closing::cancel,
     destructive = true,
   )
 }
@@ -212,6 +230,7 @@ private fun TabList(
   process: AgentProcess,
   tabs: WorkspaceTabs,
   archiving: TabArchiving,
+  terminalClosing: TerminalClosing,
   callbacks: TabListCallbacks,
   modifier: Modifier,
 ) {
@@ -221,16 +240,7 @@ private fun TabList(
   val closing = remember(graph) { FileClosing(graph.files) }
   val chatShown = tabs.shownTab == null
   LazyColumn(modifier = modifier) {
-    items(tabs.terminals, key = { "terminal-${it.id}" }) { terminal ->
-      val tab = WorkspaceTab.Terminal(terminal)
-      TerminalTabRow(
-        session = terminal,
-        shown = tab == tabs.shownTab,
-        onOpen = { callbacks.onShow(tab) },
-        onActions = { callbacks.onActions(TabMenu.Terminal(terminal)) },
-        modifier = Modifier.animateItem(),
-      )
-    }
+    terminalRows(tabs, terminalClosing, callbacks)
     fileRows(tabs, closing, callbacks)
     if (tabs.shownUnsaved) {
       item(key = UNSAVED_KEY) {
@@ -264,6 +274,28 @@ private fun TabList(
           onActions = { callbacks.onActions(TabMenu.Chat(session)) },
         )
       }
+    }
+  }
+}
+
+/** The workspace's terminals; one closes by swiping it right, as a file does. */
+private fun LazyListScope.terminalRows(tabs: WorkspaceTabs, closing: TerminalClosing, callbacks: TabListCallbacks) {
+  items(tabs.terminals, key = { "terminal-${it.id}" }) { terminal ->
+    val tab = WorkspaceTab.Terminal(terminal)
+    SwipeAway(
+      leaving = terminal.id in closing.leaving,
+      onSwiped = { closing.close(terminal) },
+      onLeft = { closing.onLeft(terminal) },
+      containerColor = pipkinColors.surface1,
+      modifier = Modifier.animateItem(),
+      mark = R.drawable.ic_lucide_x,
+    ) {
+      TerminalTabRow(
+        session = terminal,
+        shown = tab == tabs.shownTab,
+        onOpen = { callbacks.onShow(tab) },
+        onActions = { callbacks.onActions(TabMenu.Terminal(terminal)) },
+      )
     }
   }
 }
@@ -306,6 +338,43 @@ private class FileClosing(private val files: FileTabRegistry) {
   fun onLeft(file: FileTab) {
     files.close(file)
     leaving -= file.id
+  }
+}
+
+/**
+ * Closing terminals from the tab menu. A row first slides out; once it is gone the terminal closes, or, when it may
+ * have something running, the user is asked first and a cancelled row slides back.
+ */
+private class TerminalClosing(private val terminals: TerminalRegistry) {
+  /** Ids of terminals whose rows are sliding out, or out and waiting for the user. */
+  var leaving by mutableStateOf(emptySet<Int>())
+    private set
+
+  /** A slid-out terminal that may have something running, waiting for "Close". */
+  var confirming by mutableStateOf<TerminalSession?>(null)
+    private set
+
+  fun close(session: TerminalSession) {
+    leaving += session.id
+  }
+
+  fun onLeft(session: TerminalSession) {
+    if (session.mayHaveWorkRunning()) confirming = session else remove(session)
+  }
+
+  fun confirm() {
+    confirming?.let(::remove)
+    confirming = null
+  }
+
+  fun cancel() {
+    confirming?.let { leaving -= it.id }
+    confirming = null
+  }
+
+  private fun remove(session: TerminalSession) {
+    terminals.close(session)
+    leaving -= session.id
   }
 }
 
