@@ -18,6 +18,7 @@ import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.RpcError
 import io.jeph.pipkin.agent.TimelineEffect
 import io.jeph.pipkin.agent.UiAnswer
+import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.sidebar.tildePath
@@ -38,16 +39,19 @@ internal class ChatActions(
 
 /**
  * The chat screen's draft and actions for one [process]. Runs work on the screen's [scope] and reports
- * failures as snackbars, so a closed screen cancels its pending calls.
+ * failures as snackbars, so a closed screen cancels its pending calls. [scroll] is the chat's stream position, which
+ * outlives the controller.
  */
 internal class ChatController(
   val process: AgentProcess,
-  private val graph: AppGraph,
+  val scroll: ChatScroll,
   private val context: Context,
   val scope: CoroutineScope,
   private val snackbar: SnackbarStackState,
   navigator: ChatNavigator,
 ) {
+  private val graph: AppGraph = context.appGraph
+
   val draft = TextFieldState()
 
   /** Whether the composer's text field has focus; the slash menu only shows while it does. */
@@ -75,9 +79,6 @@ internal class ChatController(
 
   /** Stop was pressed before Pi answered the prompt being sent, so the run that prompt starts is aborted. */
   private var stopRequested = false
-
-  /** Whether the stream keeps its end in view. Sending turns it back on. */
-  val follow = mutableStateOf(true)
 
   val canSend: Boolean get() = (draft.text.isNotBlank() || attachments.isNotEmpty()) && !photosOnlySteer
 
@@ -137,7 +138,7 @@ internal class ChatController(
     sending = true
     sendingCommand = command
     stopRequested = false
-    follow.value = true
+    scroll.follow.value = true
     scope.launch {
       try {
         block()

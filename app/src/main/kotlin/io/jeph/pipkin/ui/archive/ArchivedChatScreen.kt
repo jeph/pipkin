@@ -38,6 +38,7 @@ import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.ui.ShellActions
+import io.jeph.pipkin.ui.chat.ChatScroll
 import io.jeph.pipkin.ui.chat.ChatStream
 import io.jeph.pipkin.ui.chat.ToolCallSheet
 import io.jeph.pipkin.ui.components.HeaderBar
@@ -208,7 +209,7 @@ private fun TranscriptBody(transcript: Transcript, onRetry: () -> Unit, onOpenTo
       ChatStream(
         timeline = transcript.state,
         processState = AgentProcessState.Ready,
-        follow = remember { mutableStateOf(true) },
+        scroll = remember { ChatScroll() },
         onOpenTool = onOpenTool,
         onOpenSettings = {},
         onRestart = {},

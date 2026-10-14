@@ -57,49 +57,54 @@ internal fun ChatScreen(
   // Outlive a process swap, so a message about the closed chat (delete failed) still shows.
   val snackbar = remember { SnackbarStackState() }
   val scope = rememberCoroutineScope()
+  val scrolls = remember { ChatScrolls() }
   if (process == null) {
     PlaceholderChat(onToggleSidebar, modifier)
     return
   }
-  val context = LocalContext.current
-  val keyboard = LocalSoftwareKeyboardController.current
-  val focus = LocalFocusManager.current
-  val openTabs = {
-    keyboard?.hide()
-    focus.clearFocus()
-    onOpenTabs()
+  // Everything below is per chat. Collecting a chat's flows outside this key would show the previous chat's
+  // timeline for a frame after a switch, until the collector of the new one has run.
+  key(process) {
+    val context = LocalContext.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val focus = LocalFocusManager.current
+    val openTabs = {
+      keyboard?.hide()
+      focus.clearFocus()
+      onOpenTabs()
+    }
+    var sheet by remember { mutableStateOf<ChatSheet?>(null) }
+    val navigator = rememberNavigator(
+      onSheet = { sheet = it },
+      onNewChat = { actions.newChat(process.cwd) },
+      onOpenTabs = openTabs,
+      onOpenSettings = onOpenSettings,
+    )
+    val controller = remember {
+      ChatController(process, scrolls[process], context.applicationContext, scope, snackbar, navigator)
+    }
+    LaunchedEffect(controller) { controller.collectEffects() }
+    LaunchedEffect(controller) { controller.steering.collectQueue() }
+    ChatContent(
+      controller,
+      snackbar,
+      onToggleSidebar,
+      openTabs,
+      onToggleExplorer,
+      onOpenSettings,
+      onSheet = { sheet = it },
+      modifier,
+    )
+    ChatSheets(
+      controller,
+      sheet,
+      onSheet = { sheet = it },
+      onNewChat = { actions.newChat(it) },
+      onNewTerminal = { context.appGraph.terminals.open(process) },
+      onArchive = actions::archive,
+    )
+    ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive = actions::archive)
   }
-  var sheet by remember(process) { mutableStateOf<ChatSheet?>(null) }
-  val navigator = rememberNavigator(
-    onSheet = { sheet = it },
-    onNewChat = { actions.newChat(process.cwd) },
-    onOpenTabs = openTabs,
-    onOpenSettings = onOpenSettings,
-  )
-  val controller = remember(process) {
-    ChatController(process, context.appGraph, context.applicationContext, scope, snackbar, navigator)
-  }
-  LaunchedEffect(controller) { controller.collectEffects() }
-  LaunchedEffect(controller) { controller.steering.collectQueue() }
-  ChatContent(
-    controller,
-    snackbar,
-    onToggleSidebar,
-    openTabs,
-    onToggleExplorer,
-    onOpenSettings,
-    onSheet = { sheet = it },
-    modifier,
-  )
-  ChatSheets(
-    controller,
-    sheet,
-    onSheet = { sheet = it },
-    onNewChat = { actions.newChat(it) },
-    onNewTerminal = { context.appGraph.terminals.open(process) },
-    onArchive = actions::archive,
-  )
-  ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive = actions::archive)
 }
 
 /** A [ChatNavigator] that outlives recompositions and always calls the latest callbacks. */
@@ -162,17 +167,14 @@ private fun ChatContent(
       Modifier.onUnhandledTap(dismissKeyboard),
     )
     Box(modifier = Modifier.weight(1f).fillMaxWidth().onUnhandledTap(dismissKeyboard)) {
-      // A fresh list per chat, so switching chats never carries the old one's scroll position over.
-      key(process) {
-        ChatStream(
-          timeline = timeline,
-          processState = processState,
-          follow = controller.follow,
-          onOpenTool = { onSheet(ChatSheet.Tool(it)) },
-          onOpenSettings = onOpenSettings,
-          onRestart = process::restart,
-        )
-      }
+      ChatStream(
+        timeline = timeline,
+        processState = processState,
+        scroll = controller.scroll,
+        onOpenTool = { onSheet(ChatSheet.Tool(it)) },
+        onOpenSettings = onOpenSettings,
+        onRestart = process::restart,
+      )
       SnackbarStack(snackbar, Modifier.align(Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16))
       SlashMenuHost(controller, ready = processState == AgentProcessState.Ready, Modifier.align(Alignment.BottomCenter))
     }

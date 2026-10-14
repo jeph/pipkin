@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Recomposer
 import androidx.compose.runtime.State
@@ -65,26 +66,28 @@ private const val LAUNCHER_MASK_SCALE = 1.5f
 
 /**
  * The chat stream: process banner, timeline items, the empty state and Paseo's scroll-to-bottom button.
- * Keeps the end in view while the user is at the bottom; dragging away stops following. While Pi starts under a
- * history already shown, a pinned [LoadingPill] replaces the banner. [onRestart] retries a failed start and
- * restarts an exited Pi.
+ * Keeps the end in view while the user is at the bottom; dragging away stops following. Opens where [scroll] says the
+ * chat was left, and records where it is when it leaves. While Pi starts under a history already shown, a pinned
+ * [LoadingPill] replaces the banner. [onRestart] retries a failed start and restarts an exited Pi.
  */
 @Composable
 internal fun ChatStream(
   timeline: TimelineState,
   processState: AgentProcessState,
-  follow: MutableState<Boolean>,
+  scroll: ChatScroll,
   onOpenTool: (key: String) -> Unit,
   onOpenSettings: () -> Unit,
   onRestart: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val listState = remember { LazyListState() }
   val scope = rememberCoroutineScope()
   val starting = processState is AgentProcessState.Starting || processState is AgentProcessState.Installing
   val loadingOverHistory = starting && timeline.items.isNotEmpty()
   val banner = processState.takeIf { !loadingOverHistory && (starting || it is AgentProcessState.Failed) }
   val count = timeline.items.size + if (banner != null) 1 else 0
+  val listState = remember { restoredListState(scroll, timeline.items, banner != null) }
+  DisposableEffect(listState) { onDispose { scroll.top = listState.top() } }
+  val follow = scroll.follow
   val threshold = with(LocalDensity.current) { 120.dp.roundToPx() }
   AutoFollow(listState, follow)
   val showScrollButton by remember(listState, threshold) {
@@ -112,6 +115,25 @@ internal fun ChatStream(
       modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = PipkinTokens.Spacing.s16),
     )
   }
+}
+
+/**
+ * A list at the item [scroll] last had at its top, when the chat isn't following its end and that item is still in
+ * [items]; otherwise at its start, which a following stream pins to the end before the first frame shows.
+ */
+private fun restoredListState(scroll: ChatScroll, items: List<TimelineItem>, bannerShown: Boolean): LazyListState {
+  val top = scroll.top?.takeUnless { scroll.follow.value } ?: return LazyListState()
+  val index = when (top.key) {
+    BANNER_KEY -> 0
+    else -> items.indexOfFirst { it.key == top.key }.takeIf { it >= 0 }?.plus(if (bannerShown) 1 else 0)
+  }
+  return if (index == null) LazyListState() else LazyListState(index, top.offset)
+}
+
+/** The item at the top of the viewport and how far it is scrolled past; null before the list has measured. */
+private fun LazyListState.top(): StreamTop? {
+  val first = layoutInfo.visibleItemsInfo.firstOrNull { it.index == firstVisibleItemIndex } ?: return null
+  return StreamTop(first.key, firstVisibleItemScrollOffset)
 }
 
 /** [AutoFollow] for the stream, which jumps to its last item while that is too far off screen to measure. */
@@ -143,11 +165,12 @@ private fun StreamList(
 ) {
   val recomposer = LocalView.current.findViewTreeCompositionContext() as Recomposer
   val anchor = remember(listState, follow, recomposer) { BottomAnchor(listState, follow, recomposer) }
+  val itemCount = items.size + if (banner != null) 1 else 0
   LazyColumn(
     state = listState,
     modifier = Modifier
       .layout { measurable, constraints ->
-        anchor.beforeMeasure(constraints.maxHeight)
+        anchor.beforeMeasure(constraints.maxHeight, itemCount)
         val placeable = measurable.measure(constraints)
         layout(placeable.width, placeable.height) { placeable.place(0, 0) }
       }.fillMaxSize(),
@@ -189,7 +212,12 @@ private class BottomAnchor(
   private var height = UNMEASURED
   private var changeCount = -1L
 
-  fun beforeMeasure(newHeight: Int) {
+  /**
+   * [itemCount] is the list's item count as just composed. The list's own layout info still has the count of its
+   * last measure: none before its first, so a new list would show its start for a frame, and one item too many
+   * after an item is removed.
+   */
+  fun beforeMeasure(newHeight: Int, itemCount: Int) {
     val shrink = if (height == UNMEASURED) 0 else height - newHeight
     height = newHeight
     // Content grows only when composition changed or the list resized. A pin's request remeasures the
@@ -198,10 +226,9 @@ private class BottomAnchor(
     changeCount = recomposer.changeCount
     // Read without observing: the scroll position is not an input to this layout step.
     Snapshot.withoutReadObservation {
-      val count = listState.layoutInfo.totalItemsCount
       when {
         follow.value && !listState.isScrollInProgress -> {
-          if (changed && count > 0) listState.requestScrollToItem(count - 1, FOLLOW_OFFSET)
+          if (changed && itemCount > 0) listState.requestScrollToItem(itemCount - 1, FOLLOW_OFFSET)
         }
 
         shrink != 0 -> listState.requestScrollToItem(
