@@ -131,6 +131,9 @@ private fun TerminalPane(session: TerminalSession, modifier: Modifier) {
       darkColorScheme = colors.isDark,
       typeface = typeface,
       fontSizeSp = TERMINAL_FONT_SIZE_SP,
+      // The keyboard would cover half the screen before there is anything to type; a tap on the terminal or the key
+      // bar's keyboard button raises it.
+      focusOnAttach = false,
     )
     StatusBar(state, onRestart = session::start)
     TerminalKeyBar(
