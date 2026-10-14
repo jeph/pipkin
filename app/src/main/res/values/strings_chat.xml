@@ -56,6 +56,7 @@
     <string name="chat_attach_photos">Photos</string>
     <string name="chat_attach_files">Files</string>
     <string name="chat_images_text_only">Text-only model</string>
+    <string name="chat_paste_images_text_only">This model reads only text, so the image wasn\'t attached</string>
     <string name="chat_remove_attachment">Remove attachment</string>
     <string name="chat_image_failed">Couldn\'t read that image</string>
     <string name="chat_file_failed">Couldn\'t read that file</string>

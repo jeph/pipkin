@@ -5,12 +5,13 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.StringRes
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import io.jeph.pipkin.AppGraph
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
@@ -21,6 +22,7 @@ import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.sidebar.tildePath
 import java.io.IOException
+import java.lang.ref.Reference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -46,7 +48,7 @@ internal class ChatController(
   private val snackbar: SnackbarStackState,
   navigator: ChatNavigator,
 ) {
-  var draft by mutableStateOf(TextFieldValue())
+  val draft = TextFieldState()
 
   /** Whether the composer's text field has focus; the slash menu only shows while it does. */
   var composerFocused by mutableStateOf(false)
@@ -90,7 +92,7 @@ internal class ChatController(
       attachments.all { it is Attachment.Image }
 
   fun setDraftText(text: String) {
-    draft = TextFieldValue(text, TextRange(text.length))
+    draft.setTextAndPlaceCursorAtEnd(text)
   }
 
   /**
@@ -99,9 +101,9 @@ internal class ChatController(
    */
   fun send(): Boolean {
     if (!canSend) return false
-    val builtin = parseBuiltin(draft.text).takeIf { attachments.isEmpty() }
+    val builtin = parseBuiltin(draft.text.toString()).takeIf { attachments.isEmpty() }
     if (builtin != null) {
-      draft = TextFieldValue()
+      draft.clearText()
       builtins.run(builtin)
       return true
     }
@@ -120,8 +122,8 @@ internal class ChatController(
       show(R.string.chat_files_too_large)
       return false
     }
-    val text = draft.text
-    draft = TextFieldValue()
+    val text = draft.text.toString()
+    draft.clearText()
     attachments.clear()
     launchSending(command = text.trim().startsWith("/")) {
       deliver(text, picked)?.let { failure -> restoreDraft(text, picked, failure) }
@@ -195,7 +197,7 @@ internal class ChatController(
   fun restoreDraft(text: String, picked: List<Attachment>, failure: String? = null) {
     val typed = draft.text
     val restored = if (typed.isBlank()) text else "$text\n$typed"
-    draft = TextFieldValue(restored, TextRange(restored.length))
+    draft.setTextAndPlaceCursorAtEnd(restored)
     attachments.addAll(0, picked)
     failure?.let(::show)
   }
@@ -253,7 +255,11 @@ internal class ChatController(
     null
   }
 
-  fun addImages(uris: List<Uri>) {
+  /**
+   * Reads [uris] into the attachments. [grant] is kept reachable until they are read: a keyboard's read permission
+   * on its image lasts only while the InputContentInfo inside the content it sent is.
+   */
+  fun addImages(uris: List<Uri>, grant: Any? = null) {
     scope.launch {
       var failed = false
       for (uri in uris) {
@@ -261,6 +267,7 @@ internal class ChatController(
         if (attachment == null) failed = true else attachments += attachment
       }
       if (failed) show(R.string.chat_image_failed)
+      Reference.reachabilityFence(grant)
     }
   }
 

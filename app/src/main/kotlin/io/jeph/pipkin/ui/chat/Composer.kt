@@ -1,13 +1,20 @@
 package io.jeph.pipkin.ui.chat
 
+import android.net.Uri
 import android.text.format.Formatter
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.content.MediaType
+import androidx.compose.foundation.content.TransferableContent
+import androidx.compose.foundation.content.consume
+import androidx.compose.foundation.content.contentReceiver
+import androidx.compose.foundation.content.hasMediaType
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,6 +40,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldDecorator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,6 +48,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,7 +66,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -122,7 +130,7 @@ internal fun Composer(
         AttachmentTray(controller.attachments, onRemove = { controller.attachments.remove(it) })
       }
       // Weighted, so the tray and toolbar are measured first and long drafts scroll instead of pushing them off.
-      ComposerField(controller, onRan = hideKeyboard, Modifier.weight(1f, fill = false))
+      ComposerField(controller, acceptsImages(model), onRan = hideKeyboard, Modifier.weight(1f, fill = false))
       Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s12))
       Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -263,15 +271,18 @@ private fun BoxScope.RemoveBadge(onRemove: () -> Unit) {
 
 /**
  * The draft field; it reports focus for the slash menu and lets the menu take its keys. It grows to half
- * the height the chat has left, so the stream keeps the other half, then scrolls.
+ * the height the chat has left, so the stream keeps the other half, then scrolls. Images pasted, dropped or sent
+ * by the keyboard join the attachments.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ComposerField(controller: ChatController, onRan: () -> Unit, modifier: Modifier) {
+private fun ComposerField(controller: ChatController, acceptsImages: Boolean, onRan: () -> Unit, modifier: Modifier) {
   val colors = pipkinColors
   val style = TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.content)
+  val currentOnRan by rememberUpdatedState(onRan)
+  val enterPicks = remember(controller) { controller.slash.enterPicks { currentOnRan() } }
   BasicTextField(
-    value = controller.draft,
-    onValueChange = { controller.slash.onDraftChange(it, onRan) },
+    state = controller.draft,
     modifier = modifier
       .fillMaxWidth()
       .layout { measurable, constraints ->
@@ -282,11 +293,13 @@ private fun ComposerField(controller: ChatController, onRan: () -> Unit, modifie
       }
       .heightIn(min = 30.dp)
       .onFocusChanged { controller.composerFocused = it.isFocused }
-      .onPreviewKeyEvent { controller.slash.onKey(it, onRan) },
+      .onPreviewKeyEvent { controller.slash.onKey(it, onRan) }
+      .contentReceiver { content -> receiveImages(controller, content, acceptsImages) },
+    inputTransformation = enterPicks,
     textStyle = style,
     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
     cursorBrush = SolidColor(colors.accent),
-    decorationBox = { inner ->
+    decorator = TextFieldDecorator { inner ->
       Box(contentAlignment = Alignment.CenterStart) {
         if (controller.draft.text.isEmpty()) {
           Text(text = stringResource(R.string.chat_placeholder), style = style.copy(color = colors.foregroundMuted))
@@ -295,6 +308,31 @@ private fun ComposerField(controller: ChatController, onRan: () -> Unit, modifie
       }
     },
   )
+}
+
+/**
+ * Takes the images in [content] into the attachments and leaves the rest, such as text, to the field. A model that
+ * reads only text gets no images, which a snackbar explains.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+private fun receiveImages(
+  controller: ChatController,
+  content: TransferableContent,
+  acceptsImages: Boolean,
+): TransferableContent? {
+  if (!content.hasMediaType(MediaType.Image)) return content
+  val uris = ArrayList<Uri>()
+  val rest = content.consume { item ->
+    val uri = item.uri ?: return@consume false
+    uris += uri
+    true
+  }
+  when {
+    uris.isEmpty() -> Unit
+    acceptsImages -> controller.addImages(uris, grant = content)
+    else -> controller.show(R.string.chat_paste_images_text_only)
+  }
+  return rest
 }
 
 /** Opens the attach sheet: photos (only when the model accepts images) or any files. */

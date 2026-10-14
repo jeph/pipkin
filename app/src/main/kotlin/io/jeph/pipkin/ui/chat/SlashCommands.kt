@@ -45,10 +45,10 @@ private val NOT_IN_QUERY = Regex("""[/\s"']""")
  * The command name typed so far when the cursor sits in a `/name` at the very start of the draft, else
  * null. Pi only expands commands that open the message, so a slash later in the text is plain text.
  */
-internal fun slashQuery(value: TextFieldValue): String? {
-  val cursor = value.selection.end
-  if (!value.selection.collapsed || cursor < 1 || !value.text.startsWith("/")) return null
-  val query = value.text.substring(1, cursor)
+internal fun slashQuery(text: CharSequence, selection: TextRange): String? {
+  val cursor = selection.end
+  if (!selection.collapsed || cursor < 1 || !text.startsWith("/")) return null
+  val query = text.substring(1, cursor)
   return query.takeUnless { NOT_IN_QUERY.containsMatchIn(it) }
 }
 
@@ -95,10 +95,9 @@ private fun isSubsequence(query: String, name: String): Boolean {
   return next == query.length
 }
 
-/** Replaces the typed `/query` with `/name`, adding a space when it ends the draft so arguments can follow. */
-internal fun insertCommand(value: TextFieldValue, name: String): TextFieldValue {
-  val cursor = value.selection.end
-  val after = value.text.substring(cursor)
+/** Replaces the `/query` typed up to [cursor] with `/name`, adding a space when it ends the draft for arguments. */
+internal fun insertCommand(text: CharSequence, cursor: Int, name: String): TextFieldValue {
+  val after = text.substring(cursor)
   val inserted = "/$name" + if (after.isEmpty()) " " else ""
   return TextFieldValue(inserted + after, TextRange(inserted.length))
 }

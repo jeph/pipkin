@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -32,7 +34,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
@@ -40,6 +42,7 @@ import io.jeph.pipkin.agent.RpcError
 import io.jeph.pipkin.agent.commands
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.launch
 
 /** The highlighted row for one query; a new query highlights its best match again. */
 private data class Highlight(val query: String, val index: Int)
@@ -60,7 +63,27 @@ internal class SlashMenu(private val controller: ChatController) {
   private var highlight by mutableStateOf(Highlight("", 0))
 
   /** The name typed after `/` while the menu is open, else null. */
-  val query: String? get() = if (controller.composerFocused) slashQuery(controller.draft) else null
+  val query: String? get() = queryIn(controller.draft.text, controller.draft.selection)
+
+  /**
+   * While the menu is open a newline typed at the cursor picks the highlighted command instead, since soft keyboards
+   * type Enter as text before any key handler sees it. [onRan] follows a built-in that ran.
+   */
+  fun enterPicks(onRan: () -> Unit) = InputTransformation {
+    val query = queryIn(originalText, originalSelection) ?: return@InputTransformation
+    val cursor = originalSelection.end
+    val typed = asCharSequence()
+    val enter = typed.length == originalText.length + 1 &&
+      typed.toString() == originalText.substring(0, cursor) + "\n" + originalText.substring(cursor)
+    if (!enter) return@InputTransformation
+    val option = options(query).let { it.getOrNull(highlighted(query, it.size)) } ?: return@InputTransformation
+    revertAllChanges()
+    // The draft takes no other edit while this one is in progress, so the pick applies once it is done.
+    controller.scope.launch { if (select(option)) onRan() }
+  }
+
+  private fun queryIn(text: CharSequence, selection: TextRange): String? =
+    if (controller.composerFocused) slashQuery(text, selection) else null
 
   fun options(query: String): List<SlashCommand> = rankCommands(menuCommands(piCommands.orEmpty()), query)
 
@@ -82,13 +105,18 @@ internal class SlashMenu(private val controller: ChatController) {
 
   /** Inserts [command] into the draft, or runs it when it is a built-in without arguments; true when it ran. */
   fun select(command: SlashCommand): Boolean {
+    val draft = controller.draft
     val builtin = command.builtin
     if (builtin != null && builtin.immediate) {
-      controller.draft = TextFieldValue()
+      draft.clearText()
       controller.builtins.run(BuiltinInvocation(builtin, ""))
       return true
     }
-    controller.draft = insertCommand(controller.draft, command.name)
+    val inserted = insertCommand(draft.text, draft.selection.end, command.name)
+    draft.edit {
+      replace(0, length, inserted.text)
+      selection = inserted.selection
+    }
     return false
   }
 
@@ -102,7 +130,7 @@ internal class SlashMenu(private val controller: ChatController) {
     val options = options(query)
     val option = options.getOrNull(highlighted(query, options.size))
     when {
-      event.key == Key.Escape -> controller.draft = TextFieldValue()
+      event.key == Key.Escape -> controller.draft.clearText()
       option == null -> return false
       event.key == Key.DirectionUp -> move(query, options.size, step = 1)
       event.key == Key.DirectionDown -> move(query, options.size, step = -1)
@@ -110,23 +138,6 @@ internal class SlashMenu(private val controller: ChatController) {
       else -> return false
     }
     return true
-  }
-
-  /**
-   * Takes the draft's next [value]. While the menu is open a newline typed at the cursor picks the
-   * highlighted command, since soft keyboards type Enter as text before any key handler sees it.
-   */
-  fun onDraftChange(value: TextFieldValue, onRan: () -> Unit) {
-    val old = controller.draft
-    val query = query
-    val cursor = old.selection.end
-    val enter = value.text == old.text.substring(0, cursor) + "\n" + old.text.substring(cursor)
-    val option = if (query != null && enter) options(query).let { it.getOrNull(highlighted(query, it.size)) } else null
-    if (option == null) {
-      controller.draft = value
-    } else if (select(option)) {
-      onRan()
-    }
   }
 
   private fun move(query: String, count: Int, step: Int) {
