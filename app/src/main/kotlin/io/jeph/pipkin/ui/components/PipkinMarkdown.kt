@@ -35,13 +35,10 @@ import com.mikepenz.markdown.model.markdownAnimations
 import com.mikepenz.markdown.model.markdownAnnotator
 import com.mikepenz.markdown.model.markdownDimens
 import com.mikepenz.markdown.model.markdownPadding
-import com.mikepenz.markdown.model.parseMarkdown
 import com.mikepenz.markdown.utils.resolveImageAlt
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.conflate
-import kotlinx.coroutines.withContext
 import org.intellij.markdown.MarkdownElementTypes
 
 /**
@@ -104,10 +101,10 @@ private fun rememberParsedMarkdown(markdown: String, cache: MarkdownCache?): Sta
       val shown = parsed
       val next = when {
         shown is State.Success && shown.content == text -> shown
-        else -> latestCache?.get(text) ?: withContext(Dispatchers.Default) { parseMarkdown(text) }
+        else -> latestCache?.get(text) ?: parseOffMain(text)
       }
       parsed = next
-      if (next is State.Success) latestCache?.put(next)
+      latestCache?.put(text, next)
     }
   }
   return parsed

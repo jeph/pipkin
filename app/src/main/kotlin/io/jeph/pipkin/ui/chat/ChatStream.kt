@@ -25,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Recomposer
 import androidx.compose.runtime.State
@@ -34,10 +35,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -55,10 +59,19 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.MarkdownCache
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /** Scrolls past the end of the last item; the list clamps it to the bottom. */
 private const val FOLLOW_OFFSET = 1_000_000
+
+/**
+ * The longest a newly shown list waits for its replies' parses before drawing them unparsed. A parse is quick unless
+ * the CPU is busy, as while another chat streams; waiting that out would show a blank chat for seconds.
+ */
+private const val MAX_HOLD_MILLIS = 500L
+
 private const val BANNER_KEY = "pipkin:banner"
 
 private val EMPTY_STATE_ICON_SIZE = 72.dp
@@ -95,7 +108,7 @@ internal fun ChatStream(
     onDispose {
       scroll.top = listState.top()
       // Replies the chat no longer has, as after a session switch, needn't stay parsed.
-      view.markdown.retainOnly(items.mapNotNullTo(HashSet()) { (it as? TimelineItem.AssistantText)?.markdown })
+      view.markdown.keepShown(items.mapNotNullTo(HashSet()) { (it as? TimelineItem.AssistantText)?.markdown })
     }
   }
   val follow = scroll.follow
@@ -177,7 +190,15 @@ private fun StreamList(
 ) {
   val recomposer = LocalView.current.findViewTreeCompositionContext() as Recomposer
   val anchor = remember(listState, follow, recomposer) { BottomAnchor(listState, follow, recomposer) }
-  val itemCount = items.size + if (banner != null) 1 else 0
+  val gate = remember(listState) { FirstDrawGate(listState) }
+  val currentItems by rememberUpdatedState(items)
+  LaunchedEffect(gate) {
+    snapshotFlow { currentItems.isNotEmpty() }.first { it }
+    delay(MAX_HOLD_MILLIS)
+    gate.stopHolding()
+  }
+  val firstItemIndex = if (banner != null) 1 else 0
+  val itemCount = items.size + firstItemIndex
   LazyColumn(
     state = listState,
     modifier = Modifier
@@ -185,7 +206,8 @@ private fun StreamList(
         anchor.beforeMeasure(constraints.maxHeight, itemCount)
         val placeable = measurable.measure(constraints)
         layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-      }.fillMaxSize(),
+      }.drawWithContent { if (gate.isOpen(items, firstItemIndex, markdownCache)) drawContent() }
+      .fillMaxSize(),
     contentPadding = PaddingValues(
       start = PipkinTokens.Spacing.s16,
       end = PipkinTokens.Spacing.s16,
@@ -207,6 +229,39 @@ private fun StreamList(
         modifier = Modifier.contentWidth().padding(top = gapBefore(items.getOrNull(index - 1), item)),
       )
     }
+  }
+}
+
+/**
+ * Holds back a newly shown list's drawing until every finished reply it has laid out on screen is parsed, so a chat
+ * whose replies weren't parsed ahead appears once, in its final place, instead of drawing them empty and then jumping
+ * as their text lands. A list without items yet, such as a chat whose history Pi still has to send, draws at once but
+ * doesn't count: the history's arrival is held back the same way. Once it has drawn items, or [stopHolding] was
+ * called, it holds nothing back, so a reply scrolled to later shows empty until parsed.
+ */
+private class FirstDrawGate(private val listState: LazyListState) {
+  private var open = false
+  private var holding by mutableStateOf(true)
+
+  /**
+   * Reads the list's layout, [MarkdownCache.version] and whether it is still holding, so the list draws again when a
+   * parse lands, even one that leaves the layout as it was, such as a failed parse that keeps the loading box's size,
+   * and when it stops holding.
+   */
+  fun isOpen(items: List<TimelineItem>, firstItemIndex: Int, markdownCache: MarkdownCache): Boolean {
+    if (open) return true
+    markdownCache.version
+    val ready = !holding || listState.layoutInfo.visibleItemsInfo.all { info ->
+      val reply = items.getOrNull(info.index - firstItemIndex) as? TimelineItem.AssistantText
+      reply == null || reply.streaming || markdownCache[reply.markdown] != null
+    }
+    open = ready && items.isNotEmpty()
+    return ready
+  }
+
+  /** Draws the list from now on, parsed or not. */
+  fun stopHolding() {
+    holding = false
   }
 }
 

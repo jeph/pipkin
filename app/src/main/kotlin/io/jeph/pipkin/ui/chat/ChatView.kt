@@ -4,8 +4,22 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import io.jeph.pipkin.agent.AgentProcess
+import io.jeph.pipkin.agent.AgentRegistry
+import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.ui.components.MarkdownCache
 import java.util.WeakHashMap
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+
+/** More items than a screen holds, at the height of the shortest rows. */
+private const val WARM_ITEMS = 30
+
+/** More reply text than a screen holds. */
+private const val WARM_CHARS = 4_000
 
 /** The item at the top of the stream's viewport, by its list key, and how far it is scrolled past. */
 internal data class StreamTop(val key: Any, val offset: Int)
@@ -38,4 +52,41 @@ internal class ChatViews {
   private val views = WeakHashMap<AgentProcess, ChatView>()
 
   operator fun get(process: AgentProcess): ChatView = views.getOrPut(process) { ChatView() }
+
+  /**
+   * Parses the finished replies at the end of every chat [registry] has open but doesn't show, as they finish or as a
+   * reloaded history brings them, so switching to one of those chats draws its end from the first frame. Runs on the
+   * main thread until cancelled; the parsing itself runs off it.
+   */
+  suspend fun warmHidden(registry: AgentRegistry<AgentProcess>) {
+    combine(registry.processes, registry.visible) { processes, visible -> processes.values.filter { it !== visible } }
+      .distinctUntilChanged()
+      .collectLatest { hidden ->
+        coroutineScope {
+          for (process in hidden) launch { warm(process) }
+        }
+      }
+  }
+
+  private suspend fun warm(process: AgentProcess) {
+    val markdown = get(process).markdown
+    process.screenTimeline
+      .map { it.items.endReplies() }
+      .distinctUntilChanged()
+      .collect { markdown.warm(it) }
+  }
+}
+
+/** The texts of the finished replies among the last [WARM_ITEMS] items, taken from the end until they reach [WARM_CHARS]. */
+private fun List<TimelineItem>.endReplies(): Set<String> {
+  val replies = HashSet<String>()
+  var chars = 0
+  for (item in asReversed().asSequence().take(WARM_ITEMS)) {
+    if (chars >= WARM_CHARS) break
+    if (item is TimelineItem.AssistantText && !item.streaming) {
+      replies += item.markdown
+      chars += item.markdown.length
+    }
+  }
+  return replies
 }

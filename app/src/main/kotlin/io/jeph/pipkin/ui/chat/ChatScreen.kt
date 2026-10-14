@@ -58,6 +58,8 @@ internal fun ChatScreen(
   val snackbar = remember { SnackbarStackState() }
   val scope = rememberCoroutineScope()
   val views = remember { ChatViews() }
+  val registry = LocalContext.current.appGraph.registry
+  LaunchedEffect(views, registry) { views.warmHidden(registry) }
   if (process == null) {
     PlaceholderChat(onToggleSidebar, modifier)
     return
