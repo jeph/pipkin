@@ -23,7 +23,7 @@ internal data class SetupError(val step: SetupStep, val message: String?, val co
 
 internal fun HostFailure.toSetupError(): SetupError {
   val step = when (kind) {
-    HostFailure.Kind.MissingTermux -> SetupStep.Termux
+    HostFailure.Kind.MissingTermux, HostFailure.Kind.UntrustedTermux -> SetupStep.Termux
 
     HostFailure.Kind.Permission -> SetupStep.RunCommand
 

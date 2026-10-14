@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
+import io.jeph.pipkin.termux.TermuxInstall
 import java.security.SecureRandom
 import java.util.UUID
 import kotlinx.coroutines.Dispatchers
@@ -76,6 +77,12 @@ internal object HostLauncher {
   )
 
   private fun start(context: Context, mode: String, port: Int, token: String, resultIntent: PendingIntent) {
+    // Checked on every launch, not only during onboarding: Termux can be swapped for another build after setup.
+    when (TermuxInstall.status(context)) {
+      TermuxInstall.Status.NotInstalled -> throw HostFailure.MissingTermux()
+      TermuxInstall.Status.PlayStore, TermuxInstall.Status.UnsupportedBuild -> throw HostFailure.UntrustedTermux()
+      TermuxInstall.Status.TooOld, TermuxInstall.Status.Supported -> Unit
+    }
     val script = script(context)
     val intent = Intent("com.termux.RUN_COMMAND").setComponent(SERVICE)
       .putExtra("com.termux.RUN_COMMAND_PATH", BASH)
