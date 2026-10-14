@@ -45,7 +45,7 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 
 /**
  * One chat in the tab menu: what Pi is doing in it, its title and age, highlighted while it is the one shown, and an
- * actions button that long-press also opens. One the other pane shows says so instead of its age and doesn't open.
+ * actions button that long-press also opens. One the other pane shows says so instead of its age.
  */
 @Composable
 internal fun ChatTabRow(
@@ -71,7 +71,7 @@ internal fun ChatTabRow(
 
 /**
  * One terminal in the tab menu: the terminal icon and its name, highlighted while it is the one shown. One the other
- * pane shows says so and doesn't open.
+ * pane shows says so.
  */
 @Composable
 internal fun TerminalTabRow(
@@ -101,7 +101,7 @@ internal fun TerminalTabRow(
 
 /**
  * One open file in the tab menu: its file-type icon, its name over its folder, highlighted while it is the one shown.
- * One the other pane shows says so instead of its folder and doesn't open.
+ * One the other pane shows says so instead of its folder.
  */
 @Composable
 internal fun FileTabRow(
@@ -131,7 +131,7 @@ internal fun FileTabRow(
 
 /**
  * One open commit in the tab menu: the commit icon and its short SHA and subject, highlighted while it's shown. One the
- * other pane shows says so and doesn't open.
+ * other pane shows says so.
  */
 @Composable
 internal fun CommitTabRow(
@@ -172,15 +172,14 @@ private fun TabRow(
   modifier: Modifier,
 ) {
   val colors = pipkinColors
-  val elsewhere = shown == TabShown.OtherPane
-  val shownDetail = if (elsewhere) stringResource(R.string.shell_split_other_pane) else detail
+  val shownDetail = if (shown == TabShown.OtherPane) stringResource(R.string.shell_split_other_pane) else detail
   Row(
     modifier = modifier
       .fillMaxWidth()
       .padding(horizontal = PipkinTokens.Spacing.s8)
       .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
       .background(if (shown == TabShown.Here) colors.surface2 else Color.Transparent)
-      .combinedClickable(onClick = { if (!elsewhere) onOpen() }, onLongClick = onActions)
+      .combinedClickable(onClick = onOpen, onLongClick = onActions)
       .heightIn(min = 52.dp)
       .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4),
     verticalAlignment = Alignment.CenterVertically,
@@ -190,7 +189,7 @@ private fun TabRow(
     Column(modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s6)) {
       Text(
         text = title,
-        color = if (elsewhere) colors.foregroundMuted else colors.foreground,
+        color = colors.foreground,
         fontSize = PipkinTokens.FontSize.base,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,

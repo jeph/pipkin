@@ -11,7 +11,6 @@ import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.animateTo
 import androidx.compose.foundation.gestures.snapTo
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -21,6 +20,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -77,19 +77,32 @@ private enum class Panel { Sidebar, Chat, Explorer }
 private val PanelAnimation = tween<Float>(durationMillis = 220, easing = FastOutSlowInEasing)
 
 /**
- * Each pane's sliding panels: its sidebar, its screen and its explorer, which slide within that pane's width. Main
- * thread only.
+ * Each pane's sliding panels: its sidebar, its screen and its explorer, which slide within that pane's width; and which
+ * side each pane is on. Main thread only.
  */
 @Stable
 private class PanePanels(
   private val primary: AnchoredDraggableState<Panel>,
   private val secondary: AnchoredDraggableState<Panel>,
+  private val swappedState: MutableState<Boolean>,
   private val scope: CoroutineScope,
 ) {
   operator fun get(pane: Pane): AnchoredDraggableState<Panel> = if (pane == Pane.Primary) primary else secondary
 
   /** Whether a pane shows its sidebar or explorer, which then takes Back before any pane's tab does. */
   val sideOpen: Boolean get() = Pane.entries.any { get(it).targetValue != Panel.Chat }
+
+  /** Whether the second pane is on the main pane's side, the start, and the main pane after it. */
+  val swapped: Boolean get() = swappedState.value
+
+  /**
+   * Swaps the panes' sides, bringing the pane beside [pane] over to its side on its screen, so what was asked for there
+   * shows rather than a side panel left open over it.
+   */
+  fun swapFrom(pane: Pane) {
+    swappedState.value = !swappedState.value
+    show(pane.other, Panel.Chat)
+  }
 
   fun show(pane: Pane, panel: Panel) {
     val state = get(pane)
@@ -99,10 +112,13 @@ private class PanePanels(
   /** Shows [panel] in [pane], or the pane's screen when [panel] already shows. */
   fun toggle(pane: Pane, panel: Panel) = show(pane, if (get(pane).targetValue == panel) Panel.Chat else panel)
 
-  /** Puts [pane] back on its screen at once, as when it closes. */
-  fun reset(pane: Pane) {
-    val state = get(pane)
-    if (state.currentValue != Panel.Chat) scope.launch { state.snapTo(Panel.Chat) }
+  /**
+   * Puts the second pane back on its screen at once and after the main pane, as when split screen closes, so it opens
+   * there whichever panel it showed and side it was on.
+   */
+  fun resetSecondary() {
+    swappedState.value = false
+    if (secondary.currentValue != Panel.Chat) scope.launch { secondary.snapTo(Panel.Chat) }
   }
 }
 
@@ -110,8 +126,9 @@ private class PanePanels(
 private fun rememberPanePanels(): PanePanels {
   val primary = rememberSaveable(saver = AnchoredDraggableState.Saver()) { AnchoredDraggableState(Panel.Chat) }
   val secondary = rememberSaveable(saver = AnchoredDraggableState.Saver()) { AnchoredDraggableState(Panel.Chat) }
+  val swapped = rememberSaveable { mutableStateOf(false) }
   val scope = rememberCoroutineScope()
-  return remember(primary, secondary, scope) { PanePanels(primary, secondary, scope) }
+  return remember(primary, secondary, swapped, scope) { PanePanels(primary, secondary, swapped, scope) }
 }
 
 /**
@@ -291,6 +308,8 @@ private fun AnchoredDraggableState<Panel>.offsetOr(width: Float): Float = offset
  * The main pane and, in split screen, the second pane beside it, each half as wide, each with its own [sidebar] and
  * explorer. Only the main pane opens chats in split screen, and the second pane slides back to its chat when it does.
  * The main pane keeps its place in the composition as split screen opens and closes, so its chat's draft survives that.
+ * Showing what the other pane shows swaps the panes' sides instead, which brings it to the side it was asked for on and
+ * leaves both panes' chats, drafts and tabs as they were.
  */
 @Composable
 private fun WorkspacePanes(
@@ -309,13 +328,12 @@ private fun WorkspacePanes(
   LaunchedEffect(views, graph.registry) { views.warmHidden(graph.registry) }
   // Not shown for the frame before a narrowed window closes split screen.
   val split = splitAvailable && panes[Pane.Secondary] != null
-  // The second pane opens on its screen, whichever panel it showed when split screen last closed.
-  LaunchedEffect(split) { if (!split) panels.reset(Pane.Secondary) }
+  LaunchedEffect(split) { if (!split) panels.resetSecondary() }
   val shownPanes = if (split) Pane.entries else listOf(Pane.Primary)
   ClearFocusWhenTerminalLeaves(
     shownPanes.mapNotNullTo(HashSet()) { (ShownTabs.shownIn(shown, panes, it) as? WorkspaceTab.Terminal)?.session },
   )
-  Row(modifier = Modifier.fillMaxSize()) {
+  PaneRow(panels.swapped) {
     for (pane in shownPanes) {
       if (pane == Pane.Secondary) VerticalDivider(thickness = 1.dp, color = pipkinColors.border)
       // Keyed, so each pane keeps its own state whichever panes show.
@@ -335,6 +353,7 @@ private fun WorkspacePanes(
         val onShownInSplit = {
           panels.show(Pane.Secondary, Panel.Chat)
         }.takeIf { pane == Pane.Primary && splitAvailable }
+        val swapPanes = { panels.swapFrom(pane) }
         BackHandler(enabled = panel != Panel.Chat) { panels.show(pane, Panel.Chat) }
         SidePanelOpenedEffect(panel)
         MobilePanels(
@@ -350,12 +369,11 @@ private fun WorkspacePanes(
             WorkspacePane(chat, tab, actions, views, controls, panels.sideOpen, onOpenSettings)
           },
           explorer = {
-            PaneExplorer(pane, panel == Panel.Explorer, snackbar, onClose = { panels.show(pane, Panel.Chat) })
+            PaneExplorer(pane, panel == Panel.Explorer, snackbar, swapPanes) { panels.show(pane, Panel.Chat) }
           },
-          modifier = Modifier.weight(1f),
         )
         if (tabsOpen && chat != null) {
-          WorkspaceTabsSheet(pane, chat, actions, snackbar, onShownInSplit, onDismiss = { tabsOpen = false })
+          WorkspaceTabsSheet(pane, chat, actions, snackbar, onShownInSplit, swapPanes, onDismiss = { tabsOpen = false })
         }
       }
     }
@@ -421,25 +439,32 @@ private fun WorkspacePane(
 /**
  * [pane]'s explorer, for the folder of the chat it shows. Opening a file or a commit shows it in place of that chat and
  * slides back to it, as Paseo's compact explorer does; the shown file's row is highlighted. One the other pane shows
- * stays there, with a snackbar saying so.
+ * stays there, and [onSwapPanes] brings that pane to this side.
  */
 @Composable
-private fun PaneExplorer(pane: Pane, open: Boolean, snackbar: SnackbarStackState, onClose: () -> Unit) {
+private fun PaneExplorer(
+  pane: Pane,
+  open: Boolean,
+  snackbar: SnackbarStackState,
+  onSwapPanes: () -> Unit,
+  onClose: () -> Unit,
+) {
   val graph = LocalContext.current.appGraph
   val panes by graph.registry.shown.collectAsStateWithLifecycle()
   val shown by graph.shownTabs.shown.collectAsStateWithLifecycle()
-  val scope = rememberCoroutineScope()
-  val elsewhere = stringResource(R.string.shell_split_shown_elsewhere)
   val chat = panes[pane]
   val shownFile = (ShownTabs.shownIn(shown, panes, pane) as? WorkspaceTab.File)?.file
-  val closeIfShown = { opened: Boolean -> if (opened) onClose() else scope.launch { snackbar.show(elsewhere) } }
+  val closeOrSwap = { opened: Boolean ->
+    if (!opened) onSwapPanes()
+    onClose()
+  }
   ExplorerPanel(
     cwd = chat?.cwd,
     open = open,
     selectedPath = shownFile?.path,
     snackbar = snackbar,
     onClose = onClose,
-    onOpenFile = { path -> chat?.let { closeIfShown(graph.files.open(pane, it, path)) } },
-    onOpenCommit = { commit -> chat?.let { closeIfShown(graph.commits.open(pane, it, commit)) } },
+    onOpenFile = { path -> chat?.let { closeOrSwap(graph.files.open(pane, it, path)) } },
+    onOpenCommit = { commit -> chat?.let { closeOrSwap(graph.commits.open(pane, it, commit)) } },
   )
 }
