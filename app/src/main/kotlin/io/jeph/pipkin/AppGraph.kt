@@ -45,13 +45,14 @@ internal class AppGraph(private val application: Application) {
   )
   val keepAlive = KeepAlive(application)
   val preferences = Preferences(application)
-  val sessionRepository = SessionRepository(hostClient, NoticeStore(File(application.filesDir, "notices")), scope)
+  val extensionTitles = ExtensionTitles()
+  val sessionRepository =
+    SessionRepository(hostClient, NoticeStore(File(application.filesDir, "notices")), extensionTitles, scope)
   val sessionArchive = SessionArchive(sessionRepository, preferences, scope)
   private val turnNotifications = TurnNotifications(application) { hostClient.lastHello.value?.home }
-  val extensionTitles = ExtensionTitles()
   val registry: AgentRegistry<AgentProcess> =
     AgentRegistry(scope, onRunEnded = turnNotifications::runEnded) { cwd, sessionPath ->
-      AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository, extensionTitles)
+      AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository)
     }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
   val modelDefaults = ModelDefaults(hostClient)

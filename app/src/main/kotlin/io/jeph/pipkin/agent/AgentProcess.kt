@@ -79,7 +79,6 @@ internal class AgentProcess(
   sessionPath: String?,
   scope: CoroutineScope,
   private val sessions: SessionRepository,
-  private val extensionTitles: ExtensionTitles,
 ) : ManagedProcess {
   private class Connection(val channel: HostChannel) {
     val rpc = RpcClient(channel::send)
@@ -105,7 +104,7 @@ internal class AgentProcess(
   private val stateFlow = MutableStateFlow<AgentProcessState>(AgentProcessState.Starting)
   private val sessionFileState = MutableStateFlow(sessionPath)
   private val sessionNameState = MutableStateFlow<String?>(null)
-  private val extensionTitleState = MutableStateFlow(sessionPath?.let { extensionTitles[it] })
+  private val extensionTitleState = MutableStateFlow(sessionPath?.let { sessions.extensionTitles[it] })
   private val contextUsageState = MutableStateFlow<ContextUsage?>(null)
   private val contextUsageRequests = Channel<Unit>(Channel.CONFLATED)
 
@@ -311,7 +310,7 @@ internal class AgentProcess(
       timeline.keepHistory()
       return null
     }
-    previousFile?.let { extensionTitles.keep(it, title) }
+    previousFile?.let { sessions.extensionTitles.keep(it, title) }
     applyState(call("get_state"))
     val messages = getMessages()
     val path = sessionFileState.value
@@ -532,7 +531,7 @@ internal class AgentProcess(
 
   /** Hands the title to [ExtensionTitles] for the next Pi on this session, whichever process that is. */
   private fun keepExtensionTitle() {
-    sessionFileState.value?.let { extensionTitles.keep(it, extensionTitleState.value) }
+    sessionFileState.value?.let { sessions.extensionTitles.keep(it, extensionTitleState.value) }
   }
 
   private fun refreshContextUsage() {
