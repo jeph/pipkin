@@ -14,6 +14,9 @@ sealed interface Destination {
   /** Termux setup and Pipkin's Android permissions, reached from Settings. */
   data object Permissions : Destination
 
+  /** Settings most people leave alone, such as how many chats keep Pi running, reached from Settings. */
+  data object Advanced : Destination
+
   /** The list of added providers. */
   data object Providers : Destination
 
@@ -82,6 +85,7 @@ class AppNavigator(initial: List<Destination>) {
       Destination.Main -> MAIN
       Destination.Settings -> SETTINGS
       Destination.Permissions -> PERMISSIONS
+      Destination.Advanced -> ADVANCED
       Destination.Onboarding -> ONBOARDING
       Destination.Providers -> PROVIDERS
       Destination.AddProvider -> ADD_PROVIDER
@@ -97,6 +101,7 @@ class AppNavigator(initial: List<Destination>) {
       key == MAIN -> Destination.Main
       key == SETTINGS -> Destination.Settings
       key == PERMISSIONS -> Destination.Permissions
+      key == ADVANCED -> Destination.Advanced
       key == ONBOARDING -> Destination.Onboarding
       key == PROVIDERS -> Destination.Providers
       key == ADD_PROVIDER -> Destination.AddProvider
@@ -112,6 +117,7 @@ class AppNavigator(initial: List<Destination>) {
     private const val MAIN = "main"
     private const val SETTINGS = "settings"
     private const val PERMISSIONS = "permissions"
+    private const val ADVANCED = "advanced"
     private const val ONBOARDING = "onboarding"
     private const val PROVIDER = "provider:"
     private const val PROVIDERS = "providers"

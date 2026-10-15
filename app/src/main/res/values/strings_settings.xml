@@ -29,6 +29,19 @@
     <string name="settings_config_folder">Config folder</string>
     <string name="settings_config_folder_unknown">Known once Termux connects</string>
 
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_running_chats">Running chats</string>
+    <string name="settings_running_chats_fewer">Fewer running chats</string>
+    <string name="settings_running_chats_more">More running chats</string>
+    <string name="settings_running_chats_caption">How many chats can keep their agent running at once. Each one runs a few processes in Termux, more while it works. Android stops apps\' processes once there are more than 32 in all, so above 6 chats may be stopped mid-run unless Disable child process restrictions is on in Developer options.</string>
+    <string name="settings_idle_stop">Stop idle chats after</string>
+    <string name="settings_idle_stop_1_minute">1 minute</string>
+    <string name="settings_idle_stop_5_minutes">5 minutes</string>
+    <string name="settings_idle_stop_15_minutes">15 minutes</string>
+    <string name="settings_idle_stop_30_minutes">30 minutes</string>
+    <string name="settings_idle_stop_never">Never</string>
+    <string name="settings_idle_stop_caption">A chat that isn\'t working or on screen stops its agent after this long to free memory. Its history stays, and the agent starts again when you open it. With Never, a chat stops only when another needs its place.</string>
+
     <string name="settings_theme">Theme</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>

@@ -54,16 +54,18 @@ internal class ShellActions(private val graph: AppGraph) {
   /** Termux's home from the last host hello; upstream Termux always uses [TERMUX_HOME] before any host ran. */
   val home: String get() = graph.hostClient.lastHello.value?.home?.takeIf { it.isNotEmpty() } ?: TERMUX_HOME
 
-  /** Shows the chat in session file [sessionPath] in [pane]; false (with a notice) when four chats are working. */
+  /**
+   * Shows the chat in session file [sessionPath] in [pane]; false (with a notice) when every running chat is working.
+   */
   fun openChat(pane: Pane, cwd: String, sessionPath: String): Boolean = show(pane) { registry.open(cwd, sessionPath) }
 
-  /** Shows a new chat in [cwd] in [pane]; false (with a notice) when four chats are working. */
+  /** Shows a new chat in [cwd] in [pane]; false (with a notice) when every running chat is working. */
   fun newChat(pane: Pane, cwd: String): Boolean = show(pane) { registry.open(cwd, null) }
 
   /**
    * Shows the workspace [cwd] in [pane], unless it shows it already: what the pane last showed there while it can
    * still show, else the chat last shown there while it is still open or listed, else its newest chat, else a new one,
-   * skipping the chat the other pane shows; false (with a notice) when four chats are working.
+   * skipping the chat the other pane shows; false (with a notice) when every running chat is working.
    */
   fun openWorkspace(pane: Pane, cwd: String): Boolean {
     if (graph.panes.itemIn(pane)?.let { sameFolder(it.cwd, cwd) } == true) return true
@@ -88,7 +90,9 @@ internal class ShellActions(private val graph: AppGraph) {
     if (pane != null && graph.panes.itemIn(pane) == null) openWorkspace(pane, tab.cwd)
   }
 
-  /** The process for [openWorkspace]; throws [TooManyRunning] when it needs a slot and all four chats are working. */
+  /**
+   * The process for [openWorkspace]; throws [TooManyRunning] when it needs a slot and every running chat is working.
+   */
   private fun workspaceChat(cwd: String, except: AgentProcess?): AgentProcess {
     val skipped = except?.sessionFile?.value
     val last = lastShownIn[folderKey(cwd)]?.takeIf { path ->
@@ -108,8 +112,8 @@ internal class ShellActions(private val graph: AppGraph) {
   }
 
   /**
-   * The process for [openMostRecent], other than [except]; throws [TooManyRunning] when it needs a slot and all four
-   * chats are working.
+   * The process for [openMostRecent], other than [except]; throws [TooManyRunning] when it needs a slot and every
+   * running chat is working.
    */
   private fun mostRecent(cwd: String?, except: AgentProcess?): AgentProcess {
     val newest = newestIn(cwd, except?.sessionFile?.value)
@@ -274,7 +278,8 @@ internal class ShellActions(private val graph: AppGraph) {
 
   /**
    * Shows the process [open] returns in [pane] instead of what it shows, which the pane's history keeps; when the other
-   * pane shows it, it stays there and [pane] keeps what it shows. False (with a notice) when four chats are working.
+   * pane shows it, it stays there and [pane] keeps what it shows. False (with a notice) when every running chat is
+   * working.
    */
   private inline fun show(pane: Pane, open: () -> AgentProcess): Boolean {
     val shown = graph.panes.itemIn(pane)

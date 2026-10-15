@@ -39,6 +39,7 @@ import io.jeph.pipkin.ui.onboarding.OnboardingScreen
 import io.jeph.pipkin.ui.onboarding.PermissionsScreen
 import io.jeph.pipkin.ui.settings.AddModelsScreen
 import io.jeph.pipkin.ui.settings.AddProviderScreen
+import io.jeph.pipkin.ui.settings.AdvancedScreen
 import io.jeph.pipkin.ui.settings.ModelEditorScreen
 import io.jeph.pipkin.ui.settings.ProviderDrafts
 import io.jeph.pipkin.ui.settings.ProviderEditorScreen
@@ -135,9 +136,12 @@ private fun Screen(
       onBack = { navigator.pop() },
       onOpenPermissions = { navigator.push(Destination.Permissions) },
       onOpenProviders = { navigator.push(Destination.Providers) },
+      onOpenAdvanced = { navigator.push(Destination.Advanced) },
     )
 
     Destination.Permissions -> PermissionsScreen(onBack = { navigator.pop() })
+
+    Destination.Advanced -> AdvancedScreen(onBack = { navigator.pop() })
 
     Destination.Providers -> ProvidersScreen(
       onBack = { navigator.pop() },

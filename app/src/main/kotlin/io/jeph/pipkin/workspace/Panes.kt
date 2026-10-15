@@ -173,7 +173,7 @@ internal class Panes<P : ManagedProcess>(
 
   /**
    * [process] while it is open, else the process [registry] opens on its session file; null when archived, when
-   * closed before Pi saved a session file, or when four chats are working.
+   * closed before Pi saved a session file, or when every running chat is working.
    */
   private fun reopen(process: P): P? {
     val path = process.sessionFile.value

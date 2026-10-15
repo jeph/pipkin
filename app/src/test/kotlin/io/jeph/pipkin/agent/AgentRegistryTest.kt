@@ -48,6 +48,8 @@ class AgentRegistryTest {
 
   private val created = mutableListOf<FakeProcess>()
   private val ended = mutableListOf<FakeProcess>()
+  private val maxRunning = MutableStateFlow(MAX_RUNNING)
+  private val idleParkMillis = MutableStateFlow(IdleStop.Default.millis)
 
   @Test
   fun openReusesTheProcessOfAnOpenSession() = registryTest { registry ->
@@ -77,7 +79,8 @@ class AgentRegistryTest {
   }
 
   @Test
-  fun hiddenIdleProcessesParkAfterTheIdleDelay() = registryTest(idleCloseMillis = 50) { registry ->
+  fun hiddenIdleProcessesParkAfterTheIdleDelay() = registryTest { registry ->
+    idleParkMillis.value = 50
     val hidden = registry.open(CWD, "/s/hidden.jsonl")
     val shown = registry.open(CWD, "/s/shown.jsonl")
     val split = registry.open(CWD, "/s/split.jsonl")
@@ -102,6 +105,20 @@ class AgentRegistryTest {
     assertTrue(split.parked)
     assertFalse(shown.parked)
     assertEquals(setOf(ChatKey("/s/shown.jsonl")), registry.processes.value.keys)
+  }
+
+  @Test
+  fun neverKeepsHiddenIdleProcessesUntilTheDelayChanges() = registryTest { registry ->
+    idleParkMillis.value = null
+    val hidden = registry.open(CWD, "/s/hidden.jsonl")
+    delay(300)
+
+    assertFalse(hidden.parked)
+
+    idleParkMillis.value = 50
+    delay(300)
+
+    assertTrue(hidden.parked)
   }
 
   @Test
@@ -235,6 +252,74 @@ class AgentRegistryTest {
   }
 
   @Test
+  fun raisingTheLimitMakesRoomForAnotherProcess() = registryTest { registry ->
+    List(4) { registry.open(CWD, "/s/$it.jsonl") }.forEach { it.busy.value = true }
+    assertThrows(TooManyRunning::class.java) { registry.open(CWD, null) }
+
+    maxRunning.value = 5
+
+    registry.open(CWD, null)
+    assertEquals(5, registry.processes.value.size)
+  }
+
+  @Test
+  fun loweringTheLimitParksHiddenIdleProcessesDownToIt() = registryTest { registry ->
+    val first = registry.open(CWD, "/s/first.jsonl")
+    val second = registry.open(CWD, "/s/second.jsonl")
+    val shown = registry.open(CWD, "/s/shown.jsonl")
+    val working = registry.open(CWD, "/s/working.jsonl")
+    working.busy.value = true
+    registry.show(Pane.Primary, shown)
+
+    maxRunning.value = 2
+    settle()
+
+    assertTrue(first.parked && second.parked)
+    assertFalse(shown.parked || working.parked)
+    assertEquals(2, registry.processes.value.size)
+  }
+
+  @Test
+  fun aLoweredLimitAppliesAsRunsEnd() = registryTest { registry ->
+    val (first, second, third) = List(3) { registry.open(CWD, "/s/$it.jsonl") }
+    listOf(first, second, third).forEach { it.busy.value = true }
+    settle()
+
+    maxRunning.value = 1
+    settle()
+    assertEquals(3, registry.processes.value.size)
+
+    first.busy.value = false
+    settle()
+    assertTrue(first.parked)
+    assertEquals(listOf(first), ended)
+
+    second.busy.value = false
+    settle()
+    assertTrue(second.parked)
+    assertFalse(third.parked)
+    assertEquals(1, registry.processes.value.size)
+  }
+
+  @Test
+  fun openingParksDownToALoweredLimit() = registryTest { registry ->
+    idleParkMillis.value = null
+    val main = registry.open(CWD, "/s/main.jsonl")
+    val split = registry.open(CWD, "/s/split.jsonl")
+    registry.show(Pane.Primary, main)
+    registry.show(Pane.Secondary, split)
+    maxRunning.value = 1
+    settle()
+    registry.show(Pane.Primary, null)
+    registry.show(Pane.Secondary, null)
+
+    val next = registry.open(CWD, null)
+
+    assertTrue(main.parked && split.parked)
+    assertEquals(listOf(next), registry.processes.value.values.toList())
+  }
+
+  @Test
   fun reloadReplacesTheProcessUnderItsKeyAndKeepsItsPane() = registryTest { registry ->
     val old = registry.open(CWD, "/s/a.jsonl")
     registry.show(Pane.Secondary, old)
@@ -355,14 +440,11 @@ class AgentRegistryTest {
     assertEquals("/s/stuck-shown.jsonl", restarted?.sessionFile?.value)
   }
 
-  private fun registryTest(
-    idleCloseMillis: Long = AgentRegistry.IDLE_CLOSE_MILLIS,
-    block: suspend (AgentRegistry<FakeProcess>) -> Unit,
-  ) = runBlocking {
+  private fun registryTest(block: suspend (AgentRegistry<FakeProcess>) -> Unit) = runBlocking {
     val scope = CoroutineScope(coroutineContext + SupervisorJob())
     try {
       block(
-        AgentRegistry(scope, idleCloseMillis, ended::add) { cwd, path ->
+        AgentRegistry(scope, maxRunning, idleParkMillis, ended::add) { cwd, path ->
           FakeProcess(cwd, path).also(created::add)
         },
       )
@@ -376,5 +458,8 @@ class AgentRegistryTest {
 
   private companion object {
     const val CWD = "/home"
+
+    /** The limit the tests start with, which their names count from. */
+    const val MAX_RUNNING = 4
   }
 }

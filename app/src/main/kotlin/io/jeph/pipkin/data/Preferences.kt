@@ -2,6 +2,8 @@ package io.jeph.pipkin.data
 
 import android.content.Context
 import androidx.core.content.edit
+import io.jeph.pipkin.agent.AgentRegistry
+import io.jeph.pipkin.agent.IdleStop
 import io.jeph.pipkin.host.GitDiffMode
 import io.jeph.pipkin.ui.files.ExplorerSort
 import io.jeph.pipkin.ui.files.SortKey
@@ -34,6 +36,12 @@ internal class Preferences(context: Context) {
   private val diffWrapLinesState = MutableStateFlow(prefs.getBoolean(DIFF_WRAP_LINES, false))
   private val diffHideWhitespaceState = MutableStateFlow(prefs.getBoolean(DIFF_HIDE_WHITESPACE, false))
   private val commitsCollapsedState = MutableStateFlow(prefs.getBoolean(COMMITS_COLLAPSED, true))
+  private val maxRunningChatsState = MutableStateFlow(
+    prefs.getInt(MAX_RUNNING_CHATS, AgentRegistry.DEFAULT_MAX_RUNNING).coerceIn(AgentRegistry.RUNNING_LIMITS),
+  )
+  private val idleStopState = prefs.getString(IDLE_STOP, null).let { name ->
+    MutableStateFlow(IdleStop.entries.firstOrNull { it.name == name } ?: IdleStop.Default)
+  }
 
   /** Onboarding finished or was skipped. */
   val setupComplete: StateFlow<Boolean> = setupCompleteState.asStateFlow()
@@ -72,6 +80,12 @@ internal class Preferences(context: Context) {
 
   /** Whether the Changes tab's Commits section is folded; Paseo starts it folded. */
   val commitsCollapsed: StateFlow<Boolean> = commitsCollapsedState.asStateFlow()
+
+  /** How many chats may have Pi running at once, within [AgentRegistry.RUNNING_LIMITS]. */
+  val maxRunningChats: StateFlow<Int> = maxRunningChatsState.asStateFlow()
+
+  /** How long a chat that is neither working nor shown keeps its Pi. */
+  val idleStop: StateFlow<IdleStop> = idleStopState.asStateFlow()
 
   fun setSetupComplete(complete: Boolean) {
     prefs.edit { putBoolean(SETUP_COMPLETE, complete) }
@@ -167,6 +181,18 @@ internal class Preferences(context: Context) {
     commitsCollapsedState.value = collapsed
   }
 
+  /** Sets [maxRunningChats], kept within [AgentRegistry.RUNNING_LIMITS]. */
+  fun setMaxRunningChats(limit: Int) {
+    val allowed = limit.coerceIn(AgentRegistry.RUNNING_LIMITS)
+    prefs.edit { putInt(MAX_RUNNING_CHATS, allowed) }
+    maxRunningChatsState.value = allowed
+  }
+
+  fun setIdleStop(stop: IdleStop) {
+    prefs.edit { putString(IDLE_STOP, stop.name) }
+    idleStopState.value = stop
+  }
+
   /** The tabs and panes last shown, for a restarted Pipkin to show again; null before any were saved. */
   fun savedLayout(): SavedLayout? = prefs.getString(LAYOUT, null)?.let(::savedLayoutOf)
 
@@ -224,6 +250,8 @@ internal class Preferences(context: Context) {
     const val DIFF_WRAP_LINES = "diffWrapLines"
     const val DIFF_HIDE_WHITESPACE = "diffHideWhitespace"
     const val COMMITS_COLLAPSED = "commitsCollapsed"
+    const val MAX_RUNNING_CHATS = "maxRunningChats"
+    const val IDLE_STOP = "idleStop"
     const val LAYOUT = "layout"
   }
 }

@@ -7,12 +7,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 /** What [AgentRegistry] needs from one chat's agent process. */
@@ -47,28 +49,28 @@ internal value class ChatKey(val value: String) {
 }
 
 /**
- * Opening another chat would need a fifth Pi process while all four are working or shown, since a chat a pane shows
- * keeps its Pi. [shownIdle] says an idle chat in a pane held a slot.
+ * Opening another chat would need a Pi process past [limit] while every open one is working or shown, since a chat a
+ * pane shows keeps its Pi. [shownIdle] says an idle chat in a pane held a slot.
  */
-internal class TooManyRunning(shownIdle: Boolean = false) :
+internal class TooManyRunning(limit: Int, shownIdle: Boolean = false) :
   IllegalStateException(
-    if (shownIdle) {
-      "${AgentRegistry.MAX_PROCESSES} chats are working or on screen. Stop one to open another."
-    } else {
-      "${AgentRegistry.MAX_PROCESSES} chats are working. Stop one to open another."
-    },
+    "${if (limit == 1) "1 chat is" else "$limit chats are"} ${if (shownIdle) "working or on screen" else "working"}. " +
+      "Stop one to open another.",
   )
 
 /**
- * The app's open agent processes, at most [MAX_PROCESSES]. A process that is neither busy nor shown in a pane is
- * parked after [idleCloseMillis], and opening one more parks the idle process shown least recently, never one a pane
- * shows: its Pi ends, but the chat and its history are kept, so opening its session again shows the history while Pi
- * restarts. At most [MAX_PARKED] chats stay parked; the least recently parked is closed for good. [onRunEnded] hears
- * each time an open process stops being busy. Main thread only.
+ * The app's open agent processes, at most [maxRunning]. A process that is neither busy nor shown in a pane is parked
+ * after [idleParkMillis], never while that is null, and opening one more parks the idle process shown least recently,
+ * never one a pane shows: its Pi ends, but the chat and its history are kept, so opening its session again shows the
+ * history while Pi restarts. A changed idle delay counts from the change. Lowering [maxRunning] parks hidden idle
+ * processes down to it at once, and the rest as runs end or more chats open. At most [MAX_PARKED] chats stay parked;
+ * the least recently parked is closed for good. [onRunEnded] hears each time an open process stops being busy. Main
+ * thread only.
  */
 internal class AgentRegistry<P : ManagedProcess>(
   private val scope: CoroutineScope,
-  private val idleCloseMillis: Long = IDLE_CLOSE_MILLIS,
+  private val maxRunning: StateFlow<Int> = MutableStateFlow(DEFAULT_MAX_RUNNING),
+  private val idleParkMillis: Flow<Long?> = flowOf(IdleStop.Default.millis),
   private val onRunEnded: (P) -> Unit = {},
   private val factory: (cwd: String, sessionPath: String?) -> P,
 ) {
@@ -97,24 +99,27 @@ internal class AgentRegistry<P : ManagedProcess>(
   /** True while any open process is working. */
   val busy: StateFlow<Boolean> = busyState.asStateFlow()
 
+  init {
+    scope.launch { maxRunning.collect { parkPastLimit() } }
+  }
+
   fun keyOf(process: P): ChatKey? = processState.value.entries.firstOrNull { it.value === process }?.key
 
   /**
    * The open process for [sessionPath], the parked one restarted, or a new one (a new session when [sessionPath] is
-   * null). Throws [TooManyRunning] when all [MAX_PROCESSES] processes are busy or shown.
+   * null). Throws [TooManyRunning] when [maxRunning] processes are open and all of them are busy or shown.
    */
   fun open(cwd: String, sessionPath: String?): P {
     val key = sessionPath?.let { ChatKey.session(it) }
     key?.let { processState.value[it] }?.let { return it }
     // Taken out first, so making room cannot close it as the least recently parked chat.
     val resumed = key?.let { parked.remove(it) }
-    if (entries.size >= MAX_PROCESSES) {
-      try {
-        evictOne()
-      } catch (refused: TooManyRunning) {
-        if (key != null && resumed != null) parked[key] = resumed
-        throw refused
-      }
+    try {
+      // A loop, since a lowered limit can leave more processes open than it allows.
+      while (entries.size >= maxRunning.value) evictOne()
+    } catch (refused: TooManyRunning) {
+      if (key != null && resumed != null) parked[key] = resumed
+      throw refused
     }
     val process = resumed?.also { it.restart() } ?: factory(cwd, sessionPath)
     add(key ?: ChatKey.new(), process)
@@ -193,11 +198,20 @@ internal class AgentRegistry<P : ManagedProcess>(
 
   /** Parks the idle process shown least recently; one a pane shows keeps its Pi. */
   private fun evictOne() {
-    val idle = entries.entries.filter { !it.key.busy.value }
-    val evicted = idle.filter { paneOf(it.key) == null }.minByOrNull { it.value.lastShown }
-      ?: throw TooManyRunning(shownIdle = idle.isNotEmpty())
-    park(evicted.key)
+    val evicted = leastRecentlyShownHiddenIdle()
+      ?: throw TooManyRunning(maxRunning.value, shownIdle = entries.keys.any { !it.busy.value })
+    park(evicted)
   }
+
+  /** Parks hidden idle processes, least recently shown first, until [maxRunning] or fewer are open or none is left. */
+  private fun parkPastLimit() {
+    while (entries.size > maxRunning.value) park(leastRecentlyShownHiddenIdle() ?: return)
+  }
+
+  private fun leastRecentlyShownHiddenIdle(): P? = entries.entries
+    .filter { !it.key.busy.value && paneOf(it.key) == null }
+    .minByOrNull { it.value.lastShown }
+    ?.key
 
   private fun add(key: ChatKey, process: P) {
     val entry = Entry(++tick)
@@ -240,20 +254,26 @@ internal class AgentRegistry<P : ManagedProcess>(
       var wasBusy = false
       process.busy.collect { busy ->
         updateBusy()
-        if (wasBusy && !busy) onRunEnded(process)
+        if (wasBusy && !busy) {
+          onRunEnded(process)
+          // A limit lowered while chats were working applies as their runs end.
+          parkPastLimit()
+        }
         wasBusy = busy
       }
     }
     launch {
       process.sessionFile.collect { path -> if (path != null) rekey(process, ChatKey.session(path)) }
     }
-    combine(process.busy, shownState) { working, panes -> !working && panes.values.none { it === process } }
+    // How long until the process parks: null while it works, a pane shows it, or idle chats keep their Pi.
+    combine(process.busy, shownState, idleParkMillis) { working, panes, millis ->
+      if (working || panes.values.any { it === process }) null else millis
+    }
       .distinctUntilChanged()
-      .collectLatest { idle ->
-        if (idle) {
-          delay(idleCloseMillis)
-          park(process)
-        }
+      .collectLatest { millis ->
+        if (millis == null) return@collectLatest
+        delay(millis)
+        park(process)
       }
   }
 
@@ -270,8 +290,9 @@ internal class AgentRegistry<P : ManagedProcess>(
   }
 
   companion object {
-    const val MAX_PROCESSES = 4
+    /** The choices for [maxRunning]. */
+    val RUNNING_LIMITS = 1..16
+    const val DEFAULT_MAX_RUNNING = 6
     const val MAX_PARKED = 12
-    const val IDLE_CLOSE_MILLIS = 60_000L
   }
 }

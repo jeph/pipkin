@@ -39,9 +39,14 @@ import io.jeph.pipkin.ui.theme.ThemeMode
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
-/** Paseo-style settings: providers, agent, appearance, Termux and about cards under a back header. */
+/** Paseo-style settings: providers, agent, appearance, Termux, advanced and about cards under a back header. */
 @Composable
-internal fun SettingsScreen(onBack: () -> Unit, onOpenPermissions: () -> Unit, onOpenProviders: () -> Unit) {
+internal fun SettingsScreen(
+  onBack: () -> Unit,
+  onOpenPermissions: () -> Unit,
+  onOpenProviders: () -> Unit,
+  onOpenAdvanced: () -> Unit,
+) {
   val graph = LocalContext.current.appGraph
   val snackbar = remember { SnackbarStackState() }
   Box(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
@@ -61,6 +66,7 @@ internal fun SettingsScreen(onBack: () -> Unit, onOpenPermissions: () -> Unit, o
         snackbar = snackbar,
         onOpenProviders = onOpenProviders,
         onOpenPermissions = onOpenPermissions,
+        onOpenAdvanced = onOpenAdvanced,
       )
     }
     SnackbarStack(
@@ -76,6 +82,7 @@ private fun SettingsContent(
   snackbar: SnackbarStackState,
   onOpenProviders: () -> Unit,
   onOpenPermissions: () -> Unit,
+  onOpenAdvanced: () -> Unit,
 ) {
   Column(
     modifier =
@@ -94,6 +101,7 @@ private fun SettingsContent(
       AgentSection(graph = graph, snackbar = snackbar)
       AppearanceSection(preferences = graph.preferences)
       TermuxSection(graph = graph, onOpenPermissions = onOpenPermissions)
+      AdvancedSection(onOpenAdvanced = onOpenAdvanced)
       AboutSection()
     }
   }
@@ -181,6 +189,26 @@ private fun AppearanceSection(preferences: Preferences) {
           tint = if (isSelected) colors.foreground else colors.foregroundMuted,
         )
       }
+    }
+  }
+}
+
+/** One row into the advanced page. */
+@Composable
+private fun AdvancedSection(onOpenAdvanced: () -> Unit) {
+  SettingsSection(title = null) {
+    SettingsRow(
+      title = stringResource(R.string.settings_advanced),
+      onClick = onOpenAdvanced,
+      leading = {
+        LucideIcon(icon = R.drawable.ic_lucide_wrench, contentDescription = null, tint = pipkinColors.foregroundMuted)
+      },
+    ) {
+      LucideIcon(
+        icon = R.drawable.ic_lucide_chevron_right,
+        contentDescription = null,
+        tint = pipkinColors.foregroundMuted,
+      )
     }
   }
 }
