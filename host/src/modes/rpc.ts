@@ -7,7 +7,7 @@ import { installedPiVersion, loadPi, PI_PACKAGE, piPackageDir } from "../env.js"
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { nullableStringParam, stringParam } from "../params.js";
-import { systemAppend } from "../prompt.js";
+import { SYSTEM_APPEND } from "../prompt.js";
 import { openSettingsIfValid } from "../settings.js";
 import { termuxSessionEnv } from "../termux-session.js";
 
@@ -184,7 +184,7 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const settings = await readGlobalSettings(ctx.env.configDir);
   await defaultSteeringToAll(ctx, settings);
   for (const dir of bundledExtensionDirs(ctx, packages, settings)) args.push("--extension", dir);
-  args.push("--append-system-prompt", systemAppend(ctx.env.configDir));
+  args.push("--append-system-prompt", SYSTEM_APPEND);
   const env = await termuxSessionEnv(ctx.env);
   const child = spawn(process.execPath, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
   const { socket } = ctx.conn;

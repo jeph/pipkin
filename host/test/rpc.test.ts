@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { encodeLine } from "../src/framing.js";
-import { systemAppend } from "../src/prompt.js";
+import { SYSTEM_APPEND } from "../src/prompt.js";
 import {
   type Dirs,
   type HostRun,
@@ -105,7 +105,7 @@ describe("rpc mode", () => {
     );
     expect(await run.next()).toEqual({
       type: "ready",
-      argv: ["--mode", "rpc", "--session", "/s.jsonl", "--append-system-prompt", systemAppend(dirs.configDir)],
+      argv: ["--mode", "rpc", "--session", "/s.jsonl", "--append-system-prompt", SYSTEM_APPEND],
       cwd: dirs.home,
       env: { PI_CODING_AGENT_DIR: dirs.configDir },
     });
@@ -213,7 +213,7 @@ describe("rpc mode", () => {
         "--extension",
         path.join(modules, "@scope/tools"),
         "--append-system-prompt",
-        systemAppend(dirs.configDir),
+        SYSTEM_APPEND,
       ],
     });
     run.socket.end();
@@ -233,7 +233,7 @@ describe("rpc mode", () => {
     run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson } });
     expect(await run.next()).toMatchObject({
       type: "ready",
-      argv: ["--mode", "rpc", "--extension", path.join(dirs.root, "pi/node_modules/kept"), "--append-system-prompt", systemAppend(dirs.configDir)],
+      argv: ["--mode", "rpc", "--extension", path.join(dirs.root, "pi/node_modules/kept"), "--append-system-prompt", SYSTEM_APPEND],
     });
     run.socket.end();
     await run.exited;
