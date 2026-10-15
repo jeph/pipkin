@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -40,7 +41,13 @@ internal fun AdvancedScreen(onBack: () -> Unit) {
         Stepper(value = maxRunning, range = AgentRegistry.RUNNING_LIMITS, onChange = preferences::setMaxRunningChats)
       }
     }
-    SettingsCaption(text = stringResource(R.string.settings_running_chats_caption, AgentRegistry.DEFAULT_MAX_RUNNING))
+    SettingsCaption(
+      text = pluralStringResource(
+        R.plurals.settings_running_chats_caption,
+        AgentRegistry.DEFAULT_MAX_RUNNING,
+        AgentRegistry.DEFAULT_MAX_RUNNING,
+      ),
+    )
     SettingsSection(title = stringResource(R.string.settings_idle_stop)) {
       IdleStop.entries.forEachIndexed { index, stop ->
         if (index > 0) SettingsDivider()

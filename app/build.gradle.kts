@@ -23,7 +23,7 @@ abstract class HostBundle : Exec() {
 }
 
 // The Termux-side host is a TypeScript package; its bundle ships as an APK asset.
-val hostInstall by tasks.registering(Exec::class) {
+val hostInstall = tasks.register<Exec>("hostInstall") {
   description = "Installs the host package's pinned toolchain."
   workingDir = hostDir.asFile
   inputs.files(hostDir.file("package.json"), hostDir.file("pnpm-lock.yaml"), hostDir.file("pnpm-workspace.yaml"))
@@ -31,7 +31,7 @@ val hostInstall by tasks.registering(Exec::class) {
   commandLine("pnpm", "install", "--frozen-lockfile")
 }
 
-val hostBuild by tasks.registering(HostBundle::class) {
+val hostBuild = tasks.register<HostBundle>("hostBuild") {
   description = "Bundles the Termux host into the pipkin-host.mjs APK asset."
   dependsOn(hostInstall)
   workingDir = hostDir.asFile
@@ -40,7 +40,7 @@ val hostBuild by tasks.registering(HostBundle::class) {
   commandLine("pnpm", "run", "build")
 }
 
-val hostCheck by tasks.registering(Exec::class) {
+val hostCheck = tasks.register<Exec>("hostCheck") {
   description = "Typechecks, lints and tests the Termux host."
   dependsOn(hostInstall)
   workingDir = hostDir.asFile
@@ -231,7 +231,7 @@ val syntaxSourcePins = listOf(
 
 val syntaxSourcesDir = layout.buildDirectory.dir("syntax/sources")
 
-val syntaxSources by tasks.registering(SyntaxSources::class) {
+val syntaxSources = tasks.register<SyntaxSources>("syntaxSources") {
   description = "Fetches tree-sitter and its grammars for the native build, and their queries as assets."
   urls.set(syntaxSourcePins.associate { it.name to it.url })
   sha256s.set(syntaxSourcePins.associate { it.name to it.sha256 })

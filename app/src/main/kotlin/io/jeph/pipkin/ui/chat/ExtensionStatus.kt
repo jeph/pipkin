@@ -96,8 +96,9 @@ private class SgrState(private val colors: PipkinColors) {
   private var strikethrough = false
 
   fun style(): SpanStyle? {
+    val foreground = foreground
     val color = when {
-      foreground != null && dim -> foreground!!.copy(alpha = foreground!!.alpha * DIM_ALPHA)
+      foreground != null && dim -> foreground.copy(alpha = foreground.alpha * DIM_ALPHA)
       foreground != null -> foreground
       dim -> colors.foregroundExtraMuted
       else -> null

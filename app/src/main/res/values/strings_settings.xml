@@ -33,7 +33,10 @@
     <string name="settings_running_chats">Running chats</string>
     <string name="settings_running_chats_fewer">Fewer running chats</string>
     <string name="settings_running_chats_more">More running chats</string>
-    <string name="settings_running_chats_caption">How many chats can keep their agent running at once. Each one runs a few processes in Termux, more while it works. Android stops apps\' processes once there are more than 32 in all, so above %1$d chats may be stopped mid-run unless Disable child process restrictions is on in Developer options (Android 14 and later).</string>
+    <plurals name="settings_running_chats_caption">
+        <item quantity="one">How many chats can keep their agent running at once. Each one runs a few processes in Termux, more while it works. Android stops apps\' processes once there are more than 32 in all, so with more than %1$d chat running, any of them may be stopped mid-run unless Disable child process restrictions is on in Developer options (Android 14 and later).</item>
+        <item quantity="other">How many chats can keep their agent running at once. Each one runs a few processes in Termux, more while it works. Android stops apps\' processes once there are more than 32 in all, so with more than %1$d chats running, any of them may be stopped mid-run unless Disable child process restrictions is on in Developer options (Android 14 and later).</item>
+    </plurals>
     <string name="settings_idle_stop">Stop idle chats after</string>
     <string name="settings_idle_stop_1_minute">1 minute</string>
     <string name="settings_idle_stop_5_minutes">5 minutes</string>
