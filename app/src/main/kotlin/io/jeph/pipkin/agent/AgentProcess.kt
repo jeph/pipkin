@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transform
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.withContext
@@ -105,12 +106,21 @@ internal class AgentProcess(
   private val sessionFileState = MutableStateFlow(sessionPath)
   private val sessionNameState = MutableStateFlow<String?>(null)
   private val extensionTitleState = MutableStateFlow(sessionPath?.let { sessions.extensionTitles[it] })
+  private val extensionStatusesState = MutableStateFlow(sessionPath?.let { sessions.extensionStatuses[it] }.orEmpty())
   private val contextUsageState = MutableStateFlow<ContextUsage?>(null)
   private val contextUsageRequests = Channel<Unit>(Channel.CONFLATED)
 
   /** Pi's setTitle requests and renames so far, so a cancelled [moveSession] knows whether the title changed since. */
   @Volatile
   private var extensionTitleChanges = 0
+
+  /**
+   * The status keys Pi set or cleared since [moveSession] took the statuses down, so a cancelled move keeps those.
+   * Guarded, with every write to the statuses, by [statusLock]: Pi's reader thread sets statuses while a move takes
+   * them down or puts them back.
+   */
+  private val extensionStatusKeysChanged = HashSet<String>()
+  private val statusLock = Any()
 
   @Volatile
   private var connection: Connection? = null
@@ -147,11 +157,18 @@ internal class AgentProcess(
 
   /**
    * The title an extension set with `ctx.ui.setTitle`, shown in place of the chat's name. It lasts until a rename or a
-   * move to another session, and across the Pi restarts Pipkin makes, through [ExtensionTitles]; extensions may set
-   * another on `session_start`. A rename clears it as in Pi's terminal UI, which puts its own title back when the name
-   * changes.
+   * move to another session, and across the Pi restarts Pipkin makes, through [SessionRepository.extensionTitles];
+   * extensions may set another on `session_start`. A rename clears it as in Pi's terminal UI, which puts its own title
+   * back when the name changes.
    */
   val extensionTitle: StateFlow<String?> = extensionTitleState.asStateFlow()
+
+  /**
+   * The text extensions set with `ctx.ui.setStatus`, by status key, with Pi's ANSI styling left in. Like the title, the
+   * statuses last until a move to another session, where Pi's terminal UI clears them too, and across the Pi restarts
+   * Pipkin makes, through [SessionRepository.extensionStatuses].
+   */
+  val extensionStatuses: StateFlow<Map<String, String>> = extensionStatusesState.asStateFlow()
 
   /** How full the context window is, from `get_session_stats`; null until Pi first answered. */
   val contextUsage: StateFlow<ContextUsage?> = contextUsageState.asStateFlow()
@@ -187,7 +204,7 @@ internal class AgentProcess(
    * a copy of Pi's history while Pi is down, and nothing can be sent to it.
    */
   override fun park() {
-    keepExtensionTitle()
+    keepExtensionUi()
     startJob?.cancel()
     connection?.close()
     connection = null
@@ -196,7 +213,7 @@ internal class AgentProcess(
   }
 
   override fun close() {
-    keepExtensionTitle()
+    keepExtensionUi()
     startJob?.cancel()
     connection?.close()
     connection = null
@@ -286,31 +303,29 @@ internal class AgentProcess(
    * then re-reads state and history. Returns Pi's answer, or null when cancelled. Waits without a deadline: Pi answers
    * after the extensions' `session_before_fork` handlers, which can wait on the user.
    *
-   * The old session's extension title goes first, since Pi starts the new session's extensions, which may set their
-   * own, before it answers; [ExtensionTitles] keeps it for the session left behind. A move that doesn't happen puts the
-   * title back unless Pi changed it meanwhile. Those extensions notify before Pi answers too, so their notices wait for
-   * the new history. The new session starts with the notices that followed messages it kept, unless it has saved
-   * notices of its own.
+   * The old session's extension title and statuses go first, since Pi starts the new session's extensions, which may
+   * set their own, before it answers; [SessionRepository] keeps them for the session left behind. A move that doesn't
+   * happen puts back whichever of them Pi didn't change meanwhile. Those extensions notify before Pi answers too, so
+   * their notices wait for the new history. The new session starts with the notices that followed messages it kept,
+   * unless it has saved notices of its own.
    */
   suspend fun moveSession(command: String, params: JSONObject = JSONObject()): JSONObject? {
-    val title = extensionTitleState.value
+    val left = takeDownExtensionUi()
     val previousFile = sessionFileState.value
-    val changes = extensionTitleChanges
-    extensionTitleState.value = null
     timeline.awaitHistory()
     val data = try {
       call(command, params, timeoutMillis = null)
     } catch (error: RpcError) {
-      if (extensionTitleChanges == changes) extensionTitleState.value = title
+      putBack(left)
       timeline.keepHistory()
       throw error
     }
     if (data.optBoolean("cancelled")) {
-      if (extensionTitleChanges == changes) extensionTitleState.value = title
+      putBack(left)
       timeline.keepHistory()
       return null
     }
-    previousFile?.let { sessions.extensionTitles.keep(it, title) }
+    previousFile?.let { keepExtensionUi(it, left.title, left.statuses) }
     applyState(call("get_state"))
     val messages = getMessages()
     val path = sessionFileState.value
@@ -510,9 +525,16 @@ internal class AgentProcess(
   }
 
   private fun extensionUi(event: JSONObject) {
-    if (event.optString("method") == "setTitle") {
-      setExtensionTitle(event.optString("title").takeIf { it.isNotBlank() })
-      return
+    when (event.optString("method")) {
+      "setTitle" -> {
+        setExtensionTitle(event.optString("title").takeIf { it.isNotBlank() })
+        return
+      }
+
+      "setStatus" -> {
+        setExtensionStatus(event)
+        return
+      }
     }
     // Pi answers a timed-out dialog itself and says nothing, so the dialog goes when Pi stops waiting on it.
     val timeout = dialogTimeoutMillis(event)?.takeIf { it > 0 } ?: return
@@ -529,9 +551,47 @@ internal class AgentProcess(
     extensionTitleState.value = title
   }
 
-  /** Hands the title to [ExtensionTitles] for the next Pi on this session, whichever process that is. */
-  private fun keepExtensionTitle() {
-    sessionFileState.value?.let { sessions.extensionTitles.keep(it, extensionTitleState.value) }
+  /** Sets or, without `statusText`, clears one key's status. */
+  private fun setExtensionStatus(event: JSONObject) {
+    val key = event.opt("statusKey") as? String ?: return
+    val text = event.opt("statusText") as? String
+    synchronized(statusLock) {
+      extensionStatusKeysChanged += key
+      val statuses = extensionStatusesState.value
+      extensionStatusesState.value = if (text == null) statuses - key else statuses + (key to text)
+    }
+  }
+
+  /** The extension title and statuses [moveSession] took down, with the title's change count it was taken at. */
+  private class LeftExtensionUi(val title: String?, val titleChanges: Int, val statuses: Map<String, String>)
+
+  private fun takeDownExtensionUi(): LeftExtensionUi {
+    val statuses = synchronized(statusLock) {
+      extensionStatusKeysChanged.clear()
+      extensionStatusesState.value.also { extensionStatusesState.value = emptyMap() }
+    }
+    val left = LeftExtensionUi(extensionTitleState.value, extensionTitleChanges, statuses)
+    extensionTitleState.value = null
+    return left
+  }
+
+  /** Puts back what [takeDownExtensionUi] took down, except the title or the status keys Pi changed since. */
+  private fun putBack(left: LeftExtensionUi) {
+    if (extensionTitleChanges == left.titleChanges) extensionTitleState.value = left.title
+    synchronized(statusLock) {
+      val current = extensionStatusesState.value
+      extensionStatusesState.value = left.statuses.filterKeys { it !in extensionStatusKeysChanged } + current
+    }
+  }
+
+  /** Hands the title and statuses to [SessionRepository] for the next Pi on this session, whichever process that is. */
+  private fun keepExtensionUi() {
+    sessionFileState.value?.let { keepExtensionUi(it, extensionTitleState.value, extensionStatusesState.value) }
+  }
+
+  private fun keepExtensionUi(sessionFile: String, title: String?, statuses: Map<String, String>) {
+    sessions.extensionTitles.keep(sessionFile, title)
+    sessions.extensionStatuses.keep(sessionFile, statuses.ifEmpty { null })
   }
 
   private fun refreshContextUsage() {

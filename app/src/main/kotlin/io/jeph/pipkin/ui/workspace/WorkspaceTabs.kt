@@ -24,25 +24,11 @@ internal class WorkspaceTabs(val tabs: List<WorkspaceTab>, val chats: List<Sessi
   val count: Int get() = tabs.size + chats.size
 }
 
-/** Where a tab menu row's tab shows: in no pane, in the menu's own pane, or in the other pane, which keeps it. */
-internal enum class TabShown { Nowhere, Here, OtherPane }
-
 /**
  * What the panes show, from one pane's side: the session file of the chat or the [tab] it shows, and the session file
- * of the chat or the tab the other pane shows, which this pane can't show too.
+ * of the chat the other pane shows, which opening from this pane swaps over.
  */
-internal class PanesShow(
-  val chat: String?,
-  val tab: WorkspaceTab?,
-  val elsewhereChat: String?,
-  val elsewhereTab: WorkspaceTab?,
-) {
-  fun of(tab: WorkspaceTab): TabShown = when (tab) {
-    this.tab -> TabShown.Here
-    elsewhereTab -> TabShown.OtherPane
-    else -> TabShown.Nowhere
-  }
-}
+internal class PanesShow(val chat: String?, val tab: WorkspaceTab?, val elsewhereChat: String?)
 
 /** By pane, what it shows. */
 @Composable
@@ -74,7 +60,6 @@ internal fun rememberWorkspaceTabs(pane: Pane, cwd: String): WorkspaceTabs {
         chat = herePath,
         tab = (here as? PaneItem.Tab)?.tab,
         elsewhereChat = elsewherePath,
-        elsewhereTab = (elsewhere as? PaneItem.Tab)?.tab,
       ),
     )
   }

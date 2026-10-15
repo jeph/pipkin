@@ -235,9 +235,9 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
 }
 
 /**
- * Session name (or the first message) over the project path, with `~` for the Termux home; the tab button with the
- * number of tabs in the workspace sits before the actions button, and the file explorer's toggle ends the row, before
- * the second pane's button that closes split screen.
+ * Session name (or the first message) over the project path, with `~` for the Termux home, or over the statuses
+ * extensions set while there are any; the tab button with the number of tabs in the workspace sits before the actions
+ * button, and the file explorer's toggle ends the row, before the second pane's button that closes split screen.
  */
 @Composable
 private fun ChatHeader(
@@ -255,9 +255,13 @@ private fun ChatHeader(
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val tabs = rememberWorkspaceTabs(controls.pane, process.cwd)
   val firstMessage = sessions.firstOrNull { it.path == sessionFile }?.firstMessage?.takeIf { it.isNotBlank() }
+  val statuses by process.extensionStatuses.collectAsStateWithLifecycle()
+  val colors = pipkinColors
+  val status = remember(statuses, colors) { extensionStatusLine(statuses, colors) }
   HeaderBar(
     title = extensionTitle ?: sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),
     subtitle = hello?.home?.let { tildePath(process.cwd, it) } ?: process.cwd,
+    status = status,
     modifier = modifier,
     leading = { MenuButton(controls.onToggleSidebar) },
     trailing = {

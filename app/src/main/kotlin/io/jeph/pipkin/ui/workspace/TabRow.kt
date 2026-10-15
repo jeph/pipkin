@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,8 +35,10 @@ import io.jeph.pipkin.files.FileTab
 import io.jeph.pipkin.git.CommitTab
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.terminal.TerminalSession
+import io.jeph.pipkin.ui.chat.extensionStatusLine
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.PanningText
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.files.fileIcon
@@ -44,24 +47,27 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
 /**
- * One chat in the tab menu: what Pi is doing in it, its title and age, highlighted while it is the one shown, and an
- * actions button that long-press also opens. One the other pane shows says so instead of its age.
+ * One chat in the tab menu: what Pi is doing in it, its title, and the statuses its extensions set, else its age;
+ * highlighted while it is the one shown, with an actions button that long-press also opens.
  */
 @Composable
 internal fun ChatTabRow(
   title: String,
   modified: Long,
+  statuses: Map<String, String>,
   process: AgentProcess?,
-  shown: TabShown,
+  current: Boolean,
   onOpen: () -> Unit,
   onActions: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  val colors = pipkinColors
+  val status = remember(statuses, colors) { extensionStatusLine(statuses, colors) }
   TabRow(
     mark = { if (process != null) ActivityMark(process) else IdleMark() },
     title = title,
-    detail = relativeTime(modified),
-    shown = shown,
+    detail = { if (status != null) PanningText(status) else DetailText(relativeTime(modified)) },
+    current = current,
     onOpen = onOpen,
     onActions = onActions,
     actionsDescription = stringResource(R.string.shell_session_actions),
@@ -69,14 +75,11 @@ internal fun ChatTabRow(
   )
 }
 
-/**
- * One terminal in the tab menu: the terminal icon and its name, highlighted while it is the one shown. One the other
- * pane shows says so.
- */
+/** One terminal in the tab menu: the terminal icon and its name, highlighted while it is the one shown. */
 @Composable
 internal fun TerminalTabRow(
   session: TerminalSession,
-  shown: TabShown,
+  current: Boolean,
   onOpen: () -> Unit,
   onActions: () -> Unit,
   modifier: Modifier = Modifier,
@@ -91,7 +94,7 @@ internal fun TerminalTabRow(
     },
     title = terminalTitle(session),
     detail = null,
-    shown = shown,
+    current = current,
     onOpen = onOpen,
     onActions = onActions,
     actionsDescription = stringResource(R.string.terminal_actions),
@@ -99,14 +102,11 @@ internal fun TerminalTabRow(
   )
 }
 
-/**
- * One open file in the tab menu: its file-type icon, its name over its folder, highlighted while it is the one shown.
- * One the other pane shows says so instead of its folder.
- */
+/** One open file in the tab menu: its file-type icon, its name over its folder, highlighted while it is the one shown. */
 @Composable
 internal fun FileTabRow(
   file: FileTab,
-  shown: TabShown,
+  current: Boolean,
   onOpen: () -> Unit,
   onActions: () -> Unit,
   modifier: Modifier = Modifier,
@@ -120,8 +120,8 @@ internal fun FileTabRow(
       )
     },
     title = file.name,
-    detail = file.folder.ifEmpty { null },
-    shown = shown,
+    detail = file.folder.takeIf { it.isNotEmpty() }?.let { folder -> { DetailText(folder) } },
+    current = current,
     onOpen = onOpen,
     onActions = onActions,
     actionsDescription = stringResource(R.string.file_actions),
@@ -129,14 +129,11 @@ internal fun FileTabRow(
   )
 }
 
-/**
- * One open commit in the tab menu: the commit icon and its short SHA and subject, highlighted while it's shown. One the
- * other pane shows says so.
- */
+/** One open commit in the tab menu: the commit icon and its short SHA and subject, highlighted while it's shown. */
 @Composable
 internal fun CommitTabRow(
   commit: CommitTab,
-  shown: TabShown,
+  current: Boolean,
   onOpen: () -> Unit,
   onActions: () -> Unit,
   modifier: Modifier = Modifier,
@@ -151,7 +148,7 @@ internal fun CommitTabRow(
     },
     title = commit.title,
     detail = null,
-    shown = shown,
+    current = current,
     onOpen = onOpen,
     onActions = onActions,
     actionsDescription = stringResource(R.string.git_commit_actions),
@@ -164,21 +161,20 @@ internal fun CommitTabRow(
 private fun TabRow(
   mark: @Composable () -> Unit,
   title: String,
-  detail: String?,
-  shown: TabShown,
+  detail: (@Composable () -> Unit)?,
+  current: Boolean,
   onOpen: () -> Unit,
   onActions: () -> Unit,
   actionsDescription: String,
   modifier: Modifier,
 ) {
   val colors = pipkinColors
-  val shownDetail = if (shown == TabShown.OtherPane) stringResource(R.string.shell_split_other_pane) else detail
   Row(
     modifier = modifier
       .fillMaxWidth()
       .padding(horizontal = PipkinTokens.Spacing.s8)
       .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
-      .background(if (shown == TabShown.Here) colors.surface2 else Color.Transparent)
+      .background(if (current) colors.surface2 else Color.Transparent)
       .combinedClickable(onClick = onOpen, onLongClick = onActions)
       .heightIn(min = 52.dp)
       .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4),
@@ -194,15 +190,7 @@ private fun TabRow(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      if (shownDetail != null) {
-        Text(
-          text = shownDetail,
-          color = colors.foregroundMuted,
-          fontSize = PipkinTokens.FontSize.sm,
-          maxLines = 1,
-          overflow = TextOverflow.StartEllipsis,
-        )
-      }
+      detail?.invoke()
     }
     IconButton28(
       icon = R.drawable.ic_lucide_ellipsis,
@@ -214,21 +202,23 @@ private fun TabRow(
   }
 }
 
+/** A row's second line; a long one keeps its end, where a folder path names the folder. */
+@Composable
+private fun DetailText(text: String) {
+  Text(
+    text = text,
+    color = pipkinColors.foregroundMuted,
+    fontSize = PipkinTokens.FontSize.sm,
+    maxLines = 1,
+    overflow = TextOverflow.StartEllipsis,
+  )
+}
+
 /** The chat's name, else its first message, else "New chat". */
 @Composable
 internal fun sessionTitle(session: SessionInfo): String = session.name?.takeIf { it.isNotBlank() }
   ?: session.firstMessage.takeIf { it.isNotBlank() }
   ?: stringResource(R.string.shell_session_untitled)
-
-/**
- * The title an extension set on the chat: its running [process]'s, or the [keptTitle] Pipkin kept when it stopped the
- * chat's Pi. Else [sessionTitle].
- */
-@Composable
-internal fun chatTitle(session: SessionInfo, process: AgentProcess?, keptTitle: String?): String {
-  val extensionTitle = if (process != null) process.extensionTitle.collectAsStateWithLifecycle().value else keptTitle
-  return extensionTitle ?: sessionTitle(session)
-}
 
 /** The simmering pot while Pi works, a danger dot after Pi exited with a failure, otherwise [IdleMark]. */
 @Composable

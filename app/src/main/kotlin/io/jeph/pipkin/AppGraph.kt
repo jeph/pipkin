@@ -9,7 +9,6 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.AgentService
-import io.jeph.pipkin.agent.ExtensionTitles
 import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.agent.TurnNotifications
 import io.jeph.pipkin.data.AccountRepository
@@ -45,9 +44,7 @@ internal class AppGraph(private val application: Application) {
   )
   val keepAlive = KeepAlive(application)
   val preferences = Preferences(application)
-  val extensionTitles = ExtensionTitles()
-  val sessionRepository =
-    SessionRepository(hostClient, NoticeStore(File(application.filesDir, "notices")), extensionTitles, scope)
+  val sessionRepository = SessionRepository(hostClient, NoticeStore(File(application.filesDir, "notices")), scope)
   val sessionArchive = SessionArchive(sessionRepository, preferences, scope)
   private val turnNotifications = TurnNotifications(application) { hostClient.lastHello.value?.home }
   val registry: AgentRegistry<AgentProcess> =

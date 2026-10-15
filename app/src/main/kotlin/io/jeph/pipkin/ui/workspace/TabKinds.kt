@@ -46,13 +46,13 @@ internal fun WorkspaceTabScreen(tab: WorkspaceTab, controls: PaneControls) {
   }
 }
 
-/** [tab]'s row in the tab menu. */
+/** [tab]'s row in the tab menu, highlighted while it's [current]. */
 @Composable
-internal fun WorkspaceTabRow(tab: WorkspaceTab, shown: TabShown, onOpen: () -> Unit, onActions: () -> Unit) {
+internal fun WorkspaceTabRow(tab: WorkspaceTab, current: Boolean, onOpen: () -> Unit, onActions: () -> Unit) {
   when (tab) {
-    is WorkspaceTab.Terminal -> TerminalTabRow(tab.session, shown, onOpen, onActions)
-    is WorkspaceTab.File -> FileTabRow(tab.file, shown, onOpen, onActions)
-    is WorkspaceTab.Commit -> CommitTabRow(tab.commit, shown, onOpen, onActions)
+    is WorkspaceTab.Terminal -> TerminalTabRow(tab.session, current, onOpen, onActions)
+    is WorkspaceTab.File -> FileTabRow(tab.file, current, onOpen, onActions)
+    is WorkspaceTab.Commit -> CommitTabRow(tab.commit, current, onOpen, onActions)
   }
 }
 

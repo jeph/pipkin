@@ -1,7 +1,7 @@
 package io.jeph.pipkin.data
 
 import android.util.Log
-import io.jeph.pipkin.agent.ExtensionTitles
+import io.jeph.pipkin.agent.KeptBySession
 import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.SessionInfo
@@ -25,13 +25,17 @@ internal class SessionRepository(
   private val hostClient: HostClient,
   /** Each session's extension notices, which Pi does not keep. */
   val notices: NoticeStore,
-  /** The extension titles of sessions whose Pi stopped, which a later Pi on the session starts with. */
-  val extensionTitles: ExtensionTitles,
   scope: CoroutineScope,
 ) {
   private val sessionsState = MutableStateFlow<List<SessionInfo>>(emptyList())
   private val loadedState = MutableStateFlow(false)
   private val requests = Channel<Unit>(Channel.CONFLATED)
+
+  /** The extension titles of sessions whose Pi stopped, which a later Pi on the session starts with. */
+  val extensionTitles = KeptBySession<String>()
+
+  /** The extension statuses of sessions whose Pi stopped, by key, which a later Pi on the session starts with. */
+  val extensionStatuses = KeptBySession<Map<String, String>>()
 
   val sessions: StateFlow<List<SessionInfo>> = sessionsState.asStateFlow()
 

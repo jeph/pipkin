@@ -234,8 +234,8 @@ private class TabListCallbacks(
 )
 
 /**
- * The tab menu's rows: the workspace's open tabs, then the saved chats. What the pane shows is highlighted, and what
- * the other pane shows is marked.
+ * The tab menu's rows: the workspace's open tabs, then the saved chats. What the pane shows is highlighted; opening the
+ * chat the other pane shows swaps the panes.
  */
 @Composable
 private fun TabList(
@@ -247,7 +247,8 @@ private fun TabList(
 ) {
   val graph = LocalContext.current.appGraph
   val processes by graph.registry.processes.collectAsStateWithLifecycle()
-  val keptTitles by graph.extensionTitles.bySessionFile.collectAsStateWithLifecycle()
+  val keptTitles by graph.sessionRepository.extensionTitles.bySessionFile.collectAsStateWithLifecycle()
+  val keptStatuses by graph.sessionRepository.extensionStatuses.bySessionFile.collectAsStateWithLifecycle()
   LazyColumn(modifier = modifier) {
     tabRows(tabs, closing, callbacks)
     items(tabs.chats, key = { it.path }) { session ->
@@ -263,12 +264,9 @@ private fun TabList(
         ChatTabRow(
           title = chatTitle(session, process, keptTitles[session.path]),
           modified = session.modified,
+          statuses = chatStatuses(process, keptStatuses[session.path]),
           process = process,
-          shown = when (session.path) {
-            tabs.shown.chat -> TabShown.Here
-            tabs.shown.elsewhereChat -> TabShown.OtherPane
-            else -> TabShown.Nowhere
-          },
+          current = session.path == tabs.shown.chat,
           onOpen = { if (elsewhere) callbacks.onSwapPanes() else callbacks.onOpenChat(session) },
           onActions = { callbacks.onActions(TabMenu.Chat(session)) },
         )
@@ -290,7 +288,7 @@ private fun LazyListScope.tabRows(tabs: WorkspaceTabs, closing: TabClosing, call
     ) {
       WorkspaceTabRow(
         tab = tab,
-        shown = tabs.shown.of(tab),
+        current = tab == tabs.shown.tab,
         onOpen = { callbacks.onShow(tab) },
         onActions = { callbacks.onActions(TabMenu.Tab(tab)) },
       )

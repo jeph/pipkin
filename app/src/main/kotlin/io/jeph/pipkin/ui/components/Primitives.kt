@@ -2,6 +2,7 @@ package io.jeph.pipkin.ui.components
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -86,12 +88,16 @@ fun IconButton28(
   }
 }
 
-/** 56dp header with an 8dp top pad below the status bar and a 1dp bottom border. */
+/**
+ * 56dp header with an 8dp top pad below the status bar and a 1dp bottom border. A [status] shows in place of the
+ * [subtitle], panning when it doesn't fit.
+ */
 @Composable
 fun HeaderBar(
   title: String,
   modifier: Modifier = Modifier,
   subtitle: String? = null,
+  status: AnnotatedString? = null,
   leading: @Composable RowScope.() -> Unit = {},
   trailing: @Composable RowScope.() -> Unit = {},
 ) {
@@ -117,7 +123,9 @@ fun HeaderBar(
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
         )
-        if (subtitle != null) {
+        if (status != null) {
+          PanningText(status)
+        } else if (subtitle != null) {
           Text(
             text = subtitle,
             color = colors.foregroundMuted,
@@ -132,6 +140,28 @@ fun HeaderBar(
     HorizontalDivider(thickness = 1.dp, color = colors.border)
   }
 }
+
+/**
+ * A muted one-line caption that, when it doesn't fit, pans to its end and around again every few seconds, so all of it
+ * shows in turn. Text that fits stays still.
+ */
+@Composable
+fun PanningText(text: AnnotatedString, modifier: Modifier = Modifier) {
+  Text(
+    text = text,
+    modifier = modifier.basicMarquee(
+      iterations = Int.MAX_VALUE,
+      initialDelayMillis = PAN_DELAY_MILLIS,
+      repeatDelayMillis = PAN_DELAY_MILLIS,
+    ),
+    color = pipkinColors.foregroundMuted,
+    fontSize = PipkinTokens.FontSize.sm,
+    maxLines = 1,
+    softWrap = false,
+  )
+}
+
+private const val PAN_DELAY_MILLIS = 2_500
 
 /** Paseo's bottom-sheet row: 44dp minimum, 20dp icon slot, value capped at 45% width. */
 @Composable
