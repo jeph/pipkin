@@ -247,6 +247,7 @@ private fun TabList(
 ) {
   val graph = LocalContext.current.appGraph
   val processes by graph.registry.processes.collectAsStateWithLifecycle()
+  val keptTitles by graph.extensionTitles.bySessionFile.collectAsStateWithLifecycle()
   LazyColumn(modifier = modifier) {
     tabRows(tabs, closing, callbacks)
     items(tabs.chats, key = { it.path }) { session ->
@@ -258,10 +259,11 @@ private fun TabList(
         containerColor = pipkinColors.surface1,
         modifier = Modifier.animateItem(),
       ) {
+        val process = processes[ChatKey.session(session.path)]
         ChatTabRow(
-          title = sessionTitle(session),
+          title = chatTitle(session, process, keptTitles[session.path]),
           modified = session.modified,
-          process = processes[ChatKey.session(session.path)],
+          process = process,
           shown = when (session.path) {
             tabs.shown.chat -> TabShown.Here
             tabs.shown.elsewhereChat -> TabShown.OtherPane

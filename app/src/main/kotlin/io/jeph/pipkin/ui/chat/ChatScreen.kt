@@ -249,13 +249,14 @@ private fun ChatHeader(
 ) {
   val graph = LocalContext.current.appGraph
   val sessionName by process.sessionName.collectAsStateWithLifecycle()
+  val extensionTitle by process.extensionTitle.collectAsStateWithLifecycle()
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
   val sessions by graph.sessionRepository.sessions.collectAsStateWithLifecycle()
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
   val tabs = rememberWorkspaceTabs(controls.pane, process.cwd)
   val firstMessage = sessions.firstOrNull { it.path == sessionFile }?.firstMessage?.takeIf { it.isNotBlank() }
   HeaderBar(
-    title = sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),
+    title = extensionTitle ?: sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),
     subtitle = hello?.home?.let { tildePath(process.cwd, it) } ?: process.cwd,
     modifier = modifier,
     leading = { MenuButton(controls.onToggleSidebar) },

@@ -220,6 +220,16 @@ internal fun sessionTitle(session: SessionInfo): String = session.name?.takeIf {
   ?: session.firstMessage.takeIf { it.isNotBlank() }
   ?: stringResource(R.string.shell_session_untitled)
 
+/**
+ * The title an extension set on the chat: its running [process]'s, or the [keptTitle] Pipkin kept when it stopped the
+ * chat's Pi. Else [sessionTitle].
+ */
+@Composable
+internal fun chatTitle(session: SessionInfo, process: AgentProcess?, keptTitle: String?): String {
+  val extensionTitle = if (process != null) process.extensionTitle.collectAsStateWithLifecycle().value else keptTitle
+  return extensionTitle ?: sessionTitle(session)
+}
+
 /** The simmering pot while Pi works, a danger dot after Pi exited with a failure, otherwise [IdleMark]. */
 @Composable
 private fun ActivityMark(process: AgentProcess) {
