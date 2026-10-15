@@ -67,18 +67,11 @@ internal fun ChatScreen(
   // timeline for a frame after a switch, until the collector of the new one has run.
   key(process) {
     val context = LocalContext.current
-    val keyboard = LocalSoftwareKeyboardController.current
-    val focus = LocalFocusManager.current
-    val openTabs = {
-      keyboard?.hide()
-      focus.clearFocus()
-      controls.onOpenTabs()
-    }
     var sheet by remember { mutableStateOf<ChatSheet?>(null) }
     val navigator = rememberNavigator(
       onSheet = { sheet = it },
       onNewChat = { actions.newChat(controls.pane, process.cwd) },
-      onOpenTabs = openTabs,
+      onOpenTabs = controls.onOpenTabs,
       onOpenSettings = onOpenSettings,
     )
     val controller = remember {
@@ -90,7 +83,6 @@ internal fun ChatScreen(
       controller,
       snackbar,
       controls,
-      openTabs,
       onOpenSettings,
       onSheet = { sheet = it },
       modifier,
@@ -137,7 +129,6 @@ private fun ChatContent(
   controller: ChatController,
   snackbar: SnackbarStackState,
   controls: PaneControls,
-  onOpenTabs: () -> Unit,
   onOpenSettings: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
   modifier: Modifier,
@@ -160,7 +151,6 @@ private fun ChatContent(
     ChatHeader(
       process,
       controls,
-      onOpenTabs,
       onActions = { onSheet(ChatSheet.Actions) },
       Modifier.onUnhandledTap(dismissKeyboard),
     )
@@ -240,13 +230,7 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
  * button, and the file explorer's toggle ends the row, before the second pane's button that closes split screen.
  */
 @Composable
-private fun ChatHeader(
-  process: AgentProcess,
-  controls: PaneControls,
-  onOpenTabs: () -> Unit,
-  onActions: () -> Unit,
-  modifier: Modifier,
-) {
+private fun ChatHeader(process: AgentProcess, controls: PaneControls, onActions: () -> Unit, modifier: Modifier) {
   val graph = LocalContext.current.appGraph
   val sessionName by process.sessionName.collectAsStateWithLifecycle()
   val extensionTitle by process.extensionTitle.collectAsStateWithLifecycle()
@@ -265,7 +249,7 @@ private fun ChatHeader(
     modifier = modifier,
     leading = { MenuButton(controls.onToggleSidebar) },
     trailing = {
-      TabCountButton(count = tabs.count, onClick = onOpenTabs)
+      TabCountButton(count = tabs.count, onClick = controls.onOpenTabs)
       IconButton28(
         icon = R.drawable.ic_lucide_ellipsis,
         contentDescription = stringResource(R.string.chat_actions),
