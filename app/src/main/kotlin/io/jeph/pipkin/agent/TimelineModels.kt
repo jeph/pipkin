@@ -78,6 +78,12 @@ sealed interface TimelineItem {
     val images: List<ImagePart>,
   ) : TimelineItem
 
+  /**
+   * A message an extension showed with `ctx.ui.notify`. Pi keeps no record of it, so Pipkin saves it as a
+   * [SavedNotice] and puts it back whenever the chat reloads its history.
+   */
+  data class ExtensionNotice(override val key: String, val level: NoticeLevel, val message: String) : TimelineItem
+
   data class Notice(override val key: String, val text: String) : TimelineItem
 
   /** Closes a run that started at [startedAt]; [durationMillis] is null while Pi is still working. */
@@ -88,6 +94,29 @@ sealed interface TimelineItem {
 
 /** A base64-encoded image attached to a user message. */
 data class ImagePart(val data: String, val mimeType: String)
+
+/** An [TimelineItem.ExtensionNotice]'s `notifyType`; Pi's terminal UI shows any other type as [Info]. */
+enum class NoticeLevel {
+  Info,
+  Warning,
+  Error,
+  ;
+
+  companion object {
+    fun of(notifyType: String?): NoticeLevel = when (notifyType) {
+      "warning" -> Warning
+      "error" -> Error
+      else -> Info
+    }
+  }
+}
+
+/**
+ * An extension notice as saved with its session, placed back after the message whose Pi `timestamp` is [after], or
+ * first when it came before any message or that message is no longer in the history (a compaction drops the oldest).
+ * One that came [afterRun], once the run that message ended had finished, follows that run's footer.
+ */
+data class SavedNotice(val level: NoticeLevel, val message: String, val after: Long?, val afterRun: Boolean)
 
 enum class ToolStatus { Pending, Running, Done }
 
@@ -115,7 +144,5 @@ internal fun dialogTimeoutMillis(event: JSONObject): Long? =
 
 /** One-shot UI actions requested by Pi extensions. */
 sealed interface TimelineEffect {
-  data class Notify(val message: String, val notifyType: String?) : TimelineEffect
-
   data class SetEditorText(val text: String) : TimelineEffect
 }

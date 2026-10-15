@@ -20,7 +20,12 @@ import org.json.JSONException
  * chat's first message creates its session file, after a run settles and after renames and deletes. A failed refresh
  * keeps the previous list; the host failure is reported through [HostClient.lastFailure].
  */
-internal class SessionRepository(private val hostClient: HostClient, scope: CoroutineScope) {
+internal class SessionRepository(
+  private val hostClient: HostClient,
+  /** Each session's extension notices, which Pi does not keep. */
+  val notices: NoticeStore,
+  scope: CoroutineScope,
+) {
   private val sessionsState = MutableStateFlow<List<SessionInfo>>(emptyList())
   private val loadedState = MutableStateFlow(false)
   private val requests = Channel<Unit>(Channel.CONFLATED)
@@ -44,9 +49,13 @@ internal class SessionRepository(private val hostClient: HostClient, scope: Coro
     if (sessionsState.value.none { it.path == path }) refresh()
   }
 
-  /** Deletes the session files; throws [HostFailure][io.jeph.pipkin.host.HostFailure] or [HostRejected]. */
+  /**
+   * Deletes the session files and their saved notices; throws [HostFailure][io.jeph.pipkin.host.HostFailure] or
+   * [HostRejected].
+   */
   suspend fun delete(paths: Collection<String>) {
     hostClient.deleteSessions(paths.toList())
+    notices.delete(paths)
     sessionsState.value = sessionsState.value.filterNot { it.path in paths }
     refresh()
   }

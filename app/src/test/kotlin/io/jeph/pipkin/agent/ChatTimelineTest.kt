@@ -2,13 +2,13 @@ package io.jeph.pipkin.agent
 
 import io.jeph.pipkin.agent.TimelineItem.AssistantText
 import io.jeph.pipkin.agent.TimelineItem.ExitBanner
+import io.jeph.pipkin.agent.TimelineItem.ExtensionNotice
 import io.jeph.pipkin.agent.TimelineItem.Notice
 import io.jeph.pipkin.agent.TimelineItem.Thinking
 import io.jeph.pipkin.agent.TimelineItem.ToolCall
 import io.jeph.pipkin.agent.TimelineItem.TurnFooter
 import io.jeph.pipkin.agent.TimelineItem.User
-import kotlinx.coroutines.flow.take
-import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
@@ -408,7 +408,7 @@ class ChatTimelineTest {
   }
 
   @Test
-  fun extensionUiDialogsArePendingAndFireAndForgetBecomeEffects() = runBlocking {
+  fun extensionUiDialogsArePendingAndSetEditorTextIsAnEffect() = runBlocking {
     apply(
       """{"type":"extension_ui_request","id":"u1","method":"select","title":"Allow?","options":["Allow","Block"],
           "timeout":10000}""",
@@ -426,14 +426,9 @@ class ChatTimelineTest {
     timeline.dismissDialog("u2")
 
     apply("""{"type":"extension_ui_request","id":"u3","method":"setStatus","statusKey":"k","statusText":"s"}""")
-    apply("""{"type":"extension_ui_request","id":"u4","method":"notify","message":"Nope","notifyType":"warning"}""")
     apply("""{"type":"extension_ui_request","id":"u5","method":"set_editor_text","text":"draft"}""")
     assertNull(timeline.state.value.pendingUi)
-    val effects = withTimeout(1_000) { timeline.effects.take(2).toList() }
-    assertEquals(
-      listOf(TimelineEffect.Notify("Nope", "warning"), TimelineEffect.SetEditorText("draft")),
-      effects,
-    )
+    assertEquals(TimelineEffect.SetEditorText("draft"), withTimeout(1_000) { timeline.effects.first() })
   }
 
   @Test

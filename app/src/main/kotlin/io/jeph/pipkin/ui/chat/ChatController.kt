@@ -313,7 +313,6 @@ internal class ChatController(
   suspend fun collectEffects() {
     process.timeline.effects.collect { effect ->
       when (effect) {
-        is TimelineEffect.Notify -> show(effect.message)
         is TimelineEffect.SetEditorText -> setDraftText(effect.text)
       }
     }
@@ -323,7 +322,7 @@ internal class ChatController(
 
   fun show(message: String) {
     if (message.isBlank()) return
-    // show suspends until the snackbar leaves; a separate coroutine keeps callers and effects flowing.
+    // show suspends until the snackbar leaves; a separate coroutine keeps its callers going.
     scope.launch { snackbar.show(message) }
   }
 

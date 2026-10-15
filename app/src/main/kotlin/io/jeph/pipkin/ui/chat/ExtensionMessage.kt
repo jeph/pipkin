@@ -1,5 +1,7 @@
 package io.jeph.pipkin.ui.chat
 
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -26,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -33,8 +37,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
+import io.jeph.pipkin.agent.NoticeLevel
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.MarkdownCache
@@ -43,11 +50,20 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlin.math.roundToInt
 
-/** How many markdown lines a folded extension message shows. */
+/** How many lines a folded extension message or notice shows. */
 private const val FOLDED_LINES = 6
 
-/** How many lines past [FOLDED_LINES] a message may run before it folds; paragraph spacing makes real lines taller. */
+/** How many lines past [FOLDED_LINES] content may run before it folds; paragraph spacing makes real lines taller. */
 private const val FOLD_SLACK_LINES = 3
+
+/** Paseo's notice line height, which also sets its icon's 20dp row. */
+private val NOTICE_LINE_HEIGHT = 20.sp
+
+/** Paseo's notice tints, the same in both themes: blue-300, amber-500 and red-500, behind the text at 10%. */
+private val INFO_TINT = Color(0xFF93C5FD)
+private val WARNING_TINT = Color(0xFFF59E0B)
+private val ERROR_WASH = Color(0xFFEF4444)
+private const val WASH_ALPHA = 0.1f
 
 /**
  * A message an extension posted, as Pi's terminal shows it: the extension's message type over its content, set apart
@@ -90,7 +106,7 @@ internal fun ExtensionMessage(
       )
     }
     if (item.markdown.isNotBlank()) {
-      FoldedContent(item.key) {
+      FoldedContent(item.key, PipkinTokens.LineHeight.markdown, fadeTo = colors.surface1) {
         PipkinMarkdown(markdown = item.markdown, modifier = Modifier.fillMaxWidth(), cache = markdownCache)
       }
     }
@@ -106,14 +122,72 @@ internal fun ExtensionMessage(
 }
 
 /**
- * [content] cut to [FOLDED_LINES] lines over a fade, with a toggle to show all of it. Content at most [FOLD_SLACK_LINES]
- * lines taller shows whole, without the toggle, since Show more would reveal next to nothing. Unfolding is kept by the
- * row's [key] while the row scrolls away.
+ * A notice an extension showed with `ctx.ui.notify`, as Paseo shows one: a card tinted by its level. Long notices fold
+ * like extension messages, and the text can be selected.
  */
 @Composable
-private fun FoldedContent(key: String, content: @Composable ColumnScope.() -> Unit) {
+internal fun ExtensionNoticeCard(item: TimelineItem.ExtensionNotice, modifier: Modifier = Modifier) {
   val colors = pipkinColors
-  val linePx = with(LocalDensity.current) { PipkinTokens.LineHeight.markdown.toPx() }
+  val look = when (item.level) {
+    NoticeLevel.Info -> NoticeLook(R.drawable.ic_lucide_info, R.string.chat_notice_info, INFO_TINT, INFO_TINT)
+
+    NoticeLevel.Warning ->
+      NoticeLook(R.drawable.ic_lucide_triangle_alert, R.string.chat_notice_warning, WARNING_TINT, WARNING_TINT)
+
+    NoticeLevel.Error ->
+      NoticeLook(R.drawable.ic_lucide_circle_x, R.string.chat_notice_error, colors.destructive, ERROR_WASH)
+  }
+  // Opaque, so a folded notice's fade ends in the card's own colour.
+  val background = look.wash.copy(alpha = WASH_ALPHA).compositeOver(colors.surface0)
+  Row(
+    modifier = modifier
+      .fillMaxWidth()
+      .background(background, RoundedCornerShape(PipkinTokens.Radius.md))
+      .padding(horizontal = PipkinTokens.Spacing.s12, vertical = 10.dp),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+  ) {
+    LucideIcon(
+      icon = look.icon,
+      contentDescription = stringResource(look.description),
+      modifier = Modifier.padding(top = PipkinTokens.Spacing.s2),
+      tint = look.tint,
+    )
+    Column(modifier = Modifier.weight(1f)) {
+      FoldedContent(item.key, NOTICE_LINE_HEIGHT, fadeTo = background) {
+        SelectionContainer {
+          Text(
+            text = item.message,
+            color = colors.foreground,
+            fontSize = PipkinTokens.FontSize.base,
+            lineHeight = NOTICE_LINE_HEIGHT,
+          )
+        }
+      }
+    }
+  }
+}
+
+private data class NoticeLook(
+  @DrawableRes val icon: Int,
+  @StringRes val description: Int,
+  val tint: Color,
+  val wash: Color,
+)
+
+/**
+ * [content] cut to [FOLDED_LINES] lines of [lineHeight] over a fade into [fadeTo], with a toggle to show all of it.
+ * Content at most [FOLD_SLACK_LINES] lines taller shows whole, without the toggle, since Show more would reveal next
+ * to nothing. Unfolding is kept by the row's [key] while the row scrolls away.
+ */
+@Composable
+private fun FoldedContent(
+  key: String,
+  lineHeight: TextUnit,
+  fadeTo: Color,
+  content: @Composable ColumnScope.() -> Unit,
+) {
+  val colors = pipkinColors
+  val linePx = with(LocalDensity.current) { lineHeight.toPx() }
   val foldedPx = (linePx * FOLDED_LINES).roundToInt()
   val foldsAbovePx = (linePx * (FOLDED_LINES + FOLD_SLACK_LINES)).roundToInt()
   var expanded by rememberSaveable(key) { mutableStateOf(false) }
@@ -140,7 +214,7 @@ private fun FoldedContent(key: String, content: @Composable ColumnScope.() -> Un
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .height(PipkinTokens.Spacing.s24)
-            .background(Brush.verticalGradient(listOf(Color.Transparent, colors.surface1))),
+            .background(Brush.verticalGradient(listOf(Color.Transparent, fadeTo))),
         )
       }
     }

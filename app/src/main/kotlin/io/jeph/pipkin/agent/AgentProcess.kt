@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -120,7 +121,13 @@ internal class AgentProcess(
   @Volatile
   private var lastAutoReconnectAt: Long? = null
 
-  val timeline = ChatTimeline()
+  /** Whether [connect] restored the session's saved notices; once, before the first connection. */
+  private var noticesRestored = false
+
+  /** Saves each notice as it arrives, so the file holds every notice the screen showed. */
+  val timeline = ChatTimeline(
+    onNoticesChanged = { notices -> sessionFileState.value?.let { sessions.notices.put(it, notices) } },
+  )
 
   /**
    * [ChatTimeline.state] for the screen, at most once per [STREAM_UPDATE_MILLIS] and always ending on the latest
@@ -282,26 +289,37 @@ internal class AgentProcess(
    *
    * The old session's extension title goes first, since Pi starts the new session's extensions, which may set their
    * own, before it answers; [ExtensionTitles] keeps it for the session left behind. A move that doesn't happen puts the
-   * title back unless Pi changed it meanwhile.
+   * title back unless Pi changed it meanwhile. Those extensions notify before Pi answers too, so their notices wait for
+   * the new history. The new session starts with the notices that followed messages it kept, unless it has saved
+   * notices of its own.
    */
   suspend fun moveSession(command: String, params: JSONObject = JSONObject()): JSONObject? {
     val title = extensionTitleState.value
     val previousFile = sessionFileState.value
     val changes = extensionTitleChanges
     extensionTitleState.value = null
+    timeline.awaitHistory()
     val data = try {
       call(command, params, timeoutMillis = null)
     } catch (error: RpcError) {
       if (extensionTitleChanges == changes) extensionTitleState.value = title
+      timeline.keepHistory()
       throw error
     }
     if (data.optBoolean("cancelled")) {
       if (extensionTitleChanges == changes) extensionTitleState.value = title
+      timeline.keepHistory()
       return null
     }
     previousFile?.let { extensionTitles.keep(it, title) }
     applyState(call("get_state"))
-    timeline.seed(getMessages())
+    val messages = getMessages()
+    val path = sessionFileState.value
+    val saved = path?.let { withContext(Dispatchers.IO) { sessions.notices.load(it) } }.orEmpty()
+    val kept = messageTimestamps(messages)
+    timeline.restoreNotices { placed -> saved.ifEmpty { placed.filter { it.after == null || it.after in kept } } }
+    path?.let { sessions.notices.put(it, timeline.savedNotices()) }
+    timeline.seed(messages)
     refreshContextUsage()
     sessions.refresh()
     return data
@@ -343,6 +361,7 @@ internal class AgentProcess(
 
   /** Connects; a `pi_version` refusal installs the pinned Pi once and retries once. */
   private suspend fun connect() {
+    restoreNotices()
     var installed = false
     while (true) {
       val rejection = attempt() ?: return
@@ -353,6 +372,16 @@ internal class AgentProcess(
       installed = true
       if (!install()) return
     }
+  }
+
+  /** Before the first connection, so a notice Pi sends while starting joins the saved ones instead of replacing them. */
+  private suspend fun restoreNotices() {
+    if (noticesRestored) return
+    sessionFileState.value?.let { path ->
+      val saved = withContext(Dispatchers.IO) { sessions.notices.load(path) }
+      timeline.restoreNotices { saved }
+    }
+    noticesRestored = true
   }
 
   /** One connection; returns the host's refusal, or null once [state] is Ready, Exited or Failed. */
@@ -511,7 +540,13 @@ internal class AgentProcess(
   }
 
   private fun applyState(data: JSONObject) {
-    (data.opt("sessionFile") as? String)?.let { sessionFileState.value = it }
+    (data.opt("sessionFile") as? String)?.let { path ->
+      val named = sessionFileState.value == null
+      sessionFileState.value = path
+      // A new chat learns its session file here, so the notices it showed before are saved now. Set first, so a notice
+      // arriving meanwhile is saved by the timeline's callback instead.
+      if (named) sessions.notices.put(path, timeline.savedNotices())
+    }
     sessionNameState.value = data.opt("sessionName") as? String
     // With no usable model Pi 1.1.0 reports a placeholder whose provider is "unknown" rather than omitting it.
     timeline.setModel(data.optJSONObject("model")?.takeUnless { it.optString("provider") == "unknown" })
@@ -551,4 +586,9 @@ private fun messageParams(message: String, images: List<ImagePart>): JSONObject 
   if (images.isEmpty()) return params
   val parts = images.map { JSONObject().put("type", "image").put("data", it.data).put("mimeType", it.mimeType) }
   return params.put("images", JSONArray(parts))
+}
+
+/** The Pi `timestamp` of every message in a `get_messages` history. */
+private fun messageTimestamps(messages: JSONArray): Set<Long> = (0 until messages.length()).mapNotNullTo(HashSet()) {
+  messages.optJSONObject(it)?.optLong("timestamp")?.takeIf { timestamp -> timestamp > 0 }
 }

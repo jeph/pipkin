@@ -324,6 +324,7 @@ private fun StreamItem(
     is TimelineItem.User -> UserMessage(item, modifier)
     is TimelineItem.AssistantText -> AssistantMessage(item, markdownCache, modifier)
     is TimelineItem.ExtensionMessage -> ExtensionMessage(item, markdownCache, modifier)
+    is TimelineItem.ExtensionNotice -> ExtensionNoticeCard(item, modifier)
     is TimelineItem.Thinking -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
     is TimelineItem.ToolCall -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
     is TimelineItem.Error -> ErrorRow(item.message, modifier)

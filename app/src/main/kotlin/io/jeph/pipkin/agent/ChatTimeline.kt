@@ -2,6 +2,7 @@ package io.jeph.pipkin.agent
 
 import io.jeph.pipkin.agent.TimelineItem.AssistantText
 import io.jeph.pipkin.agent.TimelineItem.ExitBanner
+import io.jeph.pipkin.agent.TimelineItem.ExtensionNotice
 import io.jeph.pipkin.agent.TimelineItem.Notice
 import io.jeph.pipkin.agent.TimelineItem.Thinking
 import io.jeph.pipkin.agent.TimelineItem.ToolCall
@@ -25,7 +26,11 @@ import org.json.JSONObject
  * run's [TurnFooter] is held apart and always rendered last.
  */
 @Suppress("TooManyFunctions") // Owns everything the chat renders from Pi's stream, extension dialogs included.
-class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
+class ChatTimeline(
+  /** Called under the timeline's lock with the session's notices whenever a notice is added or changed. */
+  private val onNoticesChanged: (List<SavedNotice>) -> Unit = {},
+  private val clock: () -> Long = System::currentTimeMillis,
+) {
   private val lock = Any()
   private val mutableState = MutableStateFlow(TimelineState())
   private val effectChannel = Channel<TimelineEffect>(Channel.UNLIMITED)
@@ -59,6 +64,25 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   /** How many dialogs left the front of [dialogs] since it was last empty: the ones the user saw go. */
   private var dialogsDone = 0
 
+  /** The session's extension notices in the order they came; the item of the one at index `i` is keyed `en<i>`. */
+  private val notices = mutableListOf<SavedNotice>()
+
+  /** The Pi `timestamp` of the latest message, which a notice arriving now follows. */
+  private var lastMessageAt: Long? = null
+
+  /**
+   * No message started since the last run finished, so a notice arriving now follows that run's footer. A run's
+   * start hooks notify after `agent_start` opened the next footer, but before its first message.
+   */
+  private var runEnded = true
+
+  /**
+   * Where the notices that came before the next [seed] start in [notices], or null when no seed is awaited. Set by
+   * [restoreNotices] and [awaitHistory]: Pi sends those notices after the history that seed brings, so they follow its
+   * end rather than the message the timeline showed last.
+   */
+  private var firstUnseeded: Int? = null
+
   private var model: JSONObject? = null
   private var thinkingLevel: String? = null
   private var appliedCount = 0L
@@ -69,11 +93,53 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   /** Every user message Pi started, in order. */
   val startedUserMessages = StartedUserMessages()
 
+  /** A copy of the session's extension notices, for saving. */
+  fun savedNotices(): List<SavedNotice> = synchronized(lock) { notices.toList() }
+
   /**
-   * Replaces the stream with `get_messages` `data.messages`. Pi is idle whenever its history is seeded. With
-   * [ifNoEventsSince], it seeds only when no event was applied after [appliedEvents] read that value: the stream is
-   * live then and the history may predate it. That check holds [apply]'s lock, so no event lands in between.
-   * Returns whether it seeded.
+   * Notices from here on came after the history the next [seed] brings, so they follow its end: Pi is about to move
+   * to another session, whose `session_start` handlers notify before Pipkin has its history.
+   */
+  fun awaitHistory() {
+    synchronized(lock) {
+      if (firstUnseeded == null) firstUnseeded = notices.size
+    }
+  }
+
+  /** Pi stayed on its session after [awaitHistory]: the notices since then stay where they came. */
+  fun keepHistory() {
+    synchronized(lock) {
+      if (firstUnseeded == null) return
+      firstUnseeded = null
+      onNoticesChanged(notices.toList())
+    }
+  }
+
+  /**
+   * Sets the session's notices to those [choose] picks from the ones placed so far, which the next [seed] places among
+   * its messages: the timeline keeps its notices across seeds, so this is for a new timeline and for a switch to
+   * another session. Notices awaiting that seed stay, after the chosen ones. The rows of the notices it held go until
+   * then, so their keys cannot clash with the new ones.
+   */
+  fun restoreNotices(choose: (placed: List<SavedNotice>) -> List<SavedNotice>) {
+    synchronized(lock) {
+      val unseeded = firstUnseeded ?: notices.size
+      val arrived = notices.subList(unseeded, notices.size).toList()
+      val chosen = choose(notices.subList(0, unseeded).toList())
+      notices.clear()
+      notices += chosen
+      notices += arrived
+      firstUnseeded = chosen.size
+      items.removeAll { it is ExtensionNotice }
+      publish()
+    }
+  }
+
+  /**
+   * Replaces the stream with `get_messages` `data.messages`, with the session's notices back in place. Pi is idle
+   * whenever its history is seeded. With [ifNoEventsSince], it seeds only when no event was applied after
+   * [appliedEvents] read that value: the stream is live then and the history may predate it. That check holds
+   * [apply]'s lock, so no event lands in between. Returns whether it seeded.
    *
    * Each run gets back the [TurnFooter] it had while live. A run starts with a user message and ends with the reply
    * that calls no tool, as a stop, an error or an abort; Pi times each reply, so the footer spans from the user message
@@ -94,6 +160,10 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
       footer = null
       compacting = false
       queueInFlight = false
+      lastMessageAt = null
+      runEnded = true
+      // Where each message's items end, by its timestamp, for placing the notices that followed it.
+      val messageEnds = HashMap<Long, Int>()
       var run: SeededRun? = null
       for (index in 0 until messages.length()) {
         val message = messages.optJSONObject(index) ?: continue
@@ -115,10 +185,36 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
 
           "toolResult" -> attachToolResult(message)
         }
+        message.piTimestamp?.let { timestamp ->
+          lastMessageAt = timestamp
+          messageEnds[timestamp] = items.size
+        }
       }
       run?.closeIfReplied()
+      // Pi sent these after the history it just gave, so they follow its end; Pi is idle, so any run is over.
+      val unseeded = firstUnseeded?.let { it until notices.size } ?: IntRange.EMPTY
+      for (index in unseeded) notices[index] = notices[index].copy(after = lastMessageAt, afterRun = true)
+      firstUnseeded = null
+      placeNotices(messageEnds)
       publish()
+      if (!unseeded.isEmpty()) onNoticesChanged(notices.toList())
       return true
+    }
+  }
+
+  /** Puts [notices] back among the seeded items, each where [SavedNotice] says, keeping their order at one place. */
+  private fun placeNotices(messageEnds: Map<Long, Int>) {
+    if (notices.isEmpty()) return
+    val byPosition = notices.withIndex().groupBy { (_, notice) ->
+      val end = notice.after?.let(messageEnds::get) ?: return@groupBy 0
+      // Seed adds a run's footer straight after its last reply.
+      if (notice.afterRun && items.getOrNull(end) is TurnFooter) end + 1 else end
+    }
+    val seeded = items.toList()
+    items.clear()
+    for (position in 0..seeded.size) {
+      byPosition[position]?.forEach { (index, notice) -> items += notice.item(index) }
+      seeded.getOrNull(position)?.let { items += it }
     }
   }
 
@@ -281,6 +377,7 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
     items.replaceAll(::settle)
     footer?.let { items += it.copy(durationMillis = clock() - it.startedAt) }
     footer = null
+    runEnded = true
     clearRetryNotice()
   }
 
@@ -290,6 +387,8 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   }
 
   private fun messageStart(message: JSONObject) {
+    message.piTimestamp?.let { lastMessageAt = it }
+    runEnded = false
     val timestamp = message.piTimestamp ?: clock()
     when (message.optString("role")) {
       "user" -> {
@@ -356,6 +455,8 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
   }
 
   private fun messageEnd(message: JSONObject) {
+    message.piTimestamp?.let { lastMessageAt = it }
+    runEnded = false
     when (val role = message.optString("role")) {
       "user", "assistant", "bashExecution" -> {
         val started = live?.takeIf { it.role == role }
@@ -459,14 +560,37 @@ class ChatTimeline(private val clock: () -> Long = System::currentTimeMillis) {
           )
       }
 
-      "notify" ->
-        effectChannel.trySend(
-          TimelineEffect.Notify(event.optString("message"), event.optStringOrNull("notifyType")),
-        )
+      "notify" -> notify(event.optString("message"), NoticeLevel.of(event.optStringOrNull("notifyType")))
 
       "set_editor_text" -> effectChannel.trySend(TimelineEffect.SetEditorText(event.optString("text")))
     }
   }
+
+  /**
+   * Adds an extension's notice. Like Pi's terminal UI, an info notice straight after another replaces it, so an
+   * extension reporting progress keeps one row; anything else, or anything in between, starts a new row.
+   */
+  private fun notify(message: String, level: NoticeLevel) {
+    if (message.isBlank()) return
+    val last = items.lastOrNull()
+    val lastIndex = (last as? ExtensionNotice)?.key?.removePrefix(NOTICE_KEY)?.toInt()
+    // A notice for a history still to come never takes over one from the history before it.
+    if (level == NoticeLevel.Info && last is ExtensionNotice && last.level == NoticeLevel.Info &&
+      lastIndex != null && lastIndex >= (firstUnseeded ?: 0)
+    ) {
+      notices[lastIndex] = notices[lastIndex].copy(message = message)
+      items[items.lastIndex] = last.copy(message = message)
+    } else {
+      val notice = SavedNotice(level, message, after = lastMessageAt, afterRun = runEnded)
+      items += notice.item(notices.size)
+      notices += notice
+    }
+    // The notices awaiting the next seed belong to the history it brings, so they are saved with it.
+    onNoticesChanged(notices.subList(0, firstUnseeded ?: notices.size).toList())
+  }
+
+  /** The row of the session's notice at [index]; the same index gives the same key on every reload. */
+  private fun SavedNotice.item(index: Int) = ExtensionNotice("$NOTICE_KEY$index", level, message)
 
   /** Shows [text] in the notice [key], creating a new notice when [key] is null. Returns the notice's key. */
   private fun showNotice(key: String?, text: String): String {
@@ -600,6 +724,9 @@ private fun extensionMessage(message: JSONObject, key: String): TimelineItem.Ext
   if (markdown.isBlank() && images.isEmpty()) return null
   return TimelineItem.ExtensionMessage(key, message.optString("customType"), markdown, images)
 }
+
+/** The key prefix of an [ExtensionNotice], followed by the notice's index among the session's notices. */
+private const val NOTICE_KEY = "en"
 
 /** Pi's expansion of `/skill:name args` (its `parseSkillBlock` format): the skill's file wrapped in a tag, then the args. */
 private val SKILL_BLOCK = Regex("""<skill name="([^"]+)" location="[^"]+">\n[\s\S]*?\n</skill>(?:\n\n([\s\S]+))?""")

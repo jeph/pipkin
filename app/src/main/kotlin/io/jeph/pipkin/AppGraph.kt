@@ -14,6 +14,7 @@ import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.agent.TurnNotifications
 import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.data.ModelDefaults
+import io.jeph.pipkin.data.NoticeStore
 import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.data.SessionArchive
 import io.jeph.pipkin.data.SessionRepository
@@ -26,6 +27,7 @@ import io.jeph.pipkin.terminal.TerminalRegistry
 import io.jeph.pipkin.workspace.OpenTabs
 import io.jeph.pipkin.workspace.Panes
 import io.jeph.pipkin.workspace.WorkspaceLayout
+import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,7 +45,7 @@ internal class AppGraph(private val application: Application) {
   )
   val keepAlive = KeepAlive(application)
   val preferences = Preferences(application)
-  val sessionRepository = SessionRepository(hostClient, scope)
+  val sessionRepository = SessionRepository(hostClient, NoticeStore(File(application.filesDir, "notices")), scope)
   val sessionArchive = SessionArchive(sessionRepository, preferences, scope)
   private val turnNotifications = TurnNotifications(application) { hostClient.lastHello.value?.home }
   val extensionTitles = ExtensionTitles()
