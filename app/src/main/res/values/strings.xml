@@ -10,6 +10,9 @@
     <string name="agent_notification_terminal_text">Running in Termux. It continues if you leave the app.</string>
 
     <string name="turn_notification_channel">Finished chats</string>
-    <string name="turn_notification_done">Pipkin finished.</string>
-    <string name="turn_notification_exited">Pi exited.</string>
+    <string name="turn_notification_finished">Agent finished</string>
+    <string name="turn_notification_failed">Agent failed</string>
+    <string name="turn_notification_exited">Pi exited</string>
+    <!-- The outcome above, then the chat's title. -->
+    <string name="turn_notification_title">%1$s: %2$s</string>
 </resources>

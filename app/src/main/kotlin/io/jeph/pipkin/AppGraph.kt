@@ -44,7 +44,7 @@ internal class AppGraph(private val application: Application) {
   val preferences = Preferences(application)
   val sessionRepository = SessionRepository(hostClient, scope)
   val sessionArchive = SessionArchive(sessionRepository, preferences, scope)
-  private val turnNotifications = TurnNotifications(application)
+  private val turnNotifications = TurnNotifications(application) { hostClient.lastHello.value?.home }
   val registry: AgentRegistry<AgentProcess> =
     AgentRegistry(scope, onRunEnded = turnNotifications::runEnded) { cwd, sessionPath ->
       AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository)
