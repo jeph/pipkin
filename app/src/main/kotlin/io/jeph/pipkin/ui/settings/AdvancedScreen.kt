@@ -12,7 +12,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,7 +40,7 @@ internal fun AdvancedScreen(onBack: () -> Unit) {
         Stepper(value = maxRunning, range = AgentRegistry.RUNNING_LIMITS, onChange = preferences::setMaxRunningChats)
       }
     }
-    SettingsCaption(text = stringResource(R.string.settings_running_chats_caption))
+    SettingsCaption(text = stringResource(R.string.settings_running_chats_caption, AgentRegistry.DEFAULT_MAX_RUNNING))
     SettingsSection(title = stringResource(R.string.settings_idle_stop)) {
       IdleStop.entries.forEachIndexed { index, stop ->
         if (index > 0) SettingsDivider()
@@ -48,7 +51,7 @@ internal fun AdvancedScreen(onBack: () -> Unit) {
             Modifier.selectable(selected = selected, role = Role.RadioButton) { preferences.setIdleStop(stop) },
         ) {
           if (selected) {
-            LucideIcon(icon = R.drawable.ic_lucide_check, contentDescription = null, tint = pipkinColors.foreground)
+            LucideIcon(icon = R.drawable.ic_lucide_check, contentDescription = null, tint = pipkinColors.accent)
           }
         }
       }
@@ -74,7 +77,8 @@ private fun Stepper(value: Int, range: IntRange, onChange: (Int) -> Unit) {
     )
     Text(
       text = value.toString(),
-      modifier = Modifier.widthIn(min = 24.dp),
+      // Announced as it changes, since the buttons on either side only say which way they go.
+      modifier = Modifier.widthIn(min = 24.dp).semantics { liveRegion = LiveRegionMode.Polite },
       color = colors.foreground,
       fontSize = PipkinTokens.FontSize.base,
       textAlign = TextAlign.Center,

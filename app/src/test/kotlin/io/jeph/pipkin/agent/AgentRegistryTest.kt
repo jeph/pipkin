@@ -263,7 +263,7 @@ class AgentRegistryTest {
   }
 
   @Test
-  fun loweringTheLimitParksHiddenIdleProcessesDownToIt() = registryTest { registry ->
+  fun loweringTheLimitParksHiddenIdleProcessesDownToItLeastRecentlyShownFirst() = registryTest { registry ->
     val first = registry.open(CWD, "/s/first.jsonl")
     val second = registry.open(CWD, "/s/second.jsonl")
     val shown = registry.open(CWD, "/s/shown.jsonl")
@@ -271,10 +271,16 @@ class AgentRegistryTest {
     working.busy.value = true
     registry.show(Pane.Primary, shown)
 
+    maxRunning.value = 3
+    settle()
+
+    assertTrue(first.parked)
+    assertFalse(second.parked || shown.parked || working.parked)
+
     maxRunning.value = 2
     settle()
 
-    assertTrue(first.parked && second.parked)
+    assertTrue(second.parked)
     assertFalse(shown.parked || working.parked)
     assertEquals(2, registry.processes.value.size)
   }
@@ -285,7 +291,7 @@ class AgentRegistryTest {
     listOf(first, second, third).forEach { it.busy.value = true }
     settle()
 
-    maxRunning.value = 1
+    maxRunning.value = 2
     settle()
     assertEquals(3, registry.processes.value.size)
 
@@ -296,9 +302,8 @@ class AgentRegistryTest {
 
     second.busy.value = false
     settle()
-    assertTrue(second.parked)
-    assertFalse(third.parked)
-    assertEquals(1, registry.processes.value.size)
+    assertFalse(second.parked || third.parked)
+    assertEquals(2, registry.processes.value.size)
   }
 
   @Test
@@ -306,9 +311,11 @@ class AgentRegistryTest {
     idleParkMillis.value = null
     val main = registry.open(CWD, "/s/main.jsonl")
     val split = registry.open(CWD, "/s/split.jsonl")
+    val working = registry.open(CWD, "/s/working.jsonl")
+    working.busy.value = true
     registry.show(Pane.Primary, main)
     registry.show(Pane.Secondary, split)
-    maxRunning.value = 1
+    maxRunning.value = 2
     settle()
     registry.show(Pane.Primary, null)
     registry.show(Pane.Secondary, null)
@@ -316,7 +323,29 @@ class AgentRegistryTest {
     val next = registry.open(CWD, null)
 
     assertTrue(main.parked && split.parked)
-    assertEquals(listOf(next), registry.processes.value.values.toList())
+    assertEquals(setOf(working, next), registry.processes.value.values.toSet())
+  }
+
+  @Test
+  fun aRefusedOpenParksNothingSoThePaneCanShowItsChatAgain() = registryTest { registry ->
+    val shown = registry.open(CWD, "/s/shown.jsonl")
+    val workers = List(3) { registry.open(CWD, "/s/w$it.jsonl") }
+    workers.forEach { it.busy.value = true }
+    registry.show(Pane.Primary, shown)
+    maxRunning.value = 2
+    settle()
+
+    // As ShellActions.show does: hide the pane's chat while the next one opens, and show it again when refused.
+    registry.show(Pane.Primary, null)
+    val refused = assertThrows(TooManyRunning::class.java) { registry.open(CWD, null) }
+    registry.show(Pane.Primary, shown)
+
+    assertFalse(shown.parked)
+    assertSame(shown, registry.shown.value[Pane.Primary])
+    assertEquals(
+      "4 chats are working or on screen. That's more than the limit of 2, so stop some to open another.",
+      refused.message,
+    )
   }
 
   @Test

@@ -49,13 +49,18 @@ internal value class ChatKey(val value: String) {
 }
 
 /**
- * Opening another chat would need a Pi process past [limit] while every open one is working or shown, since a chat a
- * pane shows keeps its Pi. [shownIdle] says an idle chat in a pane held a slot.
+ * Opening another chat would need a Pi process past [limit] while not enough of the [open] ones are idle and hidden,
+ * since a chat a pane shows keeps its Pi. [shownIdle] says an idle chat in a pane held a slot. [open] is above [limit]
+ * after the limit was lowered while chats were working.
  */
-internal class TooManyRunning(limit: Int, shownIdle: Boolean = false) :
+internal class TooManyRunning(open: Int, limit: Int, shownIdle: Boolean = false) :
   IllegalStateException(
-    "${if (limit == 1) "1 chat is" else "$limit chats are"} ${if (shownIdle) "working or on screen" else "working"}. " +
-      "Stop one to open another.",
+    "$open chats are ${if (shownIdle) "working or on screen" else "working"}. " +
+      if (open > limit) {
+        "That's more than the limit of $limit, so stop some to open another."
+      } else {
+        "Stop one to open another."
+      },
   )
 
 /**
@@ -114,13 +119,15 @@ internal class AgentRegistry<P : ManagedProcess>(
     key?.let { processState.value[it] }?.let { return it }
     // Taken out first, so making room cannot close it as the least recently parked chat.
     val resumed = key?.let { parked.remove(it) }
-    try {
-      // A loop, since a lowered limit can leave more processes open than it allows.
-      while (entries.size >= maxRunning.value) evictOne()
-    } catch (refused: TooManyRunning) {
+    // All or nothing, so a refused open parks no chat: a pane hides its chat while the next one opens and shows it
+    // again when that is refused. A lowered limit can leave more than one process to park.
+    val evictable = hiddenIdleByLastShown()
+    val excess = entries.size - maxRunning.value + 1
+    if (excess > evictable.size) {
       if (key != null && resumed != null) parked[key] = resumed
-      throw refused
+      throw TooManyRunning(entries.size, maxRunning.value, shownIdle = entries.keys.any { !it.busy.value })
     }
+    evictable.take(excess.coerceAtLeast(0)).forEach(::park)
     val process = resumed?.also { it.restart() } ?: factory(cwd, sessionPath)
     add(key ?: ChatKey.new(), process)
     return process
@@ -196,22 +203,16 @@ internal class AgentRegistry<P : ManagedProcess>(
     }
   }
 
-  /** Parks the idle process shown least recently; one a pane shows keeps its Pi. */
-  private fun evictOne() {
-    val evicted = leastRecentlyShownHiddenIdle()
-      ?: throw TooManyRunning(maxRunning.value, shownIdle = entries.keys.any { !it.busy.value })
-    park(evicted)
-  }
-
   /** Parks hidden idle processes, least recently shown first, until [maxRunning] or fewer are open or none is left. */
   private fun parkPastLimit() {
-    while (entries.size > maxRunning.value) park(leastRecentlyShownHiddenIdle() ?: return)
+    hiddenIdleByLastShown().take((entries.size - maxRunning.value).coerceAtLeast(0)).forEach(::park)
   }
 
-  private fun leastRecentlyShownHiddenIdle(): P? = entries.entries
+  /** The processes that are neither busy nor shown, which may be parked to make room; least recently shown first. */
+  private fun hiddenIdleByLastShown(): List<P> = entries.entries
     .filter { !it.key.busy.value && paneOf(it.key) == null }
-    .minByOrNull { it.value.lastShown }
-    ?.key
+    .sortedBy { it.value.lastShown }
+    .map { it.key }
 
   private fun add(key: ChatKey, process: P) {
     val entry = Entry(++tick)
@@ -290,8 +291,8 @@ internal class AgentRegistry<P : ManagedProcess>(
   }
 
   companion object {
-    /** The choices for [maxRunning]. */
-    val RUNNING_LIMITS = 1..16
+    /** The choices for [maxRunning]; at least two, so split screen can show a chat in each pane. */
+    val RUNNING_LIMITS = 2..16
     const val DEFAULT_MAX_RUNNING = 6
     const val MAX_PARKED = 12
   }
