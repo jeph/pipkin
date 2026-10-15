@@ -59,11 +59,21 @@ private const val FOLD_SLACK_LINES = 3
 /** Paseo's notice line height, which also sets its icon's 20dp row. */
 private val NOTICE_LINE_HEIGHT = 20.sp
 
-/** Paseo's notice tints, the same in both themes: blue-300, amber-500 and red-500, behind the text at 10%. */
+/** Paseo's notice tints, used for the dark theme: blue-300, amber-500 and red-500, behind the text at 10%. */
 private val INFO_TINT = Color(0xFF93C5FD)
 private val WARNING_TINT = Color(0xFFF59E0B)
 private val ERROR_WASH = Color(0xFFEF4444)
 private const val WASH_ALPHA = 0.1f
+
+/**
+ * On white those tints wash out, so the light theme takes the 600 shades for the icons (blue, amber), the 500 shades
+ * at [LIGHT_WASH_ALPHA] behind the text, and edges the card in its hue.
+ */
+private val LIGHT_INFO_TINT = Color(0xFF2563EB)
+private val LIGHT_INFO_WASH = Color(0xFF3B82F6)
+private val LIGHT_WARNING_TINT = Color(0xFFD97706)
+private const val LIGHT_WASH_ALPHA = 0.14f
+private const val LIGHT_BORDER_ALPHA = 0.35f
 
 /**
  * A message an extension posted, as Pi's terminal shows it: the extension's message type over its content, set apart
@@ -129,20 +139,33 @@ internal fun ExtensionMessage(
 internal fun ExtensionNoticeCard(item: TimelineItem.ExtensionNotice, modifier: Modifier = Modifier) {
   val colors = pipkinColors
   val look = when (item.level) {
-    NoticeLevel.Info -> NoticeLook(R.drawable.ic_lucide_info, R.string.chat_notice_info, INFO_TINT, INFO_TINT)
+    NoticeLevel.Info -> if (colors.isDark) {
+      NoticeLook(R.drawable.ic_lucide_info, R.string.chat_notice_info, INFO_TINT, INFO_TINT)
+    } else {
+      NoticeLook(R.drawable.ic_lucide_info, R.string.chat_notice_info, LIGHT_INFO_TINT, LIGHT_INFO_WASH)
+    }
 
-    NoticeLevel.Warning ->
-      NoticeLook(R.drawable.ic_lucide_triangle_alert, R.string.chat_notice_warning, WARNING_TINT, WARNING_TINT)
+    NoticeLevel.Warning -> NoticeLook(
+      R.drawable.ic_lucide_triangle_alert,
+      R.string.chat_notice_warning,
+      if (colors.isDark) WARNING_TINT else LIGHT_WARNING_TINT,
+      WARNING_TINT,
+    )
 
     NoticeLevel.Error ->
       NoticeLook(R.drawable.ic_lucide_circle_x, R.string.chat_notice_error, colors.destructive, ERROR_WASH)
   }
+  val shape = RoundedCornerShape(PipkinTokens.Radius.md)
   // Opaque, so a folded notice's fade ends in the card's own colour.
-  val background = look.wash.copy(alpha = WASH_ALPHA).compositeOver(colors.surface0)
+  val background = look.wash.copy(alpha = if (colors.isDark) WASH_ALPHA else LIGHT_WASH_ALPHA)
+    .compositeOver(colors.surface0)
   Row(
     modifier = modifier
       .fillMaxWidth()
-      .background(background, RoundedCornerShape(PipkinTokens.Radius.md))
+      .background(background, shape)
+      .then(
+        if (colors.isDark) Modifier else Modifier.border(1.dp, look.wash.copy(alpha = LIGHT_BORDER_ALPHA), shape),
+      )
       .padding(horizontal = PipkinTokens.Spacing.s12, vertical = 10.dp),
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
