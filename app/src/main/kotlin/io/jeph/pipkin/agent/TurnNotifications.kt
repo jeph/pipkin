@@ -80,7 +80,7 @@ internal class TurnNotifications(application: Application, private val home: () 
     )
     val title = chatTitle?.let { context.getString(R.string.turn_notification_title, outcome, it) } ?: outcome
     val text = (processState as? AgentProcessState.Failed)?.message ?: lastReply(timeline.items)
-    val project = projectName(process.cwd, home() ?: "")
+    val project = projectName(process.cwd, home().orEmpty())
     val model = timeline.model?.optString("id")?.takeIf { it.isNotBlank() }
     val sessionPath = process.sessionFile.value
     val open = Intent(context, MainActivity::class.java)
