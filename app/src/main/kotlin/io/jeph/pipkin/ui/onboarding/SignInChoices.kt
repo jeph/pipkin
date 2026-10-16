@@ -80,7 +80,8 @@ private fun SignInRow(
       modifier = Modifier.weight(1f),
       color = colors.foreground,
       fontSize = PipkinTokens.FontSize.base,
-      maxLines = 1,
+      // Two lines fit "OpenAI-compatible API" at the largest font size.
+      maxLines = 2,
       overflow = TextOverflow.Ellipsis,
     )
     if (signedIn) {

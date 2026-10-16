@@ -66,7 +66,8 @@ internal fun WizardTopBar(state: OnboardingState, step: SetupStep?, onBack: (() 
 
 /**
  * The page frame: content centered in the space above the buttons and scrolling when it doesn't fit (large fonts,
- * landscape), at most [PAGE_MAX_WIDTH] wide.
+ * landscape), at most [PAGE_MAX_WIDTH] wide. A page shorter than [ILLUSTRATED_MIN_HEIGHT], as in landscape, leaves out
+ * its illustration, which would otherwise fill the screen and push the title and text out of view.
  */
 @Composable
 internal fun WizardPage(
@@ -79,6 +80,7 @@ internal fun WizardPage(
 ) {
   Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
     BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
+      val illustrated = maxHeight >= ILLUSTRATED_MIN_HEIGHT
       Column(
         modifier = Modifier
           .fillMaxWidth()
@@ -88,7 +90,7 @@ internal fun WizardPage(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s16, Alignment.CenterVertically),
       ) {
-        illustration()
+        if (illustrated) illustration()
         PageHeading(tag, title, body)
         Column(
           modifier = Modifier.widthIn(max = PAGE_MAX_WIDTH).fillMaxWidth(),
@@ -183,6 +185,7 @@ private val TOP_BAR_HEIGHT = 56.dp
 private val BAR_BUTTON_SIZE = 40.dp
 private val BUTTON_HEIGHT = 48.dp
 private val PAGE_MAX_WIDTH = 480.dp
+private val ILLUSTRATED_MIN_HEIGHT = 480.dp
 
 // Larger than the app's type scale: each page has one title, which carries the page.
 private val TITLE_SIZE = 24.sp

@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -43,12 +44,14 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.LucideIcon
@@ -126,6 +129,16 @@ internal fun ProgressDots(done: List<Boolean>, current: Int, modifier: Modifier 
  */
 @Composable
 internal fun PasteDemo(modifier: Modifier = Modifier) {
+  // A drawing of a terminal at a fixed size, which the page's text explains; scaled with large fonts, its lines
+  // would wrap inside the box.
+  val density = LocalDensity.current
+  CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale = 1f)) {
+    PasteDemoTerminal(modifier)
+  }
+}
+
+@Composable
+private fun PasteDemoTerminal(modifier: Modifier) {
   val colors = pipkinColors
   val time = rememberDemoTime()
   val shape = RoundedCornerShape(PipkinTokens.Radius.xxl)
