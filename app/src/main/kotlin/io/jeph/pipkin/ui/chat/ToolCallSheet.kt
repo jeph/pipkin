@@ -268,7 +268,7 @@ private fun DiffLine(marker: String, line: AnnotatedString, tint: Color) {
 }
 
 /**
- * `(oldText, newText)` pairs of Pi 1.1.0's edit tool arguments: `edits[]`, which some models send as a
+ * `(oldText, newText)` pairs of Pi 1.3.0's edit tool arguments: `edits[]`, which some models send as a
  * JSON string or a single object, plus the legacy top-level `oldText`/`newText`.
  */
 private fun editPairs(args: JSONObject?): List<Pair<String, String>> {

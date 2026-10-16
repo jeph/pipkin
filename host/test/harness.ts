@@ -8,7 +8,7 @@ import { pathToFileURL } from "node:url";
 import { inject } from "vitest";
 import { encodeLine, isObject, LineSplitter, type JsonObject } from "../src/framing.js";
 
-export const PI_VERSION = "1.1.0";
+export const PI_VERSION = "1.3.0";
 /** The runtime `pi/package.json` that `ensure` would have installed: Pi alone, no bundled extensions. */
 export const PACKAGE_JSON = runtimeManifest([]);
 const FAKE_PI = path.join(import.meta.dirname, "fixtures/fake-pi.mjs");
@@ -70,7 +70,7 @@ export async function installFakePi(dirs: Dirs, version = PI_VERSION): Promise<v
   await writeRuntimeManifest(dirs);
 }
 
-/** Links the real Pi 1.1.0 devDependency in as the pinned install, for modes that use the SDK. */
+/** Links the real Pi devDependency in as the pinned install, for modes that use the SDK. */
 export async function installRealPi(dirs: Dirs): Promise<void> {
   const dir = piDir(dirs);
   await mkdir(path.dirname(dir), { recursive: true });

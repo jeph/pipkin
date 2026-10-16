@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import type { JsonObject } from "../src/framing.js";
 import { type Dirs, installRealPi, makeDirs, removeDirs, runMode } from "./harness.js";
 
-/** Pi 1.1.0's built-in `openai` entry for gpt-5.5 (other providers list different windows and maps). */
+/** Pi 1.3.0's built-in `openai` entry for gpt-5.5 (other providers list different windows and maps). */
 const GPT_5_5 = {
   id: "gpt-5.5",
   name: "GPT-5.5",
