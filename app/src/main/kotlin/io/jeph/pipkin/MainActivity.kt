@@ -167,6 +167,7 @@ private fun Screen(
       actions = actions,
       requestedChat = requestedChat,
       onOpenSettings = { navigator.push(Destination.Settings) },
+      onOpenProviders = { navigator.push(Destination.Providers) },
       onOpenArchive = { navigator.push(Destination.Archive) },
       onOpenArchivedChat = { navigator.push(Destination.ArchivedChat(it)) },
       onOpenOnboarding = { navigator.push(Destination.Onboarding) },

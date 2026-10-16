@@ -58,6 +58,7 @@ internal fun ChatScreen(
   views: ChatViews,
   controls: PaneControls,
   onOpenSettings: () -> Unit,
+  onOpenProviders: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   // Outlive a process swap, so a message about the closed chat (delete failed) still shows.
@@ -87,7 +88,7 @@ internal fun ChatScreen(
       controller,
       snackbar,
       controls,
-      onOpenSettings,
+      onOpenProviders,
       onSheet = { sheet = it },
       modifier,
     )
@@ -133,7 +134,7 @@ private fun ChatContent(
   controller: ChatController,
   snackbar: SnackbarStackState,
   controls: PaneControls,
-  onOpenSettings: () -> Unit,
+  onOpenProviders: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
   modifier: Modifier,
 ) {
@@ -160,7 +161,7 @@ private fun ChatContent(
     val dialogPending = timeline.pendingUi != null
     ChatStack(
       modifier = Modifier.weight(1f),
-      stream = { StreamArea(controller, timeline, snackbar, onOpenSettings, onSheet, dismissKeyboard) },
+      stream = { StreamArea(controller, timeline, snackbar, onOpenProviders, onSheet, dismissKeyboard) },
       dialog = { PendingDialogCard(controller, timeline) },
       steering = { PendingSteeringBox(controller, timeline, compact = dialogPending) },
       composer = {
@@ -183,7 +184,7 @@ private fun StreamArea(
   controller: ChatController,
   timeline: TimelineState,
   snackbar: SnackbarStackState,
-  onOpenSettings: () -> Unit,
+  onOpenProviders: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
   dismissKeyboard: () -> Unit,
 ) {
@@ -195,7 +196,7 @@ private fun StreamArea(
       processState = processState,
       view = controller.view,
       onOpenTool = { onSheet(ChatSheet.Tool(it)) },
-      onOpenSettings = onOpenSettings,
+      onOpenProviders = onOpenProviders,
       onRestart = process::restart,
     )
     SnackbarStack(snackbar, Modifier.align(Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16))

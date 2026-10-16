@@ -153,6 +153,7 @@ internal fun MainScreen(
   actions: ShellActions,
   requestedChat: MutableStateFlow<ChatLocation?>,
   onOpenSettings: () -> Unit,
+  onOpenProviders: () -> Unit,
   onOpenArchive: () -> Unit,
   onOpenArchivedChat: (path: String) -> Unit,
   onOpenOnboarding: () -> Unit,
@@ -178,6 +179,7 @@ internal fun MainScreen(
       panels = panels,
       snackbar = snackbar,
       onOpenSettings = onOpenSettings,
+      onOpenProviders = onOpenProviders,
       sidebar = { pane, onShownInSplit ->
         Sidebar(
           pane = pane,
@@ -332,6 +334,7 @@ private fun WorkspacePanes(
   panels: PanePanels,
   snackbar: SnackbarStackState,
   onOpenSettings: () -> Unit,
+  onOpenProviders: () -> Unit,
   sidebar: @Composable (pane: Pane, onShownInSplit: (() -> Unit)?) -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
@@ -381,7 +384,7 @@ private fun WorkspacePanes(
               sidebar(pane, onShownInSplit)
             }
           },
-          workspace = { WorkspacePane(item, actions, views, controls, onOpenSettings) },
+          workspace = { WorkspacePane(item, actions, views, controls, onOpenSettings, onOpenProviders) },
           explorer = {
             PaneExplorer(pane, item, panel == Panel.Explorer, snackbar, swapPanes) { panels.show(pane, Panel.Chat) }
           },

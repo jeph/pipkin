@@ -93,7 +93,7 @@ internal fun ChatStream(
   processState: AgentProcessState,
   view: ChatView,
   onOpenTool: (key: String) -> Unit,
-  onOpenSettings: () -> Unit,
+  onOpenProviders: () -> Unit,
   onRestart: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -121,7 +121,7 @@ internal fun ChatStream(
   Box(modifier = modifier.fillMaxSize()) {
     StreamList(listState, timeline.items, banner, follow, view.markdown, onRestart, onOpenTool)
     if (timeline.items.isEmpty() && processState == AgentProcessState.Ready) {
-      EmptyState(noModel = timeline.model == null, onOpenSettings, Modifier.align(Alignment.Center))
+      EmptyState(noModel = timeline.model == null, onOpenProviders, Modifier.align(Alignment.Center))
     }
     AnimatedVisibility(
       visible = loadingOverHistory,
@@ -336,9 +336,9 @@ private fun StreamItem(
   }
 }
 
-/** Pipkin's mark over "Message Pipkin to start", or a way to Settings when there is no model to use. */
+/** Pipkin's mark over "Message Pipkin to start", or a way to Providers when there is no model to use. */
 @Composable
-private fun EmptyState(noModel: Boolean, onOpenSettings: () -> Unit, modifier: Modifier) {
+private fun EmptyState(noModel: Boolean, onOpenProviders: () -> Unit, modifier: Modifier) {
   Column(
     modifier = modifier.padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s48),
     horizontalAlignment = Alignment.CenterHorizontally,
@@ -364,7 +364,7 @@ private fun EmptyState(noModel: Boolean, onOpenSettings: () -> Unit, modifier: M
       color = pipkinColors.foregroundMuted,
       fontSize = PipkinTokens.FontSize.base,
     )
-    if (noModel) Button(onClick = onOpenSettings) { Text(text = stringResource(R.string.chat_sign_in)) }
+    if (noModel) Button(onClick = onOpenProviders) { Text(text = stringResource(R.string.chat_sign_in)) }
   }
 }
 

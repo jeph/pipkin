@@ -216,7 +216,7 @@ private fun TranscriptBody(transcript: Transcript, onRetry: () -> Unit, onOpenTo
         processState = AgentProcessState.Ready,
         view = remember { ChatView() },
         onOpenTool = onOpenTool,
-        onOpenSettings = {},
+        onOpenProviders = {},
         onRestart = {},
       )
     }
