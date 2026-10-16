@@ -28,6 +28,8 @@ async function npmCi(ctx: ModeContext, cwd: string): Promise<void> {
   const send = (line: string): void => {
     ctx.conn.send({ type: "pipkin_progress", line });
   };
+  // npm at --loglevel=error stays quiet until it's done; this line tells the app it's installing, not just checking.
+  send("npm ci");
   const child = spawn("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error"], {
     cwd,
     signal: ctx.signal,
