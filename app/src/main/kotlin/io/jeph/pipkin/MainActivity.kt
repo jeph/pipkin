@@ -44,6 +44,7 @@ import io.jeph.pipkin.ui.MainScreen
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.archive.ArchiveScreen
 import io.jeph.pipkin.ui.archive.ArchivedChatScreen
+import io.jeph.pipkin.ui.components.HeaderBarHeight
 import io.jeph.pipkin.ui.components.LoadingPill
 import io.jeph.pipkin.ui.onboarding.OnboardingScreen
 import io.jeph.pipkin.ui.onboarding.PermissionsScreen
@@ -86,6 +87,11 @@ class MainActivity : ComponentActivity() {
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     requestedChat.value = TurnNotifications.chatLocation(intent)
+  }
+
+  override fun onStart() {
+    super.onStart()
+    TermuxWaker.pipkinShown()
   }
 
   override fun onStop() {
@@ -131,13 +137,15 @@ private fun PipkinApp(graph: AppGraph, requestedChat: MutableStateFlow<ChatLocat
   }
 }
 
-/** Pipkin opened Termux to start its helper and is waiting for it, on whichever screen asked. */
+/** Pipkin opened Termux to start its helper and is waiting for it, on whichever screen asked, below its header bar. */
 @Composable
 private fun WakingPill(modifier: Modifier) {
   val waking by TermuxWaker.waking.collectAsStateWithLifecycle()
   AnimatedVisibility(
     visible = waking,
-    modifier = modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(top = PipkinTokens.Spacing.s8),
+    modifier = modifier
+      .windowInsetsPadding(WindowInsets.safeDrawing)
+      .padding(top = PipkinTokens.Spacing.s8 + HeaderBarHeight + PipkinTokens.Spacing.s8),
     enter = fadeIn(),
     exit = fadeOut(),
   ) {

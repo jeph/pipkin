@@ -60,6 +60,10 @@ internal object TermuxWaker {
   @Volatile
   private var failed = false
 
+  /** Counts Pipkin's screen starts, so a wake can tell whether Pipkin came back over Termux since it began. */
+  @Volatile
+  private var shows = 0
+
   /**
    * Whether the helper answers, after opening Termux for it if it didn't. [asked] is the user's tap on Open Termux;
    * without it, Termux isn't opened again after a wake that failed, and with it Pipkin stays in Termux, which shows
@@ -77,6 +81,10 @@ internal object TermuxWaker {
   /** The helper answered: the next time it doesn't, opening Termux may help again. */
   fun reached() {
     failed = false
+  }
+
+  fun pipkinShown() {
+    shows++
   }
 
   /** Pipkin's screen stopped; during a wake, Termux covers it, so Pipkin switches back right away. */
@@ -100,6 +108,7 @@ internal object TermuxWaker {
   }
 
   private suspend fun waitForHelper(context: Context, stayInTermux: Boolean): Boolean {
+    val showsBefore = shows
     val covered = CompletableDeferred<Unit>()
     if (!stayInTermux) covering = covered
     context.startActivity(Intent(context, TermuxWakeActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -116,10 +125,11 @@ internal object TermuxWaker {
     }
     Log.i(TAG, "Opened Termux for the helper: listening=$listening")
     if (!listening) return false
-    // ProcessLifecycleOwner reports a stop 700 ms late; by now, a Pipkin still stopped stayed behind Termux, which
-    // is on screen and may open Pipkin itself.
+    // ProcessLifecycleOwner reports a stop 700 ms late; by now, a Pipkin still stopped that never came back stayed
+    // behind Termux, which is on screen and may open Pipkin itself. One that came back and then stopped was left by
+    // the user, who shouldn't be pulled back to it.
     delay(RETURN_GRACE_MILLIS)
-    if (!pipkinStarted()) HelperBridge.requestReturn(context)
+    if (!pipkinStarted() && shows == showsBefore) HelperBridge.requestReturn(context)
     return true
   }
 

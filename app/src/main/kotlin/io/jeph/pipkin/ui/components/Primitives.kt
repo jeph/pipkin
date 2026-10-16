@@ -79,6 +79,9 @@ fun IconButton28(
   }
 }
 
+/** The height of [HeaderBar]'s row below its top padding, which overlays such as Termux's waking pill stay under. */
+val HeaderBarHeight = 56.dp
+
 /**
  * 56dp header with an 8dp top pad below the status bar and a 1dp bottom border. A [status] shows in place of the
  * [subtitle], panning when it doesn't fit.
@@ -100,7 +103,7 @@ fun HeaderBar(
           .windowInsetsPadding(WindowInsets.statusBars)
           .padding(top = PipkinTokens.Spacing.s8)
           .fillMaxWidth()
-          .heightIn(min = 56.dp)
+          .heightIn(min = HeaderBarHeight)
           .padding(horizontal = PipkinTokens.Spacing.s12),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
