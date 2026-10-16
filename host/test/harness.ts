@@ -9,7 +9,7 @@ import { inject } from "vitest";
 import { encodeLine, isObject, LineSplitter, type JsonObject } from "../src/framing.js";
 
 export const PI_VERSION = "1.3.0";
-/** The runtime `pi/package.json` that `ensure` would have installed: Pi alone, no bundled extensions. */
+/** The runtime `pi/package.json` that `ensure` would have installed: Pi alone, no packages for extensions. */
 export const PACKAGE_JSON = runtimeManifest([]);
 const FAKE_PI = path.join(import.meta.dirname, "fixtures/fake-pi.mjs");
 const REAL_PI = path.join(import.meta.dirname, "../node_modules/@earendil-works/pi-coding-agent");
@@ -45,9 +45,9 @@ function piDir(dirs: Dirs): string {
   return path.join(dirs.root, "pi/node_modules/@earendil-works/pi-coding-agent");
 }
 
-/** A runtime `pi/package.json` pinning Pi and the given bundled extension packages. */
-export function runtimeManifest(extensions: string[]): string {
-  const dependencies = Object.fromEntries([["@earendil-works/pi-coding-agent", PI_VERSION], ...extensions.map((name) => [name, "1.0.0"])]);
+/** A runtime `pi/package.json` pinning Pi and the given packages. */
+export function runtimeManifest(packages: string[]): string {
+  const dependencies = Object.fromEntries([["@earendil-works/pi-coding-agent", PI_VERSION], ...packages.map((name) => [name, "1.0.0"])]);
   return JSON.stringify({ name: "pipkin-pi-runtime", private: true, dependencies });
 }
 

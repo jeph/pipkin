@@ -52,7 +52,7 @@
     <string name="backups_delete_file_text">%1$s will be deleted for good.</string>
     <string name="settings_extension_todo">Pipkin todo</string>
     <string name="settings_extension_todo_summary">A todo list the agent keeps, shown on the composer</string>
-    <string name="settings_extension_web_access">Web access</string>
+    <string name="settings_extension_web_access">Pipkin web access</string>
     <string name="settings_extension_web_access_summary">Web search and page fetching</string>
     <string name="settings_extensions_caption">Idle chats reload to pick up a change. A working chat picks it up the next time its agent starts.</string>
 

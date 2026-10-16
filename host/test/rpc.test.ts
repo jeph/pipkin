@@ -53,6 +53,11 @@ function todoExtension(dirs: Dirs): string {
   return path.join(dirs.root, "extensions/pipkin-todo/index.js");
 }
 
+/** A Pipkin extension as the app sends it. */
+function extension(name: string, usesRuntimePackages = false, source = "export default () => {};\n"): Record<string, unknown> {
+  return { name, source, usesRuntimePackages };
+}
+
 /** Starts a chat with `packageJson` as the runtime manifest and `params` in its request, and ends it once Pi is ready. */
 async function launchChat(dirs: Dirs, packageJson = PACKAGE_JSON, params: Record<string, unknown> = {}): Promise<void> {
   await writeRuntimeManifest(dirs, packageJson);
@@ -60,16 +65,16 @@ async function launchChat(dirs: Dirs, packageJson = PACKAGE_JSON, params: Record
   await run.next();
   run.send({
     type: "pipkin_request",
-    params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson, disabledPackages: [], pipkinExtensions: [], ...params },
+    params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson, pipkinExtensions: [], ...params },
   });
   expect(await run.next()).toMatchObject({ type: "ready" });
   run.socket.end();
   await run.exited;
 }
 
-/** Starts a chat with `packages` bundled and returns `web-search.json` as Pi then finds it, or null when absent. */
-async function webSearchConfigAfterLaunch(dirs: Dirs, packages: string[], disabledPackages: string[] = []): Promise<string | null> {
-  await launchChat(dirs, runtimeManifest(packages), { disabledPackages });
+/** Starts a chat with the named Pipkin extensions and returns `web-search.json` as Pi then finds it, or null when absent. */
+async function webSearchConfigAfterLaunch(dirs: Dirs, extensions: string[]): Promise<string | null> {
+  await launchChat(dirs, PACKAGE_JSON, { pipkinExtensions: extensions.map((name) => extension(name)) });
   return readFile(path.join(dirs.configDir, "web-search.json"), "utf8").catch(() => null);
 }
 
@@ -108,7 +113,7 @@ describe("rpc mode", () => {
     run.socket.write(
       encodeLine({
         type: "pipkin_request",
-        params: { cwd: dirs.home, sessionPath: "/s.jsonl", expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] },
+        params: { cwd: dirs.home, sessionPath: "/s.jsonl", expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] },
       }) + encodeLine(first),
     );
     expect(await run.next()).toEqual({
@@ -134,7 +139,7 @@ describe("rpc mode", () => {
     const marker = path.join(dirs.base, "eof");
     const { run } = await startHost("rpc", dirs, { FAKE_PI_MARKER: marker });
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
     expect(await run.next()).toMatchObject({ type: "ready" });
     run.socket.destroy();
     // The host exits only after Pi exited, and fake-pi writes the marker on stdin EOF.
@@ -147,7 +152,7 @@ describe("rpc mode", () => {
     const done = path.join(dirs.base, "flood-done");
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
     expect(await run.next()).toMatchObject({ type: "ready" });
 
     run.socket.pause();
@@ -164,7 +169,7 @@ describe("rpc mode", () => {
     const done = path.join(dirs.base, "flood-done");
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
     expect(await run.next()).toMatchObject({ type: "ready" });
 
     run.socket.pause();
@@ -183,7 +188,7 @@ describe("rpc mode", () => {
     const done = path.join(dirs.base, "flood-done");
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
     expect(await run.next()).toMatchObject({ type: "ready" });
 
     run.socket.pause();
@@ -199,7 +204,7 @@ describe("rpc mode", () => {
   it("refuses a Pi version other than the expected one", async () => {
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: "9.9.9", packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: "9.9.9", packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
     expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "pi_version" });
     expect(await run.next()).toBeUndefined();
   });
@@ -208,73 +213,12 @@ describe("rpc mode", () => {
     await symlink(String(process.pid), path.join(dirs.root, "config.lock"));
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
     expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "config_busy" });
     expect(await run.next()).toBeUndefined();
   });
 
-  it("loads every bundled package besides Pi, then Pipkin's own extensions from the source Pipkin sent", async () => {
-    const packageJson = runtimeManifest(["pi-web-access", "@scope/tools"]);
-    await writeRuntimeManifest(dirs, packageJson);
-    const { run } = await startHost("rpc", dirs);
-    await run.next();
-    run.send({
-      type: "pipkin_request",
-      params: {
-        cwd: dirs.home,
-        sessionPath: null,
-        expectedVersion: PI_VERSION,
-        packageJson,
-        disabledPackages: [],
-        pipkinExtensions: [{ name: "pipkin-todo", source: "export default () => {};\n" }],
-      },
-    });
-    const modules = path.join(dirs.root, "pi/node_modules");
-    expect(await run.next()).toMatchObject({
-      type: "ready",
-      argv: [
-        "--mode",
-        "rpc",
-        "--extension",
-        path.join(modules, "pi-web-access"),
-        "--extension",
-        path.join(modules, "@scope/tools"),
-        "--extension",
-        todoExtension(dirs),
-        "--append-system-prompt",
-        SYSTEM_APPEND,
-      ],
-    });
-    expect(await readFile(todoExtension(dirs), "utf8")).toBe("export default () => {};\n");
-    run.socket.end();
-    await run.exited;
-  });
-
-  it("leaves out the bundled packages the user turned off", async () => {
-    const packageJson = runtimeManifest(["pi-web-access", "@scope/tools"]);
-    await writeRuntimeManifest(dirs, packageJson);
-    const { run } = await startHost("rpc", dirs);
-    await run.next();
-    run.send({
-      type: "pipkin_request",
-      params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson, disabledPackages: ["pi-web-access"], pipkinExtensions: [] },
-    });
-    expect(await run.next()).toMatchObject({
-      type: "ready",
-      argv: ["--mode", "rpc", "--extension", path.join(dirs.root, "pi/node_modules/@scope/tools"), "--append-system-prompt", SYSTEM_APPEND],
-    });
-    run.socket.end();
-    await run.exited;
-  });
-
-  it("replaces a Pipkin extension an older Pipkin wrote", async () => {
-    await mkdir(path.dirname(todoExtension(dirs)), { recursive: true });
-    await writeFile(todoExtension(dirs), "old\n");
-    await launchChat(dirs, PACKAGE_JSON, { pipkinExtensions: [{ name: "pipkin-todo", source: "new\n" }] });
-    expect(await readFile(todoExtension(dirs), "utf8")).toBe("new\n");
-  });
-
-  it.each([["../escape"], ["a/b"], [""]])("refuses the Pipkin extension name %j", async (name) => {
+  it("saves an extension that uses runtime packages inside the runtime, and any other outside it", async () => {
     const { run } = await startHost("rpc", dirs);
     await run.next();
     run.send({
@@ -284,55 +228,98 @@ describe("rpc mode", () => {
         sessionPath: null,
         expectedVersion: PI_VERSION,
         packageJson: PACKAGE_JSON,
-        disabledPackages: [],
-        pipkinExtensions: [{ name, source: "x" }],
+        pipkinExtensions: [extension("pipkin-todo"), extension("pipkin-web-access", true, "export default () => 1;\n")],
+      },
+    });
+    const webAccess = path.join(dirs.root, "pi/extensions/pipkin-web-access/index.js");
+    expect(await run.next()).toMatchObject({
+      type: "ready",
+      argv: ["--mode", "rpc", "--extension", todoExtension(dirs), "--extension", webAccess, "--append-system-prompt", SYSTEM_APPEND],
+    });
+    expect(await readFile(todoExtension(dirs), "utf8")).toBe("export default () => {};\n");
+    expect(await readFile(webAccess, "utf8")).toBe("export default () => 1;\n");
+    run.socket.end();
+    await run.exited;
+  });
+
+  it("replaces a Pipkin extension an older Pipkin wrote", async () => {
+    await mkdir(path.dirname(todoExtension(dirs)), { recursive: true });
+    await writeFile(todoExtension(dirs), "old\n");
+    await launchChat(dirs, PACKAGE_JSON, { pipkinExtensions: [extension("pipkin-todo", false, "new\n")] });
+    expect(await readFile(todoExtension(dirs), "utf8")).toBe("new\n");
+  });
+
+  it.each([
+    ["the name ../escape", { name: "../escape", source: "x", usesRuntimePackages: false }],
+    ["the name a/b", { name: "a/b", source: "x", usesRuntimePackages: false }],
+    ["an empty name", { name: "", source: "x", usesRuntimePackages: false }],
+    ["an extension that does not say whether it uses runtime packages", { name: "pipkin-todo", source: "x" }],
+  ])("refuses %s", async (_, pipkinExtension) => {
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({
+      type: "pipkin_request",
+      params: {
+        cwd: dirs.home,
+        sessionPath: null,
+        expectedVersion: PI_VERSION,
+        packageJson: PACKAGE_JSON,
+        pipkinExtensions: [pipkinExtension],
       },
     });
     expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "bad_params" });
     expect(await run.next()).toBeUndefined();
   });
 
-  it("leaves out a bundled package the user's global settings install from npm, but not one only a project declares", async () => {
-    const packageJson = runtimeManifest(["pi-web-access", "@scope/tools", "kept"]);
-    await writeRuntimeManifest(dirs, packageJson);
-    const globalPackages = ["npm:pi-web-access@0.38.0", { source: "npm:@scope/tools@^1", skills: [] }, "npm:kept-not"];
+  it.each([
+    ["the user's global settings install it from npm", ["npm:pi-web-access@0.38.0"], [], false],
+    ["the user's global settings list it as a package object", [{ source: "npm:pi-web-access", skills: [] }], [], false],
+    // Pi may leave an untrusted project's packages unloaded, so Pipkin's copy must stay.
+    ["only a project's settings install it", [], ["npm:pi-web-access"], true],
+    ["the user installs a different package", ["npm:pi-web-access-extra"], [], true],
+  ])("loads pipkin-web-access unless pi-web-access from npm replaces it, given %s", async (_, globalPackages, projectPackages, loaded) => {
     await writeFile(path.join(dirs.configDir, "settings.json"), `\uFEFF${JSON.stringify({ packages: globalPackages })}`);
-    // Pi may leave an untrusted project's packages unloaded, so the bundled copy must stay.
     await mkdir(path.join(dirs.home, ".pi"));
-    await writeFile(path.join(dirs.home, ".pi/settings.json"), JSON.stringify({ packages: ["npm:kept"] }));
+    await writeFile(path.join(dirs.home, ".pi/settings.json"), JSON.stringify({ packages: projectPackages }));
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson, disabledPackages: [], pipkinExtensions: [] } });
+    run.send({
+      type: "pipkin_request",
+      params: {
+        cwd: dirs.home,
+        sessionPath: null,
+        expectedVersion: PI_VERSION,
+        packageJson: PACKAGE_JSON,
+        pipkinExtensions: [extension("pipkin-todo"), extension("pipkin-web-access", true)],
+      },
+    });
+    const webAccess = loaded ? ["--extension", path.join(dirs.root, "pi/extensions/pipkin-web-access/index.js")] : [];
     expect(await run.next()).toMatchObject({
       type: "ready",
-      argv: ["--mode", "rpc", "--extension", path.join(dirs.root, "pi/node_modules/kept"), "--append-system-prompt", SYSTEM_APPEND],
+      argv: ["--mode", "rpc", "--extension", todoExtension(dirs), ...webAccess, "--append-system-prompt", SYSTEM_APPEND],
     });
     run.socket.end();
     await run.exited;
   });
 
-  describe("pi-web-access tool activation", () => {
+  describe("pipkin-web-access tool activation", () => {
     it.each([
       ["no config", null, { toolActivation: "eager" }],
       ["a config without a choice", JSON.stringify({ braveApiKey: "k" }), { braveApiKey: "k", toolActivation: "eager" }],
       ["the user's own choice", JSON.stringify({ toolActivation: "auto" }), { toolActivation: "auto" }],
     ])("makes the web tools eager given %s, keeping other settings", async (_, before, after) => {
       if (before !== null) await writeFile(path.join(dirs.configDir, "web-search.json"), before);
-      const config = await webSearchConfigAfterLaunch(dirs, ["pi-web-access"]);
+      const config = await webSearchConfigAfterLaunch(dirs, ["pipkin-web-access"]);
       expect(JSON.parse(config ?? "null")).toEqual(after);
     });
 
     it("leaves a config that is not a JSON object untouched", async () => {
       await writeFile(path.join(dirs.configDir, "web-search.json"), "{ broken");
-      expect(await webSearchConfigAfterLaunch(dirs, ["pi-web-access"])).toBe("{ broken");
+      expect(await webSearchConfigAfterLaunch(dirs, ["pipkin-web-access"])).toBe("{ broken");
     });
 
-    it("writes no config when pi-web-access is not bundled", async () => {
-      expect(await webSearchConfigAfterLaunch(dirs, ["other"])).toBeNull();
-    });
-
-    it("writes no config when the user turned pi-web-access off", async () => {
-      expect(await webSearchConfigAfterLaunch(dirs, ["pi-web-access"], ["pi-web-access"])).toBeNull();
+    it("writes no config when Pipkin does not send pipkin-web-access", async () => {
+      expect(await webSearchConfigAfterLaunch(dirs, ["pipkin-todo"])).toBeNull();
     });
   });
 
@@ -356,11 +343,11 @@ describe("rpc mode", () => {
     });
   });
 
-  it("asks for a reinstall when the bundled packages changed but Pi's version did not", async () => {
+  it("asks for a reinstall when the runtime's packages changed but Pi's version did not", async () => {
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    const packageJson = runtimeManifest(["pi-web-access"]);
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson, disabledPackages: [], pipkinExtensions: [] } });
+    const packageJson = runtimeManifest(["linkedom"]);
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson, pipkinExtensions: [] } });
     expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "pi_version" });
     expect(await run.next()).toBeUndefined();
   });
@@ -377,7 +364,7 @@ describe("rpc mode", () => {
     );
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
     const ready = await run.next();
     expect(ready).toMatchObject({ type: "ready" });
     expect(ready?.env).toEqual({ PI_CODING_AGENT_DIR: dirs.configDir, SESSION_VAR: "token=none root=none" });
@@ -389,7 +376,7 @@ describe("rpc mode", () => {
     await writeLogin(dirs, "export SESSION_VAR=partial\nexit 1");
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
     const ready = await run.next();
     expect(ready).toMatchObject({ type: "ready" });
     expect(ready?.env).toEqual({ PI_CODING_AGENT_DIR: dirs.configDir });

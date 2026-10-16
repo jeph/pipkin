@@ -9,5 +9,6 @@
     "node": true,
     "es2024": true
   },
-  "ignorePatterns": ["node_modules"]
+  // Vendored upstream code keeps its own style so upstream releases merge cleanly; see its UPSTREAM.md.
+  "ignorePatterns": ["node_modules", "src/pi-extensions/pipkin-web-access"]
 }

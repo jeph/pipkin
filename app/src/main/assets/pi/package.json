@@ -8,6 +8,14 @@
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "1.3.0",
-    "pi-web-access": "0.39.0"
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@mozilla/readability": "0.6.0",
+    "defuddle": "0.19.3",
+    "linkedom": "0.16.11",
+    "p-limit": "6.2.0",
+    "promise.try": "2.0.2",
+    "turndown": "7.2.4",
+    "undici": "8.11.2",
+    "unpdf": "1.8.1"
   }
 }

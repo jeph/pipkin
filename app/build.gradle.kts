@@ -17,7 +17,10 @@ abstract class HostBundle : Exec() {
   abstract val outputDir: DirectoryProperty
 
   override fun exec() {
-    environment("OUT", outputDir.get().asFile.absolutePath)
+    val out = outputDir.get().asFile
+    // A bundle that was renamed or removed would otherwise stay behind and ship in the APK.
+    out.deleteRecursively()
+    environment("OUT", out.absolutePath)
     super.exec()
   }
 }
@@ -32,7 +35,7 @@ val hostInstall = tasks.register<Exec>("hostInstall") {
 }
 
 val hostBuild = tasks.register<HostBundle>("hostBuild") {
-  description = "Bundles the Termux host into the pipkin-host.mjs APK asset."
+  description = "Bundles the Termux host into the pipkin-host.mjs APK asset, and the Pi extensions Pipkin ships."
   dependsOn(hostInstall)
   workingDir = hostDir.asFile
   inputs.dir(hostDir.dir("src"))
@@ -41,6 +44,8 @@ val hostBuild = tasks.register<HostBundle>("hostBuild") {
     hostDir.file("pnpm-lock.yaml"),
     hostDir.file("tsconfig.json"),
     hostDir.file("build.ts"),
+    // build.ts leaves the runtime's packages out of the extensions it bundles.
+    layout.projectDirectory.file("src/main/assets/pi/package.json"),
   )
   commandLine("pnpm", "run", "build")
 }

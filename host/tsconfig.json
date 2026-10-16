@@ -16,5 +16,7 @@
     "skipLibCheck": true,
     "noEmit": true
   },
-  "include": ["src", "test", "vitest.config.ts", "build.ts"]
+  "include": ["src", "test", "vitest.config.ts", "build.ts"],
+  // Vendored upstream code follows its own, looser compiler settings; see its UPSTREAM.md.
+  "exclude": ["src/pi-extensions/pipkin-web-access"]
 }

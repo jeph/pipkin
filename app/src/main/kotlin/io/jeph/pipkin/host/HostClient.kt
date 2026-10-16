@@ -35,12 +35,15 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   private val failureState = MutableStateFlow<HostFailure?>(null)
   private val installingState = MutableStateFlow(false)
 
-  /** The bundled `pi/package.json`: Pi and the Pi packages Pipkin ships; `ensure` installs it, `rpc` requires it. */
+  /**
+   * The bundled `pi/package.json`: Pi and the packages Pipkin's extensions import; `ensure` installs it, `rpc` requires
+   * it.
+   */
   private val packageJson: String by lazy { asset(PACKAGE_JSON) }
 
-  /** The source of each extension Pipkin makes itself, which [openRpc] sends for the host to save. */
-  private val pipkinExtensionSources: Map<BundledExtension, String> by lazy {
-    BundledExtension.entries.mapNotNull { extension -> extension.asset?.let { extension to asset(it) } }.toMap()
+  /** The source of each bundled extension, which [openRpc] sends for the host to save. */
+  private val extensionSources: Map<BundledExtension, String> by lazy {
+    BundledExtension.entries.associateWith { asset(it.asset) }
   }
 
   /** The Pi version the bundled `pi/package.json` pins. */
@@ -217,24 +220,26 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
    * are [io.jeph.pipkin.data.BundledExtension.id]s.
    */
   suspend fun openRpc(cwd: String, sessionPath: String?, disabledExtensions: Set<String>): HostChannel {
-    val pipkinExtensions = pipkinExtensionSources.filterKeys { it.id !in disabledExtensions }
-      .map { (extension, source) -> JSONObject().put("name", extension.id).put("source", source) }
-    val disabledPackages = BundledExtension.entries
-      .filter { it.asset == null && it.id in disabledExtensions }
-      .map { it.id }
+    // The extensions' sources run to over a megabyte, so reading and encoding them stays off the main thread.
+    val params = withContext(Dispatchers.IO) {
+      val extensions = extensionSources.filterKeys { it.id !in disabledExtensions }
+        .map { (extension, source) ->
+          JSONObject()
+            .put("name", extension.id)
+            .put("source", source)
+            .put("usesRuntimePackages", extension.usesRuntimePackages)
+        }
+      JSONObject()
+        .put("cwd", cwd)
+        .put("sessionPath", sessionPath ?: JSONObject.NULL)
+        .put("expectedVersion", expectedPiVersion)
+        .put("packageJson", packageJson)
+        .put("pipkinExtensions", JSONArray(extensions))
+    }
     val channel = connect("rpc")
     var sent = false
     try {
-      sendRequest(
-        channel,
-        JSONObject()
-          .put("cwd", cwd)
-          .put("sessionPath", sessionPath ?: JSONObject.NULL)
-          .put("expectedVersion", expectedPiVersion)
-          .put("packageJson", packageJson)
-          .put("disabledPackages", JSONArray(disabledPackages))
-          .put("pipkinExtensions", JSONArray(pipkinExtensions)),
-      )
+      withContext(Dispatchers.IO) { sendRequest(channel, params) }
       sent = true
     } finally {
       // Cancellation skips sendRequest's IOException path; without this close the host and Pi outlive the caller.

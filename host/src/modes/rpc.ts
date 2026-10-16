@@ -3,10 +3,10 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import type { Socket } from "node:net";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
-import { installedPiVersion, loadPi, PI_PACKAGE, piPackageDir } from "../env.js";
+import { installedPiVersion, loadPi, piPackageDir } from "../env.js";
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
-import { nullableStringParam, stringArrayParam, stringParam } from "../params.js";
+import { nullableStringParam, stringParam } from "../params.js";
 import { pipkinExtensionFiles, pipkinExtensionsParam } from "../pipkin-extensions.js";
 import { SYSTEM_APPEND } from "../prompt.js";
 import { openSettingsIfValid } from "../settings.js";
@@ -22,7 +22,9 @@ const KILL_AFTER_MS = 5000;
  * bounded.
  */
 const OUTPUT_BACKLOG_LIMIT = 32 * 1024 * 1024;
-const WEB_ACCESS_PACKAGE = "pi-web-access";
+/** Pipkin's copy of pi-web-access, and the npm package a user can install in its place. */
+const WEB_ACCESS_EXTENSION = "pipkin-web-access";
+const WEB_ACCESS_NPM_PACKAGE = "pi-web-access";
 
 /** Keeps only the newest bytes of Pi's stderr for the exit report. */
 class TailBuffer {
@@ -95,26 +97,10 @@ function userNpmPackages(settings: unknown): Set<string> {
   return names;
 }
 
-/** Pipkin's bundled Pi packages: every runtime dependency besides Pi. */
-function bundledPackages(packageJson: string): string[] {
-  const manifest = JSON.parse(packageJson) as unknown;
-  const dependencies = isObject(manifest) && isObject(manifest.dependencies) ? Object.keys(manifest.dependencies) : [];
-  return dependencies.filter((name) => name !== PI_PACKAGE);
-}
-
 /**
- * The bundled packages to load with `-e`, minus any the user installs through Pi's global settings. Pi exits when two
- * copies of one extension register the same tools, so the user's copy wins.
- */
-function bundledExtensionDirs(ctx: ModeContext, packages: string[], settings: unknown): string[] {
-  const userPackages = userNpmPackages(settings);
-  return packages.filter((name) => !userPackages.has(name)).map((name) => join(ctx.env.root, "pi", "node_modules", name));
-}
-
-/**
- * Sets pi-web-access's `toolActivation` to `eager` in its `web-search.json` unless the user chose one, so every chat
- * has the web tools from its first request instead of behind a `web_enable` call some models only make sometimes.
- * A file that is not a JSON object is left alone; pi-web-access reports it itself.
+ * Sets pipkin-web-access's `toolActivation` to `eager` in its `web-search.json` unless the user chose one, so every
+ * chat has the web tools from its first request instead of behind a `web_enable` call some models only make
+ * sometimes. A file that is not a JSON object is left alone; the extension reports it itself.
  */
 async function defaultWebToolsToEager(configDir: string): Promise<void> {
   const path = join(configDir, "web-search.json");
@@ -158,8 +144,6 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const sessionPath = nullableStringParam(ctx.params, "sessionPath");
   const expectedVersion = stringParam(ctx.params, "expectedVersion");
   const packageJson = stringParam(ctx.params, "packageJson");
-  /** Bundled packages the user turned off in Pipkin's settings. */
-  const disabledPackages = new Set(stringArrayParam(ctx.params, "disabledPackages"));
   const pipkinExtensions = pipkinExtensionsParam(ctx.params);
   const installed = await installedPiVersion(ctx.env.root);
   if (installed !== expectedVersion) {
@@ -189,12 +173,14 @@ export async function rpc(ctx: ModeContext): Promise<void> {
 
   const args = [await piEntry(ctx.env.root), "--mode", "rpc"];
   if (sessionPath !== null) args.push("--session", sessionPath);
-  const packages = bundledPackages(packageJson).filter((name) => !disabledPackages.has(name));
-  if (packages.includes(WEB_ACCESS_PACKAGE)) await defaultWebToolsToEager(ctx.env.configDir);
+  if (pipkinExtensions.some(({ name }) => name === WEB_ACCESS_EXTENSION)) await defaultWebToolsToEager(ctx.env.configDir);
   const settings = await readGlobalSettings(ctx.env.configDir);
   await defaultSteeringToAll(ctx, settings);
-  for (const dir of bundledExtensionDirs(ctx, packages, settings)) args.push("--extension", dir);
-  for (const file of await pipkinExtensionFiles(ctx.env.root, pipkinExtensions)) args.push("--extension", file);
+  // Pi exits when two copies of one extension register the same tools, so pi-web-access from npm replaces Pipkin's copy.
+  const extensions = userNpmPackages(settings).has(WEB_ACCESS_NPM_PACKAGE)
+    ? pipkinExtensions.filter(({ name }) => name !== WEB_ACCESS_EXTENSION)
+    : pipkinExtensions;
+  for (const file of await pipkinExtensionFiles(ctx.env.root, extensions)) args.push("--extension", file);
   args.push("--append-system-prompt", SYSTEM_APPEND);
   const env = await termuxSessionEnv(ctx.env);
   const child = spawn(process.execPath, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
