@@ -1,6 +1,7 @@
 package io.jeph.pipkin.host
 
 import android.content.Context
+import io.jeph.pipkin.agent.KeepAlive
 import java.io.OutputStream
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -8,6 +9,12 @@ import java.util.concurrent.atomic.AtomicBoolean
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Setup of Pipkin's helper in Termux's Play build. Each copied command opens a session on [HostServer]'s loopback
@@ -17,12 +24,19 @@ import javax.crypto.spec.SecretKeySpec
 internal object PlaySetup {
   private const val SESSION_MILLIS = 30 * 60_000L
   private val route = Regex("""^/pipkin/([^/]+)/(setup\.sh|helper\.mjs|run\.sh|start\.sh|key)$""")
+  private val timers = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
   @Volatile
   private var session: SetupSession? = null
+  private var hold: AutoCloseable? = null
+  private var expiry: Job? = null
 
-  /** Opens a session, superseding the previous one, and returns the one-line command that runs its installer. */
-  fun newCommand(context: Context): String {
+  /**
+   * Opens a session, superseding the previous one, and returns the one-line command that runs its installer. While
+   * the user is in Termux, Android would freeze Pipkin and stall the installer's downloads, so [keepAlive] holds
+   * Pipkin in the foreground until a helper pairs or the session expires.
+   */
+  fun newCommand(context: Context, keepAlive: KeepAlive): String {
     val app = context.applicationContext
     val session = SetupSession.create(
       read = { HelperAssets.read(app, it) },
@@ -31,6 +45,14 @@ internal object PlaySetup {
       onKeyServed = { HelperPairing.storePending(app, it) },
     )
     open(session)
+    synchronized(this) {
+      if (hold == null) hold = keepAlive.acquire("Termux setup")
+      expiry?.cancel()
+      expiry = timers.launch {
+        delay(SESSION_MILLIS)
+        release()
+      }
+    }
     return session.command(HostServer.shared.port)
   }
 
@@ -40,14 +62,26 @@ internal object PlaySetup {
 
   /** A helper authenticated with [key]: the session that handed it out is done. */
   internal fun complete(key: ByteArray) {
-    session?.takeIf { MessageDigest.isEqual(it.key, key) }?.complete()
+    val session = session?.takeIf { MessageDigest.isEqual(it.key, key) } ?: return
+    session.complete()
+    release()
   }
 
-  /** Answers `GET [target]`; HostServer writes the response. */
+  private fun release() = synchronized(this) {
+    expiry?.cancel()
+    expiry = null
+    hold?.close()
+    hold = null
+  }
+
+  /**
+   * Answers `GET [target]`; HostServer writes the response. Pasting a command again after it paired still serves the
+   * installer and files, so the rerun repairs everything else while keeping the pairing; only its key is gone.
+   */
   internal fun respond(target: String, now: Long = System.currentTimeMillis()): HttpResponse {
     val match = route.matchEntire(target) ?: return HttpResponse(HttpResponse.NOT_FOUND)
     val (sid, name) = match.destructured
-    val session = session?.takeIf { it.isOpen(now) && it.matches(sid) } ?: return HttpResponse(HttpResponse.GONE)
+    val session = session?.takeIf { now < it.expiresAt && it.matches(sid) } ?: return HttpResponse(HttpResponse.GONE)
     return session.serve(name)
   }
 }
@@ -76,7 +110,7 @@ internal class SetupSession(
   val sid: String,
   val token: ByteArray,
   val key: ByteArray,
-  private val expiresAt: Long,
+  val expiresAt: Long,
   private val files: Map<String, ByteArray>,
   private val onKeyServed: (ByteArray) -> Unit,
 ) {
@@ -85,8 +119,6 @@ internal class SetupSession(
   /** The command checks the downloaded installer against this before running it. */
   val installerSha256: String = HelperAssets.sha256Hex(files.getValue(INSTALLER))
 
-  fun isOpen(now: Long): Boolean = !completed.get() && now < expiresAt
-
   fun matches(sid: String): Boolean =
     MessageDigest.isEqual(this.sid.toByteArray(Charsets.US_ASCII), sid.toByteArray(Charsets.US_ASCII))
 
@@ -94,10 +126,11 @@ internal class SetupSession(
 
   /**
    * Serving the key makes it Pipkin's pending key; the installer may fetch it again after a failure, and gets the
-   * same key under a fresh nonce.
+   * same key under a fresh nonce, until a helper pairs with it.
    */
   fun serve(name: String): HttpResponse {
     if (name != KEY) return HttpResponse(HttpResponse.OK, files.getValue(name))
+    if (completed.get()) return HttpResponse(HttpResponse.GONE)
     val nonce = ByteArray(NONCE_BYTES).also(random::nextBytes)
     onKeyServed(key)
     return HttpResponse(HttpResponse.OK, pairingBody(token, sid, key, nonce))
@@ -106,7 +139,7 @@ internal class SetupSession(
   /** The line the user pastes into Termux. */
   fun command(port: Int): String {
     val base = "http://127.0.0.1:$port/pipkin/$sid"
-    return "f=\$(mktemp) && curl -fsS \"$base/$INSTALLER\" -o \"\$f\" && " +
+    return "f=\$(mktemp) && curl -fsS -m 60 \"$base/$INSTALLER\" -o \"\$f\" && " +
       "echo \"$installerSha256  \$f\" | sha256sum -c --status && " +
       "PIPKIN_URL=\"$base\" PIPKIN_TOKEN=${token.toHexString()} bash \"\$f\"; s=\$?; rm -f \"\$f\"; " +
       "[ \$s = 0 ] || echo \"Pipkin setup didn't finish. " +

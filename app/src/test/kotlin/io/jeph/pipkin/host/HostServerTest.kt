@@ -94,7 +94,7 @@ class HostServerTest {
     assertTrue(ok.endsWith("\r\n\r\nrun script"))
     assertTrue(get("/pipkin/$SID/nothing").startsWith("HTTP/1.1 404 "))
     session.complete()
-    assertTrue(get("/pipkin/$SID/run.sh").startsWith("HTTP/1.1 410 "))
+    assertTrue(get("/pipkin/$SID/key").startsWith("HTTP/1.1 410 "))
   }
 
   /** The whole response; the server closes the connection after it. */

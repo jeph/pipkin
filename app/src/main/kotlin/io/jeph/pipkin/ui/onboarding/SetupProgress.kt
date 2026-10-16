@@ -2,6 +2,7 @@ package io.jeph.pipkin.ui.onboarding
 
 import android.content.Context
 import io.jeph.pipkin.AppGraph
+import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.HostFailure
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.termux.TermuxInstall
@@ -96,7 +97,7 @@ internal object SetupProgress {
   suspend fun setupCommand(context: Context, literal: String?): String {
     termuxCommandSentState.value = true
     if (literal != null) return literal
-    val command = withContext(Dispatchers.IO) { TermuxSetup.command(context) }
+    val command = withContext(Dispatchers.IO) { TermuxSetup.command(context, context.appGraph.keepAlive) }
     if (TermuxInstall.status(context).isPlay) playCommandState.value = command
     return command
   }

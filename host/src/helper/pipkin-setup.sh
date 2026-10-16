@@ -35,8 +35,16 @@ write_file() {
   fi
 }
 
-# 2. Shared storage, so Pipkin can reach the files you work on. A declined prompt doesn't stop the setup.
-[ -d "$HOME/storage/shared" ] || termux-setup-storage || true
+# 2. Shared storage, so Pipkin can reach the files you work on. Waiting for the grant brings the user back to Termux
+# before the setup ends, so the switch back to Pipkin isn't blocked. A declined prompt doesn't stop the setup.
+if [ ! -w "$HOME/storage/shared" ]; then
+  termux-setup-storage || true
+  say "Allow storage access for Termux, then come back here."
+  for ((i = 0; i < 120; i++)); do
+    [ -w "$HOME/storage/shared" ] && break
+    sleep 1
+  done
+fi
 
 # 3. Node.js 22.19 or newer.
 node_ok() {
@@ -56,7 +64,7 @@ fi
 fetch() { # $1 = name, $2 = sha256, $3 = mode
   local tmp="$dir/$1.$$.tmp"
   [ "$(sha256sum "$dir/$1" 2>/dev/null | cut -d' ' -f1)" = "$2" ] && chmod "$3" "$dir/$1" && return 0
-  curl -fsS "$PIPKIN_URL/$1" -o "$tmp" || {
+  curl -fsS -m 60 "$PIPKIN_URL/$1" -o "$tmp" || {
     rm -f "$tmp"
     fail "Couldn't download $1 from Pipkin. Keep Pipkin open and paste the command again."
   }
@@ -132,7 +140,7 @@ for ((i = 1; i <= 40; i++)); do
 done
 $ready || fail "The helper didn't start. Paste the command again."
 
-# 7. Done; back to Pipkin.
-echo "Pipkin setup done."
+# 7. Done; back to Pipkin. Android blocks the switch when Termux isn't on screen, so say how to get there too.
+echo "Pipkin setup done. Switch back to Pipkin if it doesn't open on its own."
 am start --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
   -n "$package/io.jeph.pipkin.MainActivity" >/dev/null 2>&1 || true

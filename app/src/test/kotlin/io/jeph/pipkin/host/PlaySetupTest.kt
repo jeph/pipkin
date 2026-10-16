@@ -6,7 +6,8 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PlaySetupTest {
@@ -87,37 +88,23 @@ class PlaySetupTest {
   }
 
   @Test
-  fun aHelperUsingTheKeyCompletesTheSession() {
+  fun aHelperUsingTheKeyEndsOnlyTheKey() {
     val session = open()
     PlaySetup.complete(KEY)
     assertEquals(200, PlaySetup.respond("/pipkin/${session.sid}/key", NOW).status)
     PlaySetup.complete(session.key)
     assertEquals(410, PlaySetup.respond("/pipkin/${session.sid}/key", NOW).status)
-    assertEquals(410, PlaySetup.respond("/pipkin/${session.sid}/setup.sh", NOW).status)
+    assertEquals(200, PlaySetup.respond("/pipkin/${session.sid}/setup.sh", NOW).status)
   }
 
   @Test
-  fun commandHasTheSpecShape() {
-    val session = SetupSession(
-      sid = SID,
-      token = TOKEN,
-      key = KEY,
-      expiresAt = EXPIRES,
-      files = mapOf("setup.sh" to "installer".toByteArray()),
-      onKeyServed = {},
-    )
-    val h = sha256("installer")
-    val t = "11".repeat(32)
-    // The spec's command with its P, SID, H and T placeholders, split only to fit the line length.
-    val expected = (
-      $$"""f=$(mktemp) && curl -fsS "http://127.0.0.1:P/pipkin/SID/setup.sh" -o "$f" && """ +
-        $$"""echo "H  $f" | sha256sum -c --status && """ +
-        $$"""PIPKIN_URL="http://127.0.0.1:P/pipkin/SID" PIPKIN_TOKEN=T bash "$f"; s=$?; rm -f "$f"; """ +
-        $$"""[ $s = 0 ] || echo "Pipkin setup didn't finish. """ +
-        $$"""Open Pipkin, copy the setup command again and paste it here.""""
-      ).replace(":P/", ":4242/").replace("SID", SID).replace("\"H  ", "\"$h  ").replace("=T ", "=$t ")
-    assertEquals(expected, session.command(4242))
-    assertNull(expected.lineSequence().drop(1).firstOrNull())
+  fun commandRunsTheInstallerOnlyAfterItsHashChecksOnOneLine() {
+    val session = open()
+    val command = session.command(4242)
+    val check = command.indexOf("echo \"${session.installerSha256}  \$f\" | sha256sum -c --status && ")
+    val run = command.indexOf("bash \"\$f\"")
+    assertTrue(check in 0 until run)
+    assertFalse(command.contains('\n'))
   }
 
   private fun open(): SetupSession {

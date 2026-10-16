@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.PersistableBundle
+import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.host.PlaySetup
 
 /**
@@ -28,10 +29,10 @@ internal object TermuxSetup {
 
   /**
    * The setup command for the installed build. The Play build's carries a fresh single-use pairing token, so ask for
-   * it only when it's about to be copied.
+   * it only when it's about to be copied; [keepAlive] keeps Pipkin serving its installer while the user is in Termux.
    */
-  fun command(context: Context): String =
-    if (TermuxInstall.status(context).isPlay) PlaySetup.newCommand(context) else FDROID_COMMAND
+  fun command(context: Context, keepAlive: KeepAlive): String =
+    if (TermuxInstall.status(context).isPlay) PlaySetup.newCommand(context, keepAlive) else FDROID_COMMAND
 
   /** Puts [command] on the clipboard and opens Termux so the user can paste it. */
   fun copyAndOpen(context: Context, command: String) {
