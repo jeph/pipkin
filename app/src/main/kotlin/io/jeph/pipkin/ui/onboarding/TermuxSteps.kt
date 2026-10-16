@@ -149,10 +149,10 @@ internal fun TermuxSetupStep(
   onCopy: () -> Unit,
 ) {
   StepCard(number = number, title = stringResource(R.string.onboarding_setup_title), status = status) {
-    error?.message?.let { StepText(it, color = pipkinColors.destructive) }
-    if (termuxChanged && error == null) {
-      StepText(stringResource(R.string.onboarding_setup_changed), color = pipkinColors.destructive)
-    }
+    // After a reinstall, every failure here comes down to the setup the reinstall removed; the notice also says the
+    // agent and sign-in need doing again.
+    val problem = if (termuxChanged) stringResource(R.string.onboarding_setup_changed) else error?.message
+    problem?.let { StepText(it, color = pipkinColors.destructive) }
     if (status == StepStatus.Done) StepText(stringResource(R.string.onboarding_setup_done))
     val body = if (termux.isPlay) R.string.onboarding_setup_body_play else R.string.onboarding_setup_body
     StepText(stringResource(body))
