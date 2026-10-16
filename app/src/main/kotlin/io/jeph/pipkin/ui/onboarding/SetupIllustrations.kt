@@ -148,7 +148,8 @@ private fun PasteDemoTerminal(modifier: Modifier) {
     modifier = modifier
       .widthIn(max = DEMO_WIDTH)
       .fillMaxWidth()
-      .semantics { contentDescription = description }
+      // One description in place of the drawing's fake terminal lines, which a screen reader would read out.
+      .clearAndSetSemantics { contentDescription = description }
       .graphicsLayer { alpha = fade(time.value, FADE_OUT_AT, CYCLE_MILLIS, from = 1f, to = 0f) }
       .background(colors.surface1, shape)
       .border(1.dp, colors.border, shape)

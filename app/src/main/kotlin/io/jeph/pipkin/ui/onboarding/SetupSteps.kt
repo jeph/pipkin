@@ -36,7 +36,8 @@ internal data class StepButton(val label: String, val enabled: Boolean = true, v
  * Permissions ([PermissionsScreen]). [extra] holds what's more than text and buttons: a command, install output or
  * sign-in choices.
  */
-internal data class StepSpec(
+@Suppress("LongParameterList") // One field per thing a step page renders.
+internal class StepSpec(
   val step: SetupStep,
   @param:DrawableRes val icon: Int,
   val title: String,
