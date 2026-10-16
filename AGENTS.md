@@ -37,3 +37,7 @@ Commits are signed through 1Password, so commit normally first. If 1Password doe
 Before adding a dependency, whether a Gradle dependency in `app/build.gradle.kts`, a host package in `host/package.json`, or a Pi runtime package in `app/src/main/assets/pi/package.json`, check its license. Don't add copyleft code (GPL, LGPL, AGPL) without asking first, since it would change how Pipkin can be distributed.
 
 When you copy or adapt code, icons, or other assets from another project, keep a header in the copied file naming the source, version, and license, as the Lucide icons in `app/src/main/res/drawable/ic_lucide_*.xml` do.
+
+## Vendored pi-web-access
+
+The `pipkin-web-access` extension in `host/src/pi-extensions/pipkin-web-access/` is a copy of the upstream pi-web-access package with a few Pipkin changes. Before updating it to a new upstream release or editing it, read `UPSTREAM.md` in that folder: it lists every difference from upstream and the steps for folding in a release.
