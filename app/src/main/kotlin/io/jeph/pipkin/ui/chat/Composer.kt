@@ -91,9 +91,9 @@ private const val MAX_PICKED_IMAGES = 6
 /**
  * Paseo's composer: attachment tray, growing text field and a toolbar with attach, model chip, the
  * context meter, [trailingControls] (reserved for voice input) and the primary send/stop button. Send stays
- * greyed out while Pi starts. Extension widgets hang from its edges as tabs; an open tab's panel shows only while
- * the keyboard is down and [dialogPending] is false, as both need the room, so then a tab opens its widget in a sheet
- * through [onOpenWidget].
+ * greyed out while Pi starts. The model and thinking chips open their pickers through [onSheet]. Extension widgets
+ * hang from its edges as tabs; an open tab's panel shows only while the keyboard is down and [dialogPending] is false,
+ * as both need the room, so then a tab opens its widget in a sheet.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -103,9 +103,7 @@ internal fun Composer(
   thinkingLevel: String?,
   busy: Boolean,
   dialogPending: Boolean,
-  onOpenModelSheet: () -> Unit,
-  onOpenThinkingSheet: () -> Unit,
-  onOpenWidget: (String) -> Unit,
+  onSheet: (ChatSheet) -> Unit,
   modifier: Modifier = Modifier,
   trailingControls: @Composable RowScope.() -> Unit = {},
 ) {
@@ -123,8 +121,9 @@ internal fun Composer(
   val panels = !WindowInsets.isImeVisible && !dialogPending
   val above = widgetEdge(widgets, tabs, belowEditor = false, panels)
   val below = widgetEdge(widgets, tabs, belowEditor = true, panels)
+  val openWidget = { key: String -> onSheet(ChatSheet.Widget(key)) }
   val onTap = { key: String, belowEditor: Boolean ->
-    if (panels) tabs.toggle(key, belowEditor) else onOpenWidget(key)
+    if (panels) tabs.toggle(key, belowEditor) else openWidget(key)
   }
   Box(
     modifier =
@@ -148,7 +147,7 @@ internal fun Composer(
             .border(1.dp, colors.borderAccent, shape)
             .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
       ) {
-        WidgetPanelSlot(above.shown, tabs, belowEditor = false, onExpand = onOpenWidget)
+        WidgetPanelSlot(above.shown, tabs, belowEditor = false, onExpand = openWidget)
         if (controller.attachments.isNotEmpty()) {
           AttachmentTray(controller.attachments, onRemove = { controller.attachments.remove(it) })
         }
@@ -161,11 +160,11 @@ internal fun Composer(
           thinkingLevel = thinkingLevel,
           busy = busy,
           onSend = { if (controller.send()) hideKeyboard() },
-          onOpenModelSheet = onOpenModelSheet,
-          onOpenThinkingSheet = onOpenThinkingSheet,
+          onOpenModelSheet = { onSheet(ChatSheet.Model()) },
+          onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
           trailingControls = trailingControls,
         )
-        WidgetPanelSlot(below.shown, tabs, belowEditor = true, onExpand = onOpenWidget)
+        WidgetPanelSlot(below.shown, tabs, belowEditor = true, onExpand = openWidget)
       }
       WidgetTabStrip(below, tabs, belowEditor = true, { onTap(it, true) }, Modifier.zIndex(1f).offset(y = (-1).dp))
     }

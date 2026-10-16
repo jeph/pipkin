@@ -17,7 +17,7 @@ internal data class ExtensionWidget(val lines: List<String>, val belowEditor: Bo
 internal fun withWidget(widgets: Map<String, ExtensionWidget>, event: JSONObject): Map<String, ExtensionWidget>? {
   val key = event.opt("widgetKey") as? String ?: return null
   val array = event.optJSONArray("widgetLines")
-  val lines = List(array?.length() ?: 0) { array?.opt(it) as? String ?: "" }
+  val lines = List(array?.length() ?: 0) { (array?.opt(it) as? String).orEmpty() }
   if (lines.isEmpty()) return widgets - key
   val widget = ExtensionWidget(lines, belowEditor = event.optString("widgetPlacement") == "belowEditor")
   val moved = widgets[key]?.let { it.belowEditor != widget.belowEditor } == true

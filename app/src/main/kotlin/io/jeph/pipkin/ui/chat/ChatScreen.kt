@@ -139,7 +139,6 @@ private fun ChatContent(
 ) {
   val process = controller.process
   val timeline by process.screenTimeline.collectAsStateWithLifecycle()
-  val processState by process.state.collectAsStateWithLifecycle()
   val busy by process.busy.collectAsStateWithLifecycle()
   val keyboard = LocalSoftwareKeyboardController.current
   val focus = LocalFocusManager.current
@@ -171,9 +170,7 @@ private fun ChatContent(
           thinkingLevel = timeline.thinkingLevel,
           busy = busy,
           dialogPending = dialogPending,
-          onOpenModelSheet = { onSheet(ChatSheet.Model()) },
-          onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
-          onOpenWidget = { onSheet(ChatSheet.Widget(it)) },
+          onSheet = onSheet,
         )
       },
     )
