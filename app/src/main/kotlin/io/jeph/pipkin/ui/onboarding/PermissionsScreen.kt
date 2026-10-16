@@ -15,16 +15,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.termux.TermuxInstall
@@ -34,17 +30,17 @@ import io.jeph.pipkin.ui.components.IconButton28
 import kotlinx.coroutines.launch
 
 /**
- * The onboarding steps that set up Termux and grant Pipkin access, without the Pi install and sign-in.
- * Reached from Settings; every step is re-checked on resume, like onboarding.
+ * The setup steps that prepare Termux and grant Pipkin access, as cards, without the agent install and sign-in.
+ * Reached from Settings; steps re-check whenever Pipkin comes back, like onboarding.
  */
 @Composable
 internal fun PermissionsScreen(onBack: () -> Unit) {
   val context = LocalContext.current
   val graph = remember(context) { context.appGraph }
-  var checks by remember { mutableStateOf(DeviceChecks.read(context)) }
-  val state = rememberOnboardingState(graph, checks)
-  val onAction = rememberPermissionActions(state) { checks = DeviceChecks.read(context) }
-  LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { checks = DeviceChecks.read(context) }
+  val checks = rememberDeviceChecks()
+  val state = rememberOnboardingState(graph, checks.value)
+  val onAction = rememberSetupActions(state, onPermissionResult = checks::refresh)
+  AutoInstall(graph, state)
 
   SetupPage(
     header = {
@@ -60,91 +56,53 @@ internal fun PermissionsScreen(onBack: () -> Unit) {
       )
     },
   ) {
-    PermissionSteps(state, onAction)
+    val steps = state.visibleSteps - SetupStep.InstallPi - SetupStep.SignIn
+    steps.forEachIndexed { index, step -> StepCard(stepSpec(step, state, onAction), number = index + 1) }
   }
 }
 
 /**
- * Termux, Pipkin's Android permissions, then the build's own steps (RUN_COMMAND for F-Droid, background running for
- * Play) and the Termux setup command, in setup order.
+ * Handles [SetupAction]s; [onPermissionResult] runs after a runtime permission prompt closes. [onLogin] and
+ * [onAddProvider] serve the sign-in step, which only onboarding shows.
  */
 @Composable
-internal fun PermissionSteps(state: OnboardingState, onAction: (PermissionAction) -> Unit) {
-  TermuxStep(
-    number = state.stepNumber(SetupStep.Termux),
-    status = state.status(SetupStep.Termux),
-    termux = state.checks.termux,
-    version = state.checks.termuxVersion,
-    onAction = onAction,
-  )
-  AndroidSettingsSteps(
-    state = state,
-    notificationsBlocked = Manifest.permission.POST_NOTIFICATIONS in state.blockedPermissions,
-    onAllowNotifications = { onAction(PermissionAction.AllowNotifications) },
-    onAllowBackground = { onAction(PermissionAction.AllowBackground) },
-  )
-  if (SetupStep.TermuxBackground in state.visibleSteps) {
-    TermuxBackgroundStep(
-      number = state.stepNumber(SetupStep.TermuxBackground),
-      status = state.status(SetupStep.TermuxBackground),
-      onAllow = { onAction(PermissionAction.AllowTermuxBackground) },
-    )
-  }
-  if (SetupStep.RunCommand in state.visibleSteps) {
-    RunCommandStep(
-      number = state.stepNumber(SetupStep.RunCommand),
-      status = state.status(SetupStep.RunCommand),
-      termuxInstalled = state.checks.termux != TermuxInstall.Status.NotInstalled,
-      blocked = TermuxInstall.RUN_COMMAND_PERMISSION in state.blockedPermissions,
-      error = state.errorFor(SetupStep.RunCommand),
-      onAllow = { onAction(PermissionAction.AllowRunCommand) },
-    )
-  }
-  TermuxSetupStep(
-    number = state.stepNumber(SetupStep.TermuxSetup),
-    status = state.status(SetupStep.TermuxSetup),
-    command = state.termuxCommand,
-    termux = state.checks.termux,
-    termuxChanged = state.checks.termuxChanged,
-    error = state.errorFor(SetupStep.TermuxSetup),
-    onCopyAndOpen = { onAction(PermissionAction.CopyAndOpenTermux) },
-    onCopy = { onAction(PermissionAction.CopyCommand) },
-  )
-}
-
-/** Handles [PermissionAction]s; [onPermissionResult] runs after a runtime permission prompt closes. */
-@Composable
-internal fun rememberPermissionActions(
+internal fun rememberSetupActions(
   state: OnboardingState,
   onPermissionResult: () -> Unit,
-): (PermissionAction) -> Unit {
+  onLogin: (providerId: String) -> Unit = {},
+  onAddProvider: () -> Unit = {},
+): (SetupAction) -> Unit {
   val context = LocalContext.current
+  val graph = remember(context) { context.appGraph }
   val scope = rememberCoroutineScope()
   val requestPermission = rememberPermissionRequest(state.blockedPermissions, onPermissionResult)
+  val literal = state.setupLiteral
   return { action ->
     when (action) {
-      PermissionAction.OpenFDroid -> context.startSafely { TermuxInstall.openFDroidPage(context) }
+      SetupAction.OpenFDroid -> context.startSafely { TermuxInstall.openFDroidPage(context) }
 
-      PermissionAction.OpenPlay -> context.startSafely { TermuxInstall.openPlayPage(context) }
+      SetupAction.OpenPlay -> context.startSafely { TermuxInstall.openPlayPage(context) }
 
-      PermissionAction.UninstallTermux -> context.startSafely { TermuxInstall.requestUninstall(context) }
+      SetupAction.UninstallTermux -> context.startSafely { TermuxInstall.requestUninstall(context) }
 
-      PermissionAction.AllowNotifications -> requestPermission(Manifest.permission.POST_NOTIFICATIONS)
+      SetupAction.AllowNotifications -> requestPermission(Manifest.permission.POST_NOTIFICATIONS)
 
-      PermissionAction.AllowBackground -> context.startSafely { requestBackgroundExemption(context) }
+      SetupAction.AllowBackground -> context.startSafely { requestBackgroundExemption(context) }
 
-      PermissionAction.AllowTermuxBackground -> context.startSafely { TermuxInstall.openTermuxAppSettings(context) }
+      SetupAction.AllowTermuxBackground -> context.startSafely { TermuxInstall.openTermuxAppSettings(context) }
 
-      PermissionAction.AllowRunCommand -> requestPermission(TermuxInstall.RUN_COMMAND_PERMISSION)
+      SetupAction.AllowRunCommand -> requestPermission(TermuxInstall.RUN_COMMAND_PERMISSION)
 
-      PermissionAction.CopyAndOpenTermux -> scope.launch {
-        val command = SetupProgress.setupCommand(context, state.errorFor(SetupStep.TermuxSetup)?.command)
+      SetupAction.CopyAndOpenTermux -> scope.launch {
+        val command = SetupProgress.setupCommand(context, literal)
         context.startSafely { TermuxSetup.copyAndOpen(context, command) }
       }
 
-      PermissionAction.CopyCommand -> scope.launch {
-        TermuxSetup.copy(context, SetupProgress.setupCommand(context, state.errorFor(SetupStep.TermuxSetup)?.command))
-      }
+      SetupAction.InstallPi -> SetupProgress.install(graph)
+
+      is SetupAction.Login -> onLogin(action.providerId)
+
+      SetupAction.AddProvider -> onAddProvider()
     }
   }
 }

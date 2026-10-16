@@ -23,6 +23,8 @@ import org.json.JSONObject
 internal class Preferences(context: Context) {
   private val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
   private val setupCompleteState = MutableStateFlow(prefs.getBoolean(SETUP_COMPLETE, false))
+  private val setupCommandCopiedForState = MutableStateFlow(prefs.getString(SETUP_COMMAND_COPIED_FOR, null))
+  private val setupPagesPassedState = MutableStateFlow(readStringSet(SETUP_PAGES_PASSED))
   private val themeState = prefs.getString(THEME, null).let { name ->
     MutableStateFlow(ThemeMode.entries.firstOrNull { it.name == name } ?: ThemeMode.System)
   }
@@ -45,8 +47,17 @@ internal class Preferences(context: Context) {
   }
   private val disabledExtensionsState = MutableStateFlow(readStringSet(DISABLED_EXTENSIONS))
 
-  /** Onboarding finished or was skipped. */
+  /** Onboarding finished. */
   val setupComplete: StateFlow<Boolean> = setupCompleteState.asStateFlow()
+
+  /**
+   * The Termux installation (`TermuxInstall.installation`) the setup command was last copied for, so that one may have
+   * run it. A reinstall wiped what it set up, so a copy for another installation doesn't count.
+   */
+  val setupCommandCopiedFor: StateFlow<String?> = setupCommandCopiedForState.asStateFlow()
+
+  /** Onboarding pages the user moved past without finishing them: the welcome page and skipped optional steps. */
+  val setupPagesPassed: StateFlow<Set<String>> = setupPagesPassedState.asStateFlow()
 
   val theme: StateFlow<ThemeMode> = themeState.asStateFlow()
 
@@ -95,6 +106,19 @@ internal class Preferences(context: Context) {
   fun setSetupComplete(complete: Boolean) {
     prefs.edit { putBoolean(SETUP_COMPLETE, complete) }
     setupCompleteState.value = complete
+  }
+
+  fun setSetupCommandCopiedFor(installation: String) {
+    if (setupCommandCopiedForState.value == installation) return
+    prefs.edit { putString(SETUP_COMMAND_COPIED_FOR, installation) }
+    setupCommandCopiedForState.value = installation
+  }
+
+  fun passSetupPage(page: String) {
+    val updated = setupPagesPassedState.value + page
+    if (updated.size == setupPagesPassedState.value.size) return
+    prefs.edit { putString(SETUP_PAGES_PASSED, JSONArray(updated).toString()) }
+    setupPagesPassedState.value = updated
   }
 
   fun setTheme(theme: ThemeMode) {
@@ -254,6 +278,8 @@ internal class Preferences(context: Context) {
   private companion object {
     const val FILE = "pipkin"
     const val SETUP_COMPLETE = "setupComplete"
+    const val SETUP_COMMAND_COPIED_FOR = "setupCommandCopiedFor"
+    const val SETUP_PAGES_PASSED = "setupPagesPassed"
     const val THEME = "theme"
     const val LAST_PROJECT_CWD = "lastProjectCwd"
     const val WORKSPACES = "workspaces"

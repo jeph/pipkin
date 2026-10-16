@@ -1,74 +1,90 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="onboarding_title">Set up Pipkin</string>
     <string name="onboarding_status_done">Done</string>
     <string name="onboarding_status_failed">Needs attention</string>
     <string name="onboarding_recommended">Recommended</string>
+    <string name="onboarding_optional">Optional</string>
     <string name="onboarding_open_settings">Open settings</string>
+    <string name="onboarding_allow">Allow</string>
     <string name="onboarding_retry">Retry</string>
+    <string name="onboarding_continue">Continue</string>
+    <string name="onboarding_skip">Skip for now</string>
+    <string name="onboarding_back">Back</string>
+    <string name="onboarding_close">Close setup</string>
+    <string name="onboarding_progress">Step %1$d of %2$d</string>
     <string name="onboarding_no_activity">No app on this device can open that.</string>
+    <string name="onboarding_copy_command">Copy command</string>
+
+    <string name="onboarding_welcome_title">Welcome to Pipkin</string>
+    <string name="onboarding_welcome_body">A coding agent that runs on your phone. Setup takes a few minutes, and most of it happens on its own.</string>
+    <string name="onboarding_get_started">Get started</string>
+
+    <string name="onboarding_done_title">You\'re all set</string>
+    <string name="onboarding_done_body">Open a folder from the sidebar to start your first chat.</string>
+    <string name="onboarding_done_body_no_model">Connect a model in Settings → Providers before your first chat.</string>
+    <string name="onboarding_start">Start using Pipkin</string>
 
     <string name="onboarding_termux_title">Termux</string>
-    <string name="onboarding_termux_missing">Pipkin runs inside Termux. Install it from F-Droid or Google Play.</string>
-    <string name="onboarding_termux_missing_fdroid_only">Pipkin runs inside Termux. Install it from F-Droid; the Google Play build needs Android 11 or newer.</string>
+    <string name="onboarding_termux_install_title">Install Termux</string>
+    <string name="onboarding_termux_replace_title">Replace Termux</string>
+    <string name="onboarding_termux_update_title">Update Termux</string>
+    <string name="onboarding_termux_missing">Pipkin\'s agent runs inside Termux, a terminal app for Android. Get it from F-Droid or Google Play, then come back.</string>
+    <string name="onboarding_termux_missing_fdroid_only">Pipkin\'s agent runs inside Termux, a terminal app for Android. Get it from F-Droid, then come back.</string>
     <string name="onboarding_termux_get_fdroid">Get it on F-Droid</string>
     <string name="onboarding_termux_get_play">Get it on Google Play</string>
-    <string name="onboarding_termux_unsupported">Pipkin can\'t confirm this copy of Termux is the official F-Droid or Google Play build, so it won\'t use it. Uninstall it, then install Termux from F-Droid or Google Play (uninstalling deletes Termux\'s files).</string>
-    <string name="onboarding_termux_security_title">Only official Termux, for your security</string>
-    <string name="onboarding_termux_security_body">Your agent runs inside Termux, where it can reach your code, your files and the API keys you sign in with. A modified copy of Termux could read or change any of them, so before Pipkin runs anything, it checks that F-Droid or Google Play signed your copy. Termux from GitHub or anywhere else isn\'t accepted.</string>
-    <string name="onboarding_termux_uninstall">Uninstall</string>
+    <string name="onboarding_termux_unsupported">This copy of Termux isn\'t from F-Droid or Google Play, so Pipkin won\'t use it. Uninstalling it deletes Termux\'s files.</string>
+    <string name="onboarding_termux_security">Your agent can reach your code and keys inside Termux, so Pipkin only uses copies signed by F-Droid or Google Play.</string>
+    <string name="onboarding_termux_uninstall">Uninstall Termux</string>
     <string name="onboarding_termux_too_old_fdroid">Pipkin needs Termux 0.118 or newer.</string>
-    <string name="onboarding_termux_update_fdroid">Update Termux from F-Droid</string>
-    <string name="onboarding_termux_too_old_play">This Termux from Google Play is older than Pipkin supports.</string>
-    <string name="onboarding_termux_update_play">Update in Google Play</string>
-    <string name="onboarding_termux_ready_fdroid">Termux %1$s is installed and verified as the official F-Droid build.</string>
-    <string name="onboarding_termux_ready_play">Termux %1$s is installed and verified as the official Google Play build.</string>
+    <string name="onboarding_termux_update_fdroid">Update on F-Droid</string>
+    <string name="onboarding_termux_too_old_play">This Termux is older than Pipkin supports.</string>
+    <string name="onboarding_termux_update_play">Update on Google Play</string>
+    <string name="onboarding_termux_ready_fdroid">Termux %1$s from F-Droid is installed.</string>
+    <string name="onboarding_termux_ready_play">Termux %1$s from Google Play is installed.</string>
+
+    <string name="onboarding_run_command_title">Let Pipkin use Termux</string>
+    <string name="onboarding_run_command_body">Pipkin starts its agent by sending commands to Termux. Android asks whether that\'s OK.</string>
+    <string name="onboarding_run_command_blocked">Android won\'t ask again. In settings, open Permissions, then Additional permissions if it\'s there, and allow \"Run commands in Termux environment\".</string>
+    <string name="onboarding_run_command_done">Pipkin can run commands in Termux.</string>
+
+    <string name="onboarding_setup_title">Set up Termux</string>
+    <string name="onboarding_setup_body">Paste one command in Termux: long-press, tap Paste, then press Enter. Allow storage access if Android asks.</string>
+    <string name="onboarding_setup_retry_note">If it stops with an error, paste the same command again. It picks up where it left off.</string>
+    <string name="onboarding_setup_waiting">Waiting for Termux to finish…</string>
+    <string name="onboarding_setup_connecting">Connecting to Termux…</string>
+    <string name="onboarding_setup_changed">Termux was reinstalled, which removed Pipkin\'s setup, the agent and its sign-in. Paste the command again.</string>
+    <string name="onboarding_setup_action">Copy command &amp; open Termux</string>
+    <string name="onboarding_setup_done">Termux is ready for Pipkin.</string>
+    <string name="onboarding_demo_paste">Paste</string>
+    <string name="onboarding_demo_installing">Installing Node.js…</string>
+    <string name="onboarding_demo_done">Pipkin setup done</string>
+
+    <string name="onboarding_notifications_title">Notifications</string>
+    <string name="onboarding_notifications_body">Pipkin tells you when a chat finishes while you\'re away, and shows a Stop button while the agent works.</string>
+    <string name="onboarding_notifications_done">Notifications are on.</string>
+
+    <string name="onboarding_background_title">Run in the background</string>
+    <string name="onboarding_background_body">Keeps a chat going while the screen is off or you\'re in another app. Without it, Android can cut the agent off mid-task.</string>
+    <string name="onboarding_background_done">Pipkin can run in the background.</string>
 
     <string name="onboarding_termux_background_title">Let Termux run in the background</string>
     <string name="onboarding_termux_background_body">Keeps Pipkin\'s helper in Termux running, so Pipkin starts without opening Termux. In Termux\'s app info, open App battery usage and choose Unrestricted.</string>
     <string name="onboarding_termux_background_allow">Open Termux\'s app info</string>
     <string name="onboarding_termux_background_done">Termux can run in the background.</string>
 
-    <string name="onboarding_notifications_title">Notifications</string>
-    <string name="onboarding_notifications_body">Shows when Pipkin is working in the background and lets you stop it.</string>
-    <string name="onboarding_notifications_allow">Allow notifications</string>
-    <string name="onboarding_notifications_done">Notifications are on.</string>
-
-    <string name="onboarding_background_title">Run in the background</string>
-    <string name="onboarding_background_body">Lets Pipkin keep following a chat while the screen is off. Without it, Android can cut Pipkin off from the agent mid-run.</string>
-    <string name="onboarding_background_allow">Allow</string>
-    <string name="onboarding_background_done">Pipkin can run in the background.</string>
-
-    <string name="onboarding_run_command_title">Allow Pipkin to run commands in Termux</string>
-    <string name="onboarding_run_command_body">Pipkin runs its agent through Termux.</string>
-    <string name="onboarding_run_command_needs_termux">Install Termux first.</string>
-    <string name="onboarding_run_command_blocked">Android won\'t ask again. In settings, open Permissions and allow \"Run commands in Termux environment\".</string>
-    <string name="onboarding_run_command_allow">Allow</string>
-    <string name="onboarding_run_command_done">Pipkin can run commands in Termux.</string>
-
-    <string name="onboarding_setup_title">Set up Termux</string>
-    <string name="onboarding_setup_body">In Termux, long-press, tap Paste, then press Enter. Allow storage access when Android asks. Termux brings you back here when it\'s done. If anything fails, paste the same command again.</string>
-    <string name="onboarding_setup_body_play">In Termux, long-press, tap Paste, then press Enter. Allow storage access when Android asks. Termux brings you back here when it\'s done. If anything fails, paste the same command again; it works for 30 minutes.</string>
-    <string name="onboarding_setup_play_pending">Your setup command appears here when you copy it. Each one pairs this Pipkin with Termux.</string>
-    <string name="onboarding_setup_changed">Termux was reinstalled, which removed Pi, its sign-in and Pipkin\'s setup in Termux. Run the setup command again, then reinstall the agent and sign in.</string>
-    <string name="onboarding_setup_action">Copy command &amp; open Termux</string>
-    <string name="onboarding_setup_done">Termux is ready for Pipkin.</string>
-    <string name="onboarding_copy_command">Copy command</string>
-
-    <string name="onboarding_install_title">Install the Pipkin agent</string>
-    <string name="onboarding_install_body">Pipkin installs its agent (version %1$s) in Termux. This takes a few minutes.</string>
-    <string name="onboarding_install_running">Installing the Pipkin agent %1$s…</string>
-    <string name="onboarding_install_done">The Pipkin agent %1$s is installed.</string>
-    <string name="onboarding_install_failed">Installing the Pipkin agent failed.</string>
+    <string name="onboarding_install_title">Install the agent</string>
+    <string name="onboarding_install_body">Pipkin installs its agent, Pi %1$s, in Termux. It takes a few minutes.</string>
+    <string name="onboarding_install_checking">Checking the agent…</string>
+    <string name="onboarding_install_running">Installing…</string>
+    <string name="onboarding_install_done">Pi %1$s is installed.</string>
+    <string name="onboarding_install_failed">Installing the agent failed.</string>
     <string name="onboarding_install_action">Install</string>
 
-    <string name="onboarding_signin_title">Sign in</string>
-    <string name="onboarding_signin_body">Choose how Pipkin reaches a model. You can add more in Settings later.</string>
-    <string name="onboarding_signin_needs_pi">Available once the Pipkin agent is installed.</string>
+    <string name="onboarding_signin_title">Connect a model</string>
+    <string name="onboarding_signin_body">Sign in with a subscription or add an API. You can add more in Settings later.</string>
+    <string name="onboarding_signin_needs_pi">Available once the agent is installed.</string>
     <string name="onboarding_signin_claude">Claude</string>
     <string name="onboarding_signin_openai">OpenAI</string>
     <string name="onboarding_signin_api">OpenAI-compatible API</string>
     <string name="onboarding_signed_in">Signed in</string>
-    <string name="onboarding_continue">Continue</string>
-    <string name="onboarding_skip">Skip for now</string>
 </resources>

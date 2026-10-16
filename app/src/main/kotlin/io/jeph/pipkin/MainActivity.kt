@@ -228,6 +228,8 @@ private fun Screen(
     Destination.Onboarding -> OnboardingScreen(
       onFinished = { navigator.replaceAll(Destination.Main) },
       onAddProvider = { navigator.push(Destination.ProviderEditor(null)) },
+      // Before setup finishes the wizard is the root; opened from the main screen later, it can be closed.
+      onClose = if (shown.size > 1) ({ navigator.pop() }) else null,
     )
   }
 }

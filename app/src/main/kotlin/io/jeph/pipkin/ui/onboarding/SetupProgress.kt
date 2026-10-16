@@ -18,16 +18,22 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONException
 
-/** Onboarding steps in display order; [OnboardingState.visibleSteps] drops the ones this phone or build skips. */
-internal enum class SetupStep {
-  Termux,
-  Notifications,
-  Background,
-  TermuxBackground,
-  RunCommand,
-  TermuxSetup,
-  InstallPi,
-  SignIn,
+/** Whether onboarding can move past a step without it: required ones can't be skipped. */
+internal enum class Requirement { Required, Recommended, Optional }
+
+/**
+ * Setup steps in the order onboarding asks for them: the required Termux work first, so the agent install runs while
+ * the user handles the recommended steps. [OnboardingState.visibleSteps] drops the ones this phone or build skips.
+ */
+internal enum class SetupStep(val requirement: Requirement) {
+  Termux(Requirement.Required),
+  RunCommand(Requirement.Required),
+  TermuxSetup(Requirement.Required),
+  Notifications(Requirement.Recommended),
+  Background(Requirement.Recommended),
+  TermuxBackground(Requirement.Recommended),
+  InstallPi(Requirement.Required),
+  SignIn(Requirement.Optional),
 }
 
 /**
@@ -58,26 +64,17 @@ internal fun HostFailure.toSetupError(): SetupError {
 }
 
 /**
- * Onboarding progress that outlives the screen, kept in memory for the process: whether the setup
- * command was handed to Termux, which permissions Android stopped prompting for, and the Pi install.
- * The install runs in the app scope so leaving the screen does not abort `npm ci`.
+ * Onboarding progress that outlives the screen, kept in memory for the process: which permissions Android stopped
+ * prompting for, and the Pi install. The install runs in the app scope so leaving the screen does not abort `npm ci`.
  */
 internal object SetupProgress {
   private const val PROGRESS_LINES = 4
 
-  private val termuxCommandSentState = MutableStateFlow(false)
-  private val playCommandState = MutableStateFlow<String?>(null)
   private val blockedPermissionsState = MutableStateFlow<Set<String>>(emptySet())
   private val installingState = MutableStateFlow(false)
   private val progressState = MutableStateFlow<List<String>>(emptyList())
   private val errorState = MutableStateFlow<SetupError?>(null)
   private var job: Job? = null
-
-  /** The "Copy command & open Termux" button was pressed since the app started. */
-  val termuxCommandSent: StateFlow<Boolean> = termuxCommandSentState.asStateFlow()
-
-  /** The Play build's setup command last copied; it stays valid for a re-paste until it expires or is replaced. */
-  val playCommand: StateFlow<String?> = playCommandState.asStateFlow()
 
   /** Permissions denied with "don't ask again"; their step opens system settings instead. */
   val blockedPermissions: StateFlow<Set<String>> = blockedPermissionsState.asStateFlow()
@@ -95,11 +92,8 @@ internal object SetupProgress {
    * fresh pairing session each time, which reads assets and may bind Pipkin's server, so it runs off the main thread.
    */
   suspend fun setupCommand(context: Context, literal: String?): String {
-    termuxCommandSentState.value = true
-    if (literal != null) return literal
-    val command = withContext(Dispatchers.IO) { TermuxSetup.command(context, context.appGraph.keepAlive) }
-    if (TermuxInstall.status(context).isPlay) playCommandState.value = command
-    return command
+    TermuxInstall.installation(context)?.let(context.appGraph.preferences::setSetupCommandCopiedFor)
+    return literal ?: withContext(Dispatchers.IO) { TermuxSetup.command(context, context.appGraph.keepAlive) }
   }
 
   fun setPermissionBlocked(permission: String, blocked: Boolean) {

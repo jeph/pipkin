@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,19 +29,22 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
+import io.jeph.pipkin.termux.TermuxSetup
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** A setup page: [header] over a scrolling, width-capped column of step cards. */
+/** A settings-style page: [header] over a scrolling, width-capped column of step cards. */
 @Composable
 internal fun SetupPage(header: @Composable () -> Unit, content: @Composable ColumnScope.() -> Unit) {
   Column(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
@@ -64,16 +68,9 @@ internal fun SetupPage(header: @Composable () -> Unit, content: @Composable Colu
   }
 }
 
-/** A numbered setup step: surface1 card, 1dp border, radius 8, status badge and title over [content]. */
+/** [spec] as a numbered card: surface1, 1dp border, radius 8, status badge and title over its content. */
 @Composable
-internal fun StepCard(
-  number: Int,
-  title: String,
-  status: StepStatus,
-  modifier: Modifier = Modifier,
-  tag: String? = null,
-  content: @Composable ColumnScope.() -> Unit,
-) {
+internal fun StepCard(spec: StepSpec, number: Int, modifier: Modifier = Modifier) {
   val colors = pipkinColors
   val shape = RoundedCornerShape(PipkinTokens.Radius.lg)
   Column(
@@ -89,20 +86,48 @@ internal fun StepCard(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
     ) {
-      StatusBadge(number, status)
+      StatusBadge(number, spec.status)
       Text(
-        text = title,
+        text = spec.title,
         modifier = Modifier.weight(1f),
         color = colors.foreground,
         fontSize = PipkinTokens.FontSize.base,
         fontWeight = FontWeight.Medium,
+        lineHeight = CARD_TITLE_LINE_HEIGHT,
       )
-      if (tag != null) {
-        Text(text = tag, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm)
+      requirementLabel(spec.step.requirement)?.let {
+        Text(text = it, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm)
       }
     }
-    content()
+    StepText(spec.body)
+    spec.error?.let { StepText(it, color = colors.destructive) }
+    spec.waiting?.let { WaitingRow(it) }
+    spec.extra?.invoke()
+    spec.note?.let { StepText(it) }
+    if (spec.buttons.isNotEmpty()) {
+      FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+        verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+      ) {
+        spec.buttons.forEachIndexed { index, button ->
+          // Once a step is done its buttons only redo it, so none of them is the main action any more.
+          if (index == 0 && spec.status != StepStatus.Done) {
+            PrimaryButton(button.label, button.onClick, enabled = button.enabled)
+          } else {
+            SecondaryButton(button.label, button.onClick, enabled = button.enabled)
+          }
+        }
+      }
+    }
   }
+}
+
+/** "Recommended" or "Optional"; null for required steps, which need no label. */
+@Composable
+internal fun requirementLabel(requirement: Requirement): String? = when (requirement) {
+  Requirement.Required -> null
+  Requirement.Recommended -> stringResource(R.string.onboarding_recommended)
+  Requirement.Optional -> stringResource(R.string.onboarding_optional)
 }
 
 @Composable
@@ -137,7 +162,26 @@ private fun StatusBadge(number: Int, status: StepStatus) {
 /** The muted explanation under a step title, or an error in destructive. */
 @Composable
 internal fun StepText(text: String, modifier: Modifier = Modifier, color: Color = pipkinColors.foregroundMuted) {
-  Text(text = text, modifier = modifier, color = color, fontSize = PipkinTokens.FontSize.meta)
+  Text(
+    text = text,
+    modifier = modifier,
+    color = color,
+    fontSize = PipkinTokens.FontSize.meta,
+    lineHeight = STEP_TEXT_LINE_HEIGHT,
+  )
+}
+
+/** A simmering pot beside what Pipkin is waiting for. */
+@Composable
+internal fun WaitingRow(text: String, modifier: Modifier = Modifier) {
+  Row(
+    modifier = modifier,
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+  ) {
+    SimmeringPot(size = PipkinTokens.IconSize.lg, tint = pipkinColors.foreground)
+    Text(text = text, color = pipkinColors.foreground, fontSize = PipkinTokens.FontSize.meta)
+  }
 }
 
 @Composable
@@ -186,10 +230,11 @@ internal fun SecondaryButton(
   }
 }
 
-/** A Termux command in monospace on surface2, with a copy button. */
+/** A short Termux command in monospace on surface2, with a button that copies it. */
 @Composable
-internal fun CommandBox(command: String, onCopy: () -> Unit, modifier: Modifier = Modifier) {
+internal fun CommandBox(command: String, modifier: Modifier = Modifier) {
   val colors = pipkinColors
+  val context = LocalContext.current
   val shape = RoundedCornerShape(PipkinTokens.Radius.md)
   Row(
     modifier =
@@ -213,7 +258,7 @@ internal fun CommandBox(command: String, onCopy: () -> Unit, modifier: Modifier 
     IconButton28(
       icon = R.drawable.ic_lucide_copy,
       contentDescription = stringResource(R.string.onboarding_copy_command),
-      onClick = onCopy,
+      onClick = { TermuxSetup.copy(context, command) },
       tint = colors.foregroundMuted,
       iconSize = PipkinTokens.IconSize.sm,
     )
@@ -239,3 +284,5 @@ internal fun ProgressLines(lines: List<String>, modifier: Modifier = Modifier) {
 }
 
 private val ButtonPadding = PaddingValues(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s6)
+private val STEP_TEXT_LINE_HEIGHT = 19.sp
+private val CARD_TITLE_LINE_HEIGHT = 20.sp

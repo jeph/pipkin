@@ -1,177 +1,291 @@
 package io.jeph.pipkin.ui.onboarding
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.jeph.pipkin.AppGraph
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.auth.LoginSheet
-import io.jeph.pipkin.ui.components.HeaderBar
+import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import kotlinx.coroutines.launch
-
-/** What a tap on an onboarding-only step or the footer asks for; handled in [OnboardingScreen]. */
-private sealed interface OnboardingAction {
-  data object InstallPi : OnboardingAction
-
-  data class Login(val providerId: String) : OnboardingAction
-
-  data object AddProvider : OnboardingAction
-
-  data object Finish : OnboardingAction
-}
+import kotlinx.coroutines.delay
 
 /**
- * Setup checklist: the [PermissionSteps], then the Pi install and sign-in.
- * Every step is re-checked on resume, so returning from Termux or system settings updates the page;
- * reopening it after setup shows finished steps as done.
+ * First-run setup, one step per page: welcome, then every [SetupStep] that still needs the user, then a closing page.
+ * Steps that are already done are passed over, and finishing one moves on by itself, so the wizard reacts to what the
+ * user did elsewhere (installed Termux, ran the setup command, granted a permission). Skipped optional steps and the
+ * welcome are remembered, so reopening Pipkin resumes at the first step still open. Opened again after setup (a
+ * "needs attention" tap), it starts at the broken step and [onClose] leaves it.
  */
 @Composable
-internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit) {
+internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit, onClose: (() -> Unit)?) {
   val context = LocalContext.current
   val graph = remember(context) { context.appGraph }
-  var checks by remember { mutableStateOf(DeviceChecks.read(context)) }
   var loginProvider by rememberSaveable { mutableStateOf<String?>(null) }
-  val state = rememberOnboardingState(graph, checks)
-  val onPermissionAction = rememberPermissionActions(state) { checks = DeviceChecks.read(context) }
-  RecheckOnResume(graph, state) { checks = it }
-  val onAction: (OnboardingAction) -> Unit = { action ->
-    when (action) {
-      OnboardingAction.InstallPi -> SetupProgress.install(graph)
-
-      is OnboardingAction.Login -> loginProvider = action.providerId
-
-      OnboardingAction.AddProvider -> onAddProvider()
-
-      OnboardingAction.Finish -> {
-        graph.preferences.setSetupComplete(true)
-        onFinished()
-      }
-    }
+  var poll by remember { mutableStateOf(false) }
+  val checks = rememberDeviceChecks(poll)
+  val state = rememberOnboardingState(graph, checks.value)
+  val onAction = rememberSetupActions(
+    state = state,
+    onPermissionResult = checks::refresh,
+    onLogin = { loginProvider = it },
+    onAddProvider = onAddProvider,
+  )
+  AutoInstall(graph, state)
+  val history = rememberSaveable(saver = HistorySaver) { mutableStateListOf(firstPage(state)) }
+  val page = history.last()
+  val step = stepOf(page)
+  // Installing Termux or running its setup finishes in another app, which may not bring Pipkin back.
+  SideEffect {
+    poll = (step == SetupStep.Termux || step == SetupStep.TermuxSetup) && state.status(step) != StepStatus.Done
   }
 
-  SetupPage(header = { HeaderBar(title = stringResource(R.string.onboarding_title)) }) {
-    PermissionSteps(state, onPermissionAction)
-    AgentSteps(state, onAction)
-    OnboardingFooter(canContinue = state.authStatus?.anyConfigured == true, onAction = onAction)
+  fun goTo(next: String) {
+    if (next != history.last()) history.add(next)
+  }
+
+  fun advance(from: OnboardingState = state) = goTo(from.nextOpenStep()?.name ?: DONE)
+
+  fun pass(passed: String) {
+    graph.preferences.passSetupPage(passed)
+    advance(state.copy(passedPages = state.passedPages + passed))
+  }
+
+  fun finish() {
+    graph.preferences.setSetupComplete(true)
+    onFinished()
+  }
+
+  fun back() {
+    if (history.size > 1) history.removeAt(history.lastIndex) else onClose?.invoke()
+  }
+
+  AdvanceWhenDone(page, step, state) { advance(it) }
+  BackHandler(enabled = history.size > 1 || onClose != null) { back() }
+
+  Column(
+    modifier = Modifier.fillMaxSize().background(pipkinColors.surface0).windowInsetsPadding(WindowInsets.safeDrawing),
+  ) {
+    WizardTopBar(
+      state = state,
+      step = step,
+      onBack = if (history.size > 1) ::back else null,
+      onClose = onClose,
+    )
+    AnimatedContent(
+      targetState = page,
+      modifier = Modifier.weight(1f),
+      transitionSpec = {
+        val forward = order(targetState) >= order(initialState)
+        val shift = { width: Int -> if (forward) width / SLIDE_FRACTION else -width / SLIDE_FRACTION }
+        (slideInHorizontally(tween(PAGE_MILLIS), shift) + fadeIn(tween(PAGE_MILLIS)))
+          .togetherWith(slideOutHorizontally(tween(PAGE_MILLIS)) { -shift(it) } + fadeOut(tween(PAGE_MILLIS / 2)))
+      },
+      label = "onboarding page",
+    ) { shown ->
+      val shownStep = stepOf(shown)
+      when {
+        shown == WELCOME -> WelcomePage(onStart = { pass(WELCOME) })
+
+        shownStep == null -> DonePage(signedIn = state.authStatus?.anyConfigured == true, onFinish = ::finish)
+
+        else -> StepPage(
+          spec = stepSpec(shownStep, state, onAction),
+          onContinue = { advance() },
+          onSkip = { pass(shownStep.name) },
+        )
+      }
+    }
   }
 
   loginProvider?.let { LoginSheet(providerId = it, onDismiss = { loginProvider = null }) }
 }
 
 /**
- * Re-reads [DeviceChecks] on every resume, then refreshes sign-in status once Pi is installed or
- * starts the install once its prerequisites are met.
+ * Moves on once the shown [step] gets done while it's on screen, after a beat that lets its check settle; a step that
+ * was already done when the user came back to it waits for Continue. A step this phone or build no longer shows
+ * (Termux swapped between builds) moves on right away.
  */
 @Composable
-private fun RecheckOnResume(graph: AppGraph, state: OnboardingState, onChecks: (DeviceChecks) -> Unit) {
-  val context = LocalContext.current
-  val scope = rememberCoroutineScope()
-  LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-    val fresh = DeviceChecks.read(context)
-    onChecks(fresh)
-    val current = state.copy(checks = fresh)
-    if (current.piReady) {
-      scope.launch { graph.accountRepository.refresh() }
-    } else if (current.shouldAutoInstall) {
-      SetupProgress.install(graph)
+private fun AdvanceWhenDone(
+  page: String,
+  step: SetupStep?,
+  state: OnboardingState,
+  advance: (OnboardingState) -> Unit,
+) {
+  if (step == null) return
+  val done = state.status(step) == StepStatus.Done
+  val doneOnArrival = remember(page) { done }
+  val currentState by rememberUpdatedState(state)
+  val currentAdvance by rememberUpdatedState(advance)
+  val hidden = step !in state.visibleSteps
+  LaunchedEffect(page, done, hidden) {
+    if (hidden) {
+      currentAdvance(currentState)
+    } else if (done && !doneOnArrival) {
+      delay(DONE_PAUSE_MILLIS)
+      currentAdvance(currentState)
     }
   }
-  // The host may report the installed Pi after resume, e.g. from the app's own session refresh.
-  LaunchedEffect(state.piReady) {
-    if (state.piReady && graph.accountRepository.status.value == null) graph.accountRepository.refresh()
+}
+
+@Composable
+private fun WelcomePage(onStart: () -> Unit) {
+  var arrived by remember { mutableStateOf(false) }
+  LaunchedEffect(Unit) { arrived = true }
+  // The pot settles in from slightly smaller once the page appears.
+  val scale by animateFloatAsState(
+    targetValue = if (arrived) 1f else WELCOME_START_SCALE,
+    animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow),
+    label = "welcome pot",
+  )
+  WizardPage(
+    illustration = {
+      SimmeringPot(
+        modifier = Modifier.graphicsLayer {
+          scaleX = scale
+          scaleY = scale
+        },
+        size = POT_SIZE,
+        tint = pipkinColors.foreground,
+      )
+    },
+    title = stringResource(R.string.onboarding_welcome_title),
+    body = stringResource(R.string.onboarding_welcome_body),
+    buttons = { WizardPrimary(stringResource(R.string.onboarding_get_started), onStart) },
+  )
+}
+
+@Composable
+private fun DonePage(signedIn: Boolean, onFinish: () -> Unit) {
+  WizardPage(
+    illustration = { SimmeringPot(size = POT_SIZE, tint = pipkinColors.foreground) },
+    title = stringResource(R.string.onboarding_done_title),
+    body = stringResource(if (signedIn) R.string.onboarding_done_body else R.string.onboarding_done_body_no_model),
+    buttons = { WizardPrimary(stringResource(R.string.onboarding_start), onFinish) },
+  )
+}
+
+/** One setup step as a page: its illustration, text and live status, with its actions at the bottom. */
+@Composable
+private fun StepPage(spec: StepSpec, onContinue: () -> Unit, onSkip: () -> Unit) {
+  WizardPage(
+    illustration = { StepIllustration(spec) },
+    tag = requirementLabel(spec.step.requirement),
+    title = spec.title,
+    body = spec.body,
+    content = {
+      spec.error?.let {
+        Text(
+          text = it,
+          color = pipkinColors.destructive,
+          fontSize = PipkinTokens.FontSize.base,
+          textAlign = TextAlign.Center,
+        )
+      }
+      spec.waiting?.let { WaitingRow(it) }
+      spec.extra?.invoke()
+      spec.note?.let {
+        Text(
+          text = it,
+          color = pipkinColors.foregroundMuted,
+          fontSize = PipkinTokens.FontSize.meta,
+          lineHeight = NOTE_LINE_HEIGHT,
+          textAlign = TextAlign.Center,
+        )
+      }
+    },
+    buttons = { StepButtons(spec, onContinue, onSkip) },
+  )
+}
+
+/** The setup command shows how to paste it until it has run; the agent install simmers; the rest show their icon. */
+@Composable
+private fun StepIllustration(spec: StepSpec) {
+  val done = spec.status == StepStatus.Done
+  when {
+    spec.step == SetupStep.TermuxSetup && !done -> PasteDemo()
+    spec.step == SetupStep.InstallPi && !done -> SimmeringPot(size = POT_SIZE, tint = pipkinColors.foreground)
+    else -> IconTile(icon = spec.icon, done = done)
   }
 }
 
-@Composable
-internal fun rememberOnboardingState(graph: AppGraph, checks: DeviceChecks): OnboardingState {
-  val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val lastFailure by graph.hostClient.lastFailure.collectAsStateWithLifecycle()
-  val hostInstalling by graph.hostClient.installing.collectAsStateWithLifecycle()
-  val setupComplete by graph.preferences.setupComplete.collectAsStateWithLifecycle()
-  val authStatus by graph.accountRepository.status.collectAsStateWithLifecycle()
-  val commandSent by SetupProgress.termuxCommandSent.collectAsStateWithLifecycle()
-  val playCommand by SetupProgress.playCommand.collectAsStateWithLifecycle()
-  val blockedPermissions by SetupProgress.blockedPermissions.collectAsStateWithLifecycle()
-  val installing by SetupProgress.installing.collectAsStateWithLifecycle()
-  val progress by SetupProgress.progress.collectAsStateWithLifecycle()
-  val installError by SetupProgress.error.collectAsStateWithLifecycle()
-  return OnboardingState(
-    checks = checks,
-    hello = hello,
-    expectedPiVersion = graph.hostClient.expectedPiVersion,
-    setupComplete = setupComplete,
-    termuxCommandSent = commandSent,
-    playCommand = playCommand,
-    blockedPermissions = blockedPermissions,
-    installing = installing || hostInstalling,
-    progress = progress,
-    // A setup failure from elsewhere (chat, sidebar) brought the user here; show it on its step.
-    error = installError ?: lastFailure?.takeIf { it.needsSetup }?.toSetupError(),
-    authStatus = authStatus,
-  )
+private fun firstPage(state: OnboardingState): String = when {
+  !state.setupComplete && OnboardingState.WELCOME !in state.passedPages -> WELCOME
+  else -> state.nextOpenStep()?.name ?: DONE
 }
 
-/** The Pi install and sign-in, which follow the [PermissionSteps]. */
-@Composable
-private fun AgentSteps(state: OnboardingState, onAction: (OnboardingAction) -> Unit) {
-  InstallPiStep(
-    number = state.stepNumber(SetupStep.InstallPi),
-    status = state.status(SetupStep.InstallPi),
-    version = state.expectedPiVersion,
-    progress = state.progress,
-    error = state.errorFor(SetupStep.InstallPi),
-    enabled = state.canLaunchHost,
-    onInstall = { onAction(OnboardingAction.InstallPi) },
-  )
-  SignInStep(
-    number = state.stepNumber(SetupStep.SignIn),
-    status = state.status(SetupStep.SignIn),
-    authStatus = state.authStatus,
-    enabled = state.piReady,
-    onLogin = { onAction(OnboardingAction.Login(it)) },
-    onAddProvider = { onAction(OnboardingAction.AddProvider) },
-  )
+private fun stepOf(page: String): SetupStep? = SetupStep.entries.firstOrNull { it.name == page }
+
+/** Page order for the slide direction: welcome first, the steps in setup order, then the closing page. */
+private fun order(page: String): Int = when (page) {
+  WELCOME -> -1
+  else -> stepOf(page)?.ordinal ?: SetupStep.entries.size
 }
 
-@Composable
-private fun OnboardingFooter(canContinue: Boolean, onAction: (OnboardingAction) -> Unit) {
-  Row(
-    modifier = Modifier.fillMaxWidth().padding(top = PipkinTokens.Spacing.s4),
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8, Alignment.End),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    TextButton(
-      onClick = { onAction(OnboardingAction.Finish) },
-      colors = ButtonDefaults.textButtonColors(contentColor = pipkinColors.foregroundMuted),
-    ) {
-      Text(text = stringResource(R.string.onboarding_skip), fontSize = PipkinTokens.FontSize.base)
-    }
-    PrimaryButton(
-      text = stringResource(R.string.onboarding_continue),
-      onClick = { onAction(OnboardingAction.Finish) },
-      enabled = canContinue,
-    )
-  }
-}
+private val HistorySaver = listSaver<SnapshotStateList<String>, String>(
+  save = { it.toList() },
+  restore = { it.toMutableStateList() },
+)
+
+private const val WELCOME = OnboardingState.WELCOME
+private const val DONE = "done"
+private const val PAGE_MILLIS = 320
+private const val SLIDE_FRACTION = 5
+private const val DONE_PAUSE_MILLIS = 900L
+private const val WELCOME_START_SCALE = 0.85f
+private val POT_SIZE = 112.dp
+private val NOTE_LINE_HEIGHT = 19.sp

@@ -40,6 +40,13 @@ internal object TermuxIdentity {
     return prefs(context).getBoolean(CHANGED, false)
   }
 
+  /** A host has run in the installed Termux, so the setup it needs was in place then. */
+  fun reached(context: Context): Boolean {
+    val current = TermuxInstall.installation(context) ?: return false
+    detectChange(context)
+    return prefs(context).getString(INSTALLATION, null) == current
+  }
+
   /** True only on the check that first sees the new installation. */
   private fun detectChange(context: Context): Boolean {
     val current = TermuxInstall.installation(context) ?: return false
