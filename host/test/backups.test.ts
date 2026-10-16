@@ -1,5 +1,5 @@
 import { createWriteStream } from "node:fs";
-import { chmod, lstat, mkdir, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { access, chmod, lstat, mkdir, readdir, readFile, readlink, rm, stat, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -68,8 +68,8 @@ describe("configuration backups", () => {
     await removeDirs(dirs);
   });
 
-  async function backUp(): Promise<string> {
-    const result = await runMode("backup_create", dirs, {});
+  async function backUp(env: Record<string, string> = {}): Promise<string> {
+    const result = await runMode("backup_create", dirs, {}, env);
     const data = result.data;
     if (result.ok !== true || !isObject(data) || !isObject(data.backup) || typeof data.backup.name !== "string") {
       throw new Error(`backup_create failed: ${JSON.stringify(result)}`);
@@ -289,6 +289,25 @@ describe("configuration backups", () => {
       await rm(path.join(proc, "4242"), { recursive: true });
       expect(await restore).toMatchObject({ ok: true });
       expect(await readFile(path.join(dirs.configDir, "settings.json"), "utf8")).toBe('{"theme":"dark"}');
+    });
+
+    it("finishes a restore a crash cut short only once Pi has exited", async () => {
+      const staging = `${dirs.configDir}.restore-1`;
+      await mkdir(staging);
+      await writeFile(path.join(staging, "settings.json"), '{"restored":true}');
+      await writeFile(`${staging}.complete`, "");
+      // A backup runs beside open chats, so it leaves the swap alone rather than wait for them.
+      const name = await backUp({ PIPKIN_PROC_DIR: proc });
+      expect(await readFile(path.join(dirs.configDir, "settings.json"), "utf8")).toBe('{"theme":"dark"}');
+      await access(`${staging}.complete`);
+      // A restore waits for Pi to exit, then finishes the earlier restore before unpacking its own.
+      const restore = runMode("backup_restore", dirs, { name }, { PIPKIN_PROC_DIR: proc });
+      await sleep(1000);
+      expect(await readFile(path.join(dirs.configDir, "settings.json"), "utf8")).toBe('{"theme":"dark"}');
+      await rm(path.join(proc, "4242"), { recursive: true });
+      expect(await restore).toMatchObject({ ok: true });
+      expect(await readFile(path.join(dirs.configDir, "settings.json"), "utf8")).toBe('{"theme":"dark"}');
+      expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "proc", "root"]);
     });
 
     it("ignores Pi running on another config folder and other programs", async () => {

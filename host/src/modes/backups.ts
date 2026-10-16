@@ -1,5 +1,6 @@
 import { createReadStream, createWriteStream } from "node:fs";
 import {
+  type FileHandle,
   chmod,
   lstat,
   mkdir,
@@ -22,7 +23,7 @@ import { backupsDir, HostError, type HostEnv, installedPiVersion } from "../env.
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { stringParam } from "../params.js";
-import { waitForPiExit } from "../pi-processes.js";
+import { runningPi, waitForPiExit } from "../pi-processes.js";
 import { readTar, tarStream, TarError, type TarEntry } from "../tar.js";
 
 const FORMAT = "pipkin-config-backup";
@@ -70,9 +71,23 @@ function progress(ctx: ModeContext, verb: string): (count: number) => void {
   };
 }
 
-async function* fileContent(path: string, size: number): AsyncGenerator<Buffer> {
-  if (size === 0) return;
-  yield* createReadStream(path, { start: 0, end: size - 1 }) as AsyncIterable<Buffer>;
+/** Reads the first `size` bytes of an open file, then closes it. */
+async function* fileContent(handle: FileHandle, size: number): AsyncGenerator<Buffer> {
+  try {
+    if (size > 0) yield* handle.createReadStream({ start: 0, end: size - 1, autoClose: false }) as AsyncIterable<Buffer>;
+  } finally {
+    await handle.close();
+  }
+}
+
+/** Opens `path` for reading, or null when it no longer exists. */
+async function openIfPresent(path: string): Promise<FileHandle | null> {
+  try {
+    return await open(path, "r");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
 }
 
 /**
@@ -107,7 +122,10 @@ async function* configEntries(configDir: string, counted: (count: number) => voi
         counted(++count);
         yield* walk(path, relativePath);
       } else if (stats.isFile()) {
-        yield { type: "file", path: entryPath, mode: stats.mode, mtime, size: stats.size, content: fileContent(path, stats.size) };
+        // Opened before its header is written, so a file deleted since it was listed is skipped, not a failed backup.
+        const handle = await openIfPresent(path);
+        if (handle === null) continue;
+        yield { type: "file", path: entryPath, mode: stats.mode, mtime, size: stats.size, content: fileContent(handle, stats.size) };
         counted(++count);
       } else if (stats.isSymbolicLink()) {
         yield { type: "symlink", path: entryPath, target: await readlink(path), mtime };
@@ -365,9 +383,11 @@ async function swap(configDir: string, staging: string, old: string): Promise<vo
 
 /**
  * Finishes a restore a crash interrupted after its backup was fully unpacked, and deletes one interrupted before.
- * Either way only configuration is involved: sessions never leave the config folder.
+ * Either way only configuration is involved: sessions never leave the config folder. A Pi may have started since the
+ * crash released the lock, and the swap must not happen under it: with `signal` (a restore, which stops every chat
+ * first) it waits for Pi to exit; without (a backup, while chats run) it leaves the swap for later while one runs.
  */
-async function settleRestores(env: HostEnv): Promise<void> {
+async function settleRestores(env: HostEnv, signal?: AbortSignal): Promise<void> {
   const parent = dirname(env.configDir);
   const prefix = `${basename(env.configDir)}.restore-`;
   const ids = new Set<string>();
@@ -378,6 +398,8 @@ async function settleRestores(env: HostEnv): Promise<void> {
     const staging = `${env.configDir}.restore-${id}`;
     const old = `${env.configDir}.old-${id}`;
     if ((await exists(staging)) && (await exists(`${staging}.complete`))) {
+      if (signal !== undefined) await waitForPiExit(env.configDir, signal);
+      else if ((await runningPi(env.configDir)).length > 0) continue;
       await swap(env.configDir, staging, old);
       continue;
     }
@@ -397,7 +419,7 @@ async function settleRestores(env: HostEnv): Promise<void> {
 export async function restoreBackup(ctx: ModeContext): Promise<JsonObject> {
   const archive = backupPath(ctx.env, stringParam(ctx.params, "name"));
   return withConfigLock(ctx.env, async () => {
-    await settleRestores(ctx.env);
+    await settleRestores(ctx.env, ctx.signal);
     if (!(await exists(archive))) throw new HostError("not_found", "This backup no longer exists");
     const id = `${Date.now()}-${process.pid}`;
     const staging = `${ctx.env.configDir}.restore-${id}`;
