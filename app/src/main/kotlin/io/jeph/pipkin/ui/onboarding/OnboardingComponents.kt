@@ -122,12 +122,11 @@ internal fun StepCard(spec: StepSpec, number: Int, modifier: Modifier = Modifier
   }
 }
 
-/** "Recommended" or "Optional"; null for required steps, which need no label. */
+/** "Recommended"; null for required and optional steps. An optional step says so with its Skip for now button. */
 @Composable
 internal fun requirementLabel(requirement: Requirement): String? = when (requirement) {
-  Requirement.Required -> null
   Requirement.Recommended -> stringResource(R.string.onboarding_recommended)
-  Requirement.Optional -> stringResource(R.string.onboarding_optional)
+  Requirement.Required, Requirement.Optional -> null
 }
 
 @Composable
