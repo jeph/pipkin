@@ -61,10 +61,11 @@ internal class HostChannel(
 
   /** Writes one JSONL record; throws [IOException] once the connection is gone. */
   suspend fun send(obj: JSONObject) {
-    val bytes = (obj.toString() + "\n").toByteArray(Charsets.UTF_8)
     writeLock.withLock {
+      // Encoded under the lock so messages keep their send order, and off the caller's thread, which may be the main
+      // one: ensure's request carries over a megabyte of extension source.
       withContext(Dispatchers.IO) {
-        output.write(bytes)
+        output.write((obj.toString() + "\n").toByteArray(Charsets.UTF_8))
         output.flush()
       }
     }

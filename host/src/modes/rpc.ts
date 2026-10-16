@@ -7,7 +7,7 @@ import { installedPiVersion, loadPi, piPackageDir } from "../env.js";
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { nullableStringParam, stringParam } from "../params.js";
-import { pipkinExtensionFiles, pipkinExtensionsParam } from "../pipkin-extensions.js";
+import { installedPipkinExtensionFiles, pipkinExtensionFingerprintsParam } from "../pipkin-extensions.js";
 import { SYSTEM_APPEND } from "../prompt.js";
 import { openSettingsIfValid } from "../settings.js";
 import { termuxSessionEnv } from "../termux-session.js";
@@ -144,16 +144,21 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const sessionPath = nullableStringParam(ctx.params, "sessionPath");
   const expectedVersion = stringParam(ctx.params, "expectedVersion");
   const packageJson = stringParam(ctx.params, "packageJson");
-  const pipkinExtensions = pipkinExtensionsParam(ctx.params);
+  const pipkinExtensions = pipkinExtensionFingerprintsParam(ctx.params);
   const installed = await installedPiVersion(ctx.env.root);
   if (installed !== expectedVersion) {
     const found = installed === null ? "The agent is not installed" : `Agent ${installed} is installed`;
     fail(ctx, "pi_version", `${found}; Pipkin needs ${expectedVersion}`);
     return;
   }
-  // Bundled extensions can change while Pi's version stays put; ensure installs from this same manifest.
+  // The runtime's packages and Pipkin's extensions can change while Pi's version stays put; ensure installs both.
   const installedPackageJson = await readFile(join(ctx.env.root, "pi", "package.json"), "utf8").catch(() => null);
   if (installedPackageJson !== packageJson) {
+    fail(ctx, "pi_version", "The agent's packages are out of date");
+    return;
+  }
+  const extensionFiles = await installedPipkinExtensionFiles(ctx.env.root, pipkinExtensions);
+  if (extensionFiles === null) {
     fail(ctx, "pi_version", "The agent's bundled extensions are out of date");
     return;
   }
@@ -177,10 +182,10 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const settings = await readGlobalSettings(ctx.env.configDir);
   await defaultSteeringToAll(ctx, settings);
   // Pi exits when two copies of one extension register the same tools, so pi-web-access from npm replaces Pipkin's copy.
-  const extensions = userNpmPackages(settings).has(WEB_ACCESS_NPM_PACKAGE)
-    ? pipkinExtensions.filter(({ name }) => name !== WEB_ACCESS_EXTENSION)
-    : pipkinExtensions;
-  for (const file of await pipkinExtensionFiles(ctx.env.root, extensions)) args.push("--extension", file);
+  const replacedByNpm = userNpmPackages(settings).has(WEB_ACCESS_NPM_PACKAGE);
+  for (const { name, path } of extensionFiles) {
+    if (!(replacedByNpm && name === WEB_ACCESS_EXTENSION)) args.push("--extension", path);
+  }
   args.push("--append-system-prompt", SYSTEM_APPEND);
   const env = await termuxSessionEnv(ctx.env);
   const child = spawn(process.execPath, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });

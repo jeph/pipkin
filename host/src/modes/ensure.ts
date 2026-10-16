@@ -6,6 +6,7 @@ import { HostError, installedPiVersion } from "../env.js";
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { stringParam } from "../params.js";
+import { installPipkinExtensions, pipkinExtensionsParam } from "../pipkin-extensions.js";
 
 /** Longest progress line forwarded; npm never needs more, and the app shows only a few lines. */
 const MAX_PROGRESS_LINE = 4096;
@@ -45,6 +46,7 @@ export async function ensure(ctx: ModeContext): Promise<JsonObject> {
   const packageJson = stringParam(ctx.params, "packageJson");
   const packageLock = stringParam(ctx.params, "packageLock");
   const expectedVersion = stringParam(ctx.params, "expectedVersion");
+  const pipkinExtensions = pipkinExtensionsParam(ctx.params);
   const piDir = join(ctx.env.root, "pi");
   await mkdir(piDir, { recursive: true });
   await mkdir(ctx.env.configDir, { recursive: true });
@@ -63,6 +65,7 @@ export async function ensure(ctx: ModeContext): Promise<JsonObject> {
     await writeFile(lockPath, packageLock);
     await npmCi(ctx, piDir);
   }
+  await installPipkinExtensions(ctx.env.root, pipkinExtensions);
 
   return { piVersion: await installedPiVersion(ctx.env.root) };
 }

@@ -1,8 +1,8 @@
 /**
  * Bundles the host into `$OUT/pipkin-host.mjs`, and each Pi extension Pipkin ships into
  * `$OUT/pipkin-extensions/<name>.js`. Both ship as APK assets. The extensions stay out of the host, which Pipkin hands
- * to Termux inside an Intent with a size limit (`HostLauncher`); Pipkin sends their source over the host's socket
- * instead.
+ * to Termux inside an Intent with a size limit (`HostLauncher`); Pipkin sends their source over the host's socket to
+ * `ensure` instead, which installs them, and each chat sends only their SHA-256 to check the installed copy.
  */
 import { readFile } from "node:fs/promises";
 import { build } from "esbuild";

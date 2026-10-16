@@ -1,4 +1,5 @@
-import { access, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -48,14 +49,22 @@ async function expectWholeFlood(run: HostRun): Promise<void> {
   expect(seqs.length).toBeGreaterThan(0);
 }
 
-/** Where the host writes the pipkin-todo extension for Pi. */
-function todoExtension(dirs: Dirs): string {
-  return path.join(dirs.root, "extensions/pipkin-todo/index.js");
+/** Where `ensure` installs a Pipkin extension. */
+function extensionFile(dirs: Dirs, name: string, usesRuntimePackages = false): string {
+  return path.join(dirs.root, usesRuntimePackages ? "pi/extensions" : "extensions", name, "index.js");
 }
 
-/** A Pipkin extension as the app sends it. */
-function extension(name: string, usesRuntimePackages = false, source = "export default () => {};\n"): Record<string, unknown> {
-  return { name, source, usesRuntimePackages };
+/** Installs a Pipkin extension the way `ensure` leaves it, and returns the fingerprint a chat sends for `source`. */
+async function installedExtension(
+  dirs: Dirs,
+  name: string,
+  usesRuntimePackages = false,
+  source = "export default () => {};\n",
+): Promise<Record<string, unknown>> {
+  const file = extensionFile(dirs, name, usesRuntimePackages);
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, source);
+  return { name, sha256: createHash("sha256").update(source).digest("hex"), usesRuntimePackages };
 }
 
 /** Starts a chat with `packageJson` as the runtime manifest and `params` in its request, and ends it once Pi is ready. */
@@ -74,7 +83,8 @@ async function launchChat(dirs: Dirs, packageJson = PACKAGE_JSON, params: Record
 
 /** Starts a chat with the named Pipkin extensions and returns `web-search.json` as Pi then finds it, or null when absent. */
 async function webSearchConfigAfterLaunch(dirs: Dirs, extensions: string[]): Promise<string | null> {
-  await launchChat(dirs, PACKAGE_JSON, { pipkinExtensions: extensions.map((name) => extension(name)) });
+  const pipkinExtensions = await Promise.all(extensions.map((name) => installedExtension(dirs, name)));
+  await launchChat(dirs, PACKAGE_JSON, { pipkinExtensions });
   return readFile(path.join(dirs.configDir, "web-search.json"), "utf8").catch(() => null);
 }
 
@@ -218,42 +228,55 @@ describe("rpc mode", () => {
     expect(await run.next()).toBeUndefined();
   });
 
-  it("saves an extension that uses runtime packages inside the runtime, and any other outside it", async () => {
+  it("loads each extension from where ensure installed it", async () => {
+    const pipkinExtensions = [await installedExtension(dirs, "pipkin-todo"), await installedExtension(dirs, "pipkin-web-access", true)];
     const { run } = await startHost("rpc", dirs);
     await run.next();
     run.send({
       type: "pipkin_request",
-      params: {
-        cwd: dirs.home,
-        sessionPath: null,
-        expectedVersion: PI_VERSION,
-        packageJson: PACKAGE_JSON,
-        pipkinExtensions: [extension("pipkin-todo"), extension("pipkin-web-access", true, "export default () => 1;\n")],
-      },
+      params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions },
     });
-    const webAccess = path.join(dirs.root, "pi/extensions/pipkin-web-access/index.js");
     expect(await run.next()).toMatchObject({
       type: "ready",
-      argv: ["--mode", "rpc", "--extension", todoExtension(dirs), "--extension", webAccess, "--append-system-prompt", SYSTEM_APPEND],
+      argv: [
+        "--mode",
+        "rpc",
+        "--extension",
+        extensionFile(dirs, "pipkin-todo"),
+        "--extension",
+        extensionFile(dirs, "pipkin-web-access", true),
+        "--append-system-prompt",
+        SYSTEM_APPEND,
+      ],
     });
-    expect(await readFile(todoExtension(dirs), "utf8")).toBe("export default () => {};\n");
-    expect(await readFile(webAccess, "utf8")).toBe("export default () => 1;\n");
     run.socket.end();
     await run.exited;
   });
 
-  it("replaces a Pipkin extension an older Pipkin wrote", async () => {
-    await mkdir(path.dirname(todoExtension(dirs)), { recursive: true });
-    await writeFile(todoExtension(dirs), "old\n");
-    await launchChat(dirs, PACKAGE_JSON, { pipkinExtensions: [extension("pipkin-todo", false, "new\n")] });
-    expect(await readFile(todoExtension(dirs), "utf8")).toBe("new\n");
+  it.each([
+    ["missing", null],
+    ["from an older Pipkin", "export default () => 1;\n"],
+  ])("asks for a reinstall when an installed extension is %s", async (_, installedSource) => {
+    const fingerprint = await installedExtension(dirs, "pipkin-todo");
+    const file = extensionFile(dirs, "pipkin-todo");
+    if (installedSource === null) await rm(file);
+    else await writeFile(file, installedSource);
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({
+      type: "pipkin_request",
+      params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [fingerprint] },
+    });
+    expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "pi_version" });
+    expect(await run.next()).toBeUndefined();
   });
 
   it.each([
-    ["the name ../escape", { name: "../escape", source: "x", usesRuntimePackages: false }],
-    ["the name a/b", { name: "a/b", source: "x", usesRuntimePackages: false }],
-    ["an empty name", { name: "", source: "x", usesRuntimePackages: false }],
-    ["an extension that does not say whether it uses runtime packages", { name: "pipkin-todo", source: "x" }],
+    ["the name ../escape", { name: "../escape", sha256: "x", usesRuntimePackages: false }],
+    ["the name a/b", { name: "a/b", sha256: "x", usesRuntimePackages: false }],
+    ["an empty name", { name: "", sha256: "x", usesRuntimePackages: false }],
+    ["an extension that does not say whether it uses runtime packages", { name: "pipkin-todo", sha256: "x" }],
+    ["an extension without a fingerprint", { name: "pipkin-todo", usesRuntimePackages: false }],
   ])("refuses %s", async (_, pipkinExtension) => {
     const { run } = await startHost("rpc", dirs);
     await run.next();
@@ -281,6 +304,7 @@ describe("rpc mode", () => {
     await writeFile(path.join(dirs.configDir, "settings.json"), `\uFEFF${JSON.stringify({ packages: globalPackages })}`);
     await mkdir(path.join(dirs.home, ".pi"));
     await writeFile(path.join(dirs.home, ".pi/settings.json"), JSON.stringify({ packages: projectPackages }));
+    const pipkinExtensions = [await installedExtension(dirs, "pipkin-todo"), await installedExtension(dirs, "pipkin-web-access", true)];
     const { run } = await startHost("rpc", dirs);
     await run.next();
     run.send({
@@ -290,13 +314,13 @@ describe("rpc mode", () => {
         sessionPath: null,
         expectedVersion: PI_VERSION,
         packageJson: PACKAGE_JSON,
-        pipkinExtensions: [extension("pipkin-todo"), extension("pipkin-web-access", true)],
+        pipkinExtensions,
       },
     });
-    const webAccess = loaded ? ["--extension", path.join(dirs.root, "pi/extensions/pipkin-web-access/index.js")] : [];
+    const webAccess = loaded ? ["--extension", extensionFile(dirs, "pipkin-web-access", true)] : [];
     expect(await run.next()).toMatchObject({
       type: "ready",
-      argv: ["--mode", "rpc", "--extension", todoExtension(dirs), ...webAccess, "--append-system-prompt", SYSTEM_APPEND],
+      argv: ["--mode", "rpc", "--extension", extensionFile(dirs, "pipkin-todo"), ...webAccess, "--append-system-prompt", SYSTEM_APPEND],
     });
     run.socket.end();
     await run.exited;

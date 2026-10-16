@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import io.jeph.pipkin.data.BundledExtension
 import java.io.IOException
+import java.security.MessageDigest
 import java.util.Base64
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -41,9 +42,15 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
    */
   private val packageJson: String by lazy { asset(PACKAGE_JSON) }
 
-  /** The source of each bundled extension, which [openRpc] sends for the host to save. */
-  private val extensionSources: Map<BundledExtension, String> by lazy {
-    BundledExtension.entries.associateWith { asset(it.asset) }
+  /**
+   * The SHA-256 of each bundled extension's source, which [openRpc] sends so the host can check the copy [ensure]
+   * installed without Pipkin sending the source every time.
+   */
+  private val extensionFingerprints: Map<BundledExtension, String> by lazy {
+    BundledExtension.entries.associateWith { extension ->
+      val source = context.assets.open(extension.asset).use { it.readBytes() }
+      MessageDigest.getInstance("SHA-256").digest(source).toHexString()
+    }
   }
 
   /** The Pi version the bundled `pi/package.json` pins. */
@@ -60,15 +67,23 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   /** True while [ensure] runs. */
   val installing: StateFlow<Boolean> = installingState.asStateFlow()
 
-  /** Installs the pinned Pi runtime if needed and returns the installed version. */
+  /** Installs the pinned Pi runtime if needed, and every bundled extension, and returns the installed version. */
   suspend fun ensure(onProgress: (String) -> Unit): String {
     installingState.value = true
     try {
       val params = withContext(Dispatchers.IO) {
+        // Every extension, including the ones the user turned off, so turning one on never needs an install.
+        val extensions = BundledExtension.entries.map { extension ->
+          JSONObject()
+            .put("name", extension.id)
+            .put("source", asset(extension.asset))
+            .put("usesRuntimePackages", extension.usesRuntimePackages)
+        }
         JSONObject()
           .put("packageJson", packageJson)
           .put("packageLock", asset(PACKAGE_LOCK))
           .put("expectedVersion", expectedPiVersion)
+          .put("pipkinExtensions", JSONArray(extensions))
       }
       val data = call("ensure", params, ENSURE_TIMEOUT_MILLIS) { _, line ->
         if (line.optString("type") == HostProtocol.PROGRESS) onProgress(line.optString("line"))
@@ -216,17 +231,18 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   /**
    * Starts `pi --mode rpc` and returns its channel: Pi's RPC JSONL both ways, ended by a
    * `pipkin_exit` line. A refusal (`pi_version`, `cwd_missing`) arrives instead as a
-   * `pipkin_result` line; see [HostRejected.from]. Pi loads the bundled extensions not in [disabledExtensions], which
-   * are [io.jeph.pipkin.data.BundledExtension.id]s.
+   * `pipkin_result` line; see [HostRejected.from], which is `pi_version` when an extension [ensure] installed is out of
+   * date too. Pi loads the bundled extensions not in [disabledExtensions], which are
+   * [io.jeph.pipkin.data.BundledExtension.id]s.
    */
   suspend fun openRpc(cwd: String, sessionPath: String?, disabledExtensions: Set<String>): HostChannel {
-    // The extensions' sources run to over a megabyte, so reading and encoding them stays off the main thread.
+    // The first call reads every extension's source to fingerprint it.
     val params = withContext(Dispatchers.IO) {
-      val extensions = extensionSources.filterKeys { it.id !in disabledExtensions }
-        .map { (extension, source) ->
+      val extensions = extensionFingerprints.filterKeys { it.id !in disabledExtensions }
+        .map { (extension, sha256) ->
           JSONObject()
             .put("name", extension.id)
-            .put("source", source)
+            .put("sha256", sha256)
             .put("usesRuntimePackages", extension.usesRuntimePackages)
         }
       JSONObject()
@@ -239,7 +255,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     val channel = connect("rpc")
     var sent = false
     try {
-      withContext(Dispatchers.IO) { sendRequest(channel, params) }
+      sendRequest(channel, params)
       sent = true
     } finally {
       // Cancellation skips sendRequest's IOException path; without this close the host and Pi outlive the caller.

@@ -5,8 +5,8 @@ import io.jeph.pipkin.R
 
 /**
  * The Pi extensions Pipkin bundles, which Settings can turn off. Each one's source is the APK asset [asset]
- * (`host/build.ts` bundles it), which the host saves under [id]. [usesRuntimePackages] marks one that imports packages
- * the bundled `pi/package.json` installs, which the host saves inside that runtime so Node finds them.
+ * (`host/build.ts` bundles it), which the host's `ensure` installs under [id]. [usesRuntimePackages] marks one that
+ * imports packages the bundled `pi/package.json` installs, which `ensure` installs inside that runtime so Node finds them.
  */
 internal enum class BundledExtension(
   val id: String,
