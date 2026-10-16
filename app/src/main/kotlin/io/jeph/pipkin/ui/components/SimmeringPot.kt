@@ -37,19 +37,50 @@ import kotlinx.coroutines.delay
 /** How often the pot moves. Each step redraws the window, so it steps this often instead of every display frame. */
 private const val FRAME_MILLIS = 100L
 
-/** One rise of a wisp; the two wisps are half a cycle apart and the lid hops as each one leaves. */
-private const val STEAM_CYCLE_MILLIS = 1_600L
+/** One loop: the pot shakes, a wisp leaves, the pot rests, and a second wisp leaves with a hop of the lid. */
+private const val LOOP_MILLIS = 2_000L
+
+/** When each wisp leaves the pot: one as the shake ends, the other halfway round the loop with the lid's hop. */
+private val WISP_LEAVE_MILLIS = longArrayOf(500L, 1_500L)
 
 /** The launcher icon's area around the pot, in its group's coordinates, with room for the steam to rise. */
 private const val VIEW_LEFT = 85f
 private const val VIEW_TOP = 62f
 private const val VIEW_SIZE = 356f
 
-/** Heavier than the launcher icon's 17 so the steam still shows at icon sizes. */
-private const val STEAM_WIDTH = 30f
+/**
+ * About a pixel per 10 units at icon sizes, so the steam is drawn heavier than the launcher icon's 17 and rises
+ * and sways by whole pixels; smaller moves vanish into antialiasing.
+ */
+private const val STEAM_WIDTH = 38f
+private const val STEAM_RISE = 56f
+private const val STEAM_SWAY = 5f
 
-private const val LID_PIVOT_X = 243f
-private const val LID_PIVOT_Y = 218f
+private val LID_PIVOT = Offset(243f, 218f)
+
+/** The middle of the pot's feet, which it rocks on. */
+private val FEET = Offset(243f, 397f)
+
+/** Where the pot and its lid are on one frame: tilts in degrees clockwise, the lid's lift in icon units. */
+private class Pose(val potTilt: Float = 0f, val lidLift: Float = 0f, val lidTilt: Float = 0f)
+
+private val REST = Pose()
+
+/**
+ * The shake that opens each loop, one pose per frame: the pot rocks on its feet, swinging less each time, while
+ * the lid jumps and rattles against it. Whole-pot moves of a pixel or two still show at icon sizes.
+ */
+private val SHAKE = listOf(
+  Pose(potTilt = -5f, lidLift = 10f, lidTilt = 3f),
+  Pose(potTilt = 5f, lidLift = 16f, lidTilt = -3f),
+  Pose(potTilt = -4f, lidLift = 8f, lidTilt = 2f),
+  Pose(potTilt = 4f, lidLift = 14f, lidTilt = -2f),
+  Pose(potTilt = -2f, lidLift = 4f, lidTilt = 1f),
+)
+
+/** The lid's hop as the second wisp leaves. */
+private val HOP = Pose(lidLift = 10f, lidTilt = -3f)
+private val HOP_FRAME = (WISP_LEAVE_MILLIS[1] / FRAME_MILLIS).toInt()
 
 /**
  * False where pots are composed but off screen: they then hold their current frame instead of redrawing the
@@ -58,9 +89,10 @@ private const val LID_PIVOT_Y = 218f
 val LocalPotsSimmer = compositionLocalOf { true }
 
 /**
- * Pipkin's loading indicator: the launcher icon's pot simmering, steam rising out of it while the lid hops as
- * each wisp leaves. Every pot on screen steps on the same [FRAME_MILLIS] boundaries, so they share frames
- * with each other. Pots hold still while [LocalPotsSimmer] is false.
+ * Pipkin's loading indicator: the launcher icon's pot simmering. It shakes on its feet with the lid rattling,
+ * lets out a wisp of steam, rests, and lets out another as the lid hops, every [LOOP_MILLIS]. Every pot on screen
+ * steps on the same [FRAME_MILLIS] boundaries, so they share frames with each other. Pots hold still while
+ * [LocalPotsSimmer] is false.
  */
 @Composable
 fun SimmeringPot(
@@ -102,17 +134,19 @@ private class Pot(icon: ImageVector) {
 
   fun draw(scope: DrawScope, timeMillis: Long, tint: Color) = with(scope) {
     val scale = size.minDimension / VIEW_SIZE
+    val pose = poseAt(timeMillis)
     withTransform({
       scale(scale, scale, pivot = Offset.Zero)
       translate(-VIEW_LEFT, -VIEW_TOP)
     }) {
-      wisps.forEachIndexed { index, wisp -> drawWisp(wisp, cyclePosition(timeMillis, index * 0.5f), tint) }
-      drawPath(handle, tint)
-      drawPath(legs, tint, style = legStroke)
-      drawPath(body, tint)
-      val hop = lidHop(timeMillis)
-      translate(top = -10f * hop) {
-        rotate(-3f * hop, pivot = Offset(LID_PIVOT_X, LID_PIVOT_Y)) { drawPath(lid, tint) }
+      wisps.forEachIndexed { index, wisp -> drawWisp(wisp, wispPosition(timeMillis, WISP_LEAVE_MILLIS[index]), tint) }
+      rotate(pose.potTilt, pivot = FEET) {
+        drawPath(handle, tint)
+        drawPath(legs, tint, style = legStroke)
+        drawPath(body, tint)
+        translate(top = -pose.lidLift) {
+          rotate(pose.lidTilt, pivot = LID_PIVOT) { drawPath(lid, tint) }
+        }
       }
     }
   }
@@ -127,22 +161,24 @@ private class Pot(icon: ImageVector) {
     wispSegment.reset()
     if (!wisp.getSegment(start, end, wispSegment, startWithMoveTo = true)) return
     val fade = (position / 0.2f).coerceIn(0f, 1f) * ((1 - position) / 0.3f).coerceIn(0f, 1f)
-    val sway = 3f * sin(2 * PI.toFloat() * position)
-    translate(left = sway, top = 20f - 44f * position) {
+    val sway = STEAM_SWAY * sin(2 * PI.toFloat() * position)
+    translate(left = sway, top = 20f - STEAM_RISE * position) {
       drawPath(wispSegment, tint, alpha = fade, style = steamStroke)
     }
   }
 }
 
-/** Where a wisp is in its rise, from 0 to 1, starting [offset] of a cycle in. */
-private fun cyclePosition(timeMillis: Long, offset: Float): Float =
-  ((timeMillis % STEAM_CYCLE_MILLIS).toFloat() / STEAM_CYCLE_MILLIS + offset) % 1f
+/** Where a wisp that leaves the pot [leaveMillis] into each loop is in its rise, from 0 to 1. */
+private fun wispPosition(timeMillis: Long, leaveMillis: Long): Float =
+  Math.floorMod(timeMillis - leaveMillis, LOOP_MILLIS).toFloat() / LOOP_MILLIS
 
-/** How far the lid is lifted, from 0 to 1: a short hop at the start of each half cycle, when a wisp leaves. */
-private fun lidHop(timeMillis: Long): Float {
-  val half = STEAM_CYCLE_MILLIS / 2
-  val position = (timeMillis % half).toFloat() / half
-  return if (position < 0.18f) sin(PI.toFloat() * position / 0.18f) else 0f
+private fun poseAt(timeMillis: Long): Pose {
+  val frame = ((timeMillis % LOOP_MILLIS) / FRAME_MILLIS).toInt()
+  return when {
+    frame < SHAKE.size -> SHAKE[frame]
+    frame == HOP_FRAME -> HOP
+    else -> REST
+  }
 }
 
 private fun ImageVector.vectorPath(name: String): VectorPath = root.group(name).first() as VectorPath
