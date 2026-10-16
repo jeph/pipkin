@@ -39,12 +39,13 @@ internal class ChatScroll {
 }
 
 /**
- * What the chat screen keeps of one chat while another one shows: its [scroll] position and its replies' parsed
- * [markdown], so switching back draws the chat as it was from the first frame.
+ * What the chat screen keeps of one chat while another one shows: its [scroll] position, its replies' parsed
+ * [markdown], so switching back draws the chat as it was from the first frame, and its [widgetTabs].
  */
 internal class ChatView {
   val scroll = ChatScroll()
   val markdown = MarkdownCache()
+  val widgetTabs = WidgetTabs()
 }
 
 /** Each chat's [ChatView], kept as long as its process: a parked chat keeps its own, a closed one's is dropped. */

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -45,6 +47,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -68,6 +71,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.IconButton28
@@ -87,16 +91,21 @@ private const val MAX_PICKED_IMAGES = 6
 /**
  * Paseo's composer: attachment tray, growing text field and a toolbar with attach, model chip, the
  * context meter, [trailingControls] (reserved for voice input) and the primary send/stop button. Send stays
- * greyed out while Pi starts.
+ * greyed out while Pi starts. Extension widgets hang from its edges as tabs; an open tab's panel shows only while
+ * the keyboard is down and [dialogPending] is false, as both need the room, so then a tab opens its widget in a sheet
+ * through [onOpenWidget].
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun Composer(
   controller: ChatController,
   model: JSONObject?,
   thinkingLevel: String?,
   busy: Boolean,
+  dialogPending: Boolean,
   onOpenModelSheet: () -> Unit,
   onOpenThinkingSheet: () -> Unit,
+  onOpenWidget: (String) -> Unit,
   modifier: Modifier = Modifier,
   trailingControls: @Composable RowScope.() -> Unit = {},
 ) {
@@ -107,8 +116,16 @@ internal fun Composer(
     keyboard?.hide()
     focus.clearFocus()
   }
-  val send = { if (controller.send()) hideKeyboard() }
   val shape = RoundedCornerShape(PipkinTokens.Radius.xxl)
+  val tabs = controller.view.widgetTabs
+  val widgets by controller.process.extensionWidgets.collectAsStateWithLifecycle()
+  LaunchedEffect(widgets) { tabs.track(widgets) }
+  val panels = !WindowInsets.isImeVisible && !dialogPending
+  val above = widgetEdge(widgets, tabs, belowEditor = false, panels)
+  val below = widgetEdge(widgets, tabs, belowEditor = true, panels)
+  val onTap = { key: String, belowEditor: Boolean ->
+    if (panels) tabs.toggle(key, belowEditor) else onOpenWidget(key)
+  }
   Box(
     modifier =
       modifier
@@ -117,44 +134,76 @@ internal fun Composer(
         .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s16),
     contentAlignment = Alignment.TopCenter,
   ) {
-    // Not clipped: the attachment remove buttons overhang their thumbnails.
-    Column(
-      modifier =
-        Modifier
-          .widthIn(max = PipkinTokens.contentMaxWidth)
-          .fillMaxWidth()
-          .background(colors.surface1, shape)
-          .border(1.dp, colors.borderAccent, shape)
-          .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
-    ) {
-      if (controller.attachments.isNotEmpty()) {
-        AttachmentTray(controller.attachments, onRemove = { controller.attachments.remove(it) })
-      }
-      // Weighted, so the tray and toolbar are measured first and long drafts scroll instead of pushing them off.
-      ComposerField(controller, acceptsImages(model), onRan = hideKeyboard, Modifier.weight(1f, fill = false))
-      Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s12))
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    Column(modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth()) {
+      // Over the composer's border by its width, so an open tab covers the border where the two meet.
+      WidgetTabStrip(above, tabs, belowEditor = false, { onTap(it, false) }, Modifier.zIndex(1f).offset(y = 1.dp))
+      // Not clipped: the attachment remove buttons overhang their thumbnails. Weighted, so the tab strips keep their
+      // height when the composer has to shrink.
+      Column(
+        modifier =
+          Modifier
+            .weight(1f, fill = false)
+            .fillMaxWidth()
+            .background(colors.surface1, shape)
+            .border(1.dp, colors.borderAccent, shape)
+            .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
       ) {
-        // The left group takes what the trailing buttons leave, and inside it the model chip is
-        // measured last, so on a narrow screen the model name is cut before send is pushed off.
-        Row(
-          modifier = Modifier.weight(1f),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
-        ) {
-          AttachButton(controller, model)
-          ModelChip(model, onOpenModelSheet, Modifier.weight(1f, fill = false))
-          if (supportsThinking(model)) ThinkingChip(thinkingLevel, onOpenThinkingSheet)
+        WidgetPanelSlot(above.shown, tabs, belowEditor = false, onExpand = onOpenWidget)
+        if (controller.attachments.isNotEmpty()) {
+          AttachmentTray(controller.attachments, onRemove = { controller.attachments.remove(it) })
         }
-        val contextUsage by controller.process.contextUsage.collectAsStateWithLifecycle()
-        ContextMeter(contextUsage, controller.contextDetailsOpen) { controller.contextDetailsOpen = it }
-        trailingControls()
-        val processState by controller.process.state.collectAsStateWithLifecycle()
-        PrimaryButton(primaryAction(controller, busy, processState.starting), onSend = send, onStop = controller::abort)
+        // Weighted, so the tray and toolbar are measured first and long drafts scroll instead of pushing them off.
+        ComposerField(controller, acceptsImages(model), onRan = hideKeyboard, Modifier.weight(1f, fill = false))
+        Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s12))
+        ComposerToolbar(
+          controller = controller,
+          model = model,
+          thinkingLevel = thinkingLevel,
+          busy = busy,
+          onSend = { if (controller.send()) hideKeyboard() },
+          onOpenModelSheet = onOpenModelSheet,
+          onOpenThinkingSheet = onOpenThinkingSheet,
+          trailingControls = trailingControls,
+        )
+        WidgetPanelSlot(below.shown, tabs, belowEditor = true, onExpand = onOpenWidget)
       }
+      WidgetTabStrip(below, tabs, belowEditor = true, { onTap(it, true) }, Modifier.zIndex(1f).offset(y = (-1).dp))
     }
+  }
+}
+
+/** Attach, the model and thinking chips, the context meter, [trailingControls] and the send/stop button. */
+@Composable
+private fun ComposerToolbar(
+  controller: ChatController,
+  model: JSONObject?,
+  thinkingLevel: String?,
+  busy: Boolean,
+  onSend: () -> Unit,
+  onOpenModelSheet: () -> Unit,
+  onOpenThinkingSheet: () -> Unit,
+  trailingControls: @Composable RowScope.() -> Unit,
+) {
+  Row(
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+  ) {
+    // The left group takes what the trailing buttons leave, and inside it the model chip is
+    // measured last, so on a narrow screen the model name is cut before send is pushed off.
+    Row(
+      modifier = Modifier.weight(1f),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    ) {
+      AttachButton(controller, model)
+      ModelChip(model, onOpenModelSheet, Modifier.weight(1f, fill = false))
+      if (supportsThinking(model)) ThinkingChip(thinkingLevel, onOpenThinkingSheet)
+    }
+    val contextUsage by controller.process.contextUsage.collectAsStateWithLifecycle()
+    ContextMeter(contextUsage, controller.contextDetailsOpen) { controller.contextDetailsOpen = it }
+    trailingControls()
+    val processState by controller.process.state.collectAsStateWithLifecycle()
+    PrimaryButton(primaryAction(controller, busy, processState.starting), onSend = onSend, onStop = controller::abort)
   }
 }
 
@@ -404,77 +453,3 @@ private fun PrimaryButton(action: PrimaryAction, onSend: () -> Unit, onStop: () 
     )
   }
 }
-
-/**
- * The messages Pi has queued but not taken yet, one per line as typed, so the user sees what is about to steer the
- * run; attachments show only as a count. Edit takes them back into the composer; Send now stops the run and sends
- * them at once, each as its own message. Both are off while Pi may be taking the queue for its next turn, since it
- * then delivers the messages regardless.
- */
-@Composable
-internal fun SteeringBox(
-  summary: SteeringSummary,
-  editEnabled: Boolean,
-  sendNowEnabled: Boolean,
-  onEdit: () -> Unit,
-  onSendNow: () -> Unit,
-  modifier: Modifier = Modifier,
-) {
-  val colors = pipkinColors
-  Box(modifier = modifier.fillMaxWidth().padding(horizontal = PipkinTokens.Spacing.s16), Alignment.TopCenter) {
-    Column(
-      modifier =
-        Modifier
-          .widthIn(max = PipkinTokens.contentMaxWidth)
-          .fillMaxWidth()
-          .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
-          .background(colors.surface2)
-          .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4, bottom = PipkinTokens.Spacing.s12),
-    ) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-          text = stringResource(R.string.chat_steering),
-          modifier = Modifier.weight(1f),
-          color = colors.foregroundMuted,
-          fontSize = PipkinTokens.FontSize.sm,
-        )
-        TextButton(onClick = onEdit, enabled = editEnabled) { Text(text = stringResource(R.string.chat_steering_edit)) }
-        TextButton(onClick = onSendNow, enabled = sendNowEnabled) {
-          Text(text = stringResource(R.string.chat_steering_send_now))
-        }
-      }
-      if (summary.text.isNotEmpty()) {
-        Text(
-          text = summary.text,
-          modifier = Modifier.padding(end = PipkinTokens.Spacing.s8),
-          color = colors.foreground,
-          fontSize = PipkinTokens.FontSize.base,
-          maxLines = STEERING_MAX_LINES,
-          overflow = TextOverflow.Ellipsis,
-        )
-      }
-      if (summary.attachments > 0) {
-        Row(
-          modifier = Modifier.padding(top = PipkinTokens.Spacing.s4),
-          verticalAlignment = Alignment.CenterVertically,
-          horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
-        ) {
-          LucideIcon(
-            R.drawable.ic_lucide_paperclip,
-            contentDescription = null,
-            size = PipkinTokens.IconSize.sm,
-            tint = colors.foregroundMuted,
-          )
-          Text(
-            text = pluralStringResource(R.plurals.chat_steering_attachments, summary.attachments, summary.attachments),
-            color = colors.foregroundMuted,
-            fontSize = PipkinTokens.FontSize.sm,
-          )
-        }
-      }
-    }
-  }
-}
-
-/** Long enough to read several queued messages, short enough to leave the stream most of the screen. */
-private const val STEERING_MAX_LINES = 6

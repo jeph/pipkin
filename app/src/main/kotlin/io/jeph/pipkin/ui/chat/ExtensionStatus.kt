@@ -21,6 +21,9 @@ private val CUBE = intArrayOf(0, 95, 135, 175, 215, 255)
 
 private const val DIM_ALPHA = 0.7f
 
+/** What a tab in a widget line shows as. */
+private const val TAB = "   "
+
 /**
  * The statuses extensions set with `ctx.ui.setStatus` as one line, as Pi's footer shows them: sorted by key, each
  * flattened to one line and trimmed, joined by spaces. Pi's ANSI styling becomes spans: the 16 palette colors Pi's
@@ -42,19 +45,55 @@ internal fun extensionStatusLine(statuses: Map<String, String>, colors: PipkinCo
   }.toAnnotatedString()
 }
 
+/**
+ * A widget's lines as one text with a line break between them, as Pi's terminal UI draws them: spaces kept, a tab as
+ * spaces, and Pi's ANSI styling as spans, as in [extensionStatusLine]. Each line starts unstyled, since Pi's terminal
+ * UI resets the style at the end of every line.
+ */
+internal fun extensionWidgetText(lines: List<String>, colors: PipkinColors): AnnotatedString =
+  AnnotatedString.Builder().apply {
+    lines.forEachIndexed { index, line ->
+      if (index > 0) append('\n')
+      forEachStyledRun(line, colors) { run, style ->
+        val text = buildString {
+          for (char in run) {
+            when {
+              char == '\t' -> append(TAB)
+
+              char == '\n' -> append(char)
+
+              // Other control characters, such as a lone ESC or a carriage return, would draw as boxes.
+              char < ' ' || char == '\u007F' -> Unit
+
+              else -> append(char)
+            }
+          }
+        }
+        val at = length
+        append(text)
+        if (style != null && text.isNotEmpty()) addStyle(style, at, length)
+      }
+    }
+  }.toAnnotatedString()
+
 /** One status: on one line with single spaces and no outer whitespace, as Pi's footer sanitizes it, and styled. */
 private fun styledStatus(raw: String, colors: PipkinColors): AnnotatedString {
-  val text = OSC.replace(raw, "")
   val line = OneLine()
+  forEachStyledRun(raw, colors, line::append)
+  return line.build()
+}
+
+/** Calls [onRun] with each run of [raw]'s text and the SGR style over it; other escapes are dropped. */
+private inline fun forEachStyledRun(raw: String, colors: PipkinColors, onRun: (String, SpanStyle?) -> Unit) {
+  val text = OSC.replace(raw, "")
   val sgr = SgrState(colors)
   var start = 0
   for (escape in CSI.findAll(text)) {
-    line.append(text.substring(start, escape.range.first), sgr.style())
+    onRun(text.substring(start, escape.range.first), sgr.style())
     if (escape.groupValues[2] == "m") sgr.apply(escape.groupValues[1])
     start = escape.range.last + 1
   }
-  line.append(text.substring(start), sgr.style())
-  return line.build()
+  onRun(text.substring(start), sgr.style())
 }
 
 /** Styled runs on one line: line breaks and tabs become spaces, runs of spaces one, and none at either end. */
@@ -86,7 +125,7 @@ private class OneLine {
   }
 }
 
-/** The SGR attributes in effect while reading one status. */
+/** The SGR attributes in effect while reading one status or widget line. */
 private class SgrState(private val colors: PipkinColors) {
   private var foreground: Color? = null
   private var dim = false

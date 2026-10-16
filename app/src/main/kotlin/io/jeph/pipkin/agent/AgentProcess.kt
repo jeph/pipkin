@@ -107,6 +107,7 @@ internal class AgentProcess(
   private val sessionNameState = MutableStateFlow<String?>(null)
   private val extensionTitleState = MutableStateFlow(sessionPath?.let { sessions.extensionTitles[it] })
   private val extensionStatusesState = MutableStateFlow(sessionPath?.let { sessions.extensionStatuses[it] }.orEmpty())
+  private val extensionWidgetsState = MutableStateFlow(sessionPath?.let { sessions.extensionWidgets[it] }.orEmpty())
   private val contextUsageState = MutableStateFlow<ContextUsage?>(null)
   private val contextUsageRequests = Channel<Unit>(Channel.CONFLATED)
 
@@ -115,12 +116,13 @@ internal class AgentProcess(
   private var extensionTitleChanges = 0
 
   /**
-   * The status keys Pi set or cleared since [moveSession] took the statuses down, so a cancelled move keeps those.
-   * Guarded, with every write to the statuses, by [statusLock]: Pi's reader thread sets statuses while a move takes
-   * them down or puts them back.
+   * The status and widget keys Pi set or cleared since [moveSession] took them down, so a cancelled move keeps those.
+   * Guarded, with every write to the statuses and widgets, by [extensionUiLock]: Pi's reader thread sets them while a
+   * move takes them down or puts them back.
    */
   private val extensionStatusKeysChanged = HashSet<String>()
-  private val statusLock = Any()
+  private val extensionWidgetKeysChanged = HashSet<String>()
+  private val extensionUiLock = Any()
 
   @Volatile
   private var connection: Connection? = null
@@ -169,6 +171,13 @@ internal class AgentProcess(
    * Pipkin makes, through [SessionRepository.extensionStatuses].
    */
   val extensionStatuses: StateFlow<Map<String, String>> = extensionStatusesState.asStateFlow()
+
+  /**
+   * The widgets extensions set with `ctx.ui.setWidget`, by widget key, in the order the composer shows them. Like the
+   * statuses, they last until a move to another session and across the Pi restarts Pipkin makes, through
+   * [SessionRepository.extensionWidgets].
+   */
+  val extensionWidgets: StateFlow<Map<String, ExtensionWidget>> = extensionWidgetsState.asStateFlow()
 
   /** How full the context window is, from `get_session_stats`; null until Pi first answered. */
   val contextUsage: StateFlow<ContextUsage?> = contextUsageState.asStateFlow()
@@ -303,11 +312,11 @@ internal class AgentProcess(
    * then re-reads state and history. Returns Pi's answer, or null when cancelled. Waits without a deadline: Pi answers
    * after the extensions' `session_before_fork` handlers, which can wait on the user.
    *
-   * The old session's extension title and statuses go first, since Pi starts the new session's extensions, which may
-   * set their own, before it answers; [SessionRepository] keeps them for the session left behind. A move that doesn't
-   * happen puts back whichever of them Pi didn't change meanwhile. Those extensions notify before Pi answers too, so
-   * their notices wait for the new history. The new session starts with the notices that followed messages it kept,
-   * unless it has saved notices of its own.
+   * The old session's extension title, statuses and widgets go first, since Pi starts the new session's extensions,
+   * which may set their own, before it answers; [SessionRepository] keeps them for the session left behind. A move that
+   * doesn't happen puts back whichever of them Pi didn't change meanwhile. Those extensions notify before Pi answers
+   * too, so their notices wait for the new history. The new session starts with the notices that followed messages it
+   * kept, unless it has saved notices of its own.
    */
   suspend fun moveSession(command: String, params: JSONObject = JSONObject()): JSONObject? {
     val left = takeDownExtensionUi()
@@ -325,7 +334,7 @@ internal class AgentProcess(
       timeline.keepHistory()
       return null
     }
-    previousFile?.let { keepExtensionUi(it, left.title, left.statuses) }
+    previousFile?.let { keepExtensionUi(it, left) }
     applyState(call("get_state"))
     val messages = getMessages()
     val path = sessionFileState.value
@@ -535,6 +544,11 @@ internal class AgentProcess(
         setExtensionStatus(event)
         return
       }
+
+      "setWidget" -> {
+        setExtensionWidget(event)
+        return
+      }
     }
     // Pi answers a timed-out dialog itself and says nothing, so the dialog goes when Pi stops waiting on it.
     val timeout = dialogTimeoutMillis(event)?.takeIf { it > 0 } ?: return
@@ -555,43 +569,73 @@ internal class AgentProcess(
   private fun setExtensionStatus(event: JSONObject) {
     val key = event.opt("statusKey") as? String ?: return
     val text = event.opt("statusText") as? String
-    synchronized(statusLock) {
+    synchronized(extensionUiLock) {
       extensionStatusKeysChanged += key
       val statuses = extensionStatusesState.value
       extensionStatusesState.value = if (text == null) statuses - key else statuses + (key to text)
     }
   }
 
-  /** The extension title and statuses [moveSession] took down, with the title's change count it was taken at. */
-  private class LeftExtensionUi(val title: String?, val titleChanges: Int, val statuses: Map<String, String>)
+  private fun setExtensionWidget(event: JSONObject) {
+    synchronized(extensionUiLock) {
+      extensionWidgetsState.value = withWidget(extensionWidgetsState.value, event) ?: return
+      extensionWidgetKeysChanged += event.getString("widgetKey")
+    }
+  }
+
+  /** The extension title, statuses and widgets [moveSession] took down, with the title's change count then. */
+  private class LeftExtensionUi(
+    val title: String?,
+    val titleChanges: Int,
+    val statuses: Map<String, String>,
+    val widgets: Map<String, ExtensionWidget>,
+  )
 
   private fun takeDownExtensionUi(): LeftExtensionUi {
-    val statuses = synchronized(statusLock) {
+    val left = synchronized(extensionUiLock) {
       extensionStatusKeysChanged.clear()
-      extensionStatusesState.value.also { extensionStatusesState.value = emptyMap() }
+      extensionWidgetKeysChanged.clear()
+      LeftExtensionUi(
+        extensionTitleState.value,
+        extensionTitleChanges,
+        extensionStatusesState.value,
+        extensionWidgetsState.value,
+      ).also {
+        extensionStatusesState.value = emptyMap()
+        extensionWidgetsState.value = emptyMap()
+      }
     }
-    val left = LeftExtensionUi(extensionTitleState.value, extensionTitleChanges, statuses)
     extensionTitleState.value = null
     return left
   }
 
-  /** Puts back what [takeDownExtensionUi] took down, except the title or the status keys Pi changed since. */
+  /** Puts back what [takeDownExtensionUi] took down, except the title or the status and widget keys Pi changed since. */
   private fun putBack(left: LeftExtensionUi) {
     if (extensionTitleChanges == left.titleChanges) extensionTitleState.value = left.title
-    synchronized(statusLock) {
-      val current = extensionStatusesState.value
-      extensionStatusesState.value = left.statuses.filterKeys { it !in extensionStatusKeysChanged } + current
+    synchronized(extensionUiLock) {
+      extensionStatusesState.value =
+        left.statuses.filterKeys { it !in extensionStatusKeysChanged } + extensionStatusesState.value
+      extensionWidgetsState.value =
+        left.widgets.filterKeys { it !in extensionWidgetKeysChanged } + extensionWidgetsState.value
     }
   }
 
-  /** Hands the title and statuses to [SessionRepository] for the next Pi on this session, whichever process that is. */
+  /** Hands the extension UI to [SessionRepository] for the next Pi on this session, whichever process that is. */
   private fun keepExtensionUi() {
-    sessionFileState.value?.let { keepExtensionUi(it, extensionTitleState.value, extensionStatusesState.value) }
+    val sessionFile = sessionFileState.value ?: return
+    val ui = LeftExtensionUi(
+      extensionTitleState.value,
+      extensionTitleChanges,
+      extensionStatusesState.value,
+      extensionWidgetsState.value,
+    )
+    keepExtensionUi(sessionFile, ui)
   }
 
-  private fun keepExtensionUi(sessionFile: String, title: String?, statuses: Map<String, String>) {
-    sessions.extensionTitles.keep(sessionFile, title)
-    sessions.extensionStatuses.keep(sessionFile, statuses.ifEmpty { null })
+  private fun keepExtensionUi(sessionFile: String, left: LeftExtensionUi) {
+    sessions.extensionTitles.keep(sessionFile, left.title)
+    sessions.extensionStatuses.keep(sessionFile, left.statuses.ifEmpty { null })
+    sessions.extensionWidgets.keep(sessionFile, left.widgets.ifEmpty { null })
   }
 
   private fun refreshContextUsage() {

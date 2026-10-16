@@ -18,10 +18,14 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
@@ -154,37 +158,51 @@ private fun ChatContent(
       onActions = { onSheet(ChatSheet.Actions) },
       Modifier.onUnhandledTap(dismissKeyboard),
     )
-    Box(modifier = Modifier.weight(1f).fillMaxWidth().onUnhandledTap(dismissKeyboard)) {
-      ChatStream(
-        timeline = timeline,
-        processState = processState,
-        view = controller.view,
-        onOpenTool = { onSheet(ChatSheet.Tool(it)) },
-        onOpenSettings = onOpenSettings,
-        onRestart = process::restart,
-      )
-      SnackbarStack(snackbar, Modifier.align(Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16))
-      SlashMenuHost(controller, ready = processState == AgentProcessState.Ready, Modifier.align(Alignment.BottomCenter))
-    }
-    PendingDialogCard(controller, timeline)
-    if (timeline.queue.isNotEmpty()) {
-      SteeringBox(
-        summary = controller.steering.summary(timeline.queue),
-        editEnabled = !timeline.queueInFlight,
-        sendNowEnabled = !timeline.queueInFlight && !controller.sending,
-        onEdit = controller.steering::edit,
-        onSendNow = controller.steering::sendNow,
-        modifier = Modifier.padding(bottom = PipkinTokens.Spacing.s8),
-      )
-    }
-    Composer(
-      controller = controller,
-      model = timeline.model,
-      thinkingLevel = timeline.thinkingLevel,
-      busy = busy,
-      onOpenModelSheet = { onSheet(ChatSheet.Model()) },
-      onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
+    val dialogPending = timeline.pendingUi != null
+    ChatStack(
+      modifier = Modifier.weight(1f),
+      stream = { StreamArea(controller, timeline, snackbar, onOpenSettings, onSheet, dismissKeyboard) },
+      dialog = { PendingDialogCard(controller, timeline) },
+      steering = { PendingSteeringBox(controller, timeline, compact = dialogPending) },
+      composer = {
+        Composer(
+          controller = controller,
+          model = timeline.model,
+          thinkingLevel = timeline.thinkingLevel,
+          busy = busy,
+          dialogPending = dialogPending,
+          onOpenModelSheet = { onSheet(ChatSheet.Model()) },
+          onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
+          onOpenWidget = { onSheet(ChatSheet.Widget(it)) },
+        )
+      },
     )
+  }
+}
+
+/** The stream, with the snackbars and the slash menu over its bottom. */
+@Composable
+private fun StreamArea(
+  controller: ChatController,
+  timeline: TimelineState,
+  snackbar: SnackbarStackState,
+  onOpenSettings: () -> Unit,
+  onSheet: (ChatSheet) -> Unit,
+  dismissKeyboard: () -> Unit,
+) {
+  val process = controller.process
+  val processState by process.state.collectAsStateWithLifecycle()
+  Box(modifier = Modifier.fillMaxSize().onUnhandledTap(dismissKeyboard)) {
+    ChatStream(
+      timeline = timeline,
+      processState = processState,
+      view = controller.view,
+      onOpenTool = { onSheet(ChatSheet.Tool(it)) },
+      onOpenSettings = onOpenSettings,
+      onRestart = process::restart,
+    )
+    SnackbarStack(snackbar, Modifier.align(Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16))
+    SlashMenuHost(controller, ready = processState == AgentProcessState.Ready, Modifier.align(Alignment.BottomCenter))
   }
 }
 
@@ -328,6 +346,12 @@ private fun ChatSheets(
     is ChatSheet.SessionInfo -> SessionInfoSheet(sheet.stats, sessionName, controller.home, onDismiss = dismiss)
 
     is ChatSheet.Fork -> ForkSheet(sheet.messages, onDismiss = dismiss) { controller.builtins.fork(it) }
+
+    is ChatSheet.Widget -> {
+      val widgets by process.extensionWidgets.collectAsStateWithLifecycle()
+      val widget = widgets[sheet.key]
+      if (widget != null) WidgetSheet(KeyedWidget(sheet.key, widget), controller.view.widgetTabs, onDismiss = dismiss)
+    }
 
     else -> Unit
   }

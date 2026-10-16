@@ -52,7 +52,6 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.ExtensionUiRequest
 import io.jeph.pipkin.agent.UiAnswer
 import io.jeph.pipkin.ui.components.LucideIcon
-import io.jeph.pipkin.ui.components.atMostHalfTall
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.delay
@@ -78,7 +77,6 @@ internal fun ExtensionUiCard(
       val cardModifier = Modifier
         .widthIn(max = PipkinTokens.contentMaxWidth)
         .fillMaxWidth()
-        .atMostHalfTall()
         .clip(shape)
         .background(colors.surface1)
         .border(1.dp, colors.border, shape)

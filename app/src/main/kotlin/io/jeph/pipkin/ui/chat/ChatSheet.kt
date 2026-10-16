@@ -24,6 +24,9 @@ internal sealed interface ChatSheet {
   /** `/session`: Pi's `get_session_stats` data. */
   data class SessionInfo(val stats: JSONObject) : ChatSheet
 
+  /** The whole of the extension widget with this key. */
+  data class Widget(val key: String) : ChatSheet
+
   /** `/fork`: the user messages (`entryId`, `text`) a fork can start from. */
   data class Fork(val messages: List<JSONObject>) : ChatSheet
 }

@@ -1,6 +1,7 @@
 package io.jeph.pipkin.data
 
 import android.util.Log
+import io.jeph.pipkin.agent.ExtensionWidget
 import io.jeph.pipkin.agent.KeptBySession
 import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.host.HostRejected
@@ -36,6 +37,9 @@ internal class SessionRepository(
 
   /** The extension statuses of sessions whose Pi stopped, by key, which a later Pi on the session starts with. */
   val extensionStatuses = KeptBySession<Map<String, String>>()
+
+  /** The extension widgets of sessions whose Pi stopped, by key, which a later Pi on the session starts with. */
+  val extensionWidgets = KeptBySession<Map<String, ExtensionWidget>>()
 
   val sessions: StateFlow<List<SessionInfo>> = sessionsState.asStateFlow()
 
