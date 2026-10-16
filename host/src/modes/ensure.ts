@@ -39,7 +39,8 @@ async function npmCi(ctx: ModeContext, cwd: string): Promise<void> {
   };
   // npm at --loglevel=error stays quiet until it's done; this line tells the app it's installing, not just checking.
   send("npm ci");
-  const child = spawn("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--loglevel=error"], {
+  const args = ["ci", "--ignore-scripts", "--no-audit", "--no-fund", "--no-update-notifier", "--loglevel=error"];
+  const child = spawn("npm", args, {
     cwd,
     signal: ctx.signal,
     stdio: ["ignore", "pipe", "pipe"],
