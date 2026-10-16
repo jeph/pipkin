@@ -16,6 +16,21 @@ fail() {
 dir="$HOME/.pipkin/helper"
 package='@PIPKIN_PACKAGE@'
 
+# Termux sessions run the shell that ~/.termux/shell links to (chsh sets it), or bash without a usable one; this picks
+# it the way $PREFIX/bin/login does. Pipkin starts its helper by opening a session, so that shell must run one of the
+# hooks written in step 4.
+login_shell=bash
+if [ -L "$HOME/.termux/shell" ]; then
+  target=$(readlink "$HOME/.termux/shell")
+  if [ -f "$target" ] && [ -x "$target" ] && [ ! "$target" -ef "$PREFIX/bin/login" ]; then
+    login_shell=$(basename "$(readlink -f "$target")")
+  fi
+fi
+case $login_shell in
+  bash | zsh | fish) ;;
+  *) fail "Pipkin needs bash, zsh or fish as Termux's shell. Run chsh -s bash, then paste the command again." ;;
+esac
+
 alive() { # $1 = pid file, $2 = text the process's command line must contain
   local pid
   pid=$(cat "$1" 2>/dev/null) && [ -n "$pid" ] && grep -qaF "$2" "/proc/$pid/cmdline" 2>/dev/null
@@ -59,7 +74,7 @@ if ! node_ok; then
   node_ok || fail "Node.js couldn't be installed. Check your internet connection and paste the command again."
 fi
 
-# 4. The helper's files, the boot script, the .bashrc block and pipkin-start.
+# 4. The helper's files, the boot script, the shell hooks and pipkin-start.
 { mkdir -p "$dir" && chmod 700 "$dir"; } || fail "Couldn't create $dir."
 fetch() { # $1 = name, $2 = sha256, $3 = mode
   local tmp="$dir/$1.$$.tmp"
@@ -85,26 +100,53 @@ printf '#!%s/bin/sh\nexec "$HOME/.pipkin/helper/run.sh"\n' "$PREFIX" | write_fil
   fail "Couldn't write the boot script."
 chmod 700 "$boot" || fail "Couldn't write the boot script."
 
-rc="$HOME/.bashrc"
-[ -L "$rc" ] && rc=$(readlink -f "$rc")
-touch "$rc" || fail "Couldn't update ~/.bashrc."
-# shellcheck disable=SC2016 # $HOME expands when .bashrc runs.
-PIPKIN_BLOCK='# >>> pipkin >>>
+# Puts $2 in the file $1 between Pipkin's markers: in place of the first complete marked block, dropping any later
+# ones, or at the end when there is none. A start marker without an end marker is left alone.
+put_block() {
+  local rc=$1
+  [ -L "$rc" ] && rc=$(readlink -f "$rc")
+  [ -e "$rc" ] || : >"$rc" || return 1
+  PIPKIN_BLOCK=$2 awk '
+    function flush() { for (i = 0; i < n; i++) print held[i]; n = 0 }
+    $0 == "# >>> pipkin >>>" { flush(); inside = 1; held[n++] = $0; next }
+    inside && $0 == "# <<< pipkin <<<" { n = 0; inside = 0; if (!done) print ENVIRON["PIPKIN_BLOCK"]; done = 1; next }
+    inside { held[n++] = $0; next }
+    { print }
+    END { flush(); if (!done) print ENVIRON["PIPKIN_BLOCK"] }
+  ' "$rc" | write_file "$rc"
+}
+
+# The session Pipkin opens to start the helper runs these hooks; start.sh does the rest. A shell gets its hook when
+# it's installed, so switching to it later with chsh keeps working; bash is always installed. A session that stays
+# open starts with status 0, so prompts that show a failed status don't flag it.
+# shellcheck disable=SC2016 # $HOME expands when the shell runs the hook.
+sh_hook='# >>> pipkin >>>
 if [ -x "$HOME/.pipkin/helper/start.sh" ]; then
   "$HOME/.pipkin/helper/start.sh" --shell
   # 3: this session only started the helper, and closing it keeps Termux under its limit of 8 sessions.
-  [ $? = 3 ] && exit 0
+  if [ $? = 3 ]; then exit 0; fi
 fi
-# <<< pipkin <<<' awk '
-  # Replaces the first complete marked block in place and drops any later ones; appends it if there is none.
-  # A start marker without an end marker is left alone.
-  function flush() { for (i = 0; i < n; i++) print held[i]; n = 0 }
-  $0 == "# >>> pipkin >>>" { flush(); inside = 1; held[n++] = $0; next }
-  inside && $0 == "# <<< pipkin <<<" { n = 0; inside = 0; if (!done) print ENVIRON["PIPKIN_BLOCK"]; done = 1; next }
-  inside { held[n++] = $0; next }
-  { print }
-  END { flush(); if (!done) print ENVIRON["PIPKIN_BLOCK"] }
-' "$rc" | write_file "$rc" || fail "Couldn't update ~/.bashrc."
+# <<< pipkin <<<'
+put_block "$HOME/.bashrc" "$sh_hook" || fail "Couldn't update ~/.bashrc."
+if [ -x "$PREFIX/bin/zsh" ] || [ "$login_shell" = zsh ]; then
+  put_block "${ZDOTDIR:-$HOME}/.zshrc" "$sh_hook" || fail "Couldn't update ~/.zshrc."
+fi
+if [ -x "$PREFIX/bin/fish" ] || [ "$login_shell" = fish ]; then
+  # A file of its own, since fish sources conf.d in every fish process, scripts and fish -c included. exit there would
+  # only end the file, so the shell gives way to a command that exits 0 instead.
+  fish_hook="${XDG_CONFIG_HOME:-$HOME/.config}/fish/conf.d/pipkin.fish"
+  mkdir -p "${fish_hook%/*}" || fail "Couldn't create ${fish_hook%/*}."
+  write_file "$fish_hook" <<'EOF' || fail "Couldn't write $fish_hook."
+# Written by Pipkin's Termux setup, which replaces this file each time it runs.
+if status is-interactive; and test -x "$HOME/.pipkin/helper/start.sh"
+    "$HOME/.pipkin/helper/start.sh" --shell
+    # 3: this session only started the helper, and closing it keeps Termux under its limit of 8 sessions.
+    if test $status = 3
+        exec true
+    end
+end
+EOF
+fi
 
 if [ "$(readlink "$PREFIX/bin/pipkin-start" 2>/dev/null)" != "$dir/start.sh" ]; then
   ln -sfn "$dir/start.sh" "$PREFIX/bin/pipkin-start" || fail "Couldn't create pipkin-start."

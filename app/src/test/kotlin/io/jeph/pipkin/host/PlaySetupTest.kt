@@ -1,12 +1,12 @@
 package io.jeph.pipkin.host
 
+import io.jeph.pipkin.termux.assertRunsInAnyShell
 import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -98,13 +98,13 @@ class PlaySetupTest {
   }
 
   @Test
-  fun commandRunsTheInstallerOnlyAfterItsHashChecksOnOneLine() {
+  fun commandRunsTheInstallerOnlyAfterItsHashChecksInAnyShell() {
     val session = open()
     val command = session.command(4242)
     val check = command.indexOf("echo \"${session.installerSha256}  \$f\" | sha256sum -c --status && ")
     val run = command.indexOf("bash \"\$f\"")
     assertTrue(check in 0 until run)
-    assertFalse(command.contains('\n'))
+    assertRunsInAnyShell(command)
   }
 
   private fun open(): SetupSession {

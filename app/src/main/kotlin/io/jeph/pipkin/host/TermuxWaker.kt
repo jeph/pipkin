@@ -21,8 +21,9 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Starts Pipkin's helper in Termux's Play build by opening Termux in a new terminal session: its `.bashrc` starts the
- * helper. Pipkin switches back as soon as Termux is up and waits there, showing [waking], while the helper starts.
+ * Starts Pipkin's helper in Termux's Play build by opening Termux in a new terminal session: the hook setup wrote for
+ * its login shell (bash, zsh or fish) starts the helper. Pipkin switches back as soon as Termux is up and waits there,
+ * showing [waking], while the helper starts.
  *
  * Android lets an app open activities from the background for a few seconds after one of its own starts or finishes,
  * unless the user leaves for the home screen meanwhile. [TermuxWakeActivity] opens Termux for that reason, and

@@ -2,6 +2,7 @@ package io.jeph.pipkin.host
 
 import android.content.Context
 import io.jeph.pipkin.agent.KeepAlive
+import io.jeph.pipkin.termux.TermuxSetup
 import java.io.OutputStream
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -136,14 +137,16 @@ internal class SetupSession(
     return HttpResponse(HttpResponse.OK, pairingBody(token, sid, key, nonce))
   }
 
-  /** The line the user pastes into Termux. */
+  /** The line the user pastes into Termux; [TermuxSetup.inBash] runs it in bash whatever Termux's shell is. */
   fun command(port: Int): String {
     val base = "http://127.0.0.1:$port/pipkin/$sid"
-    return "f=\$(mktemp) && curl -fsS -m 60 \"$base/$INSTALLER\" -o \"\$f\" && " +
-      "echo \"$installerSha256  \$f\" | sha256sum -c --status && " +
-      "PIPKIN_URL=\"$base\" PIPKIN_TOKEN=${token.toHexString()} bash \"\$f\"; s=\$?; rm -f \"\$f\"; " +
-      "[ \$s = 0 ] || echo \"Pipkin setup didn't finish. " +
-      "Open Pipkin, copy the setup command again and paste it here.\""
+    return TermuxSetup.inBash(
+      "f=\$(mktemp) && curl -fsS -m 60 \"$base/$INSTALLER\" -o \"\$f\" && " +
+        "echo \"$installerSha256  \$f\" | sha256sum -c --status && " +
+        "PIPKIN_URL=\"$base\" PIPKIN_TOKEN=${token.toHexString()} bash \"\$f\"; s=\$?; rm -f \"\$f\"; " +
+        "[ \$s = 0 ] || echo \"Pipkin setup did not finish. " +
+        "Open Pipkin, copy the setup command again and paste it here.\"",
+    )
   }
 
   companion object {

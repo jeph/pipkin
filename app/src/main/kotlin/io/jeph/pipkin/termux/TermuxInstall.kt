@@ -98,9 +98,9 @@ internal object TermuxInstall {
   }
 
   /**
-   * Opens Termux in a new terminal session, whose `.bashrc` starts Pipkin's helper. Termux adds a session for
-   * [Intent.ACTION_RUN] (its launcher's "New session" shortcut) only while creating its activity, so the task is
-   * cleared first; the sessions themselves live on in Termux's service.
+   * Opens Termux in a new terminal session, whose login shell runs the hook setup wrote to start Pipkin's helper.
+   * Termux adds a session for [Intent.ACTION_RUN] (its launcher's "New session" shortcut) only while creating its
+   * activity, so the task is cleared first; the sessions themselves live on in Termux's service.
    */
   fun openTermuxNewSession(context: Context) = context.startActivity(
     Intent(Intent.ACTION_RUN)
