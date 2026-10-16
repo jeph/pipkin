@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
+import io.jeph.pipkin.termux.TermuxIdentity
 import io.jeph.pipkin.termux.TermuxInstall
 import java.security.SecureRandom
 import java.util.UUID
@@ -14,8 +15,9 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Starts one short-lived `host.mjs` through Termux's RUN_COMMAND service and waits for it to
- * connect back to [HostServer]. The host script travels as a bash argument; the token only on stdin.
+ * Starts one short-lived `host.mjs` in Termux and waits for it to connect back to [HostServer]: through Termux's
+ * RUN_COMMAND service in the F-Droid build, through Pipkin's helper ([HelperBridge]) in the Play build. Either way
+ * the host script travels as bash arguments and the token only on stdin.
  */
 internal object HostLauncher {
   @Suppress("SdCardPath") // Termux's own prefix, not this app's storage.
@@ -41,7 +43,7 @@ internal object HostLauncher {
 
   /**
    * Retries a launch that Termux cancelled while stopping its service (its last command just exited);
-   * the retry starts a fresh Termux service.
+   * the retry starts a fresh Termux service. A host the helper's child was killed in is retried too.
    */
   suspend fun launch(context: Context, mode: String): HostChannel {
     repeat(INTERRUPTED_RETRIES) {
@@ -55,23 +57,60 @@ internal object HostLauncher {
   }
 
   private suspend fun launchOnce(context: Context, mode: String): HostChannel = withContext(Dispatchers.IO) {
+    // Checked on every launch, not only during onboarding: Termux can be swapped for another build after setup.
+    val status = TermuxInstall.status(context)
+    if (status == TermuxInstall.Status.NotInstalled) throw HostFailure.MissingTermux()
+    if (!status.isTrusted) throw HostFailure.UntrustedTermux()
+    TermuxIdentity.verify(context)
     val server = HostServer.shared
     val token = ByteArray(TOKEN_BYTES).also(random::nextBytes).toHexString()
-    val id = UUID.randomUUID().toString()
+    val arguments = arguments(context, mode, server.port)
+    val stdin = token + "\n"
     val connected = server.register(token)
+    val onFailure: (HostFailure) -> Unit = { connected.completeExceptionally(it) }
+    var started: StartedHost? = null
     var channel: HostChannel? = null
     try {
-      HostResultReceiver.register(id) { failure -> connected.completeExceptionally(failure) }
-      start(context, mode, server.port, token, resultIntent(context, id))
+      started = if (status.isPlay) {
+        HelperBridge.start(context, mode, arguments, stdin, onFailure)
+      } else {
+        runCommand(context, mode, arguments, stdin, onFailure)
+      }
       val result = withTimeoutOrNull(CONNECT_TIMEOUT_MILLIS) { connected.await() } ?: throw HostFailure.Timeout()
       channel = result
       result
     } finally {
       server.unregister(token)
       // Once connected, the channel reports the host's end; Termux's result only adds the host's diagnostics.
-      if (channel != null) HostResultReceiver.logExit(id, mode) else HostResultReceiver.unregister(id)
+      started?.settle(connected = channel != null)
       // If the host matched in the same instant, it gets no request and exits on its own after 10 s.
       if (channel == null) connected.cancel()
+    }
+  }
+
+  /** `bash` arguments for one host: [BOOTSTRAP], `<mode> <port>`, then the host script in pieces. */
+  private fun arguments(context: Context, mode: String, port: Int): List<String> =
+    listOf("--noprofile", "--norc", "-c", BOOTSTRAP, "pipkin-host", mode, port.toString()) + script(context)
+
+  /** Termux reports the command's exit to [HostResultReceiver] through a one-shot PendingIntent. */
+  private fun runCommand(
+    context: Context,
+    mode: String,
+    arguments: List<String>,
+    stdin: String,
+    onFailure: (HostFailure) -> Unit,
+  ): StartedHost {
+    val id = UUID.randomUUID().toString()
+    HostResultReceiver.register(id, onFailure)
+    var sent = false
+    try {
+      start(context, mode, arguments, stdin, resultIntent(context, id))
+      sent = true
+    } finally {
+      if (!sent) HostResultReceiver.unregister(id)
+    }
+    return StartedHost { connected ->
+      if (connected) HostResultReceiver.logExit(id, mode) else HostResultReceiver.unregister(id)
     }
   }
 
@@ -82,21 +121,17 @@ internal object HostLauncher {
     PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_MUTABLE,
   )
 
-  private fun start(context: Context, mode: String, port: Int, token: String, resultIntent: PendingIntent) {
-    // Checked on every launch, not only during onboarding: Termux can be swapped for another build after setup.
-    when (TermuxInstall.status(context)) {
-      TermuxInstall.Status.NotInstalled -> throw HostFailure.MissingTermux()
-      TermuxInstall.Status.PlayStore, TermuxInstall.Status.UnsupportedBuild -> throw HostFailure.UntrustedTermux()
-      TermuxInstall.Status.TooOld, TermuxInstall.Status.Supported -> Unit
-    }
-    val script = script(context)
+  private fun start(
+    context: Context,
+    mode: String,
+    arguments: List<String>,
+    stdin: String,
+    resultIntent: PendingIntent,
+  ) {
     val intent = Intent("com.termux.RUN_COMMAND").setComponent(SERVICE)
       .putExtra("com.termux.RUN_COMMAND_PATH", BASH)
-      .putExtra(
-        "com.termux.RUN_COMMAND_ARGUMENTS",
-        arrayOf("--noprofile", "--norc", "-c", BOOTSTRAP, "pipkin-host", mode, port.toString()) + script,
-      )
-      .putExtra("com.termux.RUN_COMMAND_STDIN", token + "\n")
+      .putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments.toTypedArray())
+      .putExtra("com.termux.RUN_COMMAND_STDIN", stdin)
       .putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
       .putExtra("com.termux.RUN_COMMAND_BACKGROUND_CUSTOM_LOG_LEVEL", "0")
       .putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "Pipkin: $mode")
@@ -160,4 +195,9 @@ internal object HostLauncher {
     fi
     exec node "$host" "$mode" "$port"
   """.trimIndent()
+}
+
+/** A host command on its way; [settle] tells the bridge whether the host connected, once the launch is decided. */
+internal fun interface StartedHost {
+  fun settle(connected: Boolean)
 }

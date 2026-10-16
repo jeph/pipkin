@@ -15,6 +15,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,13 +30,16 @@ import androidx.compose.ui.unit.TextUnit
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.TimelineItem
+import io.jeph.pipkin.host.TermuxWaker
 import io.jeph.pipkin.termux.TermuxSetup
 import io.jeph.pipkin.ui.components.CodeBox
 import io.jeph.pipkin.ui.components.CodeText
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.onboarding.SetupProgress
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.launch
 
 /** The process banner at the top of the stream: starting, installing Pi, or failed with Retry. */
 @Composable
@@ -111,24 +115,38 @@ private fun BannerLine(
   }
 }
 
-/** Pi could not start; a Termux setup failure also offers its fix command. */
+/**
+ * Pi could not start. A Termux setup failure also offers its fix command; an unreachable Play helper offers Open
+ * Termux, which starts the helper there and switches back to Pipkin before retrying.
+ */
 @Composable
 private fun FailedBanner(state: AgentProcessState.Failed, onRetry: () -> Unit, modifier: Modifier) {
   val context = LocalContext.current
-  val command = state.failure?.command
+  val scope = rememberCoroutineScope()
+  val failure = state.failure
   BannerCard(modifier) {
     AlertLine(state.message)
-    if (state.failure?.needsSetup == true) {
-      Text(
-        text = stringResource(R.string.chat_setup_hint),
-        color = pipkinColors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.meta,
-      )
+    val hint = when {
+      failure?.needsTermuxOpen == true -> R.string.chat_open_termux_hint
+      failure?.needsSetup == true -> R.string.chat_setup_hint
+      else -> null
+    }
+    if (hint != null) {
+      Text(text = stringResource(hint), color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
     }
     Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
+      if (failure?.needsTermuxOpen == true) {
+        TextButton(onClick = { scope.launch { if (TermuxWaker.wake(context)) onRetry() } }) {
+          Text(text = stringResource(R.string.chat_open_termux))
+        }
+      }
       TextButton(onClick = onRetry) { Text(text = stringResource(R.string.chat_retry)) }
-      if (command != null) {
-        TextButton(onClick = { TermuxSetup.copyAndOpen(context, command) }) {
+      if (failure != null && (failure.command != null || failure.needsSetupCommand)) {
+        TextButton(
+          onClick = {
+            scope.launch { TermuxSetup.copyAndOpen(context, SetupProgress.setupCommand(context, failure.command)) }
+          },
+        ) {
           Text(text = stringResource(R.string.chat_copy_command))
         }
       }

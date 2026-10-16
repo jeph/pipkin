@@ -3,6 +3,7 @@ package io.jeph.pipkin.host
 import android.content.Context
 import android.util.Log
 import io.jeph.pipkin.data.BundledExtension
+import io.jeph.pipkin.termux.TermuxIdentity
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.Base64
@@ -315,6 +316,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     }
     failureState.value = null
     helloState.value = HostHello.from(channel.hello)
+    TermuxIdentity.remember(context)
     return channel
   }
 

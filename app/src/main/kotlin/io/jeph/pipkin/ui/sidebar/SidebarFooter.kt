@@ -11,6 +11,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -20,11 +21,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.host.TermuxWaker
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.launch
 
-/** Termux/Pi health (tap opens onboarding when setup needs attention), Add workspace, Archive and Settings. */
+/** Termux/Pi health (tap fixes what needs attention), Add workspace, Archive and Settings. */
 @Composable
 internal fun SidebarFooter(
   onAddWorkspace: () -> Unit,
@@ -63,30 +66,41 @@ internal fun SidebarFooter(
   }
 }
 
-/** Termux/Pi health; tapping it opens onboarding when setup needs attention. */
+/**
+ * Termux/Pi health. Tapping it opens onboarding when setup needs attention, or opens Termux when the Play build's
+ * helper isn't running there.
+ */
 @Composable
 private fun HostStatus(onOpenOnboarding: () -> Unit, modifier: Modifier) {
   val colors = pipkinColors
-  val hostClient = LocalContext.current.appGraph.hostClient
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  val hostClient = context.appGraph.hostClient
   val hello by hostClient.lastHello.collectAsStateWithLifecycle()
   val failure by hostClient.lastFailure.collectAsStateWithLifecycle()
   val installing by hostClient.installing.collectAsStateWithLifecycle()
-  val needsSetup = failure?.needsSetup == true
+  val onClick: (() -> Unit)? = when {
+    installing -> null
+    failure?.needsSetup == true -> onOpenOnboarding
+    failure?.needsTermuxOpen == true -> { -> scope.launch { TermuxWaker.wake(context) } }
+    else -> null
+  }
   val dot = when {
     installing -> colors.dotWarning
     failure != null -> colors.dotDanger
     hello != null -> colors.dotSuccess
     else -> null
   }
-  val label = if (needsSetup && !installing) {
-    stringResource(R.string.shell_termux_attention)
-  } else {
-    hello?.piVersion?.let { stringResource(R.string.shell_termux_status, it) }
-      ?: stringResource(R.string.shell_termux_status_unknown)
-  }
+  val label = when {
+    installing -> null
+    failure?.needsSetup == true -> stringResource(R.string.shell_termux_attention)
+    failure?.needsTermuxOpen == true -> stringResource(R.string.shell_termux_open)
+    else -> null
+  } ?: hello?.piVersion?.let { stringResource(R.string.shell_termux_status, it) }
+    ?: stringResource(R.string.shell_termux_status_unknown)
   Row(
     modifier = modifier
-      .then(if (needsSetup) Modifier.clickable(onClick = onOpenOnboarding) else Modifier)
+      .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
       .padding(vertical = PipkinTokens.Spacing.s8),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
@@ -94,7 +108,7 @@ private fun HostStatus(onOpenOnboarding: () -> Unit, modifier: Modifier) {
     dot?.let { StatusDot(it) }
     Text(
       text = label,
-      color = if (needsSetup) colors.foreground else colors.foregroundMuted,
+      color = if (onClick != null) colors.foreground else colors.foregroundMuted,
       fontSize = PipkinTokens.FontSize.sm,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,

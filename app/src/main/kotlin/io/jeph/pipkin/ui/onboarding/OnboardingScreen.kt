@@ -112,6 +112,7 @@ internal fun rememberOnboardingState(graph: AppGraph, checks: DeviceChecks): Onb
   val setupComplete by graph.preferences.setupComplete.collectAsStateWithLifecycle()
   val authStatus by graph.accountRepository.status.collectAsStateWithLifecycle()
   val commandSent by SetupProgress.termuxCommandSent.collectAsStateWithLifecycle()
+  val playCommand by SetupProgress.playCommand.collectAsStateWithLifecycle()
   val blockedPermissions by SetupProgress.blockedPermissions.collectAsStateWithLifecycle()
   val installing by SetupProgress.installing.collectAsStateWithLifecycle()
   val progress by SetupProgress.progress.collectAsStateWithLifecycle()
@@ -122,6 +123,7 @@ internal fun rememberOnboardingState(graph: AppGraph, checks: DeviceChecks): Onb
     expectedPiVersion = graph.hostClient.expectedPiVersion,
     setupComplete = setupComplete,
     termuxCommandSent = commandSent,
+    playCommand = playCommand,
     blockedPermissions = blockedPermissions,
     installing = installing || hostInstalling,
     progress = progress,

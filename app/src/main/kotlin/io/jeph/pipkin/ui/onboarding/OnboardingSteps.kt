@@ -30,71 +30,6 @@ import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-@Composable
-internal fun TermuxStep(
-  number: Int,
-  status: StepStatus,
-  termux: TermuxInstall.Status,
-  version: String?,
-  onOpenFDroid: () -> Unit,
-  onUninstall: () -> Unit,
-) {
-  StepCard(number = number, title = stringResource(R.string.onboarding_termux_title), status = status) {
-    when (termux) {
-      TermuxInstall.Status.NotInstalled -> {
-        StepText(stringResource(R.string.onboarding_termux_missing))
-        TermuxSecurityNote()
-        PrimaryButton(stringResource(R.string.onboarding_termux_install), onOpenFDroid)
-      }
-
-      TermuxInstall.Status.PlayStore, TermuxInstall.Status.UnsupportedBuild -> {
-        val text = if (termux == TermuxInstall.Status.PlayStore) {
-          R.string.onboarding_termux_play
-        } else {
-          R.string.onboarding_termux_unsupported
-        }
-        StepText(stringResource(text))
-        TermuxSecurityNote()
-        Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
-          PrimaryButton(stringResource(R.string.onboarding_termux_uninstall), onUninstall)
-          SecondaryButton(stringResource(R.string.onboarding_termux_open_fdroid), onOpenFDroid)
-        }
-      }
-
-      TermuxInstall.Status.TooOld -> {
-        StepText(stringResource(R.string.onboarding_termux_too_old))
-        PrimaryButton(stringResource(R.string.onboarding_termux_update), onOpenFDroid)
-      }
-
-      TermuxInstall.Status.Supported -> StepText(stringResource(R.string.onboarding_termux_ready, version.orEmpty()))
-    }
-  }
-}
-
-/** Why Pipkin accepts only F-Droid's Termux, shown until an F-Droid build is installed. */
-@Composable
-private fun TermuxSecurityNote() {
-  val colors = pipkinColors
-  Row(
-    modifier = Modifier
-      .fillMaxWidth()
-      .background(colors.surface2, RoundedCornerShape(PipkinTokens.Radius.md))
-      .padding(PipkinTokens.Spacing.s12),
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
-  ) {
-    LucideIcon(icon = R.drawable.ic_lucide_shield_check, contentDescription = null, tint = colors.foreground)
-    Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4)) {
-      Text(
-        text = stringResource(R.string.onboarding_termux_security_title),
-        color = colors.foreground,
-        fontSize = PipkinTokens.FontSize.base,
-        fontWeight = FontWeight.Medium,
-      )
-      StepText(stringResource(R.string.onboarding_termux_security_body))
-    }
-  }
-}
-
 /** The Android settings Pipkin asks for itself, as opposed to Termux's. */
 @Composable
 internal fun AndroidSettingsSteps(
@@ -173,29 +108,6 @@ internal fun RunCommandStep(
     if (status != StepStatus.Done) {
       val action = if (blocked) R.string.onboarding_open_settings else R.string.onboarding_run_command_allow
       PrimaryButton(stringResource(action), onAllow, enabled = termuxInstalled)
-    }
-  }
-}
-
-@Composable
-internal fun TermuxSetupStep(
-  number: Int,
-  status: StepStatus,
-  command: String,
-  error: SetupError?,
-  enabled: Boolean,
-  onCopyAndOpen: () -> Unit,
-  onCopy: () -> Unit,
-) {
-  StepCard(number = number, title = stringResource(R.string.onboarding_setup_title), status = status) {
-    error?.message?.let { StepText(it, color = pipkinColors.destructive) }
-    if (status == StepStatus.Done) StepText(stringResource(R.string.onboarding_setup_done))
-    StepText(stringResource(R.string.onboarding_setup_body))
-    CommandBox(command = command, onCopy = onCopy)
-    if (status == StepStatus.Done) {
-      SecondaryButton(stringResource(R.string.onboarding_setup_action), onCopyAndOpen, enabled = enabled)
-    } else {
-      PrimaryButton(stringResource(R.string.onboarding_setup_action), onCopyAndOpen, enabled = enabled)
     }
   }
 }

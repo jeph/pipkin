@@ -3,8 +3,11 @@
  * `$OUT/pipkin-extensions/<name>.js`. Both ship as APK assets. The extensions stay out of the host, which Pipkin hands
  * to Termux inside an Intent with a size limit (`HostLauncher`); Pipkin sends their source over the host's socket to
  * `ensure` instead, which installs them, and each chat sends only their SHA-256 to check the installed copy.
+ *
+ * Also bundles the Termux helper daemon (Google Play Termux has no RUN_COMMAND) into `$OUT/pipkin-helper.mjs`, and
+ * copies its shell scripts into `$OUT/termux-helper/`.
  */
-import { readFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile } from "node:fs/promises";
 import { build } from "esbuild";
 
 const runtimeManifest: unknown = JSON.parse(await readFile("../app/src/main/assets/pi/package.json", "utf8"));
@@ -18,6 +21,7 @@ const out = process.env.OUT;
 if (!out) throw new Error("Set OUT to the directory the bundles go in");
 
 const common = { bundle: true, platform: "node", format: "esm", target: "node22", logLevel: "warning" } as const;
+const helperScripts = ["pipkin-setup.sh", "run.sh", "start.sh"];
 
 // The MIT License asks every copy to carry its notice, and esbuild drops the notices of the code it bundles.
 const [webAccessLicense, typeboxLicense] = await Promise.all([
@@ -26,6 +30,7 @@ const [webAccessLicense, typeboxLicense] = await Promise.all([
 ]);
 const webAccessNotices = `/*\nVendored from pi-web-access:\n\n${webAccessLicense}\nBundles typebox:\n\n${typeboxLicense}*/`;
 
+await mkdir(`${out}/termux-helper`, { recursive: true });
 await Promise.all([
   build({ ...common, entryPoints: ["src/main.ts"], outfile: `${out}/pipkin-host.mjs` }),
   build({
@@ -44,4 +49,6 @@ await Promise.all([
     // external loads its whole module graph, so typebox, which builds the tool schemas at startup, is bundled.
     external: [...runtimePackages, "@earendil-works/*"],
   }),
+  build({ ...common, entryPoints: ["src/helper/main.ts"], outfile: `${out}/pipkin-helper.mjs` }),
+  ...helperScripts.map((name) => copyFile(`src/helper/${name}`, `${out}/termux-helper/${name}`)),
 ]);

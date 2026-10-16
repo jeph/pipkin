@@ -8,18 +8,26 @@
     <string name="onboarding_retry">Retry</string>
     <string name="onboarding_no_activity">No app on this device can open that.</string>
 
-    <string name="onboarding_termux_title">Termux from F-Droid</string>
-    <string name="onboarding_termux_missing">Pipkin runs inside Termux.</string>
-    <string name="onboarding_termux_install">Install Termux from F-Droid</string>
-    <string name="onboarding_termux_play">This copy of Termux came from Google Play, so Pipkin won\'t use it. Uninstall it, then install Termux from F-Droid (uninstalling deletes Termux\'s files).</string>
-    <string name="onboarding_termux_unsupported">Pipkin can\'t confirm this copy of Termux is the official F-Droid build, so it won\'t use it. Uninstall it, then install Termux from F-Droid (uninstalling deletes Termux\'s files).</string>
-    <string name="onboarding_termux_security_title">Only Termux from F-Droid, for your security</string>
-    <string name="onboarding_termux_security_body">Your agent runs inside Termux, where it can reach your code, your files and the API keys you sign in with. A modified copy of Termux could read or change any of them, so before Pipkin runs anything, it checks that F-Droid signed your copy. Termux from Google Play, GitHub or anywhere else isn\'t accepted.</string>
+    <string name="onboarding_termux_title">Termux</string>
+    <string name="onboarding_termux_missing">Pipkin runs inside Termux. Install it from F-Droid or Google Play.</string>
+    <string name="onboarding_termux_missing_fdroid_only">Pipkin runs inside Termux. Install it from F-Droid; the Google Play build needs Android 11 or newer.</string>
+    <string name="onboarding_termux_get_fdroid">Get it on F-Droid</string>
+    <string name="onboarding_termux_get_play">Get it on Google Play</string>
+    <string name="onboarding_termux_unsupported">Pipkin can\'t confirm this copy of Termux is the official F-Droid or Google Play build, so it won\'t use it. Uninstall it, then install Termux from F-Droid or Google Play (uninstalling deletes Termux\'s files).</string>
+    <string name="onboarding_termux_security_title">Only official Termux, for your security</string>
+    <string name="onboarding_termux_security_body">Your agent runs inside Termux, where it can reach your code, your files and the API keys you sign in with. A modified copy of Termux could read or change any of them, so before Pipkin runs anything, it checks that F-Droid or Google Play signed your copy. Termux from GitHub or anywhere else isn\'t accepted.</string>
     <string name="onboarding_termux_uninstall">Uninstall</string>
-    <string name="onboarding_termux_open_fdroid">Open F-Droid</string>
-    <string name="onboarding_termux_too_old">Pipkin needs Termux 0.118 or newer.</string>
-    <string name="onboarding_termux_update">Update Termux from F-Droid</string>
-    <string name="onboarding_termux_ready">Termux %1$s is installed and verified as the official F-Droid build.</string>
+    <string name="onboarding_termux_too_old_fdroid">Pipkin needs Termux 0.118 or newer.</string>
+    <string name="onboarding_termux_update_fdroid">Update Termux from F-Droid</string>
+    <string name="onboarding_termux_too_old_play">This Termux from Google Play is older than Pipkin supports.</string>
+    <string name="onboarding_termux_update_play">Update in Google Play</string>
+    <string name="onboarding_termux_ready_fdroid">Termux %1$s is installed and verified as the official F-Droid build.</string>
+    <string name="onboarding_termux_ready_play">Termux %1$s is installed and verified as the official Google Play build.</string>
+
+    <string name="onboarding_termux_background_title">Let Termux run in the background</string>
+    <string name="onboarding_termux_background_body">Keeps Pipkin\'s helper in Termux running, so Pipkin starts without opening Termux. In Termux\'s app info, open App battery usage and choose Unrestricted.</string>
+    <string name="onboarding_termux_background_allow">Open Termux\'s app info</string>
+    <string name="onboarding_termux_background_done">Termux can run in the background.</string>
 
     <string name="onboarding_notifications_title">Notifications</string>
     <string name="onboarding_notifications_body">Shows when Pipkin is working in the background and lets you stop it.</string>
@@ -39,7 +47,10 @@
     <string name="onboarding_run_command_done">Pipkin can run commands in Termux.</string>
 
     <string name="onboarding_setup_title">Set up Termux</string>
-    <string name="onboarding_setup_body">In Termux, long-press, tap Paste, then press Enter. Allow storage access when Android asks. Termux brings you back here when it\'s done.</string>
+    <string name="onboarding_setup_body">In Termux, long-press, tap Paste, then press Enter. Allow storage access when Android asks. Termux brings you back here when it\'s done. If anything fails, paste the same command again.</string>
+    <string name="onboarding_setup_body_play">In Termux, long-press, tap Paste, then press Enter. Allow storage access when Android asks. Termux brings you back here when it\'s done. If anything fails, paste the same command again; it works for 30 minutes.</string>
+    <string name="onboarding_setup_play_pending">Your setup command appears here when you copy it. Each one pairs this Pipkin with Termux.</string>
+    <string name="onboarding_setup_changed">Termux was reinstalled, which removed Pi, its sign-in and Pipkin\'s setup in Termux. Run the setup command again, then reinstall the agent and sign in.</string>
     <string name="onboarding_setup_action">Copy command &amp; open Termux</string>
     <string name="onboarding_setup_done">Termux is ready for Pipkin.</string>
     <string name="onboarding_copy_command">Copy command</string>

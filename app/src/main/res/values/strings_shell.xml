@@ -18,6 +18,7 @@
     <string name="shell_termux_status">Termux · Agent %1$s</string>
     <string name="shell_termux_status_unknown">Termux</string>
     <string name="shell_termux_attention">Termux needs attention</string>
+    <string name="shell_termux_open">Termux isn\'t running · Open</string>
     <string name="shell_time_now">now</string>
     <string name="shell_time_minutes">%1$dm</string>
     <string name="shell_time_hours">%1$dh</string>

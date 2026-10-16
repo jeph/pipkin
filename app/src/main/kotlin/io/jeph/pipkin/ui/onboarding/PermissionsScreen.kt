@@ -6,8 +6,6 @@ package io.jeph.pipkin.ui.onboarding
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -19,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +31,7 @@ import io.jeph.pipkin.termux.TermuxInstall
 import io.jeph.pipkin.termux.TermuxSetup
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.IconButton28
+import kotlinx.coroutines.launch
 
 /**
  * The onboarding steps that set up Termux and grant Pipkin access, without the Pi install and sign-in.
@@ -64,7 +64,10 @@ internal fun PermissionsScreen(onBack: () -> Unit) {
   }
 }
 
-/** Termux, Pipkin's Android permissions, RUN_COMMAND and the Termux setup command, in setup order. */
+/**
+ * Termux, Pipkin's Android permissions, then the build's own steps (RUN_COMMAND for F-Droid, background running for
+ * Play) and the Termux setup command, in setup order.
+ */
 @Composable
 internal fun PermissionSteps(state: OnboardingState, onAction: (PermissionAction) -> Unit) {
   TermuxStep(
@@ -72,8 +75,7 @@ internal fun PermissionSteps(state: OnboardingState, onAction: (PermissionAction
     status = state.status(SetupStep.Termux),
     termux = state.checks.termux,
     version = state.checks.termuxVersion,
-    onOpenFDroid = { onAction(PermissionAction.OpenFDroid) },
-    onUninstall = { onAction(PermissionAction.UninstallTermux) },
+    onAction = onAction,
   )
   AndroidSettingsSteps(
     state = state,
@@ -81,20 +83,30 @@ internal fun PermissionSteps(state: OnboardingState, onAction: (PermissionAction
     onAllowNotifications = { onAction(PermissionAction.AllowNotifications) },
     onAllowBackground = { onAction(PermissionAction.AllowBackground) },
   )
-  RunCommandStep(
-    number = state.stepNumber(SetupStep.RunCommand),
-    status = state.status(SetupStep.RunCommand),
-    termuxInstalled = state.checks.termux != TermuxInstall.Status.NotInstalled,
-    blocked = TermuxInstall.RUN_COMMAND_PERMISSION in state.blockedPermissions,
-    error = state.errorFor(SetupStep.RunCommand),
-    onAllow = { onAction(PermissionAction.AllowRunCommand) },
-  )
+  if (SetupStep.TermuxBackground in state.visibleSteps) {
+    TermuxBackgroundStep(
+      number = state.stepNumber(SetupStep.TermuxBackground),
+      status = state.status(SetupStep.TermuxBackground),
+      onAllow = { onAction(PermissionAction.AllowTermuxBackground) },
+    )
+  }
+  if (SetupStep.RunCommand in state.visibleSteps) {
+    RunCommandStep(
+      number = state.stepNumber(SetupStep.RunCommand),
+      status = state.status(SetupStep.RunCommand),
+      termuxInstalled = state.checks.termux != TermuxInstall.Status.NotInstalled,
+      blocked = TermuxInstall.RUN_COMMAND_PERMISSION in state.blockedPermissions,
+      error = state.errorFor(SetupStep.RunCommand),
+      onAllow = { onAction(PermissionAction.AllowRunCommand) },
+    )
+  }
   TermuxSetupStep(
     number = state.stepNumber(SetupStep.TermuxSetup),
     status = state.status(SetupStep.TermuxSetup),
     command = state.termuxCommand,
+    termux = state.checks.termux,
+    termuxChanged = state.checks.termuxChanged,
     error = state.errorFor(SetupStep.TermuxSetup),
-    enabled = state.checks.termux == TermuxInstall.Status.Supported,
     onCopyAndOpen = { onAction(PermissionAction.CopyAndOpenTermux) },
     onCopy = { onAction(PermissionAction.CopyCommand) },
   )
@@ -107,10 +119,13 @@ internal fun rememberPermissionActions(
   onPermissionResult: () -> Unit,
 ): (PermissionAction) -> Unit {
   val context = LocalContext.current
+  val scope = rememberCoroutineScope()
   val requestPermission = rememberPermissionRequest(state.blockedPermissions, onPermissionResult)
   return { action ->
     when (action) {
       PermissionAction.OpenFDroid -> context.startSafely { TermuxInstall.openFDroidPage(context) }
+
+      PermissionAction.OpenPlay -> context.startSafely { TermuxInstall.openPlayPage(context) }
 
       PermissionAction.UninstallTermux -> context.startSafely { TermuxInstall.requestUninstall(context) }
 
@@ -118,14 +133,18 @@ internal fun rememberPermissionActions(
 
       PermissionAction.AllowBackground -> context.startSafely { requestBackgroundExemption(context) }
 
+      PermissionAction.AllowTermuxBackground -> context.startSafely { TermuxInstall.openTermuxAppSettings(context) }
+
       PermissionAction.AllowRunCommand -> requestPermission(TermuxInstall.RUN_COMMAND_PERMISSION)
 
-      PermissionAction.CopyAndOpenTermux -> {
-        SetupProgress.markTermuxCommandSent()
-        context.startSafely { TermuxSetup.copyAndOpen(context, state.termuxCommand) }
+      PermissionAction.CopyAndOpenTermux -> scope.launch {
+        val command = SetupProgress.setupCommand(context, state.errorFor(SetupStep.TermuxSetup)?.command)
+        context.startSafely { TermuxSetup.copyAndOpen(context, command) }
       }
 
-      PermissionAction.CopyCommand -> copyCommand(context, state.termuxCommand)
+      PermissionAction.CopyCommand -> scope.launch {
+        TermuxSetup.copy(context, SetupProgress.setupCommand(context, state.errorFor(SetupStep.TermuxSetup)?.command))
+      }
     }
   }
 }
@@ -160,11 +179,6 @@ private fun rememberPermissionRequest(blocked: Set<String>, onResult: () -> Unit
       else -> context.startSafely { openNotificationSettings(context) }
     }
   }
-}
-
-private fun copyCommand(context: Context, command: String) {
-  context.getSystemService(ClipboardManager::class.java)
-    .setPrimaryClip(ClipData.newPlainText("Termux command", command))
 }
 
 private fun openNotificationSettings(context: Context) {

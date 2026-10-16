@@ -80,5 +80,8 @@ class HostResultReceiver : BroadcastReceiver() {
       exitCode == 80 -> HostFailure.Internal()
       else -> HostFailure.Crashed(exitCode)
     }
+
+    /** A host that exited before connecting with no Termux-side error, as Pipkin's helper reports it. */
+    fun exitFailure(exitCode: Int): HostFailure = failureFor(exitCode, ERRNO_SUCCESS, "")
   }
 }
