@@ -15,4 +15,7 @@
     <string name="turn_notification_exited">Pi exited</string>
     <!-- The outcome above, then the chat's title. -->
     <string name="turn_notification_title">%1$s: %2$s</string>
+
+    <!-- Shown over every screen while Pipkin waits for its helper in Termux's Google Play build. -->
+    <string name="termux_waking">Starting Pipkin\'s helper in Termux…</string>
 </resources>

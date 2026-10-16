@@ -183,7 +183,7 @@ describe("helper daemon", () => {
     connection.send({ type: "return", package: "io.jeph.pipkin.debug" });
     expect(await connection.next()).toEqual({ type: "returned", ok: true });
     expect(await readFile(env.amLog, "utf8")).toBe(
-      "start --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n io.jeph.pipkin.debug/io.jeph.pipkin.MainActivity\n",
+      "start --user 0 --activity-reorder-to-front -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n io.jeph.pipkin.debug/io.jeph.pipkin.MainActivity\n",
     );
     connection.send({ type: "return", package: "io.jeph.pipkin; rm -rf /" });
     expect(await connection.next()).toEqual({ type: "returned", ok: false });

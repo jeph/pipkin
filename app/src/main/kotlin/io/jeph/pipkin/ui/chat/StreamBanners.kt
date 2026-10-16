@@ -74,29 +74,6 @@ internal fun StatusBanner(state: AgentProcessState, onRetry: () -> Unit, modifie
   }
 }
 
-/**
- * Pi starting or installing under a chat that already shows its history: a pill pinned over the top of the stream,
- * so it shows wherever the history is scrolled, unlike the banner at the top of the list.
- */
-@Composable
-internal fun LoadingPill(installing: Boolean, modifier: Modifier = Modifier) {
-  Row(
-    modifier = modifier
-      .clip(RoundedCornerShape(PipkinTokens.Radius.xxl))
-      .background(pipkinColors.surface2)
-      .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
-  ) {
-    SimmeringPot(size = PipkinTokens.IconSize.sm)
-    Text(
-      text = stringResource(if (installing) R.string.chat_installing else R.string.chat_loading),
-      color = pipkinColors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.meta,
-    )
-  }
-}
-
 /** A pot beside [text]; Starting is the chat's only content while a session opens, so it uses larger sizes. */
 @Composable
 private fun BannerLine(

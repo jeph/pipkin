@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -15,7 +16,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -24,17 +30,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.agent.ChatLocation
 import io.jeph.pipkin.agent.TurnNotifications
+import io.jeph.pipkin.host.TermuxWaker
 import io.jeph.pipkin.ui.AppNavigator
 import io.jeph.pipkin.ui.Destination
 import io.jeph.pipkin.ui.MainScreen
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.archive.ArchiveScreen
 import io.jeph.pipkin.ui.archive.ArchivedChatScreen
+import io.jeph.pipkin.ui.components.LoadingPill
 import io.jeph.pipkin.ui.onboarding.OnboardingScreen
 import io.jeph.pipkin.ui.onboarding.PermissionsScreen
 import io.jeph.pipkin.ui.settings.AddModelsScreen
@@ -49,6 +59,7 @@ import io.jeph.pipkin.ui.settings.SettingsScreen
 import io.jeph.pipkin.ui.settings.SubscriptionScreen
 import io.jeph.pipkin.ui.settings.ownsDraft
 import io.jeph.pipkin.ui.theme.PipkinTheme
+import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -76,6 +87,11 @@ class MainActivity : ComponentActivity() {
     super.onNewIntent(intent)
     requestedChat.value = TurnNotifications.chatLocation(intent)
   }
+
+  override fun onStop() {
+    super.onStop()
+    TermuxWaker.pipkinCovered(this)
+  }
 }
 
 /**
@@ -99,16 +115,33 @@ private fun PipkinApp(graph: AppGraph, requestedChat: MutableStateFlow<ChatLocat
     if (chat != null && Destination.Main in navigator.stack.value) navigator.popTo(Destination.Main)
   }
   BackHandler(enabled = stack.size > 1) { navigator.pop() }
-  AnimatedContent(
-    targetState = stack,
-    transitionSpec = { stackTransition(from = initialState.size, to = targetState.size) },
-    contentKey = { AppNavigator.key(it.last()) },
-    label = "navigation",
-  ) { shown ->
-    val top = shown.last()
-    holder.SaveableStateProvider(AppNavigator.key(top)) {
-      Screen(shown, navigator, actions, drafts, requestedChat)
+  Box(modifier = Modifier.fillMaxSize()) {
+    AnimatedContent(
+      targetState = stack,
+      transitionSpec = { stackTransition(from = initialState.size, to = targetState.size) },
+      contentKey = { AppNavigator.key(it.last()) },
+      label = "navigation",
+    ) { shown ->
+      val top = shown.last()
+      holder.SaveableStateProvider(AppNavigator.key(top)) {
+        Screen(shown, navigator, actions, drafts, requestedChat)
+      }
     }
+    WakingPill(Modifier.align(Alignment.TopCenter))
+  }
+}
+
+/** Pipkin opened Termux to start its helper and is waiting for it, on whichever screen asked. */
+@Composable
+private fun WakingPill(modifier: Modifier) {
+  val waking by TermuxWaker.waking.collectAsStateWithLifecycle()
+  AnimatedVisibility(
+    visible = waking,
+    modifier = modifier.windowInsetsPadding(WindowInsets.safeDrawing).padding(top = PipkinTokens.Spacing.s8),
+    enter = fadeIn(),
+    exit = fadeOut(),
+  ) {
+    LoadingPill(stringResource(R.string.termux_waking))
   }
 }
 

@@ -333,9 +333,11 @@ class Daemon {
       return;
     }
     const component = `${pkg}/io.jeph.pipkin.MainActivity`;
+    // Reordering brings Pipkin's existing screen forward instead of stacking a new one on it.
+    const intent = ["-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER", "-n", component];
     execFile(
       "am",
-      ["start", "--user", "0", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER", "-n", component],
+      ["start", "--user", "0", "--activity-reorder-to-front", ...intent],
       { timeout: 10_000 },
       (error) => channel.send({ type: "returned", ok: error === null }),
     );

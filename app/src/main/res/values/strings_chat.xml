@@ -24,7 +24,7 @@
     <string name="chat_copy_command">Copy command &amp; open Termux</string>
     <string name="chat_setup_hint">Tap “Termux needs attention” in the Agents list to finish setup.</string>
     <string name="chat_open_termux">Open Termux</string>
-    <string name="chat_open_termux_hint">Pipkin opens Termux to start its helper, then switches back on its own. If it stays in Termux, switch back to Pipkin. Still stuck? Type pipkin-start in Termux and press Enter.</string>
+    <string name="chat_open_termux_hint">Termux shows why Pipkin\'s helper didn\'t start. Once it\'s running, Pipkin switches back on its own. Still stuck? Type pipkin-start in Termux and press Enter.</string>
     <string name="chat_exit_code">Agent stopped (exit %1$d)</string>
     <string name="chat_agent_stopped">Agent stopped</string>
     <string name="chat_show_details">Show details</string>

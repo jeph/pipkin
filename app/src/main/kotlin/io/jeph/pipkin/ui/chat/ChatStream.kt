@@ -55,6 +55,7 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.TimelineState
+import io.jeph.pipkin.ui.components.LoadingPill
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.MarkdownCache
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -128,7 +129,8 @@ internal fun ChatStream(
       enter = fadeIn(),
       exit = fadeOut(),
     ) {
-      LoadingPill(installing = processState is AgentProcessState.Installing)
+      val installing = processState is AgentProcessState.Installing
+      LoadingPill(stringResource(if (installing) R.string.chat_installing else R.string.chat_loading))
     }
     ScrollToBottomButton(
       visible = showScrollButton,
