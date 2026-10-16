@@ -94,6 +94,7 @@ internal fun ChatStream(
   view: ChatView,
   onOpenTool: (key: String) -> Unit,
   onOpenProviders: () -> Unit,
+  onOpenOnboarding: () -> Unit,
   onRestart: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -119,7 +120,7 @@ internal fun ChatStream(
     derivedStateOf { listState.distanceFromBottom() > threshold }
   }
   Box(modifier = modifier.fillMaxSize()) {
-    StreamList(listState, timeline.items, banner, follow, view.markdown, onRestart, onOpenTool)
+    StreamList(listState, timeline.items, banner, follow, view.markdown, onRestart, onOpenOnboarding, onOpenTool)
     if (timeline.items.isEmpty() && processState == AgentProcessState.Ready) {
       EmptyState(noModel = timeline.model == null, onOpenProviders, Modifier.align(Alignment.Center))
     }
@@ -188,6 +189,7 @@ private fun StreamList(
   follow: State<Boolean>,
   markdownCache: MarkdownCache,
   onRestart: () -> Unit,
+  onOpenOnboarding: () -> Unit,
   onOpenTool: (key: String) -> Unit,
 ) {
   val recomposer = LocalView.current.findViewTreeCompositionContext() as Recomposer
@@ -219,7 +221,12 @@ private fun StreamList(
   ) {
     if (banner != null) {
       item(key = BANNER_KEY, contentType = BANNER_KEY) {
-        StatusBanner(banner, onRetry = onRestart, Modifier.contentWidth().padding(top = PipkinTokens.Spacing.s8))
+        StatusBanner(
+          state = banner,
+          onRetry = onRestart,
+          onOpenOnboarding = onOpenOnboarding,
+          modifier = Modifier.contentWidth().padding(top = PipkinTokens.Spacing.s8),
+        )
       }
     }
     itemsIndexed(items, key = { _, item -> item.key }, contentType = { _, item -> item::class }) { index, item ->

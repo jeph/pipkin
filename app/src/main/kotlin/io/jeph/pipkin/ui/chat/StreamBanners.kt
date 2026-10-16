@@ -31,19 +31,25 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.host.TermuxWaker
-import io.jeph.pipkin.termux.TermuxSetup
 import io.jeph.pipkin.ui.components.CodeBox
 import io.jeph.pipkin.ui.components.CodeText
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
-import io.jeph.pipkin.ui.onboarding.SetupProgress
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
-/** The process banner at the top of the stream: starting, installing Pi, or failed with Retry. */
+/**
+ * The process banner at the top of the stream: starting, installing Pi, or failed with Retry. [onOpenOnboarding] opens
+ * setup at the step a failure needs.
+ */
 @Composable
-internal fun StatusBanner(state: AgentProcessState, onRetry: () -> Unit, modifier: Modifier = Modifier) {
+internal fun StatusBanner(
+  state: AgentProcessState,
+  onRetry: () -> Unit,
+  onOpenOnboarding: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
   when (state) {
     AgentProcessState.Starting -> BannerLine(
       text = stringResource(R.string.chat_starting),
@@ -68,7 +74,7 @@ internal fun StatusBanner(state: AgentProcessState, onRetry: () -> Unit, modifie
       }
     }
 
-    is AgentProcessState.Failed -> FailedBanner(state, onRetry, modifier)
+    is AgentProcessState.Failed -> FailedBanner(state, onRetry, onOpenOnboarding, modifier)
 
     AgentProcessState.Ready, is AgentProcessState.Exited -> Unit
   }
@@ -93,23 +99,27 @@ private fun BannerLine(
 }
 
 /**
- * Pi could not start. A Termux setup failure also offers its fix command; an unreachable Play helper offers Open
- * Termux, which starts the helper there and switches back to Pipkin before retrying.
+ * Pi could not start. A Termux setup failure offers setup, which opens at the step that fixes it; an unreachable Play
+ * helper offers Open Termux, which starts the helper there and switches back to Pipkin before retrying.
  */
 @Composable
-private fun FailedBanner(state: AgentProcessState.Failed, onRetry: () -> Unit, modifier: Modifier) {
+private fun FailedBanner(
+  state: AgentProcessState.Failed,
+  onRetry: () -> Unit,
+  onOpenOnboarding: () -> Unit,
+  modifier: Modifier,
+) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val failure = state.failure
   BannerCard(modifier) {
     AlertLine(state.message)
-    val hint = when {
-      failure?.needsTermuxOpen == true -> R.string.chat_open_termux_hint
-      failure?.needsSetup == true -> R.string.chat_setup_hint
-      else -> null
-    }
-    if (hint != null) {
-      Text(text = stringResource(hint), color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
+    if (failure?.needsTermuxOpen == true) {
+      Text(
+        text = stringResource(R.string.chat_open_termux_hint),
+        color = pipkinColors.foregroundMuted,
+        fontSize = PipkinTokens.FontSize.meta,
+      )
     }
     Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
       if (failure?.needsTermuxOpen == true) {
@@ -117,16 +127,10 @@ private fun FailedBanner(state: AgentProcessState.Failed, onRetry: () -> Unit, m
           Text(text = stringResource(R.string.chat_open_termux))
         }
       }
-      TextButton(onClick = onRetry) { Text(text = stringResource(R.string.chat_retry)) }
-      if (failure != null && (failure.command != null || failure.needsSetupCommand)) {
-        TextButton(
-          onClick = {
-            scope.launch { TermuxSetup.copyAndOpen(context, SetupProgress.setupCommand(context, failure.command)) }
-          },
-        ) {
-          Text(text = stringResource(R.string.chat_copy_command))
-        }
+      if (failure?.needsSetup == true) {
+        TextButton(onClick = onOpenOnboarding) { Text(text = stringResource(R.string.chat_set_up_termux)) }
       }
+      TextButton(onClick = onRetry) { Text(text = stringResource(R.string.chat_retry)) }
     }
   }
 }

@@ -62,6 +62,7 @@ internal fun ChatScreen(
   controls: PaneControls,
   onOpenSettings: () -> Unit,
   onOpenProviders: () -> Unit,
+  onOpenOnboarding: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   // Outlive a process swap, so a message about the closed chat (delete failed) still shows.
@@ -92,6 +93,7 @@ internal fun ChatScreen(
       snackbar,
       controls,
       onOpenProviders,
+      onOpenOnboarding,
       onSheet = { sheet = it },
       modifier,
     )
@@ -139,6 +141,7 @@ private fun ChatContent(
   snackbar: SnackbarStackState,
   controls: PaneControls,
   onOpenProviders: () -> Unit,
+  onOpenOnboarding: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
   modifier: Modifier,
 ) {
@@ -167,7 +170,9 @@ private fun ChatContent(
     val tight = WindowInsets.isImeVisible || timeline.pendingUi != null
     ChatStack(
       modifier = Modifier.weight(1f),
-      stream = { StreamArea(controller, timeline, snackbar, onOpenProviders, onSheet, dismissKeyboard) },
+      stream = {
+        StreamArea(controller, timeline, snackbar, onOpenProviders, onOpenOnboarding, onSheet, dismissKeyboard)
+      },
       dialog = { PendingDialogCard(controller, timeline) },
       steering = { PendingSteeringBox(controller, timeline, compact = tight) },
       composer = {
@@ -191,6 +196,7 @@ private fun StreamArea(
   timeline: TimelineState,
   snackbar: SnackbarStackState,
   onOpenProviders: () -> Unit,
+  onOpenOnboarding: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
   dismissKeyboard: () -> Unit,
 ) {
@@ -203,6 +209,7 @@ private fun StreamArea(
       view = controller.view,
       onOpenTool = { onSheet(ChatSheet.Tool(it)) },
       onOpenProviders = onOpenProviders,
+      onOpenOnboarding = onOpenOnboarding,
       onRestart = process::restart,
     )
     SnackbarStack(snackbar, Modifier.align(Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16))
@@ -302,7 +309,7 @@ private fun PlaceholderChat(controls: PaneControls, modifier: Modifier) {
       trailing = { CloseSplitButton(controls) },
     )
     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-      StatusBanner(AgentProcessState.Starting, onRetry = {})
+      StatusBanner(AgentProcessState.Starting, onRetry = {}, onOpenOnboarding = {})
     }
   }
 }

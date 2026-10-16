@@ -1,19 +1,16 @@
 package io.jeph.pipkin.host
 
-import io.jeph.pipkin.termux.TermuxSetup
 import java.io.IOException
 import org.json.JSONObject
 
 /**
  * Why a Termux-side operation could not run. [message] is user-presentable. [command], when set, is a literal Termux
- * command the UI offers to copy before opening Termux; [needsSetupCommand] asks for the installed build's setup
- * command instead ([TermuxSetup.command]), which for the Play build is made fresh each time it's copied.
+ * command that fixes it, which setup shows in place of the installed build's setup command.
  */
 internal sealed class HostFailure(
   val kind: Kind,
   message: String,
   val command: String? = null,
-  val needsSetupCommand: Boolean = false,
   cause: Throwable? = null,
 ) : IOException(message, cause) {
   enum class Kind {
@@ -52,13 +49,13 @@ internal sealed class HostFailure(
 
   class Permission : HostFailure(Kind.Permission, PERMISSION)
 
-  class ExternalApps : HostFailure(Kind.ExternalApps, EXTERNAL_APPS, command = TermuxSetup.FDROID_COMMAND)
+  class ExternalApps : HostFailure(Kind.ExternalApps, EXTERNAL_APPS)
 
   class Background : HostFailure(Kind.Background, BACKGROUND)
 
   class TermuxNotInitialized : HostFailure(Kind.TermuxNotInitialized, TERMUX_NOT_INITIALIZED)
 
-  class NodeMissing : HostFailure(Kind.NodeMissing, NODE_MISSING, needsSetupCommand = true)
+  class NodeMissing : HostFailure(Kind.NodeMissing, NODE_MISSING)
 
   class NodeTooOld : HostFailure(Kind.NodeTooOld, NODE_TOO_OLD, "yes | pkg upgrade -y")
 
@@ -82,13 +79,13 @@ internal sealed class HostFailure(
    * Termux was reinstalled, or swapped between its F-Droid and Play builds, after Pipkin set it up. Either wipes
    * Termux's home folder, so Pi, its sign-in and Pipkin's setup there are gone.
    */
-  class TermuxChanged : HostFailure(Kind.TermuxChanged, TERMUX_CHANGED, needsSetupCommand = true)
+  class TermuxChanged : HostFailure(Kind.TermuxChanged, TERMUX_CHANGED)
 
   /** Play build: Pipkin holds no pairing with a helper in Termux yet. */
-  class HelperNotPaired : HostFailure(Kind.HelperNotPaired, HELPER_NOT_PAIRED, needsSetupCommand = true)
+  class HelperNotPaired : HostFailure(Kind.HelperNotPaired, HELPER_NOT_PAIRED)
 
   /** Play build: the helper answered but holds another pairing key, e.g. after Pipkin's data was cleared. */
-  class HelperRejected : HostFailure(Kind.HelperRejected, HELPER_REJECTED, needsSetupCommand = true)
+  class HelperRejected : HostFailure(Kind.HelperRejected, HELPER_REJECTED)
 
   /** Play build: nothing listens on the helper's ports, so Termux or the helper isn't running. */
   class HelperUnreachable : HostFailure(Kind.HelperUnreachable, HELPER_UNREACHABLE)
@@ -124,6 +121,7 @@ internal sealed class HostFailure(
       "Restart your phone, then retry."
 
     val SETUP_KINDS = setOf(
+      Kind.MissingTermux,
       Kind.UntrustedTermux,
       Kind.ExternalApps,
       Kind.Permission,

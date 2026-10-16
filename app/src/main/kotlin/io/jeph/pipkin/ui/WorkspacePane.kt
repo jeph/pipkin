@@ -23,10 +23,13 @@ internal fun WorkspacePane(
   controls: PaneControls,
   onOpenSettings: () -> Unit,
   onOpenProviders: () -> Unit,
+  onOpenOnboarding: () -> Unit,
 ) {
   when (item) {
     is PaneItem.Tab -> WorkspaceTabScreen(item.tab, controls)
-    is PaneItem.Chat, null -> ChatScreen(item?.process, actions, views, controls, onOpenSettings, onOpenProviders)
+
+    is PaneItem.Chat, null ->
+      ChatScreen(item?.process, actions, views, controls, onOpenSettings, onOpenProviders, onOpenOnboarding)
   }
 }
 

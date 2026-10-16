@@ -21,8 +21,7 @@
     <string name="chat_loading">Loading…</string>
     <string name="chat_installing">Installing the Pipkin agent…</string>
     <string name="chat_retry">Retry</string>
-    <string name="chat_copy_command">Copy command &amp; open Termux</string>
-    <string name="chat_setup_hint">Tap “Termux needs attention” in the Agents list to finish setup.</string>
+    <string name="chat_set_up_termux">Set up Termux</string>
     <string name="chat_open_termux">Open Termux</string>
     <string name="chat_open_termux_hint">Termux shows why Pipkin\'s helper didn\'t start. Once it\'s running, Pipkin switches back on its own. Still stuck? Type pipkin-start in Termux and press Enter.</string>
     <string name="chat_exit_code">Agent stopped (exit %1$d)</string>

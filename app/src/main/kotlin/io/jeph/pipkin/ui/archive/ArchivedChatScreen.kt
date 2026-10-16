@@ -217,6 +217,7 @@ private fun TranscriptBody(transcript: Transcript, onRetry: () -> Unit, onOpenTo
         view = remember { ChatView() },
         onOpenTool = onOpenTool,
         onOpenProviders = {},
+        onOpenOnboarding = {},
         onRestart = {},
       )
     }

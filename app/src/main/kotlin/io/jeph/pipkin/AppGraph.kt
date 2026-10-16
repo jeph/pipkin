@@ -7,6 +7,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import io.jeph.pipkin.agent.AgentProcess
+import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.AgentService
 import io.jeph.pipkin.agent.KeepAlive
@@ -71,6 +72,7 @@ internal class AppGraph(private val application: Application) {
 
   init {
     holdWhileWorking()
+    restartChatsOnceSetupWorks()
     ProcessLifecycleOwner.get().lifecycle.addObserver(
       object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
@@ -81,6 +83,28 @@ internal class AppGraph(private val application: Application) {
         }
       },
     )
+  }
+
+  /**
+   * A host that connects after a setup failure proves the setup was fixed, in setup or in Termux, so chats that failed
+   * on it start again instead of waiting on Retry.
+   */
+  private fun restartChatsOnceSetupWorks() {
+    scope.launch {
+      var setupBroken = false
+      hostClient.lastFailure.collect { failure ->
+        if (failure != null) {
+          setupBroken = setupBroken || failure.needsSetup
+          return@collect
+        }
+        if (!setupBroken) return@collect
+        setupBroken = false
+        for (process in registry.processes.value.values) {
+          val state = process.state.value
+          if (state is AgentProcessState.Failed && state.failure?.needsSetup == true) process.restart()
+        }
+      }
+    }
   }
 
   /**

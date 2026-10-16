@@ -180,6 +180,7 @@ internal fun MainScreen(
       snackbar = snackbar,
       onOpenSettings = onOpenSettings,
       onOpenProviders = onOpenProviders,
+      onOpenOnboarding = onOpenOnboarding,
       sidebar = { pane, onShownInSplit ->
         Sidebar(
           pane = pane,
@@ -335,6 +336,7 @@ private fun WorkspacePanes(
   snackbar: SnackbarStackState,
   onOpenSettings: () -> Unit,
   onOpenProviders: () -> Unit,
+  onOpenOnboarding: () -> Unit,
   sidebar: @Composable (pane: Pane, onShownInSplit: (() -> Unit)?) -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
@@ -384,7 +386,9 @@ private fun WorkspacePanes(
               sidebar(pane, onShownInSplit)
             }
           },
-          workspace = { WorkspacePane(item, actions, views, controls, onOpenSettings, onOpenProviders) },
+          workspace = {
+            WorkspacePane(item, actions, views, controls, onOpenSettings, onOpenProviders, onOpenOnboarding)
+          },
           explorer = {
             PaneExplorer(pane, item, panel == Panel.Explorer, snackbar, swapPanes) { panels.show(pane, Panel.Chat) }
           },
