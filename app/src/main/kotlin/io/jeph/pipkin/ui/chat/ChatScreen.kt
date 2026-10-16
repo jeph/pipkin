@@ -3,8 +3,11 @@ package io.jeph.pipkin.ui.chat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
@@ -129,6 +132,7 @@ private fun rememberNavigator(
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChatContent(
   controller: ChatController,
@@ -158,19 +162,21 @@ private fun ChatContent(
       onActions = { onSheet(ChatSheet.Actions) },
       Modifier.onUnhandledTap(dismissKeyboard),
     )
-    val dialogPending = timeline.pendingUi != null
+    // The keyboard and a dialog both take the room the steering box and widget panels would use, so then the steering
+    // box keeps to one line and a panel to a few.
+    val tight = WindowInsets.isImeVisible || timeline.pendingUi != null
     ChatStack(
       modifier = Modifier.weight(1f),
       stream = { StreamArea(controller, timeline, snackbar, onOpenProviders, onSheet, dismissKeyboard) },
       dialog = { PendingDialogCard(controller, timeline) },
-      steering = { PendingSteeringBox(controller, timeline, compact = dialogPending) },
+      steering = { PendingSteeringBox(controller, timeline, compact = tight) },
       composer = {
         Composer(
           controller = controller,
           model = timeline.model,
           thinkingLevel = timeline.thinkingLevel,
           busy = busy,
-          dialogPending = dialogPending,
+          tight = tight,
           onSheet = onSheet,
         )
       },

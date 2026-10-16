@@ -47,8 +47,8 @@ internal fun PendingSteeringBox(controller: ChatController, timeline: TimelineSt
  * The messages Pi has queued but not taken yet, one per line as typed, so the user sees what is about to steer the
  * run; attachments show only as a count. Edit takes them back into the composer; Send now stops the run and sends
  * them at once, each as its own message. Both are off while Pi may be taking the queue for its next turn, since it
- * then delivers the messages regardless. A [compact] box leaves room for a dialog: one line with the first message
- * and how many lines follow it.
+ * then delivers the messages regardless. A [compact] box leaves room for the keyboard or a dialog: one line with the
+ * first message and how many lines follow it.
  */
 @Composable
 internal fun SteeringBox(

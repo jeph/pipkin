@@ -83,6 +83,12 @@ private val TAB_LABEL_MAX_WIDTH = 150.dp
 /** How tall a widget's lines grow inside the composer before they scroll; the sheet shows them all. */
 private val PANEL_MAX_HEIGHT = 180.dp
 
+/** The same while the keyboard is up or a dialog waits: four lines, so the field and the dialog keep their room. */
+private val PANEL_TIGHT_MAX_HEIGHT = 72.dp
+
+/** Lowers the panel's lines so the first one centres on the 28 dp expand button beside it: (28 - 18) / 2. */
+private val PANEL_TEXT_TOP = 5.dp
+
 /** How far a tab strip or a panel fades at an edge it scrolls past. */
 private val SCROLL_FADE = 24.dp
 
@@ -133,18 +139,10 @@ internal class WidgetTabs {
 /** The widgets on one edge of the composer, and the one whose panel shows; null while none does. */
 internal class WidgetEdge(val widgets: List<KeyedWidget>, val shown: KeyedWidget?)
 
-/**
- * The [widgets] on the editor's [belowEditor] edge, in their order, and the open tab's widget while [panels] are
- * allowed to show.
- */
-internal fun widgetEdge(
-  widgets: Map<String, ExtensionWidget>,
-  tabs: WidgetTabs,
-  belowEditor: Boolean,
-  panels: Boolean,
-): WidgetEdge {
+/** The [widgets] on the editor's [belowEditor] edge, in their order, and the open tab's widget. */
+internal fun widgetEdge(widgets: Map<String, ExtensionWidget>, tabs: WidgetTabs, belowEditor: Boolean): WidgetEdge {
   val edge = widgets.filterValues { it.belowEditor == belowEditor }.map { KeyedWidget(it.key, it.value) }
-  val open = tabs.open(belowEditor)?.takeIf { panels }
+  val open = tabs.open(belowEditor)
   return WidgetEdge(edge, edge.firstOrNull { it.key == open })
 }
 
@@ -152,16 +150,11 @@ internal fun widgetEdge(
  * The widgets Pi draws on one edge of the editor as tabs hanging from that edge of the composer: its top border for
  * widgets above the editor, its bottom border for those below. The strip unfolds out of the border with its first
  * widget and folds back with its last, a tab added later rises out of the border, and one removed fades. A label
- * stops at 150 dp, and a strip with more tabs than fit scrolls sideways, fading at an edge it continues past.
+ * stops at 150 dp, and a strip with more tabs than fit scrolls sideways, fading at an edge it continues past. A tab
+ * opens its widget's panel, or closes it when open.
  */
 @Composable
-internal fun WidgetTabStrip(
-  edge: WidgetEdge,
-  tabs: WidgetTabs,
-  belowEditor: Boolean,
-  onTap: (String) -> Unit,
-  modifier: Modifier = Modifier,
-) {
+internal fun WidgetTabStrip(edge: WidgetEdge, tabs: WidgetTabs, belowEditor: Boolean, modifier: Modifier = Modifier) {
   val widgets = edge.widgets
   // Kept while the strip folds away, which it does once there are no widgets left to show.
   var shown by remember { mutableStateOf(widgets) }
@@ -196,7 +189,7 @@ internal fun WidgetTabStrip(
           open = item.key == edge.shown?.key,
           changed = tabs.changed(item.key, item.widget),
           belowEditor = belowEditor,
-          onClick = { onTap(item.key) },
+          onClick = { tabs.toggle(item.key, belowEditor) },
           modifier = Modifier
             .animateItem()
             .graphicsLayer { translationY = rise.value * size.height * fromBorder },
@@ -310,44 +303,59 @@ private fun Modifier.fadeScrolledEdges(state: ScrollableState, vertical: Boolean
 /**
  * The open tab's widget inside the composer: above the text field for a widget above the editor, under the toolbar for
  * one below it. It grows open and folds closed, and switching tabs eases from one widget's height to the other's. The
- * user has seen the widget's lines for as long as they show.
+ * user has seen the widget's lines for as long as they show. A [tight] panel keeps to a few lines.
  */
 @Composable
-internal fun WidgetPanelSlot(shown: KeyedWidget?, tabs: WidgetTabs, belowEditor: Boolean, onExpand: (String) -> Unit) {
+internal fun WidgetPanelSlot(
+  shown: KeyedWidget?,
+  tabs: WidgetTabs,
+  belowEditor: Boolean,
+  tight: Boolean,
+  onExpand: (String) -> Unit,
+  modifier: Modifier = Modifier,
+) {
   LaunchedEffect(shown?.key, shown?.widget) { shown?.let { tabs.see(it.key, it.widget) } }
   AnimatedContent(
     targetState = shown,
+    modifier = modifier,
     contentKey = { it?.key },
     transitionSpec = { fadeIn() togetherWith fadeOut() using SizeTransform(clip = true) },
     contentAlignment = if (belowEditor) Alignment.TopStart else Alignment.BottomStart,
     label = "widget panel",
   ) { item ->
-    if (item != null) WidgetPanel(item, belowEditor, onExpand = { onExpand(item.key) })
+    if (item != null) WidgetPanel(item, belowEditor, tight, onExpand = { onExpand(item.key) })
   }
 }
 
 /**
- * A widget's lines as Pi sent them, in monospace and wrapped like Pi's terminal UI, up to [PANEL_MAX_HEIGHT] and then
- * scrolling. Unlike Pi's terminal UI, which shows the first 10 lines, every line is here. The header gives the number of
- * lines and opens the widget in a sheet.
+ * A widget's lines as Pi sent them, in monospace and wrapped like Pi's terminal UI, up to [PANEL_MAX_HEIGHT], or
+ * [PANEL_TIGHT_MAX_HEIGHT] when [tight], and then scrolling. Unlike Pi's terminal UI, which shows the first 10 lines,
+ * every line is here. Beside them at the top, a button opens the widget in a sheet.
  */
 @Composable
-private fun WidgetPanel(item: KeyedWidget, belowEditor: Boolean, onExpand: () -> Unit) {
+private fun WidgetPanel(item: KeyedWidget, belowEditor: Boolean, tight: Boolean, onExpand: () -> Unit) {
   val colors = pipkinColors
-  val lines = item.widget.lines
-  val text = remember(lines, colors) { extensionWidgetText(lines, colors) }
+  val text = remember(item.widget.lines, colors) { extensionWidgetText(item.widget.lines, colors) }
   val scroll = rememberScrollState()
   Column(modifier = Modifier.fillMaxWidth()) {
     if (belowEditor) HorizontalDivider(Modifier.padding(top = PipkinTokens.Spacing.s8), 1.dp, colors.border)
+    // Weighted, so the dividers stay when the composer gives the panel less than its lines.
     Row(
-      modifier = Modifier.fillMaxWidth(),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4, Alignment.End),
+      modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
     ) {
       Text(
-        text = pluralStringResource(R.plurals.chat_widget_lines, lines.size, lines.size),
-        color = colors.foregroundExtraMuted,
-        fontSize = 11.sp,
+        text = text,
+        modifier = Modifier
+          .weight(1f)
+          .padding(top = PANEL_TEXT_TOP)
+          .heightIn(max = if (tight) PANEL_TIGHT_MAX_HEIGHT else PANEL_MAX_HEIGHT)
+          .fadeScrolledEdges(scroll, vertical = true)
+          .verticalScroll(scroll),
+        color = colors.foreground,
+        fontFamily = FontFamily.Monospace,
+        fontSize = PipkinTokens.FontSize.code,
+        lineHeight = PipkinTokens.LineHeight.code,
       )
       IconButton28(
         icon = R.drawable.ic_lucide_maximize_2,
@@ -357,18 +365,6 @@ private fun WidgetPanel(item: KeyedWidget, belowEditor: Boolean, onExpand: () ->
         iconSize = PipkinTokens.IconSize.sm,
       )
     }
-    Text(
-      text = text,
-      modifier = Modifier
-        .fillMaxWidth()
-        .heightIn(max = PANEL_MAX_HEIGHT)
-        .fadeScrolledEdges(scroll, vertical = true)
-        .verticalScroll(scroll),
-      color = colors.foreground,
-      fontFamily = FontFamily.Monospace,
-      fontSize = PipkinTokens.FontSize.code,
-      lineHeight = PipkinTokens.LineHeight.code,
-    )
     if (!belowEditor) {
       HorizontalDivider(
         Modifier.padding(top = PipkinTokens.Spacing.s8, bottom = PipkinTokens.Spacing.s4),
@@ -379,10 +375,7 @@ private fun WidgetPanel(item: KeyedWidget, belowEditor: Boolean, onExpand: () ->
   }
 }
 
-/**
- * The whole widget over the chat, for one too long for its panel or opened while the keyboard or a dialog leaves no
- * room for a panel: its label, key, edge and number of lines over every line, selectable.
- */
+/** The whole widget over the chat, for one too long for its panel: its label over every line, selectable. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WidgetSheet(item: KeyedWidget, tabs: WidgetTabs, onDismiss: () -> Unit) {
@@ -391,33 +384,28 @@ internal fun WidgetSheet(item: KeyedWidget, tabs: WidgetTabs, onDismiss: () -> U
   val text = remember(widget.lines, colors) { extensionWidgetText(widget.lines, colors) }
   LaunchedEffect(widget) { tabs.see(item.key, widget) }
   PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = SHEET_MAX_HEIGHT) {
-    Column(modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s16)) {
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
-      ) {
-        LucideIcon(
-          icon = if (widget.belowEditor) R.drawable.ic_lucide_panel_bottom else R.drawable.ic_lucide_panel_top,
-          contentDescription = null,
-          size = PipkinTokens.IconSize.md,
-          tint = colors.accent,
-        )
-        Text(
-          text = widgetLabel(item.key),
-          modifier = Modifier.weight(1f),
-          color = colors.foreground,
-          fontSize = PipkinTokens.FontSize.lg,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-      }
-      val edge = stringResource(if (widget.belowEditor) R.string.chat_widget_below else R.string.chat_widget_above)
-      val count = pluralStringResource(R.plurals.chat_widget_lines, widget.lines.size, widget.lines.size)
+    Row(
+      modifier = Modifier.padding(
+        start = PipkinTokens.Spacing.s16,
+        end = PipkinTokens.Spacing.s16,
+        bottom = PipkinTokens.Spacing.s12,
+      ),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    ) {
+      LucideIcon(
+        icon = if (widget.belowEditor) R.drawable.ic_lucide_panel_bottom else R.drawable.ic_lucide_panel_top,
+        contentDescription = null,
+        size = PipkinTokens.IconSize.md,
+        tint = colors.accent,
+      )
       Text(
-        text = "${item.key} · $edge · $count",
-        modifier = Modifier.padding(top = PipkinTokens.Spacing.s4, bottom = PipkinTokens.Spacing.s12),
-        color = colors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.sm,
+        text = widgetLabel(item.key),
+        modifier = Modifier.weight(1f),
+        color = colors.foreground,
+        fontSize = PipkinTokens.FontSize.lg,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
       )
     }
     SelectionContainer(modifier = Modifier.weight(1f, fill = false)) {

@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -29,7 +28,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -92,17 +90,16 @@ private const val MAX_PICKED_IMAGES = 6
  * Paseo's composer: attachment tray, growing text field and a toolbar with attach, model chip, the
  * context meter, [trailingControls] (reserved for voice input) and the primary send/stop button. Send stays
  * greyed out while Pi starts. The model and thinking chips open their pickers through [onSheet]. Extension widgets
- * hang from its edges as tabs; an open tab's panel shows only while the keyboard is down and [dialogPending] is false,
- * as both need the room, so then a tab opens its widget in a sheet.
+ * hang from its edges as tabs, and a tab opens its widget's panel in the composer, which keeps to a few lines and
+ * scrolls when [tight].
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun Composer(
   controller: ChatController,
   model: JSONObject?,
   thinkingLevel: String?,
   busy: Boolean,
-  dialogPending: Boolean,
+  tight: Boolean,
   onSheet: (ChatSheet) -> Unit,
   modifier: Modifier = Modifier,
   trailingControls: @Composable RowScope.() -> Unit = {},
@@ -118,13 +115,9 @@ internal fun Composer(
   val tabs = controller.view.widgetTabs
   val widgets by controller.process.extensionWidgets.collectAsStateWithLifecycle()
   LaunchedEffect(widgets) { tabs.track(widgets) }
-  val panels = !WindowInsets.isImeVisible && !dialogPending
-  val above = widgetEdge(widgets, tabs, belowEditor = false, panels)
-  val below = widgetEdge(widgets, tabs, belowEditor = true, panels)
+  val above = widgetEdge(widgets, tabs, belowEditor = false)
+  val below = widgetEdge(widgets, tabs, belowEditor = true)
   val openWidget = { key: String -> onSheet(ChatSheet.Widget(key)) }
-  val onTap = { key: String, belowEditor: Boolean ->
-    if (panels) tabs.toggle(key, belowEditor) else openWidget(key)
-  }
   Box(
     modifier =
       modifier
@@ -135,7 +128,7 @@ internal fun Composer(
   ) {
     Column(modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth()) {
       // Over the composer's border by its width, so an open tab covers the border where the two meet.
-      WidgetTabStrip(above, tabs, belowEditor = false, { onTap(it, false) }, Modifier.zIndex(1f).offset(y = 1.dp))
+      WidgetTabStrip(above, tabs, belowEditor = false, Modifier.zIndex(1f).offset(y = 1.dp))
       // Not clipped: the attachment remove buttons overhang their thumbnails. Weighted, so the tab strips keep their
       // height when the composer has to shrink.
       Column(
@@ -147,7 +140,10 @@ internal fun Composer(
             .border(1.dp, colors.borderAccent, shape)
             .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
       ) {
-        WidgetPanelSlot(above.shown, tabs, belowEditor = false, onExpand = openWidget)
+        // An open panel is weighted like the field, so it shrinks to the room left once the toolbar is measured. A
+        // closed one isn't: a column doesn't pass on a weighted child's unused share, so it would cap the draft.
+        val panelWeight = Modifier.weight(1f, fill = false)
+        WidgetPanelSlot(above.shown, tabs, false, tight, openWidget, if (above.shown != null) panelWeight else Modifier)
         if (controller.attachments.isNotEmpty()) {
           AttachmentTray(controller.attachments, onRemove = { controller.attachments.remove(it) })
         }
@@ -164,9 +160,9 @@ internal fun Composer(
           onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
           trailingControls = trailingControls,
         )
-        WidgetPanelSlot(below.shown, tabs, belowEditor = true, onExpand = openWidget)
+        WidgetPanelSlot(below.shown, tabs, true, tight, openWidget, if (below.shown != null) panelWeight else Modifier)
       }
-      WidgetTabStrip(below, tabs, belowEditor = true, { onTap(it, true) }, Modifier.zIndex(1f).offset(y = (-1).dp))
+      WidgetTabStrip(below, tabs, belowEditor = true, Modifier.zIndex(1f).offset(y = (-1).dp))
     }
   }
 }
