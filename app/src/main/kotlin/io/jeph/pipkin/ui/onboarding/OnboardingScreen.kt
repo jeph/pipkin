@@ -252,13 +252,19 @@ private fun StepPage(spec: StepSpec, onContinue: () -> Unit, onSkip: () -> Unit)
   )
 }
 
-/** The setup command shows how to paste it until it has run; the agent install simmers; the rest show their icon. */
+/**
+ * The setup command shows how to paste it until it has run; the agent install simmers while it runs; the rest show
+ * their icon.
+ */
 @Composable
 private fun StepIllustration(spec: StepSpec) {
   val done = spec.status == StepStatus.Done
   when {
     spec.step == SetupStep.TermuxSetup && !done -> PasteDemo()
-    spec.step == SetupStep.InstallPi && !done -> SimmeringPot(size = POT_SIZE, tint = pipkinColors.foreground)
+
+    spec.step == SetupStep.InstallPi && spec.status == StepStatus.Running ->
+      SimmeringPot(size = POT_SIZE, tint = pipkinColors.foreground)
+
     else -> IconTile(icon = spec.icon, done = done)
   }
 }
