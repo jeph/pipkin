@@ -1,7 +1,20 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { isNpmNetworkError } from "../src/modes/ensure.js";
 import { type Dirs, installFakePi, makeDirs, PACKAGE_JSON, PI_VERSION, removeDirs, runMode, writeRuntimeManifest } from "./harness.js";
+
+describe("npm network errors", () => {
+  it("recognizes npm's reports of an unreachable registry and nothing else", () => {
+    // Lines npm printed on the emulator with Wi-Fi and mobile data off.
+    expect(isNpmNetworkError("npm error network In most cases you are behind a proxy or have bad network settings.")).toBe(true);
+    expect(isNpmNetworkError("npm error code EAI_AGAIN")).toBe(true);
+    expect(isNpmNetworkError("npm error code ECONNRESET")).toBe(true);
+    expect(isNpmNetworkError("npm error code EINTEGRITY")).toBe(false);
+    expect(isNpmNetworkError("npm error code ENOSPC")).toBe(false);
+    expect(isNpmNetworkError("added 1 package: network-utils")).toBe(false);
+  });
+});
 
 const PACKAGE_LOCK = JSON.stringify({ name: "pipkin-pi-runtime", lockfileVersion: 3 });
 

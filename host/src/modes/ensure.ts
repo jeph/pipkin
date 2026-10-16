@@ -11,6 +11,13 @@ import { installPipkinExtensions, pipkinExtensionsParam } from "../pipkin-extens
 /** Longest progress line forwarded; npm never needs more, and the app shows only a few lines. */
 const MAX_PROGRESS_LINE = 4096;
 
+/** npm's report that it couldn't reach the registry: offline, DNS down, or a dropped connection. */
+const NETWORK_ERROR = /^npm error (network|code E(AI_AGAIN|NOTFOUND|CONNREFUSED|CONNRESET|TIMEDOUT|NETUNREACH))\b/;
+
+export function isNpmNetworkError(line: string): boolean {
+  return NETWORK_ERROR.test(line);
+}
+
 function forwardLines(stream: Readable, send: (line: string) => void): void {
   let carry = "";
   stream.setEncoding("utf8");
@@ -25,7 +32,9 @@ function forwardLines(stream: Readable, send: (line: string) => void): void {
 }
 
 async function npmCi(ctx: ModeContext, cwd: string): Promise<void> {
+  let offline = false;
   const send = (line: string): void => {
+    offline ||= isNpmNetworkError(line);
     ctx.conn.send({ type: "pipkin_progress", line });
   };
   // npm at --loglevel=error stays quiet until it's done; this line tells the app it's installing, not just checking.
@@ -41,7 +50,9 @@ async function npmCi(ctx: ModeContext, cwd: string): Promise<void> {
   child.on("error", reject);
   child.on("close", resolve);
   const code = await promise;
-  if (code !== 0) throw new HostError("npm_failed", `npm ci failed (exit ${code ?? "signal"})`);
+  if (code === 0) return;
+  if (offline) throw new HostError("npm_offline", "Couldn't download the agent. Check your internet connection, then retry.");
+  throw new HostError("npm_failed", `npm ci failed (exit ${code ?? "signal"})`);
 }
 
 export async function ensure(ctx: ModeContext): Promise<JsonObject> {
