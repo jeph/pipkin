@@ -82,7 +82,7 @@ private fun HostStatus(onOpenOnboarding: () -> Unit, modifier: Modifier) {
   val onClick: (() -> Unit)? = when {
     installing -> null
     failure?.needsSetup == true -> onOpenOnboarding
-    failure?.needsTermuxOpen == true -> { -> scope.launch { TermuxWaker.wake(context) } }
+    failure?.needsTermuxOpen == true -> { -> scope.launch { TermuxWaker.wake(context, asked = true) } }
     else -> null
   }
   val dot = when {

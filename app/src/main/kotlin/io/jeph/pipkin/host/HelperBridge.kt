@@ -166,13 +166,14 @@ internal object HelperBridge {
       delay(RESTART_POLL_MILLIS)
       reach = reach(keys)
     }
-    if (reach == Reach.Unreachable && TermuxWaker.wake(context)) reach = reach(keys)
+    if (reach == Reach.Unreachable && TermuxWaker.wake(context, asked = false)) reach = reach(keys)
     val connected = when (reach) {
       is Reach.Connected -> reach
       Reach.Rejected -> throw HostFailure.HelperRejected()
       Reach.PortsTaken -> throw HostFailure.HelperPortTaken()
       Reach.Unreachable -> throw HostFailure.HelperUnreachable()
     }
+    TermuxWaker.reached()
     HelperPairing.confirm(context, connected.key)
     PlaySetup.complete(connected.key)
     return connected.connection

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
+import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.termux.TermuxInstall
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -33,20 +34,41 @@ internal object TermuxWaker {
   private var waking: Deferred<Boolean>? = null
 
   /**
-   * Whether the helper answers, after opening Termux for it if it didn't. Concurrent callers share one attempt.
+   * A wake that didn't bring the helper up (no key, Node missing, ports taken) would fail the same way on every
+   * return to Pipkin and send the user back to Termux each time; until the helper answers again, only the user's
+   * own Open Termux tap opens it.
+   */
+  @Volatile
+  private var failed = false
+
+  /**
+   * Whether the helper answers, after opening Termux for it if it didn't. [asked] is the user's tap on Open Termux;
+   * without it, Termux isn't opened again after a wake that failed. Concurrent callers share one attempt.
    * Termux is only opened while Pipkin is on screen: from the background, Android would block the switch back.
    */
-  suspend fun wake(context: Context): Boolean {
+  suspend fun wake(context: Context, asked: Boolean): Boolean {
     val app = context.applicationContext
     val attempt = lock.withLock {
-      waking?.takeIf { it.isActive } ?: scope.async { wakeOnce(app) }.also { waking = it }
+      waking?.takeIf { it.isActive } ?: scope.async { wakeOnce(app, asked) }.also { waking = it }
     }
     return attempt.await()
   }
 
-  private suspend fun wakeOnce(context: Context): Boolean {
+  /** The helper answered: the next time it doesn't, opening Termux may help again. */
+  fun reached() {
+    failed = false
+  }
+
+  private suspend fun wakeOnce(context: Context, asked: Boolean): Boolean {
     if (HelperBridge.listening(context)) return true
-    if (!pipkinStarted()) return false
+    if (!pipkinStarted() || (failed && !asked)) return false
+    // Behind Termux, Android would freeze Pipkin within seconds, long before a cold helper is up.
+    val listening = context.appGraph.keepAlive.acquire("waking Termux").use { waitForHelper(context) }
+    failed = !listening
+    return listening
+  }
+
+  private suspend fun waitForHelper(context: Context): Boolean {
     try {
       TermuxInstall.openTermuxNewSession(context)
     } catch (_: ActivityNotFoundException) {

@@ -136,7 +136,7 @@ private fun FailedBanner(state: AgentProcessState.Failed, onRetry: () -> Unit, m
     }
     Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
       if (failure?.needsTermuxOpen == true) {
-        TextButton(onClick = { scope.launch { if (TermuxWaker.wake(context)) onRetry() } }) {
+        TextButton(onClick = { scope.launch { if (TermuxWaker.wake(context, asked = true)) onRetry() } }) {
           Text(text = stringResource(R.string.chat_open_termux))
         }
       }
