@@ -114,6 +114,9 @@ internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit,
   }
 
   AdvanceWhenDone(page, step, state) { advance(it) }
+  // A failure pinned to another step, such as an install that finds Termux's setup broken, shows on that step.
+  val failedStep = state.currentError?.step?.takeIf { it in state.visibleSteps }
+  LaunchedEffect(failedStep) { failedStep?.let { goTo(it.name) } }
   BackHandler(enabled = history.size > 1 || onClose != null) { back() }
 
   Column(
