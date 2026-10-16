@@ -23,7 +23,7 @@
     <string name="chat_retry">Retry</string>
     <string name="chat_set_up_termux">Set up Termux</string>
     <string name="chat_open_termux">Open Termux</string>
-    <string name="chat_open_termux_hint">Termux shows why Pipkin\'s helper didn\'t start. Once it\'s running, Pipkin switches back on its own. Still stuck? Type pipkin-start in Termux and press Enter.</string>
+    <string name="chat_open_termux_hint">Termux shows why Pipkin\'s helper didn\'t start. Once it\'s running, Pipkin switches back on its own. If Termux asks for the setup command, tap Set up Termux.</string>
     <string name="chat_exit_code">Agent stopped (exit %1$d)</string>
     <string name="chat_agent_stopped">Agent stopped</string>
     <string name="chat_show_details">Show details</string>

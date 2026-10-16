@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -100,7 +101,8 @@ private fun BannerLine(
 
 /**
  * Pi could not start. A Termux setup failure offers setup, which opens at the step that fixes it; an unreachable Play
- * helper offers Open Termux, which starts the helper there and switches back to Pipkin before retrying.
+ * helper offers Open Termux, which starts the helper there and switches back to Pipkin before retrying, and setup for
+ * when Termux says the helper can't start.
  */
 @Composable
 private fun FailedBanner(
@@ -121,13 +123,14 @@ private fun FailedBanner(
         fontSize = PipkinTokens.FontSize.meta,
       )
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
+    // Open Termux, Set up Termux and Retry don't fit on one line at large font sizes.
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
       if (failure?.needsTermuxOpen == true) {
         TextButton(onClick = { scope.launch { if (TermuxWaker.wake(context, asked = true)) onRetry() } }) {
           Text(text = stringResource(R.string.chat_open_termux))
         }
       }
-      if (failure?.needsSetup == true) {
+      if (failure?.fixedInTermux == true) {
         TextButton(onClick = onOpenOnboarding) { Text(text = stringResource(R.string.chat_set_up_termux)) }
       }
       TextButton(onClick = onRetry) { Text(text = stringResource(R.string.chat_retry)) }

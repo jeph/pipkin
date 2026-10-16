@@ -72,7 +72,7 @@ internal class AppGraph(private val application: Application) {
 
   init {
     holdWhileWorking()
-    restartChatsOnceSetupWorks()
+    restartChatsOnceTermuxWorks()
     ProcessLifecycleOwner.get().lifecycle.addObserver(
       object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
@@ -86,22 +86,22 @@ internal class AppGraph(private val application: Application) {
   }
 
   /**
-   * A host that connects after a setup failure proves the setup was fixed, in setup or in Termux, so chats that failed
-   * on it start again instead of waiting on Retry.
+   * A host that connects after a failure fixed in Termux (a setup step, or a helper that wasn't running) proves the
+   * fix, so chats that failed on it start again instead of waiting on Retry.
    */
-  private fun restartChatsOnceSetupWorks() {
+  private fun restartChatsOnceTermuxWorks() {
     scope.launch {
-      var setupBroken = false
+      var termuxBroken = false
       hostClient.lastFailure.collect { failure ->
         if (failure != null) {
-          setupBroken = setupBroken || failure.needsSetup
+          termuxBroken = termuxBroken || failure.fixedInTermux
           return@collect
         }
-        if (!setupBroken) return@collect
-        setupBroken = false
+        if (!termuxBroken) return@collect
+        termuxBroken = false
         for (process in registry.processes.value.values) {
           val state = process.state.value
-          if (state is AgentProcessState.Failed && state.failure?.needsSetup == true) process.restart()
+          if (state is AgentProcessState.Failed && state.failure?.fixedInTermux == true) process.restart()
         }
       }
     }

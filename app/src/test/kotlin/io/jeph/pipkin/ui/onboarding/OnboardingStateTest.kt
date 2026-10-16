@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.onboarding
 
+import io.jeph.pipkin.host.HostFailure
 import io.jeph.pipkin.host.HostHello
 import io.jeph.pipkin.termux.TermuxInstall.Status
 import org.junit.Assert.assertEquals
@@ -104,6 +105,14 @@ class OnboardingStateTest {
     assertTrue(state(fdroid(runCommand = true), complete = true, error = refused).shouldAutoInstall)
     val storage = SetupError(SetupStep.TermuxSetup, "Termux can't reach shared storage.", "termux-setup-storage")
     assertEquals(storage, state(fdroid(runCommand = true), error = storage).currentError)
+  }
+
+  @Test
+  fun aHelperThatWontStartReopensTheSetupStepOfAFinishedSetup() {
+    val unreachable = HostFailure.HelperUnreachable().toSetupError()
+    val state = state(play(reached = true, paired = true), complete = true, hello = READY, error = unreachable)
+    assertEquals(StepStatus.Failed, state.status(SetupStep.TermuxSetup))
+    assertEquals(SetupStep.TermuxSetup, state.nextOpenStep())
   }
 
   private fun fdroid(runCommand: Boolean = false, reached: Boolean = false) = checks(Status.FDroid).copy(

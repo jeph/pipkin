@@ -48,6 +48,9 @@ internal fun HostFailure.toSetupError(): SetupError {
 
     HostFailure.Kind.Permission -> SetupStep.RunCommand
 
+    // Opening Termux didn't start the helper; whatever Termux reports, the setup command fixes.
+    HostFailure.Kind.HelperUnreachable -> return SetupError(SetupStep.TermuxSetup, HELPER_DIDNT_START)
+
     HostFailure.Kind.ExternalApps,
     HostFailure.Kind.NodeMissing,
     HostFailure.Kind.NodeTooOld,
@@ -62,6 +65,8 @@ internal fun HostFailure.toSetupError(): SetupError {
   }
   return SetupError(step, message, command)
 }
+
+private const val HELPER_DIDNT_START = "Pipkin's helper didn't start in Termux. Paste the setup command again."
 
 /**
  * Onboarding progress that outlives the screen, kept in memory for the process: which permissions Android stopped

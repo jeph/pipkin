@@ -39,8 +39,14 @@ internal sealed class HostFailure(
   /** Fixed by a step of onboarding rather than by retrying. */
   val needsSetup: Boolean get() = kind in SETUP_KINDS
 
-  /** Fixed by opening Termux, which starts Pipkin's helper there; Pipkin then switches back on its own. */
+  /**
+   * Fixed by opening Termux, which starts Pipkin's helper there; Pipkin then switches back on its own. Should the
+   * helper still not start, the setup command fixes what Termux reports (no key, Node.js missing, a crashing helper).
+   */
   val needsTermuxOpen: Boolean get() = kind == Kind.HelperUnreachable
+
+  /** Fixed in Termux, by setup or by opening it, rather than by retrying; a host connecting proves the fix. */
+  val fixedInTermux: Boolean get() = needsSetup || needsTermuxOpen
 
   class MissingTermux : HostFailure(Kind.MissingTermux, MISSING_TERMUX)
 

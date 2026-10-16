@@ -299,8 +299,8 @@ internal fun rememberOnboardingState(graph: AppGraph, checks: DeviceChecks): Onb
     blockedPermissions = blockedPermissions,
     installing = installing || hostInstalling,
     progress = progress,
-    // A setup failure from elsewhere (chat, sidebar) brought the user here; show it on its step.
-    error = installError ?: lastFailure?.takeIf { it.needsSetup }?.toSetupError(),
+    // A failure fixed in Termux brought the user here from elsewhere (chat, sidebar); show it on its step.
+    error = installError ?: lastFailure?.takeIf { it.fixedInTermux }?.toSetupError(),
     authStatus = authStatus,
   )
 }
