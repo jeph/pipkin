@@ -30,6 +30,7 @@ internal sealed class HostFailure(
     Disconnected,
     Interrupted,
     TermuxError,
+    ConfigMove,
   }
 
   /** Fixed by a step of onboarding rather than by retrying. */
@@ -68,6 +69,10 @@ internal sealed class HostFailure(
   /** Termux refused the command for a reason other than `allow-external-apps`. */
   class TermuxError : HostFailure(Kind.TermuxError, TERMUX_ERROR)
 
+  /** Pi's config folder could not move off shared storage into Termux, so the host runs nothing else until it has. */
+  class ConfigMove(reason: String, cause: Throwable? = null) :
+    HostFailure(Kind.ConfigMove, "$CONFIG_MOVE $reason", cause = cause)
+
   private companion object {
     const val MISSING_TERMUX = "Termux is not installed. Install it from F-Droid."
     const val UNTRUSTED_TERMUX = "For your security, Pipkin only runs in the official F-Droid build of Termux, " +
@@ -86,6 +91,7 @@ internal sealed class HostFailure(
     const val CRASHED = "Pipkin's Termux helper exited with status"
     const val TIMEOUT = "Termux did not respond in time. Open Termux once, then retry."
     const val DISCONNECTED = "The connection to Termux closed unexpectedly. Retry."
+    const val CONFIG_MOVE = "Pipkin couldn't move Pi's settings from shared storage into Termux:"
 
     val SETUP_KINDS = setOf(
       Kind.UntrustedTermux,

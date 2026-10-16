@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { open, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { HostEnv } from "./env.js";
+import { type HostEnv, withoutHostVariables } from "./env.js";
 
 /** How long the user's startup files get before Pi starts with the host's own environment. */
 const CAPTURE_TIMEOUT_MS = 5000;
@@ -54,7 +54,7 @@ async function captureSessionEnv(env: HostEnv, base: NodeJS.ProcessEnv): Promise
  * host's environment, minus its own variables, when the capture fails.
  */
 export async function termuxSessionEnv(env: HostEnv): Promise<NodeJS.ProcessEnv> {
-  const { PIPKIN_TOKEN: _token, PIPKIN_ROOT: _root, PI_CODING_AGENT_DIR: _configDir, ...base } = process.env;
+  const base = withoutHostVariables(process.env);
   const session = (await captureSessionEnv(env, base)) ?? base;
   return { ...session, PI_CODING_AGENT_DIR: env.configDir };
 }

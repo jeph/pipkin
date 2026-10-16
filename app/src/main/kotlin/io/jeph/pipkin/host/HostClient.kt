@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
@@ -26,12 +28,23 @@ import org.json.JSONObject
  * Doze it blocks the host's connection back to Pipkin once Pipkin's foreground service stops, so the launch would
  * fail. Nothing launched from the background needs to run before the user returns: reconnects and session lists
  * are only seen on screen.
+ *
+ * While a host reports that Pi's config folder still has to move off shared storage, every launch first waits for
+ * that one move; [onConfigMoved] updates the paths Pipkin keeps between its copy and its deletion of the original.
  */
-internal class HostClient(context: Context, private val foreground: Flow<Boolean>) {
+@Suppress("TooManyFunctions") // One typed wrapper per host mode, beside the launch code they share.
+internal class HostClient(
+  context: Context,
+  private val foreground: Flow<Boolean>,
+  private val onConfigMoved: suspend (ConfigMove) -> Unit,
+) {
   private val context = context.applicationContext
   private val helloState = MutableStateFlow<HostHello?>(null)
   private val failureState = MutableStateFlow<HostFailure?>(null)
   private val installingState = MutableStateFlow(false)
+  private val movingState = MutableStateFlow<String?>(null)
+  private val moveLock = Mutex()
+  private var movesDone = 0
 
   /** The bundled `pi/package.json`: Pi and the Pi packages Pipkin ships; `ensure` installs it, `rpc` requires it. */
   private val packageJson: String by lazy { asset(PACKAGE_JSON) }
@@ -49,6 +62,9 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
 
   /** True while [ensure] runs. */
   val installing: StateFlow<Boolean> = installingState.asStateFlow()
+
+  /** While Pi's config folder moves into Termux: its latest progress line, or "" before the first; otherwise null. */
+  val moving: StateFlow<String?> = movingState.asStateFlow()
 
   /** Installs the pinned Pi runtime if needed and returns the installed version. */
   suspend fun ensure(onProgress: (String) -> Unit): String {
@@ -155,6 +171,30 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     return call("save_attachments", JSONObject().put("files", array)).optJSONArray("paths").strings()
   }
 
+  /** The backups folder in Termux and its backups, newest first. */
+  suspend fun backups(): Backups {
+    val data = call("backups", JSONObject())
+    return Backups(data.optString("dir"), data.optJSONArray("backups").objects().map(BackupInfo::from))
+  }
+
+  /** Backs up the configuration (Pi's config folder without sessions, caches and logs); returns the new backup. */
+  suspend fun createBackup(onProgress: (String) -> Unit): BackupInfo = BackupInfo.from(
+    call("backup_create", JSONObject(), BACKUP_TIMEOUT_MILLIS, progress(onProgress)).getJSONObject("backup"),
+  )
+
+  /** Replaces the configuration with backup [name]'s; sessions stay. Every chat's Pi must be stopping already. */
+  suspend fun restoreBackup(name: String, onProgress: (String) -> Unit) {
+    call("backup_restore", JSONObject().put("name", name), BACKUP_TIMEOUT_MILLIS, progress(onProgress))
+  }
+
+  suspend fun deleteBackup(name: String) {
+    call("backup_delete", JSONObject().put("name", name))
+  }
+
+  private fun progress(onProgress: (String) -> Unit): suspend (HostChannel, JSONObject) -> Unit = { _, line ->
+    if (line.optString("type") == HostProtocol.PROGRESS) onProgress(line.optString("line"))
+  }
+
   /** Opens a folder browser session; close it to end the host. Cancelling the caller closes it too. */
   suspend fun openFolderBrowser(): FolderBrowser {
     val channel = connect("browse")
@@ -242,11 +282,27 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     }
   }
 
+  /** Launches [mode], first moving the config folder when a host reports it still has to move. */
   private suspend fun connect(mode: String): HostChannel {
     if (!foreground.first()) {
       Log.i(TAG, "Host $mode waits until Pipkin is in the foreground")
       foreground.first { it }
     }
+    val channel = launch(mode)
+    if (mode == MOVE_CONFIG || !HostHello.from(channel.hello).configMove) return channel
+    channel.close()
+    try {
+      moveConfig()
+    } catch (rejected: HostRejected) {
+      throw HostFailure.ConfigMove(rejected.error, rejected).also { failureState.value = it }
+    }
+    val retried = launch(mode)
+    if (!HostHello.from(retried.hello).configMove) return retried
+    retried.close()
+    throw HostFailure.ConfigMove("the move did not finish.").also { failureState.value = it }
+  }
+
+  private suspend fun launch(mode: String): HostChannel {
     val channel = try {
       HostLauncher.launch(context, mode)
     } catch (failure: HostFailure) {
@@ -256,6 +312,39 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     failureState.value = null
     helloState.value = HostHello.from(channel.hello)
     return channel
+  }
+
+  /**
+   * Copies the config folder into Termux, lets [onConfigMoved] update the paths Pipkin keeps, then has the original
+   * deleted. Runs once however many launches found the folder unmoved meanwhile; a failed move is tried again by the
+   * next launch that needs it.
+   */
+  private suspend fun moveConfig() {
+    val seen = movesDone
+    moveLock.withLock {
+      if (movesDone != seen) return
+      movingState.value = ""
+      try {
+        val move = ConfigMove.from(
+          call(
+            MOVE_CONFIG,
+            JSONObject(),
+            ENSURE_TIMEOUT_MILLIS,
+            progress {
+              movingState.value =
+                it
+            },
+          ),
+        )
+        if (move.from != null) {
+          onConfigMoved(move)
+          call(MOVE_CONFIG, JSONObject().put("finish", true), ENSURE_TIMEOUT_MILLIS)
+        }
+        movesDone++
+      } finally {
+        movingState.value = null
+      }
+    }
   }
 
   private suspend fun call(
@@ -298,8 +387,10 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     const val PACKAGE_JSON = "pi/package.json"
     const val PACKAGE_LOCK = "pi/package-lock.json"
     const val PI_PACKAGE = "@earendil-works/pi-coding-agent"
+    const val MOVE_CONFIG = "move_config"
     const val DEFAULT_TIMEOUT_MILLIS = 60_000L
     const val ENSURE_TIMEOUT_MILLIS = 15 * 60_000L
+    const val BACKUP_TIMEOUT_MILLIS = 15 * 60_000L
     const val LOGIN_TIMEOUT_MILLIS = 10 * 60_000L
     const val REQUEST_HOST_START_TIMEOUT_MILLIS = 15_000L
   }

@@ -10,6 +10,7 @@ import { nullableStringParam, stringParam } from "../params.js";
 import { SYSTEM_APPEND } from "../prompt.js";
 import { openSettingsIfValid } from "../settings.js";
 import { termuxSessionEnv } from "../termux-session.js";
+import { isConfigLocked } from "../config-lock.js";
 
 const STDERR_TAIL = 16 * 1024;
 const TERM_AFTER_MS = 5000;
@@ -174,6 +175,11 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   );
   if (!isDirectory) {
     fail(ctx, "cwd_missing", `Folder not found: ${cwd}`);
+    return;
+  }
+  // A restore swaps the configuration while it holds the lock; Pi must start on one side of the swap or the other.
+  if (await isConfigLocked(ctx.env)) {
+    fail(ctx, "config_busy", "Pipkin is backing up or restoring the configuration; try again in a moment");
     return;
   }
 

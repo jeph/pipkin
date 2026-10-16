@@ -469,6 +469,33 @@ class AgentRegistryTest {
     assertEquals("/s/stuck-shown.jsonl", restarted?.sessionFile?.value)
   }
 
+  @Test
+  fun stopAllEndsEveryPiAndRestartShownBringsBackOnlyTheChatsOnScreen() = registryTest { registry ->
+    val shownWorker = registry.open(CWD, "/s/shown.jsonl")
+    val stuckHidden = registry.open(CWD, "/s/stuck.jsonl")
+    val hidden = registry.open(CWD, "/s/hidden.jsonl")
+    listOf(shownWorker, stuckHidden).forEach { it.busy.value = true }
+    stuckHidden.abortFails = true
+    registry.show(Pane.Primary, shownWorker)
+
+    registry.stopAll()
+
+    assertEquals(1, shownWorker.aborts)
+    assertEquals(1, stuckHidden.aborts)
+    assertTrue(created.all { it.parked && !it.closed })
+    // The shown chat stays in its pane with its history; hidden ones leave the registry for reopening later.
+    assertSame(shownWorker, registry.shown.value[Pane.Primary])
+    assertEquals(setOf(ChatKey("/s/shown.jsonl")), registry.processes.value.keys)
+
+    registry.restartShown()
+
+    assertEquals(1, shownWorker.restarts)
+    assertFalse(shownWorker.parked)
+    assertTrue(stuckHidden.parked && hidden.parked)
+    assertSame(stuckHidden, registry.open(CWD, "/s/stuck.jsonl"))
+    assertEquals(1, stuckHidden.restarts)
+  }
+
   private fun registryTest(block: suspend (AgentRegistry<FakeProcess>) -> Unit) = runBlocking {
     val scope = CoroutineScope(coroutineContext + SupervisorJob())
     try {

@@ -1,6 +1,7 @@
 package io.jeph.pipkin.host
 
 import java.io.IOException
+import java.time.Instant
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -10,6 +11,8 @@ internal data class HostHello(
   val nodeVersion: String,
   val configDir: String,
   val home: String,
+  /** Pi's config folder still has to move off shared storage; until it has, the host runs nothing else. */
+  val configMove: Boolean = false,
 ) {
   companion object {
     fun from(hello: JSONObject) = HostHello(
@@ -17,9 +20,49 @@ internal data class HostHello(
       nodeVersion = hello.optString("nodeVersion"),
       configDir = hello.optString("configDir"),
       home = hello.optString("home"),
+      configMove = hello.optBoolean("configMove"),
     )
   }
 }
+
+/**
+ * The config folder's move off shared storage: [from] the old folder, null when there was nothing to move, [to] the
+ * new one, and [sessions] the session files in it relative to [to], whose old paths Pipkin may still keep.
+ */
+internal data class ConfigMove(val from: String?, val to: String, val sessions: List<String>) {
+  companion object {
+    fun from(json: JSONObject) = ConfigMove(
+      from = json.opt("from") as? String,
+      to = json.optString("to"),
+      sessions = json.optJSONArray("sessions").strings(),
+    )
+  }
+}
+
+/**
+ * One file in the backups folder. [createdAt] is the backup's own time (epoch milliseconds), or the file's for one that
+ * isn't a readable backup, which carries the reason in [error].
+ */
+internal data class BackupInfo(
+  val name: String,
+  val size: Long,
+  val createdAt: Long,
+  val piVersion: String?,
+  val error: String?,
+) {
+  companion object {
+    fun from(json: JSONObject) = BackupInfo(
+      name = json.getString("name"),
+      size = json.optLong("size"),
+      createdAt = runCatching { Instant.parse(json.optString("createdAt")).toEpochMilli() }.getOrDefault(0L),
+      piVersion = json.opt("piVersion") as? String,
+      error = json.opt("error") as? String,
+    )
+  }
+}
+
+/** The backups folder and the backups in it, newest first. */
+internal data class Backups(val dir: String, val backups: List<BackupInfo>)
 
 /** One Pi session file; times are epoch milliseconds. [cwdExists] is false once its workspace folder is gone. */
 internal data class SessionInfo(

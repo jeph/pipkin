@@ -7,6 +7,7 @@ import java.io.File
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.Locale
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import org.json.JSONArray
@@ -43,6 +44,24 @@ internal class NoticeStore(private val dir: File, private val writer: Executor =
   /** Forgets the notices of the deleted sessions [sessionPaths]. */
   fun delete(sessionPaths: Collection<String>) {
     for (path in sessionPaths) put(path, emptyList())
+  }
+
+  /**
+   * Moves the notices of each session in [renamed], old path to new, to its new path. Blocking until the files have
+   * moved, so a [load] afterwards finds them: call off the main thread.
+   */
+  fun rename(renamed: Map<String, String>) {
+    val moved = CountDownLatch(1)
+    synchronized(cache) {
+      for ((old, new) in renamed) {
+        cache.remove(old)?.let { cache[new] = it }
+        val from = fileOf(old)
+        val to = fileOf(new)
+        writer.execute { if (from.exists() && !from.renameTo(to)) Log.w(TAG, "Moving notices to $to failed") }
+      }
+      writer.execute(moved::countDown)
+    }
+    moved.await()
   }
 
   private fun fileOf(sessionPath: String): File {

@@ -12,6 +12,7 @@ import io.jeph.pipkin.agent.AgentService
 import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.agent.TurnNotifications
 import io.jeph.pipkin.data.AccountRepository
+import io.jeph.pipkin.data.ConfigBackups
 import io.jeph.pipkin.data.ModelDefaults
 import io.jeph.pipkin.data.NoticeStore
 import io.jeph.pipkin.data.Preferences
@@ -19,6 +20,7 @@ import io.jeph.pipkin.data.SessionArchive
 import io.jeph.pipkin.data.SessionRepository
 import io.jeph.pipkin.files.FileTabRegistry
 import io.jeph.pipkin.git.CommitTabRegistry
+import io.jeph.pipkin.host.ConfigMove
 import io.jeph.pipkin.host.FileHost
 import io.jeph.pipkin.host.GitHost
 import io.jeph.pipkin.host.HostClient
@@ -33,6 +35,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** The app's long-lived objects, built once by [PipkinApplication]. Reach it with [Context.appGraph]. */
 internal class AppGraph(private val application: Application) {
@@ -41,10 +44,12 @@ internal class AppGraph(private val application: Application) {
   val hostClient = HostClient(
     application,
     foreground = ProcessLifecycleOwner.get().lifecycle.currentStateFlow.map { it.isAtLeast(Lifecycle.State.STARTED) },
+    onConfigMoved = ::configMoved,
   )
   val keepAlive = KeepAlive(application)
   val preferences = Preferences(application)
-  val sessionRepository = SessionRepository(hostClient, NoticeStore(File(application.filesDir, "notices")), scope)
+  private val notices = NoticeStore(File(application.filesDir, "notices"))
+  val sessionRepository = SessionRepository(hostClient, notices, scope)
   val sessionArchive = SessionArchive(sessionRepository, preferences, scope)
   private val turnNotifications = TurnNotifications(application) { hostClient.lastHello.value?.home }
   val registry: AgentRegistry<AgentProcess> =
@@ -57,6 +62,7 @@ internal class AppGraph(private val application: Application) {
       AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository)
     }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
+  val configBackups = ConfigBackups(hostClient, registry, keepAlive, accountRepository, sessionRepository, scope)
   val modelDefaults = ModelDefaults(hostClient)
   val panes = Panes(registry, sessionArchive::isArchived)
   val tabs = OpenTabs(panes)
@@ -79,6 +85,16 @@ internal class AppGraph(private val application: Application) {
         }
       },
     )
+  }
+
+  /** Points the session paths Pipkin keeps at the config folder's new place in Termux. */
+  private suspend fun configMoved(move: ConfigMove) {
+    val from = move.from ?: return
+    val renamed = move.sessions.associate { "$from/$it" to "${move.to}/$it" }
+    withContext(Dispatchers.IO) {
+      preferences.renameSessions(renamed)
+      notices.rename(renamed)
+    }
   }
 
   /**

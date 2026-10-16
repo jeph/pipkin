@@ -186,6 +186,28 @@ internal class AgentRegistry<P : ManagedProcess>(
     }
   }
 
+  /**
+   * Ends every chat's Pi so its configuration can be replaced, aborting working chats first. Hidden chats are parked;
+   * shown ones keep their history on screen until [restartShown] starts their Pi again.
+   */
+  suspend fun stopAll() {
+    for (process in processState.value.values.toList()) {
+      if (process.busy.value) {
+        try {
+          process.abort()
+        } catch (_: RpcError) {
+          // Its Pi ends next either way.
+        }
+      }
+      if (paneOf(process) != null) process.park() else park(process)
+    }
+  }
+
+  /** Starts Pi again for every chat a pane shows, after [stopAll]. */
+  fun restartShown() {
+    for (process in shownState.value.values) process.restart()
+  }
+
   /** Closes and forgets [process] (for example before its session is deleted). */
   fun close(process: P) = remove(process)
 

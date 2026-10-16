@@ -4,6 +4,7 @@ import { HostError, installedPiVersion, readHostEnv } from "./env.js";
 import { isObject, type JsonObject } from "./framing.js";
 import type { ModeContext } from "./mode.js";
 import { authStatus } from "./modes/auth-status.js";
+import { createBackup, deleteBackup, listBackups, restoreBackup } from "./modes/backups.js";
 import { browse } from "./modes/browse.js";
 import { defaultModel } from "./modes/default-model.js";
 import { deleteSessions } from "./modes/delete-sessions.js";
@@ -11,6 +12,7 @@ import { ensure } from "./modes/ensure.js";
 import { files } from "./modes/files.js";
 import { git } from "./modes/git.js";
 import { login } from "./modes/login.js";
+import { configMoveState, moveConfig } from "./modes/move-config.js";
 import { logout } from "./modes/logout.js";
 import { modelDefaults } from "./modes/model-defaults.js";
 import { providerModels } from "./modes/provider-models.js";
@@ -67,6 +69,7 @@ async function main(): Promise<void> {
 
   const socket = connect({ host: "127.0.0.1", port, allowHalfOpen: true });
   const conn = new Connection(socket);
+  const configMove = await configMoveState(env);
   conn.send({
     type: "pipkin_hello",
     protocol: PROTOCOL,
@@ -76,6 +79,7 @@ async function main(): Promise<void> {
     nodeVersion: process.versions.node,
     configDir: env.configDir,
     home: env.home,
+    configMove: configMove !== "none",
   });
 
   const request = await conn.firstMessage(mode === "rpc", REQUEST_TIMEOUT_MS);
@@ -88,6 +92,12 @@ async function main(): Promise<void> {
   }
 
   const ctx: ModeContext = { env, params: request.params, conn, signal: conn.abort.signal };
+  // Until the config folder has moved off shared storage, nothing may read or create the new one.
+  if (configMove !== "none" && mode !== "move_config") {
+    conn.send({ type: "pipkin_result", ok: false, error: "Pi's config folder has not moved into Termux yet", code: "config_not_moved" });
+    conn.finish();
+    return;
+  }
   switch (mode) {
     case "rpc":
       try {
@@ -139,6 +149,16 @@ async function main(): Promise<void> {
       return respond(ctx, subscriptionSave);
     case "default_model":
       return respond(ctx, defaultModel);
+    case "move_config":
+      return respond(ctx, moveConfig);
+    case "backups":
+      return respond(ctx, listBackups);
+    case "backup_create":
+      return respond(ctx, createBackup);
+    case "backup_restore":
+      return respond(ctx, restoreBackup);
+    case "backup_delete":
+      return respond(ctx, deleteBackup);
     default:
       conn.send({ type: "pipkin_result", ok: false, error: `Unknown mode ${mode}`, code: "unknown_mode" });
       conn.finish();

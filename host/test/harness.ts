@@ -161,14 +161,21 @@ export async function startHost(
   return { run: new HostRun(socket, child, exited.promise), token };
 }
 
-/** Runs a non-rpc mode to completion and returns its `pipkin_result`. */
-export async function runMode(mode: string, dirs: Dirs, params: JsonObject): Promise<JsonObject> {
-  const { run } = await startHost(mode, dirs);
+/** Runs a non-rpc mode to completion and returns its `pipkin_result`; progress lines go to `progress`. */
+export async function runMode(
+  mode: string,
+  dirs: Dirs,
+  params: JsonObject,
+  extraEnv: Record<string, string> = {},
+  progress: string[] = [],
+): Promise<JsonObject> {
+  const { run } = await startHost(mode, dirs, extraEnv);
   await run.next();
   run.send({ type: "pipkin_request", params });
   for (;;) {
     const message = await run.next();
     if (message === undefined) throw new Error(`${mode} closed without a result`);
+    if (message.type === "pipkin_progress") progress.push(String(message.line));
     if (message.type === "pipkin_result") {
       await run.exited;
       return message;

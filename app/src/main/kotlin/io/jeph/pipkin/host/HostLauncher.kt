@@ -23,6 +23,12 @@ internal object HostLauncher {
   private val SERVICE = ComponentName("com.termux", "com.termux.app.RunCommandService")
   private const val HOST_ASSET = "pipkin-host.mjs"
   private const val ARGUMENT_LIMIT = 256 * 1024
+
+  /**
+   * Linux refuses to exec a command with any one argument over 128 KiB (`MAX_ARG_STRLEN`), so the script travels in
+   * pieces of at most this many UTF-16 units: three UTF-8 bytes each at most, well under that cap.
+   */
+  private const val PIECE_CHARS = 32 * 1024
   private const val CONNECT_TIMEOUT_MILLIS = 30_000L
   private const val TOKEN_BYTES = 32
   private const val INTERRUPTED_RETRIES = 2
@@ -31,7 +37,7 @@ internal object HostLauncher {
   private val random = SecureRandom()
 
   @Volatile
-  private var hostScript: String? = null
+  private var hostScript: List<String>? = null
 
   /**
    * Retries a launch that Termux cancelled while stopping its service (its last command just exited);
@@ -88,7 +94,7 @@ internal object HostLauncher {
       .putExtra("com.termux.RUN_COMMAND_PATH", BASH)
       .putExtra(
         "com.termux.RUN_COMMAND_ARGUMENTS",
-        arrayOf("--noprofile", "--norc", "-c", BOOTSTRAP, "pipkin-host", script, mode, port.toString()),
+        arrayOf("--noprofile", "--norc", "-c", BOOTSTRAP, "pipkin-host", mode, port.toString()) + script,
       )
       .putExtra("com.termux.RUN_COMMAND_STDIN", token + "\n")
       .putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
@@ -106,16 +112,27 @@ internal object HostLauncher {
     }
   }
 
-  private fun script(context: Context): String {
+  /** The host script in the pieces it travels in, joined again by [BOOTSTRAP]. */
+  private fun script(context: Context): List<String> {
     hostScript?.let { return it }
     val text = context.assets.open(HOST_ASSET).bufferedReader(Charsets.UTF_8).use { it.readText() }
     check(text.toByteArray(Charsets.UTF_8).size <= ARGUMENT_LIMIT) { "$HOST_ASSET exceeds the Intent size limit" }
-    hostScript = text
-    return text
+    val pieces = buildList {
+      var start = 0
+      while (start < text.length) {
+        var end = minOf(start + PIECE_CHARS, text.length)
+        // A surrogate pair stays in one piece, so each piece is valid UTF-16 on its own.
+        if (end < text.length && text[end - 1].isHighSurrogate()) end -= 1
+        add(text.substring(start, end))
+        start = end
+      }
+    }
+    hostScript = pieces
+    return pieces
   }
 
   /**
-   * `$1` host script, then `<mode> <port>` for `host.mjs`; the token is the one stdin line.
+   * `<mode> <port>` for `host.mjs`, then the host script in pieces; the token is the one stdin line.
    * Exit codes: 70 Termux env, 72 node missing, 73 node too old, 74 npm missing,
    * 75 shared storage unavailable, 80 token missing.
    */
@@ -131,14 +148,18 @@ internal object HostLauncher {
     command -v npm >/dev/null 2>&1 || exit 74
     [ -d "$HOME/storage/shared" ] && [ -w "$HOME/storage/shared" ] || exit 75
     export PIPKIN_ROOT="$HOME/.local/share/pipkin"
-    PI_CODING_AGENT_DIR="$(realpath "$HOME/storage/shared")/.pipkin/pi"
-    export PI_CODING_AGENT_DIR
-    mkdir -p "$PIPKIN_ROOT" "$PI_CODING_AGENT_DIR"
+    export PI_CODING_AGENT_DIR="$HOME/.pipkin/pi"
+    PIPKIN_LEGACY_CONFIG_DIR="$(realpath "$HOME/storage/shared")/.pipkin/pi"
+    export PIPKIN_LEGACY_CONFIG_DIR
+    mkdir -p "$PIPKIN_ROOT"
+    mode=$1
+    port=$2
+    shift 2
     host="$PIPKIN_ROOT/host.mjs"
-    if [ ! -f "$host" ] || ! printf '%s' "$1" | cmp -s - "$host"; then
-      printf '%s' "$1" > "$host.$$.tmp" && mv -f "$host.$$.tmp" "$host"
+    # cmp stops reading at the first difference, which would make printf report a broken pipe.
+    if [ ! -f "$host" ] || ! printf '%s' "$@" 2>/dev/null | cmp -s - "$host"; then
+      printf '%s' "$@" > "$host.$$.tmp" && mv -f "$host.$$.tmp" "$host"
     fi
-    shift
-    exec node "$host" "$@"
+    exec node "$host" "$mode" "$port"
   """.trimIndent()
 }

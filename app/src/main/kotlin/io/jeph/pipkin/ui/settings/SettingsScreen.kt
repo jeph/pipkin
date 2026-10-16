@@ -45,6 +45,7 @@ internal fun SettingsScreen(
   onBack: () -> Unit,
   onOpenPermissions: () -> Unit,
   onOpenProviders: () -> Unit,
+  onOpenBackups: () -> Unit,
   onOpenAdvanced: () -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
@@ -66,6 +67,7 @@ internal fun SettingsScreen(
         snackbar = snackbar,
         onOpenProviders = onOpenProviders,
         onOpenPermissions = onOpenPermissions,
+        onOpenBackups = onOpenBackups,
         onOpenAdvanced = onOpenAdvanced,
       )
     }
@@ -82,6 +84,7 @@ private fun SettingsContent(
   snackbar: SnackbarStackState,
   onOpenProviders: () -> Unit,
   onOpenPermissions: () -> Unit,
+  onOpenBackups: () -> Unit,
   onOpenAdvanced: () -> Unit,
 ) {
   Column(
@@ -98,7 +101,7 @@ private fun SettingsContent(
       verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s24),
     ) {
       ProvidersSection(onOpenProviders = onOpenProviders)
-      AgentSection(graph = graph, snackbar = snackbar)
+      AgentSection(graph = graph, snackbar = snackbar, onOpenBackups = onOpenBackups)
       AppearanceSection(preferences = graph.preferences)
       TermuxSection(graph = graph, onOpenPermissions = onOpenPermissions)
       AdvancedSection(onOpenAdvanced = onOpenAdvanced)
@@ -128,7 +131,7 @@ private fun ProvidersSection(onOpenProviders: () -> Unit) {
 }
 
 @Composable
-private fun AgentSection(graph: AppGraph, snackbar: SnackbarStackState) {
+private fun AgentSection(graph: AppGraph, snackbar: SnackbarStackState, onOpenBackups: () -> Unit) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
@@ -156,6 +159,20 @@ private fun AgentSection(graph: AppGraph, snackbar: SnackbarStackState) {
           tint = pipkinColors.foregroundMuted,
         )
       }
+    }
+    SettingsDivider()
+    SettingsRow(
+      title = stringResource(R.string.backups_title),
+      onClick = onOpenBackups,
+      leading = {
+        LucideIcon(
+          icon = R.drawable.ic_lucide_archive_restore,
+          contentDescription = null,
+          tint = pipkinColors.foregroundMuted,
+        )
+      },
+    ) {
+      Chevron()
     }
   }
 }

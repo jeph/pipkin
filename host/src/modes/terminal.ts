@@ -3,7 +3,7 @@ import { readdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
-import { HostError } from "../env.js";
+import { HostError, withoutHostVariables } from "../env.js";
 import type { ModeContext } from "../mode.js";
 import { positiveIntParam, stringParam } from "../params.js";
 
@@ -223,7 +223,7 @@ export async function terminal(ctx: ModeContext): Promise<void> {
   if (!isDirectory) throw new HostError("cwd_missing", `Folder not found: ${cwd}`);
 
   const deviceFile = join(ctx.env.root, `terminal-tty-${process.pid}`);
-  const { PIPKIN_TOKEN: _token, PIPKIN_ROOT: _root, PI_CODING_AGENT_DIR: _configDir, ...base } = process.env;
+  const base = withoutHostVariables(process.env);
   const child = spawn(join(ctx.env.prefix, "bin", "script"), ["-qfec", SHELL_COMMAND, "/dev/null"], {
     cwd,
     env: {

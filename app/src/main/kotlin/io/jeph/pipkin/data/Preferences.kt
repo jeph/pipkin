@@ -10,6 +10,7 @@ import io.jeph.pipkin.ui.files.SortKey
 import io.jeph.pipkin.ui.git.ExplorerTab
 import io.jeph.pipkin.ui.theme.ThemeMode
 import io.jeph.pipkin.workspace.SavedLayout
+import io.jeph.pipkin.workspace.SavedPaneItem
 import io.jeph.pipkin.workspace.savedLayoutOf
 import io.jeph.pipkin.workspace.toJson
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,6 +20,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** App settings in the `pipkin` SharedPreferences file. Setters persist and publish immediately. */
+@Suppress("TooManyFunctions") // A setter per stored setting, each beside the state it publishes.
 internal class Preferences(context: Context) {
   private val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
   private val setupCompleteState = MutableStateFlow(prefs.getBoolean(SETUP_COMPLETE, false))
@@ -133,6 +135,26 @@ internal class Preferences(context: Context) {
 
   fun unarchiveSessions(paths: Collection<String>) {
     writeArchived(archivedState.value - paths.toSet())
+  }
+
+  /**
+   * Points the archived sessions and the saved layout's chats at the new paths of the sessions in [renamed], old path
+   * to new. Written with `commit`, so the change is on disk before the session files' old paths stop existing.
+   */
+  fun renameSessions(renamed: Map<String, String>) {
+    val archived = archivedState.value.mapKeys { (path) -> renamed[path] ?: path }
+    val layout = savedLayout()?.let { saved ->
+      saved.copy(
+        panes = saved.panes.mapValues { (_, item) ->
+          if (item is SavedPaneItem.Chat) item.copy(sessionPath = item.sessionPath?.let { renamed[it] ?: it }) else item
+        },
+      )
+    }
+    prefs.edit(commit = true) {
+      putString(ARCHIVED_SESSIONS, JSONObject(archived).toString())
+      if (layout != null) putString(LAYOUT, layout.toJson())
+    }
+    archivedState.value = archived
   }
 
   fun setShowHiddenFiles(show: Boolean) {

@@ -29,6 +29,29 @@
     <string name="settings_config_folder">Config folder</string>
     <string name="settings_config_folder_unknown">Known once Termux connects</string>
 
+    <string name="backups_title">Backups</string>
+    <string name="backups_create">Back up now</string>
+    <string name="backups_creating">Backing up the configuration…</string>
+    <string name="backups_created">Backed up.</string>
+    <string name="backups_restoring">Restoring the backup from %1$s…</string>
+    <string name="backups_restored">Restored. Chats use the restored configuration from now on.</string>
+    <string name="backups_saved">Saved backups</string>
+    <string name="backups_loading">Loading backups…</string>
+    <string name="backups_retry">Retry</string>
+    <string name="backups_empty">No backups yet</string>
+    <string name="backups_unreadable">%1$s can\'t be restored: %2$s</string>
+    <string name="backups_restore">Restore</string>
+    <string name="backups_delete">Delete</string>
+    <string name="backups_folder">~/.pipkin/backups</string>
+    <string name="backups_caption">A backup holds Pi\'s configuration: settings, sign-ins, models, extensions, skills, prompts and themes. Chats aren\'t part of it, and a restore leaves them as they are. Backups are kept in Termux at %1$s, where the Files app can reach them under Termux. Uninstalling Termux or clearing its data deletes them too.</string>
+    <string name="backups_restore_title">Restore this backup?</string>
+    <string name="backups_restore_text">Pi\'s configuration will be replaced by the backup from %1$s, and anything changed since is lost. Chats stay. Running chats stop first, so a reply in progress ends. Quit any pi you started yourself in a Termux terminal before restoring.</string>
+    <string name="backups_delete_title">Delete this backup?</string>
+    <string name="backups_delete_text">The backup from %1$s will be deleted for good.</string>
+    <string name="backups_delete_file_text">%1$s will be deleted for good.</string>
+    <string name="config_move_title">Moving Pi\'s settings</string>
+    <string name="config_move_text">Pipkin is moving Pi\'s settings and chats from shared storage into Termux, where Pi reads them faster. This happens once.</string>
+
     <string name="settings_advanced">Advanced</string>
     <string name="settings_running_chats">Running chats</string>
     <string name="settings_running_chats_fewer">Fewer running chats</string>

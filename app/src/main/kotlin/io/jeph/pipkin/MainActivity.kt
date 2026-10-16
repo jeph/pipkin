@@ -40,6 +40,8 @@ import io.jeph.pipkin.ui.onboarding.PermissionsScreen
 import io.jeph.pipkin.ui.settings.AddModelsScreen
 import io.jeph.pipkin.ui.settings.AddProviderScreen
 import io.jeph.pipkin.ui.settings.AdvancedScreen
+import io.jeph.pipkin.ui.settings.BackupsScreen
+import io.jeph.pipkin.ui.settings.ConfigMoveDialog
 import io.jeph.pipkin.ui.settings.ModelEditorScreen
 import io.jeph.pipkin.ui.settings.ProviderDrafts
 import io.jeph.pipkin.ui.settings.ProviderEditorScreen
@@ -109,6 +111,7 @@ private fun PipkinApp(graph: AppGraph, requestedChat: MutableStateFlow<ChatLocat
       Screen(shown, navigator, actions, drafts, requestedChat)
     }
   }
+  ConfigMoveDialog(graph.hostClient)
 }
 
 /** The top of [shown]; model sub-pages edit the draft of the subscription or provider page below. */
@@ -136,10 +139,13 @@ private fun Screen(
       onBack = { navigator.pop() },
       onOpenPermissions = { navigator.push(Destination.Permissions) },
       onOpenProviders = { navigator.push(Destination.Providers) },
+      onOpenBackups = { navigator.push(Destination.Backups) },
       onOpenAdvanced = { navigator.push(Destination.Advanced) },
     )
 
     Destination.Permissions -> PermissionsScreen(onBack = { navigator.pop() })
+
+    Destination.Backups -> BackupsScreen(onBack = { navigator.pop() })
 
     Destination.Advanced -> AdvancedScreen(onBack = { navigator.pop() })
 

@@ -1,4 +1,4 @@
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -88,6 +88,7 @@ describe("rpc mode", () => {
       nodeVersion: process.versions.node,
       configDir: dirs.configDir,
       home: dirs.home,
+      configMove: false,
     });
     run.socket.end();
     await run.exited;
@@ -193,6 +194,15 @@ describe("rpc mode", () => {
     await run.next();
     run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: "9.9.9", packageJson: PACKAGE_JSON } });
     expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "pi_version" });
+    expect(await run.next()).toBeUndefined();
+  });
+
+  it("refuses to start Pi while a backup or restore holds the config lock", async () => {
+    await symlink(String(process.pid), path.join(dirs.root, "config.lock"));
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON } });
+    expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "config_busy" });
     expect(await run.next()).toBeUndefined();
   });
 
