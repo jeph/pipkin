@@ -97,6 +97,17 @@ internal object TermuxInstall {
     context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
   }
 
+  /**
+   * Opens Termux in a new terminal session, whose `.bashrc` starts Pipkin's helper. Termux adds a session for
+   * [Intent.ACTION_RUN] (its launcher's "New session" shortcut) only while creating its activity, so the task is
+   * cleared first; the sessions themselves live on in Termux's service.
+   */
+  fun openTermuxNewSession(context: Context) = context.startActivity(
+    Intent(Intent.ACTION_RUN)
+      .setClassName(PACKAGE_NAME, "com.termux.app.TermuxActivity")
+      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+  )
+
   fun openFDroidPage(context: Context) = context.startActivity(Intent(Intent.ACTION_VIEW, FDROID_URL.toUri()))
 
   /** Termux's Play Store listing; the Play Store app opens the web link when it's installed. */

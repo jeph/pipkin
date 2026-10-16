@@ -348,6 +348,31 @@ describe("helper daemon", () => {
     expect(await readOptional(file("status"))).toBe("no-key\n");
   });
 
+  it("stops once the process that started it is gone", async () => {
+    const wrapper = spawn("/bin/sh", ["-c", `"$0" "$1" & exec sleep 30`, process.execPath, file("helper.mjs")], {
+      env: env.env,
+      stdio: "ignore",
+    });
+    children.push(wrapper);
+    const pid = await waitFor(async () => (await readOptional(file("helper.pid")))?.trim() || undefined);
+    const alive = (): boolean => {
+      try {
+        process.kill(Number(pid), 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    try {
+      wrapper.kill("SIGKILL");
+      await waitFor(async () => (alive() ? undefined : true), 5000);
+      expect(await readOptional(file("helper.pid"))).toBeUndefined();
+      expect(await readOptional(file("helper.log"))).toContain("stopping (wrapper gone), exit 0");
+    } finally {
+      if (alive()) process.kill(Number(pid), "SIGKILL");
+    }
+  });
+
   it("replaces helper.mjs on update and exits 75", async () => {
     const { child, port } = await startDaemon();
     const connection = await connectHelper({ port, keys: [KEY] });

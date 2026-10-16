@@ -11,7 +11,8 @@ alive() { # $1 = pid file, $2 = text the process's command line must contain
   pid=$(cat "$1" 2>/dev/null) && [ -n "$pid" ] && grep -qaF "$2" "/proc/$pid/cmdline" 2>/dev/null
 }
 
-alive "$dir/helper.pid" helper.mjs && exit 0
+# A helper without its wrapper is stopping itself (see daemon.ts), so it doesn't count.
+alive "$dir/helper.pid" helper.mjs && alive "$dir/run.pid" run.sh && exit 0
 
 if $shell; then
   case $(cat "$dir/status" 2>/dev/null) in

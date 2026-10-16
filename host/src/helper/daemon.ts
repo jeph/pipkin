@@ -42,6 +42,7 @@ export const EXIT_NO_KEY = 78;
 
 const DEFAULT_PORTS = [47310, 47311, 47312, 47313, 47314];
 const HANDSHAKE_TIMEOUT_MS = 5000;
+const WRAPPER_CHECK_MS = 1000;
 const STDERR_TAIL = 4096;
 const LOG_KEEP = 64 * 1024;
 const TERMUX_PREFIX = "/data/data/com.termux/files/usr";
@@ -86,6 +87,7 @@ export async function runDaemon(files = new HelperFiles()): Promise<number> {
   daemon.onStop = resolve;
   process.on("SIGTERM", () => daemon.stop(0, "SIGTERM"));
   process.on("SIGUSR1", () => daemon.stop(EXIT_RESTART, "SIGUSR1"));
+  daemon.watchWrapper();
   writeFileAtomic(files.port, `${port}\n`);
   writeFileAtomic(files.pid, `${process.pid}\n`);
   rmSync(files.status, { force: true });
@@ -130,6 +132,8 @@ function readTail(file: string): string {
 class Daemon {
   private server: Server | undefined;
   private readonly sockets = new Set<Socket>();
+  private readonly wrapperPid = process.ppid;
+  private wrapperTimer: NodeJS.Timeout | undefined;
   onStop: (code: number) => void = () => undefined;
 
   constructor(
@@ -154,9 +158,27 @@ class Daemon {
     return undefined;
   }
 
+  /**
+   * Termux's Exit kills `run.sh` but not this helper, which then neither restarts nor keeps Termux's service up, so
+   * Android freezes it. Such a helper stops, checked every second and on every connection (a frozen one thaws when
+   * Termux opens), so the fresh `run.sh` that opening Termux starts takes over and no launch lands on a doomed helper.
+   */
+  watchWrapper(): void {
+    this.wrapperTimer = setInterval(() => this.stopIfOrphaned(), WRAPPER_CHECK_MS);
+    this.wrapperTimer.unref();
+  }
+
+  /** Whether this helper lost the process that started it, in which case it stops. */
+  private stopIfOrphaned(): boolean {
+    if (process.ppid === this.wrapperPid) return false;
+    this.stop(0, "wrapper gone");
+    return true;
+  }
+
   /** Stops listening and removes the pid and port files; started children keep running. */
   stop(code: number, reason: string): void {
     if (this.server === undefined) return;
+    clearInterval(this.wrapperTimer);
     this.server.close();
     this.server = undefined;
     for (const socket of this.sockets) socket.destroy();
@@ -175,6 +197,10 @@ class Daemon {
   }
 
   private accept(socket: Socket): void {
+    if (this.stopIfOrphaned()) {
+      socket.destroy();
+      return;
+    }
     this.sockets.add(socket);
     socket.on("close", () => this.sockets.delete(socket));
     socket.on("error", () => undefined);

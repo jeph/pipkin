@@ -17,13 +17,15 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
- * Starts Pipkin's helper in Termux's Play build by opening Termux: its `.bashrc` starts the helper with the first
- * terminal session, and Android lets Termux start it while Termux is on screen. Pipkin then comes back to the front.
+ * Starts Pipkin's helper in Termux's Play build by opening Termux in a new terminal session: its `.bashrc` starts the
+ * helper, and Android lets Termux start it while Termux is on screen. Pipkin then comes back to the front.
  */
 internal object TermuxWaker {
   private const val TAG = "Pipkin"
   private const val POLL_MILLIS = 250L
-  private const val WAIT_MILLIS = 8_000L
+
+  // From a frozen Termux on the emulator: 4.5 s to the new session, 3.4 s for `am startservice`, 6 s for Node.
+  private const val WAIT_MILLIS = 30_000L
   private const val RETURN_GRACE_MILLIS = 1_000L
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -46,7 +48,7 @@ internal object TermuxWaker {
     if (HelperBridge.listening(context)) return true
     if (!pipkinStarted()) return false
     try {
-      TermuxInstall.openTermux(context)
+      TermuxInstall.openTermuxNewSession(context)
     } catch (_: ActivityNotFoundException) {
       return false
     }
