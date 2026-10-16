@@ -90,7 +90,11 @@ rc="$HOME/.bashrc"
 touch "$rc" || fail "Couldn't update ~/.bashrc."
 # shellcheck disable=SC2016 # $HOME expands when .bashrc runs.
 PIPKIN_BLOCK='# >>> pipkin >>>
-if [ -x "$HOME/.pipkin/helper/start.sh" ]; then "$HOME/.pipkin/helper/start.sh" --shell; fi
+if [ -x "$HOME/.pipkin/helper/start.sh" ]; then
+  "$HOME/.pipkin/helper/start.sh" --shell
+  # 3: this session only started the helper, and closing it keeps Termux under its limit of 8 sessions.
+  [ $? = 3 ] && exit 0
+fi
 # <<< pipkin <<<' awk '
   # Replaces the first complete marked block in place and drops any later ones; appends it if there is none.
   # A start marker without an end marker is left alone.
