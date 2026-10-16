@@ -2,6 +2,7 @@ package io.jeph.pipkin.host
 
 import android.content.Context
 import android.util.Log
+import io.jeph.pipkin.data.BundledExtension
 import java.io.IOException
 import java.util.Base64
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,11 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
 
   /** The bundled `pi/package.json`: Pi and the Pi packages Pipkin ships; `ensure` installs it, `rpc` requires it. */
   private val packageJson: String by lazy { asset(PACKAGE_JSON) }
+
+  /** The source of each extension Pipkin makes itself, which [openRpc] sends for the host to save. */
+  private val pipkinExtensionSources: Map<BundledExtension, String> by lazy {
+    BundledExtension.entries.mapNotNull { extension -> extension.asset?.let { extension to asset(it) } }.toMap()
+  }
 
   /** The Pi version the bundled `pi/package.json` pins. */
   val expectedPiVersion: String by lazy {
@@ -207,9 +213,15 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   /**
    * Starts `pi --mode rpc` and returns its channel: Pi's RPC JSONL both ways, ended by a
    * `pipkin_exit` line. A refusal (`pi_version`, `cwd_missing`) arrives instead as a
-   * `pipkin_result` line; see [HostRejected.from].
+   * `pipkin_result` line; see [HostRejected.from]. Pi loads the bundled extensions not in [disabledExtensions], which
+   * are [io.jeph.pipkin.data.BundledExtension.id]s.
    */
-  suspend fun openRpc(cwd: String, sessionPath: String?): HostChannel {
+  suspend fun openRpc(cwd: String, sessionPath: String?, disabledExtensions: Set<String>): HostChannel {
+    val pipkinExtensions = pipkinExtensionSources.filterKeys { it.id !in disabledExtensions }
+      .map { (extension, source) -> JSONObject().put("name", extension.id).put("source", source) }
+    val disabledPackages = BundledExtension.entries
+      .filter { it.asset == null && it.id in disabledExtensions }
+      .map { it.id }
     val channel = connect("rpc")
     var sent = false
     try {
@@ -219,7 +231,9 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
           .put("cwd", cwd)
           .put("sessionPath", sessionPath ?: JSONObject.NULL)
           .put("expectedVersion", expectedPiVersion)
-          .put("packageJson", packageJson),
+          .put("packageJson", packageJson)
+          .put("disabledPackages", JSONArray(disabledPackages))
+          .put("pipkinExtensions", JSONArray(pipkinExtensions)),
       )
       sent = true
     } finally {

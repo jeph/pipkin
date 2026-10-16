@@ -10,7 +10,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -23,10 +25,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.AppGraph
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.data.BundledExtension
 import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.ui.auth.LoginSheet
 import io.jeph.pipkin.ui.components.HeaderBar
@@ -102,6 +106,7 @@ private fun SettingsContent(
     ) {
       ProvidersSection(onOpenProviders = onOpenProviders)
       AgentSection(graph = graph, snackbar = snackbar, onOpenBackups = onOpenBackups)
+      ExtensionsSection(graph = graph)
       AppearanceSection(preferences = graph.preferences)
       TermuxSection(graph = graph, onOpenPermissions = onOpenPermissions)
       AdvancedSection(onOpenAdvanced = onOpenAdvanced)
@@ -174,6 +179,36 @@ private fun AgentSection(graph: AppGraph, snackbar: SnackbarStackState, onOpenBa
     ) {
       Chevron()
     }
+  }
+}
+
+/**
+ * A switch for each extension Pipkin bundles. A change reloads idle chats so they pick it up at once; a working chat
+ * picks it up when its agent next starts.
+ */
+@Composable
+private fun ExtensionsSection(graph: AppGraph) {
+  val disabled by graph.preferences.disabledExtensions.collectAsStateWithLifecycle()
+  Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12)) {
+    SettingsSection(title = stringResource(R.string.settings_section_extensions)) {
+      BundledExtension.entries.forEachIndexed { index, extension ->
+        if (index > 0) SettingsDivider()
+        val enabled = extension.id !in disabled
+        val toggle = { on: Boolean ->
+          graph.preferences.setExtensionEnabled(extension, on)
+          graph.sessionRepository.forgetExtensionUi()
+          graph.registry.reloadIdle()
+        }
+        SettingsRow(
+          title = stringResource(extension.title),
+          subtitle = stringResource(extension.summary),
+          modifier = Modifier.toggleable(value = enabled, role = Role.Switch, onValueChange = toggle),
+        ) {
+          Switch(checked = enabled, onCheckedChange = null)
+        }
+      }
+    }
+    SettingsCaption(text = stringResource(R.string.settings_extensions_caption))
   }
 }
 

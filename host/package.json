@@ -7,18 +7,20 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --log-level=warning --outfile=$OUT/pipkin-host.mjs",
+    "build": "node build.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --deny-warnings",
     "test": "vitest run",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run test"
   },
   "devDependencies": {
+    "@earendil-works/pi-ai": "1.3.0",
     "@earendil-works/pi-coding-agent": "1.3.0",
     "@types/node": "^22.20.5",
     "diff": "9.0.0",
     "esbuild": "^0.28.2",
     "oxlint": "^1.87.0",
+    "typebox": "1.3.27",
     "typescript": "^7.0.2",
     "vitest": "^5.0.3"
   }

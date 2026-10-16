@@ -80,6 +80,8 @@ internal class AgentProcess(
   sessionPath: String?,
   scope: CoroutineScope,
   private val sessions: SessionRepository,
+  /** [io.jeph.pipkin.data.BundledExtension.id]s the user turned off, which each new Pi leaves out. */
+  private val disabledExtensions: StateFlow<Set<String>>,
 ) : ManagedProcess {
   private class Connection(val channel: HostChannel) {
     val rpc = RpcClient(channel::send)
@@ -123,6 +125,14 @@ internal class AgentProcess(
   private val extensionStatusKeysChanged = HashSet<String>()
   private val extensionWidgetKeysChanged = HashSet<String>()
   private val extensionUiLock = Any()
+
+  /**
+   * The [disabledExtensions] of the Pi that set the extension title, statuses and widgets shown. Another set means
+   * another set of extensions, which wouldn't clear what a turned-off one showed, so the next Pi starts without them,
+   * as Pi's own `/reload` does, and they aren't kept for later ones. What [SessionRepository] keeps came from this
+   * set: it forgets everything when the set changes.
+   */
+  private var extensionUiConfiguration = disabledExtensions.value
 
   @Volatile
   private var connection: Connection? = null
@@ -410,8 +420,13 @@ internal class AgentProcess(
   /** One connection; returns the host's refusal, or null once [state] is Ready, Exited or Failed. */
   private suspend fun attempt(): HostRejected? {
     stateFlow.value = AgentProcessState.Starting
+    val disabled = disabledExtensions.value
+    if (disabled != extensionUiConfiguration) {
+      takeDownExtensionUi()
+      extensionUiConfiguration = disabled
+    }
     val channel = try {
-      hostClient.openRpc(cwd, sessionFileState.value)
+      hostClient.openRpc(cwd, sessionFileState.value, disabled)
     } catch (failure: HostFailure) {
       stateFlow.value = AgentProcessState.Failed(failure.message.orEmpty(), failure)
       return null
@@ -633,6 +648,7 @@ internal class AgentProcess(
   }
 
   private fun keepExtensionUi(sessionFile: String, left: LeftExtensionUi) {
+    if (extensionUiConfiguration != disabledExtensions.value) return
     sessions.extensionTitles.keep(sessionFile, left.title)
     sessions.extensionStatuses.keep(sessionFile, left.statuses.ifEmpty { null })
     sessions.extensionWidgets.keep(sessionFile, left.widgets.ifEmpty { null })

@@ -22,4 +22,8 @@ internal class KeptBySession<T : Any> {
   fun keep(sessionFile: String, value: T?) {
     state.update { if (value == null) it - sessionFile else it + (sessionFile to value) }
   }
+
+  fun forgetAll() {
+    state.value = emptyMap()
+  }
 }

@@ -55,7 +55,7 @@ internal class AppGraph(private val application: Application) {
       idleParkMillis = preferences.idleStop.map { it.millis },
       onRunEnded = turnNotifications::runEnded,
     ) { cwd, sessionPath ->
-      AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository)
+      AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository, preferences.disabledExtensions)
     }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
   val configBackups = ConfigBackups(hostClient, registry, keepAlive, accountRepository, sessionRepository, scope)

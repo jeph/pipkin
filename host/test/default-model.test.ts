@@ -38,7 +38,7 @@ describe("default_model mode", () => {
   async function newSessionState(): Promise<JsonObject> {
     const { run } = await startHost("rpc", dirs);
     await run.next();
-    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON } });
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] } });
     run.send({ id: "s", type: "get_state" });
     for (;;) {
       const message = await run.next();

@@ -6,7 +6,8 @@ import type { Readable } from "node:stream";
 import { installedPiVersion, loadPi, PI_PACKAGE, piPackageDir } from "../env.js";
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
-import { nullableStringParam, stringParam } from "../params.js";
+import { nullableStringParam, stringArrayParam, stringParam } from "../params.js";
+import { pipkinExtensionFiles, pipkinExtensionsParam } from "../pipkin-extensions.js";
 import { SYSTEM_APPEND } from "../prompt.js";
 import { openSettingsIfValid } from "../settings.js";
 import { termuxSessionEnv } from "../termux-session.js";
@@ -157,6 +158,9 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const sessionPath = nullableStringParam(ctx.params, "sessionPath");
   const expectedVersion = stringParam(ctx.params, "expectedVersion");
   const packageJson = stringParam(ctx.params, "packageJson");
+  /** Bundled packages the user turned off in Pipkin's settings. */
+  const disabledPackages = new Set(stringArrayParam(ctx.params, "disabledPackages"));
+  const pipkinExtensions = pipkinExtensionsParam(ctx.params);
   const installed = await installedPiVersion(ctx.env.root);
   if (installed !== expectedVersion) {
     const found = installed === null ? "The agent is not installed" : `Agent ${installed} is installed`;
@@ -185,11 +189,12 @@ export async function rpc(ctx: ModeContext): Promise<void> {
 
   const args = [await piEntry(ctx.env.root), "--mode", "rpc"];
   if (sessionPath !== null) args.push("--session", sessionPath);
-  const packages = bundledPackages(packageJson);
+  const packages = bundledPackages(packageJson).filter((name) => !disabledPackages.has(name));
   if (packages.includes(WEB_ACCESS_PACKAGE)) await defaultWebToolsToEager(ctx.env.configDir);
   const settings = await readGlobalSettings(ctx.env.configDir);
   await defaultSteeringToAll(ctx, settings);
   for (const dir of bundledExtensionDirs(ctx, packages, settings)) args.push("--extension", dir);
+  for (const file of await pipkinExtensionFiles(ctx.env.root, pipkinExtensions)) args.push("--extension", file);
   args.push("--append-system-prompt", SYSTEM_APPEND);
   const env = await termuxSessionEnv(ctx.env);
   const child = spawn(process.execPath, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });

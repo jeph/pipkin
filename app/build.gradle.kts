@@ -36,7 +36,12 @@ val hostBuild = tasks.register<HostBundle>("hostBuild") {
   dependsOn(hostInstall)
   workingDir = hostDir.asFile
   inputs.dir(hostDir.dir("src"))
-  inputs.files(hostDir.file("package.json"), hostDir.file("pnpm-lock.yaml"), hostDir.file("tsconfig.json"))
+  inputs.files(
+    hostDir.file("package.json"),
+    hostDir.file("pnpm-lock.yaml"),
+    hostDir.file("tsconfig.json"),
+    hostDir.file("build.ts"),
+  )
   commandLine("pnpm", "run", "build")
 }
 
@@ -52,6 +57,7 @@ val hostCheck = tasks.register<Exec>("hostCheck") {
     hostDir.file("tsconfig.json"),
     hostDir.file(".oxlintrc.json"),
     hostDir.file("vitest.config.ts"),
+    hostDir.file("build.ts"),
   )
   outputs.upToDateWhen { false }
   commandLine("pnpm", "run", "check")

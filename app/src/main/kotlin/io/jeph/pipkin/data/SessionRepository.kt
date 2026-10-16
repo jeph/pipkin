@@ -41,6 +41,13 @@ internal class SessionRepository(
   /** The extension widgets of sessions whose Pi stopped, by key, which a later Pi on the session starts with. */
   val extensionWidgets = KeptBySession<Map<String, ExtensionWidget>>()
 
+  /** Forgets every session's kept extension UI, for when the extensions loaded change and wouldn't clear it. */
+  fun forgetExtensionUi() {
+    extensionTitles.forgetAll()
+    extensionStatuses.forgetAll()
+    extensionWidgets.forgetAll()
+  }
+
   val sessions: StateFlow<List<SessionInfo>> = sessionsState.asStateFlow()
 
   /** True once the first refresh finished, successfully or not. */

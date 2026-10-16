@@ -19,6 +19,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /** App settings in the `pipkin` SharedPreferences file. Setters persist and publish immediately. */
+@Suppress("TooManyFunctions") // One setter per setting, beside the readers they share.
 internal class Preferences(context: Context) {
   private val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
   private val setupCompleteState = MutableStateFlow(prefs.getBoolean(SETUP_COMPLETE, false))
@@ -32,7 +33,7 @@ internal class Preferences(context: Context) {
   private val explorerSortState = MutableStateFlow(readExplorerSort())
   private val explorerTabsState = MutableStateFlow(readEnumMap(EXPLORER_TABS, ExplorerTab.entries))
   private val diffModesState = MutableStateFlow(readEnumMap(DIFF_MODES, GitDiffMode.entries))
-  private val trustedRepositoriesState = MutableStateFlow(readTrustedRepositories())
+  private val trustedRepositoriesState = MutableStateFlow(readStringSet(TRUSTED_REPOSITORIES))
   private val diffWrapLinesState = MutableStateFlow(prefs.getBoolean(DIFF_WRAP_LINES, false))
   private val diffHideWhitespaceState = MutableStateFlow(prefs.getBoolean(DIFF_HIDE_WHITESPACE, false))
   private val commitsCollapsedState = MutableStateFlow(prefs.getBoolean(COMMITS_COLLAPSED, true))
@@ -42,6 +43,7 @@ internal class Preferences(context: Context) {
   private val idleStopState = prefs.getString(IDLE_STOP, null).let { name ->
     MutableStateFlow(IdleStop.entries.firstOrNull { it.name == name } ?: IdleStop.Default)
   }
+  private val disabledExtensionsState = MutableStateFlow(readStringSet(DISABLED_EXTENSIONS))
 
   /** Onboarding finished or was skipped. */
   val setupComplete: StateFlow<Boolean> = setupCompleteState.asStateFlow()
@@ -86,6 +88,9 @@ internal class Preferences(context: Context) {
 
   /** How long a chat that is neither working nor shown keeps its Pi. */
   val idleStop: StateFlow<IdleStop> = idleStopState.asStateFlow()
+
+  /** The extensions Pipkin bundles that the user turned off, by [BundledExtension.id]; a chat's next Pi leaves them out. */
+  val disabledExtensions: StateFlow<Set<String>> = disabledExtensionsState.asStateFlow()
 
   fun setSetupComplete(complete: Boolean) {
     prefs.edit { putBoolean(SETUP_COMPLETE, complete) }
@@ -193,6 +198,17 @@ internal class Preferences(context: Context) {
     idleStopState.value = stop
   }
 
+  fun setExtensionEnabled(extension: BundledExtension, enabled: Boolean) {
+    val updated = if (enabled) {
+      disabledExtensionsState.value - extension.id
+    } else {
+      disabledExtensionsState.value +
+        extension.id
+    }
+    prefs.edit { putString(DISABLED_EXTENSIONS, JSONArray(updated).toString()) }
+    disabledExtensionsState.value = updated
+  }
+
   /** The tabs and panes last shown, for a restarted Pipkin to show again; null before any were saved. */
   fun savedLayout(): SavedLayout? = prefs.getString(LAYOUT, null)?.let(::savedLayoutOf)
 
@@ -211,8 +227,9 @@ internal class Preferences(context: Context) {
     return ExplorerSort(key, prefs.getBoolean(EXPLORER_SORT_DESCENDING, key.descendingFirst))
   }
 
-  private fun readTrustedRepositories(): Set<String> {
-    val array = JSONArray(prefs.getString(TRUSTED_REPOSITORIES, null) ?: return emptySet())
+  /** The JSON array of strings at [key], as a set. */
+  private fun readStringSet(key: String): Set<String> {
+    val array = JSONArray(prefs.getString(key, null) ?: return emptySet())
     return List(array.length()) { array.getString(it) }.toSet()
   }
 
@@ -253,5 +270,6 @@ internal class Preferences(context: Context) {
     const val MAX_RUNNING_CHATS = "maxRunningChats"
     const val IDLE_STOP = "idleStop"
     const val LAYOUT = "layout"
+    const val DISABLED_EXTENSIONS = "disabledExtensions"
   }
 }
