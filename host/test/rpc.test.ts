@@ -88,7 +88,6 @@ describe("rpc mode", () => {
       nodeVersion: process.versions.node,
       configDir: dirs.configDir,
       home: dirs.home,
-      configMove: false,
     });
     run.socket.end();
     await run.exited;

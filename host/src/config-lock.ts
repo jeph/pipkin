@@ -23,13 +23,13 @@ async function livePid(path: string): Promise<number | null> {
   return Number.isInteger(pid) && pid > 0 && (await isLiveHost(pid)) ? pid : null;
 }
 
-/** True while a move, backup, restore or delete holds the config lock, so Pi must not start on a half-swapped config. */
+/** True while a backup, restore or delete holds the config lock, so Pi must not start on a half-swapped config. */
 export async function isConfigLocked(env: HostEnv): Promise<boolean> {
   return (await livePid(join(env.root, LOCK_FILE))) !== null;
 }
 
 /**
- * Runs `run` holding the config lock: one move, backup, restore or delete at a time, across host processes. A lock left
+ * Runs `run` holding the config lock: one backup, restore or delete at a time, across host processes. A lock left
  * by a host that died is taken over; one a live host holds fails with `busy`.
  *
  * The lock is a symlink whose target is the holder's pid: creating one is atomic and fails when it exists, and it never
@@ -46,7 +46,7 @@ export async function withConfigLock<T>(env: HostEnv, run: () => Promise<T>): Pr
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
     if ((await livePid(path)) !== null || attempt === 2) {
-      throw new HostError("busy", "Another backup, restore or move of the configuration is running.");
+      throw new HostError("busy", "Another backup or restore of the configuration is running.");
     }
     // A rename has one winner, so two hosts that both found the lock stale cannot both remove it. A host that lost
     // the race moved the winner's fresh lock aside, and puts it back.

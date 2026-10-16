@@ -49,8 +49,6 @@
     <string name="backups_delete_title">Delete this backup?</string>
     <string name="backups_delete_text">The backup from %1$s will be deleted for good.</string>
     <string name="backups_delete_file_text">%1$s will be deleted for good.</string>
-    <string name="config_move_title">Moving Pi\'s settings</string>
-    <string name="config_move_text">Pipkin is moving Pi\'s settings and chats from shared storage into Termux, where Pi reads them faster. This happens once.</string>
 
     <string name="settings_advanced">Advanced</string>
     <string name="settings_running_chats">Running chats</string>

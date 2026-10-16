@@ -149,9 +149,7 @@ internal object HostLauncher {
     [ -d "$HOME/storage/shared" ] && [ -w "$HOME/storage/shared" ] || exit 75
     export PIPKIN_ROOT="$HOME/.local/share/pipkin"
     export PI_CODING_AGENT_DIR="$HOME/.pipkin/pi"
-    PIPKIN_LEGACY_CONFIG_DIR="$(realpath "$HOME/storage/shared")/.pipkin/pi"
-    export PIPKIN_LEGACY_CONFIG_DIR
-    mkdir -p "$PIPKIN_ROOT"
+    mkdir -p "$PIPKIN_ROOT" "$PI_CODING_AGENT_DIR"
     mode=$1
     port=$2
     shift 2

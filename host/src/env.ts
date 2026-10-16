@@ -15,8 +15,6 @@ export interface HostEnv {
   root: string;
   /** `PI_CODING_AGENT_DIR`, `$HOME/.pipkin/pi`: Pi's config, sessions and user-installed packages. */
   configDir: string;
-  /** Where Pipkin kept `configDir` on shared storage before it moved into Termux; unset when there is no such place. */
-  legacyConfigDir: string | undefined;
   home: string;
   /** Termux's `$PREFIX`, the root of its packages. */
   prefix: string;
@@ -60,19 +58,12 @@ export function readHostEnv(): HostEnv | undefined {
   const configDir = process.env.PI_CODING_AGENT_DIR;
   const prefix = process.env.PREFIX;
   if (!token || !root || !configDir || !prefix) return undefined;
-  const legacyConfigDir = process.env.PIPKIN_LEGACY_CONFIG_DIR || undefined;
-  return { token, root, configDir, legacyConfigDir, home: process.env.HOME ?? os.homedir(), prefix };
+  return { token, root, configDir, home: process.env.HOME ?? os.homedir(), prefix };
 }
 
 /** The host's own variables, which Pi, shells and the commands they run never inherit. */
 export function withoutHostVariables(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const {
-    PIPKIN_TOKEN: _token,
-    PIPKIN_ROOT: _root,
-    PI_CODING_AGENT_DIR: _configDir,
-    PIPKIN_LEGACY_CONFIG_DIR: _legacyConfigDir,
-    ...rest
-  } = environment;
+  const { PIPKIN_TOKEN: _token, PIPKIN_ROOT: _root, PI_CODING_AGENT_DIR: _configDir, ...rest } = environment;
   return rest;
 }
 

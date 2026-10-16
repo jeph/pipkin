@@ -11,8 +11,6 @@ internal data class HostHello(
   val nodeVersion: String,
   val configDir: String,
   val home: String,
-  /** Pi's config folder still has to move off shared storage; until it has, the host runs nothing else. */
-  val configMove: Boolean = false,
 ) {
   companion object {
     fun from(hello: JSONObject) = HostHello(
@@ -20,21 +18,6 @@ internal data class HostHello(
       nodeVersion = hello.optString("nodeVersion"),
       configDir = hello.optString("configDir"),
       home = hello.optString("home"),
-      configMove = hello.optBoolean("configMove"),
-    )
-  }
-}
-
-/**
- * The config folder's move off shared storage: [from] the old folder, null when there was nothing to move, [to] the
- * new one, and [sessions] the session files in it relative to [to], whose old paths Pipkin may still keep.
- */
-internal data class ConfigMove(val from: String?, val to: String, val sessions: List<String>) {
-  companion object {
-    fun from(json: JSONObject) = ConfigMove(
-      from = json.opt("from") as? String,
-      to = json.optString("to"),
-      sessions = json.optJSONArray("sessions").strings(),
     )
   }
 }

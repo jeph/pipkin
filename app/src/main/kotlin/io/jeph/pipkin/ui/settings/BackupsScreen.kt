@@ -3,11 +3,8 @@ package io.jeph.pipkin.ui.settings
 import android.content.Context
 import android.text.format.DateUtils
 import android.text.format.Formatter
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,7 +19,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
@@ -31,7 +27,6 @@ import io.jeph.pipkin.data.BackupTask
 import io.jeph.pipkin.data.ConfigBackups
 import io.jeph.pipkin.host.BackupInfo
 import io.jeph.pipkin.host.Backups
-import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.IconButton28
@@ -261,7 +256,7 @@ private fun OutcomeCaption(outcome: BackupOutcome, failed: String) {
   SettingsCaption(text = text, color = color)
 }
 
-/** The latest line of a backup, restore or move's progress, on one monospace line. */
+/** The latest line of a backup or restore's progress, on one monospace line. */
 @Composable
 private fun ProgressLine(line: String, modifier: Modifier = Modifier) {
   Text(
@@ -282,30 +277,3 @@ private fun backupTime(context: Context, backup: BackupInfo): String = DateUtils
   DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME or DateUtils.FORMAT_SHOW_YEAR or
     DateUtils.FORMAT_ABBREV_MONTH,
 )
-
-/**
- * Shown over everything while Pi's config folder moves off shared storage into Termux, once after updating: nothing
- * that needs Pi can run until it has moved.
- */
-@Composable
-internal fun ConfigMoveDialog(hostClient: HostClient) {
-  val moving by hostClient.moving.collectAsStateWithLifecycle()
-  val progress = moving ?: return
-  val colors = pipkinColors
-  AlertDialog(
-    onDismissRequest = {},
-    confirmButton = {},
-    icon = { SimmeringPot() },
-    title = { Text(text = stringResource(R.string.config_move_title), fontSize = PipkinTokens.FontSize.xl) },
-    text = {
-      Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
-        Text(text = stringResource(R.string.config_move_text), fontSize = PipkinTokens.FontSize.base)
-        if (progress.isNotEmpty()) ProgressLine(progress)
-      }
-    },
-    properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
-    containerColor = colors.surface1,
-    titleContentColor = colors.foreground,
-    textContentColor = colors.foregroundMuted,
-  )
-}
