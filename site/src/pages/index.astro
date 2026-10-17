@@ -168,16 +168,13 @@ const structuredData = [
           <p class="eyebrow">No computer required</p>
           <h2 id="on-device-title">On your phone, not controlled from it.</h2>
           <p>
-            Most agents you can use from a phone are remote controls. The real work happens on a laptop or cloud server
-            somewhere else, and your phone only sends it messages. Pipkin runs the agent on the phone itself, so your
-            code, your tools, and every command stay in your pocket. There's no other machine to set up, pay for, or
-            keep awake.
+            Most agents you use from a phone are remote controls. The real work happens on a laptop or cloud server
+            somewhere else. Pipkin runs directly on your phone, so your code, your tools, and every command run in your
+            pocket. There's no other machine to set up, pay for, or keep awake.
           </p>
           <p>
-            Under the hood is <a href={TERMUX_URL} rel="noopener">Termux</a>, a Linux-like environment for Android. The
-            agent installs compilers, runtimes, and tools with <code>pkg</code>, just like on a desktop. Need something
-            that isn't packaged? <code>proot-distro</code> sets up a full Debian, Ubuntu, or Arch, and the agent can
-            install it there. When you'd rather type yourself, open a terminal tab right next to your chat.
+            Pipkin is powered by <a href={TERMUX_URL} rel="noopener">Termux</a>, a Linux-like environment for Android. It
+            allows Pipkin to run programs just like on a desktop or server.
           </p>
         </div>
         <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
