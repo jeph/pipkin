@@ -1,0 +1,57 @@
+---
+// Pipkin's launcher mark, from app/src/main/res/drawable/ic_launcher_foreground.xml without the launcher's scale.
+// The pot is drawn once by LogoDefs.astro and reused here; the steam stays inline so it can simmer.
+interface Props {
+  size?: number;
+  class?: string;
+  simmer?: boolean;
+}
+const { size = 32, class: className, simmer = false } = Astro.props;
+---
+
+<svg
+  class:list={["mark", className, { simmer }]}
+  width={size}
+  height={size}
+  viewBox="98 104 320 320"
+  aria-hidden="true"
+  focusable="false"
+>
+  <use href="#pipkin-pot"></use>
+  <path class="steam" d="M224 178Q197 151 224 123" />
+  <path class="steam steam-late" d="M283 178Q256 151 283 123" />
+</svg>
+
+<style>
+  .mark {
+    display: block;
+    flex: none;
+  }
+  .steam {
+    fill: none;
+    stroke: var(--steam);
+    stroke-width: 17;
+    stroke-linecap: round;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .simmer .steam {
+      animation: simmer 2.8s ease-in-out infinite;
+      transform-box: fill-box;
+      transform-origin: 50% 100%;
+    }
+    .simmer .steam-late {
+      animation-delay: -1.4s;
+    }
+  }
+  @keyframes simmer {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: translateY(6px) scaleY(0.85);
+    }
+    50% {
+      opacity: 1;
+      transform: translateY(-4px) scaleY(1);
+    }
+  }
+</style>

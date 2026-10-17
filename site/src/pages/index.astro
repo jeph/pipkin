@@ -1,0 +1,1075 @@
+---
+import Icon, { type IconName } from "../components/Icon.astro";
+import Logo from "../components/Logo.astro";
+import Nav from "../components/Nav.astro";
+import PhoneDemo from "../components/PhoneDemo.astro";
+import Screenshot from "../components/Screenshot.astro";
+import Base from "../layouts/Base.astro";
+import { GITHUB_URL, PI_URL, TERMUX_URL } from "../site";
+
+import extensionSelect from "../assets/screens/extension-select.png";
+import fileView from "../assets/screens/file-view.png";
+import gitChanges from "../assets/screens/git-changes.png";
+import notifications from "../assets/screens/notifications.png";
+import onboarding from "../assets/screens/onboarding.png";
+import photos from "../assets/screens/photos.png";
+import todoWidget from "../assets/screens/todo-widget.png";
+
+const title = "Pipkin: a coding agent that lives on your Android phone";
+const description =
+  "Pipkin is a native Android app for agentic coding. Built on the Pi harness and powered by Termux, it reads your code, runs commands, edits files and checks its work, all on your phone.";
+
+const facts: { icon: IconName; text: string }[] = [
+  { icon: "plug", text: "Built on Pi" },
+  { icon: "square_terminal", text: "Runs in Termux" },
+  { icon: "panel_right", text: "Native Kotlin and Compose UI" },
+  { icon: "key_round", text: "Bring your own model" },
+];
+
+const steps = [
+  { title: "Pick a folder", text: "A project in Termux, or any folder on your phone's storage." },
+  {
+    title: "Say what you want",
+    text: "Plain language is fine: “add a dark mode”, “why does this crash?”, “sort my photos by month”.",
+  },
+  {
+    title: "Watch it work",
+    text: "The agent plans, edits files and runs commands, and you see every step. Stop it or change course at any time.",
+  },
+];
+
+const setupSteps = [
+  { title: "Install Termux", text: "From F-Droid or Google Play. Pipkin tells you which build you have." },
+  { title: "Connect it to Pipkin", text: "One Android permission lets Pipkin send commands to Termux." },
+  { title: "Paste one command", text: "Pipkin copies a setup command; paste it into Termux and it prepares everything." },
+  { title: "Allow the helpful extras", text: "Notifications, background running and storage, each explained in plain words." },
+  { title: "Install the agent", text: "Pipkin installs Pi for you. It takes a few minutes." },
+  { title: "Connect a model", text: "Sign in with your Claude or OpenAI subscription, or add an API." },
+];
+
+const extras: { icon: IconName; title: string; text: string }[] = [
+  {
+    icon: "pencil",
+    title: "Steer while it works",
+    text: "Send a message mid-task to correct course. The agent picks it up without starting over.",
+  },
+  {
+    icon: "columns_2",
+    title: "Split panes",
+    text: "On foldables and tablets, put chats, files, diffs and terminals side by side.",
+  },
+  {
+    icon: "bell",
+    title: "Runs in the background",
+    text: "Lock your phone or switch apps. A notification tells you when the chat is done.",
+  },
+  {
+    icon: "key_round",
+    title: "Your model, your plan",
+    text: "Sign in with a Claude or OpenAI subscription, or point Pipkin at any OpenAI-compatible API.",
+  },
+  {
+    icon: "search",
+    title: "Web search included",
+    text: "A bundled extension lets the agent search the web and read pages, docs and PDFs.",
+  },
+  {
+    icon: "image",
+    title: "Images in prompts",
+    text: "Attach a screenshot or photo when the model can see images.",
+  },
+  {
+    icon: "archive",
+    title: "Many chats, kept tidy",
+    text: "Run chats side by side, fork one to try another approach, archive the rest.",
+  },
+  {
+    icon: "refresh_cw",
+    title: "Backups",
+    text: "Save your settings, sign-ins, models and extensions in one tap, and restore them when you need to.",
+  },
+  {
+    icon: "moon",
+    title: "Light and dark",
+    text: "Follows your system theme, or pick one.",
+  },
+];
+
+const faqs = [
+  {
+    question: "What is an AI coding agent?",
+    answer:
+      "It's an assistant that does the work instead of only suggesting it. You describe a goal, and the agent reads your files, runs commands, makes changes and checks the result, step by step, while you watch and steer.",
+  },
+  {
+    question: "Do I need a computer?",
+    answer:
+      "No. The agent, your files, git and a terminal all run on your phone. Pipkin was built so a phone can be your only development machine.",
+  },
+  {
+    question: "Which AI models can I use?",
+    answer:
+      "Sign in with a Claude or OpenAI subscription, or add any API that speaks the OpenAI format, including hosted gateways and servers you run yourself. You can add several and switch per chat.",
+  },
+  {
+    question: "Does the AI model run on my phone?",
+    answer:
+      "The agent and every command it runs are on your phone. The model's thinking happens at the provider you connect, so you need a network connection while a chat is working.",
+  },
+  {
+    question: "What are Pi and Termux?",
+    answer:
+      "Pi is an open-source, extensible coding agent; Pipkin runs it and gives it a native Android interface. Termux is a Linux environment for Android, which gives the agent a real shell, package manager and toolchains.",
+  },
+  {
+    question: "Which phones does Pipkin support?",
+    answer: "Phones running Android 10 or newer. Pipkin also adapts to tablets and foldables.",
+  },
+  {
+    question: "Is Pipkin open source?",
+    answer: "It will be. The source is going public on GitHub soon.",
+  },
+];
+
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Pipkin",
+    description,
+    applicationCategory: "DeveloperApplication",
+    operatingSystem: "Android 10 or later",
+    softwareRequirements: "Termux",
+    url: new URL("/", Astro.site).href,
+    image: new URL("/og.png", Astro.site).href,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map(({ question, answer }) => ({
+      "@type": "Question",
+      name: question,
+      acceptedAnswer: { "@type": "Answer", text: answer },
+    })),
+  },
+];
+---
+
+<Base title={title} description={description} structuredData={structuredData}>
+  <Nav />
+
+  <main>
+    <section class="hero container">
+      <div class="hero-copy">
+        <p class="eyebrow intro" style="--i: 0">
+          <span class="pulse" aria-hidden="true"></span>
+          Agentic coding for Android
+        </p>
+        <h1 class="intro" style="--i: 1">A coding agent that lives on your phone.</h1>
+        <p class="lede intro" style="--i: 2">
+          Pipkin is a native Android app that runs the Pi coding agent in Termux. Tell it what to build or fix, and it
+          reads your code, runs commands, edits files and checks its own work. Your phone is all you need.
+        </p>
+        <div class="actions intro" style="--i: 3">
+          <a class="button button-primary" href={GITHUB_URL} rel="noopener">View on GitHub</a>
+          <a class="button button-quiet" href="#features">See what it does</a>
+        </div>
+        <ul class="facts intro" style="--i: 4">
+          {
+            facts.map((fact) => (
+              <li>
+                <Icon name={fact.icon} size={16} />
+                {fact.text}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+      <div class="hero-demo intro" style="--i: 2">
+        <div class="glow" aria-hidden="true"></div>
+        <PhoneDemo />
+      </div>
+    </section>
+
+    <section class="how container" aria-labelledby="how-title">
+      <h2 id="how-title" class="section-label">New to agentic coding? It's three steps.</h2>
+      <ol class="how-steps">
+        {
+          steps.map((step, index) => (
+            <li data-reveal style={`--reveal-delay: ${index * 0.08}s`}>
+              <span class="how-number">{String(index + 1).padStart(2, "0")}</span>
+              <h3>{step.title}</h3>
+              <p>{step.text}</p>
+            </li>
+          ))
+        }
+      </ol>
+    </section>
+
+    <div id="features">
+      <section class="feature container" id="pi" aria-labelledby="pi-title">
+        <div class="feature-copy" data-reveal>
+          <p class="eyebrow">Built on Pi</p>
+          <h2 id="pi-title">The Pi harness, extensions included.</h2>
+          <p>
+            Pipkin doesn't reinvent the agent. It runs <a href={PI_URL} rel="noopener">Pi</a>, the open-source coding
+            agent, so you get Pi's tools, sessions, skills and prompt templates, and most Pi extensions work as they
+            are.
+          </p>
+          <p>
+            Extensions that ask you a question, show a status or add a panel don't fall back to a terminal. Pipkin draws
+            them with its own native controls, so they look like part of the app.
+          </p>
+          <ul class="checks">
+            <li>Choices, confirmations and text fields appear as cards above the composer</li>
+            <li>Status lines, notices and widgets, like the bundled to-do list, each get a home</li>
+            <li>Install extensions the usual Pi way; Pipkin picks them up</li>
+          </ul>
+        </div>
+        <div class="feature-media stacked-media" data-reveal style="--reveal-delay: 0.1s; --overlap: 12px">
+          <Screenshot
+            src={extensionSelect}
+            alt="A Pi extension asking where a build should go, shown as a native card with radio buttons and a Submit button"
+          />
+          <Screenshot
+            class="stacked-front"
+            src={todoWidget}
+            alt="The bundled to-do extension's widget, showing three finished tasks above the composer"
+            sizes="(max-width: 720px) 70vw, 300px"
+          />
+          <p class="media-caption">
+            A Pi extension's <code>ctx.ui.select</code> and the bundled to-do widget, both drawn with native controls.
+          </p>
+        </div>
+      </section>
+
+      <section class="feature container flip" id="android" aria-labelledby="android-title">
+        <div class="feature-copy" data-reveal>
+          <p class="eyebrow">Android-native agentic coding</p>
+          <h2 id="android-title">Made for your phone. Not shrunk down to fit it.</h2>
+          <p>
+            Pipkin isn't a desktop tool with a mobile companion. It is the whole setup: the agent, your files, git and a
+            terminal, all on the phone in your pocket. No laptop to keep awake and no server to connect to.
+          </p>
+          <p>
+            Lock the screen and the work carries on; a notification tells you when it's done. On a foldable or tablet,
+            split the screen and keep a chat next to the code it's changing.
+          </p>
+        </div>
+        <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
+          <Screenshot
+            src={notifications}
+            alt="Android's notification shade showing that a Pipkin agent is still working in Termux, and that two other chats have finished"
+            sizes="(max-width: 720px) 80vw, 380px"
+          >
+            Chats keep running with the screen off, and Android tells you when each one is done.
+          </Screenshot>
+        </div>
+      </section>
+
+      <section class="feature container" id="native" aria-labelledby="native-title">
+        <div class="feature-copy" data-reveal>
+          <p class="eyebrow">Native UI</p>
+          <h2 id="native-title">Smooth, because it's native.</h2>
+          <p>
+            Pipkin is written in Kotlin with Jetpack Compose, Android's own UI toolkit. There's no React Native, no web
+            view and no JavaScript in the interface, so scrolling, typing and streaming replies stay smooth, even in
+            long chats.
+          </p>
+          <p>
+            Code gets real syntax highlighting from Tree-sitter, compiled into the app, for more than twenty languages,
+            from Python and TypeScript to Rust, Kotlin and Dockerfiles.
+          </p>
+        </div>
+        <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
+          <Screenshot
+            src={fileView}
+            alt="A Python file open in Pipkin's file viewer with syntax highlighting and line numbers"
+          />
+        </div>
+      </section>
+
+      <section class="feature container flip" id="termux" aria-labelledby="termux-title">
+        <div class="feature-copy" data-reveal>
+          <p class="eyebrow">The full power of Termux</p>
+          <h2 id="termux-title">A real Linux toolbox under the hood.</h2>
+          <p>
+            Pipkin runs on <a href={TERMUX_URL} rel="noopener">Termux</a>, so the agent works in a real Linux
+            environment. It installs compilers, runtimes and tools with <code>pkg</code>, just like on a desktop.
+          </p>
+          <p>
+            Need something that isn't packaged? <code>proot-distro</code> sets up a full Debian, Ubuntu or Arch next to
+            Termux, and the agent can install it there. When you'd rather type yourself, open a terminal tab right next
+            to your chat.
+          </p>
+        </div>
+        <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
+          <div class="terminal" role="img" aria-label="A terminal installing Python, Node.js, Rust and git with pkg, then logging in to Debian with proot-distro">
+            <div class="terminal-bar" aria-hidden="true">
+              <Icon name="square_terminal" size={16} />
+              <em>Terminal 1 · ~/projects</em>
+            </div>
+            <pre aria-hidden="true"><code><span class="prompt">~/projects $</span> pkg install python nodejs rust git
+<span class="dim">Setting up python ...
+Setting up nodejs ...
+Setting up rust ...
+Setting up git ...</span>
+<span class="prompt">~/projects $</span> proot-distro install debian
+<span class="prompt">~/projects $</span> proot-distro login debian
+<span class="root">root@localhost:~#</span> apt install <span class="accent">anything-else</span><span class="cursor"></span></code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="feature container" id="setup" aria-labelledby="setup-title">
+        <div class="feature-copy" data-reveal>
+          <p class="eyebrow">Guided setup</p>
+          <h2 id="setup-title">Ready in minutes. Most of it happens on its own.</h2>
+          <p>
+            A step-by-step guide walks you through installing Termux and connecting it to Pipkin. Each permission comes
+            with a plain explanation of why it's needed, and optional steps can be skipped.
+          </p>
+          <ol class="setup-steps">
+            {
+              setupSteps.map((step, index) => (
+                <li>
+                  <span class="setup-dot" aria-hidden="true">{index + 1}</span>
+                  <div>
+                    <strong>{step.title}</strong>
+                    <span>{step.text}</span>
+                  </div>
+                </li>
+              ))
+            }
+          </ol>
+        </div>
+        <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
+          <Screenshot
+            device
+            src={onboarding}
+            alt="Pipkin's setup screen asking to allow notifications, with a progress indicator and Allow and Skip for now buttons"
+            sizes="(max-width: 720px) 70vw, 320px"
+          />
+        </div>
+      </section>
+
+      <section class="feature container flip" id="real-work" aria-labelledby="real-title">
+        <div class="feature-copy" data-reveal>
+          <p class="eyebrow">A real tool, not a toy</p>
+          <h2 id="real-title">Built for serious work. Handy for the small stuff.</h2>
+          <p>
+            Pipkin is made for real software projects: real repositories, real toolchains, real test suites. Review
+            every change in the built-in diff viewer, browse and edit files, and look back through your commits without
+            leaving the app.
+          </p>
+          <p>
+            Because the agent can reach your phone's storage, it's just as good at everyday chores. Ask it to find
+            duplicate photos, sort downloads into folders or clear out pictures you don't want, and check its work
+            before anything is deleted.
+          </p>
+        </div>
+        <div class="feature-media stacked-media" data-reveal style="--reveal-delay: 0.1s">
+          <Screenshot
+            src={gitChanges}
+            alt="Pipkin's Changes view showing uncommitted git changes across three files, with added lines highlighted"
+          />
+          <Screenshot
+            class="stacked-front"
+            src={photos}
+            alt="Pipkin's reply after finding duplicate photos in the Camera folder and moving the extra copies to a Duplicates folder for review"
+            sizes="(max-width: 720px) 70vw, 320px"
+          />
+          <p class="media-caption">
+            Reviewing an uncommitted change, and a camera roll the agent tidied without deleting a thing.
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <section class="extras container" id="more" aria-labelledby="more-title">
+      <div class="extras-head" data-reveal>
+        <p class="eyebrow">And more</p>
+        <h2 id="more-title">The details other harnesses skip.</h2>
+      </div>
+      <ul class="extras-grid">
+        {
+          extras.map((extra, index) => (
+            <li data-reveal style={`--reveal-delay: ${(index % 3) * 0.06}s`}>
+              <span class="extra-icon">
+                <Icon name={extra.icon} size={20} />
+              </span>
+              <h3>{extra.title}</h3>
+              <p>{extra.text}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="faq container" id="faq" aria-labelledby="faq-title">
+      <div class="faq-head" data-reveal>
+        <p class="eyebrow">Questions</p>
+        <h2 id="faq-title">Good to know</h2>
+      </div>
+      <div class="faq-list" data-reveal>
+        {
+          faqs.map((faq) => (
+            <details name="faq">
+              <summary>
+                {faq.question}
+                <Icon name="plus" size={18} />
+              </summary>
+              <p>{faq.answer}</p>
+            </details>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="closing container" aria-labelledby="closing-title" data-reveal>
+      <span class="closing-mark"><Logo size={56} simmer /></span>
+      <h2 id="closing-title">Your next project fits in your pocket.</h2>
+      <p>Pipkin is getting ready for its public release. Follow along on GitHub.</p>
+      <a class="button button-primary" href={GITHUB_URL} rel="noopener">View on GitHub</a>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <a class="footer-brand" href="/">
+        <Logo size={20} />
+        Pipkin
+      </a>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="#">Docs</a>
+        <a href={GITHUB_URL} rel="noopener">GitHub</a>
+        <a href={PI_URL} rel="noopener">Pi</a>
+        <a href={TERMUX_URL} rel="noopener">Termux</a>
+      </nav>
+      <p class="footer-note">A coding agent for Android. © 2026 Pipkin</p>
+    </div>
+  </footer>
+</Base>
+
+<style>
+  main {
+    overflow-x: clip;
+  }
+
+  /* Hero */
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+    align-items: center;
+    gap: clamp(32px, 6vw, 72px);
+    padding-top: clamp(40px, 7vw, 88px);
+    padding-bottom: clamp(56px, 8vw, 104px);
+  }
+
+  .hero h1 {
+    margin-top: 18px;
+    font-size: clamp(38px, 5.6vw, 64px);
+  }
+
+  .lede {
+    max-width: 34em;
+    margin-top: 22px;
+    color: var(--muted);
+    font-size: clamp(17px, 1.6vw, 19px);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 32px;
+  }
+
+  .facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 22px;
+    margin: 36px 0 0;
+    padding: 0;
+    color: var(--muted);
+    font-size: 14px;
+    list-style: none;
+  }
+
+  .facts li {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .facts :global(svg) {
+    color: var(--accent);
+  }
+
+  .pulse {
+    position: relative;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .hero-demo {
+    position: relative;
+    display: grid;
+    place-items: center;
+  }
+
+  .glow {
+    position: absolute;
+    inset: 8% -10%;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 26%, transparent), transparent);
+    filter: blur(30px);
+    opacity: 0.7;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .intro {
+      animation: intro 0.9s var(--ease-out) both;
+      animation-delay: calc(var(--i) * 0.08s + 0.05s);
+    }
+
+    .pulse::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2.4s ease-out infinite;
+    }
+  }
+
+  @keyframes intro {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+  }
+
+  @keyframes pulse {
+    from {
+      opacity: 0.6;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(3);
+    }
+  }
+
+  /* How it works */
+  .how {
+    padding-bottom: clamp(64px, 9vw, 120px);
+  }
+
+  .section-label {
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  .how-steps {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin: 20px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .how-steps li {
+    padding: 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+  }
+
+  .how-number {
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 14px;
+  }
+
+  .how-steps h3 {
+    margin: 10px 0 6px;
+    font-size: 20px;
+  }
+
+  .how-steps p {
+    color: var(--muted);
+    font-size: 16px;
+  }
+
+  /* Feature sections */
+  .feature {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(36px, 7vw, 96px);
+    padding-block: clamp(56px, 8vw, 104px);
+    border-top: 1px solid var(--border);
+  }
+
+  .feature.flip .feature-copy {
+    order: 2;
+  }
+
+  .feature h2 {
+    margin-top: 14px;
+    font-size: clamp(28px, 3.4vw, 40px);
+  }
+
+  .feature-copy > p:not(.eyebrow) {
+    margin-top: 18px;
+    color: var(--muted);
+  }
+
+  .feature-copy a {
+    color: var(--fg);
+    text-decoration-color: var(--accent);
+    text-underline-offset: 3px;
+  }
+
+  .feature-copy code {
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--fg);
+  }
+
+  .feature-media {
+    display: flex;
+    justify-content: center;
+  }
+
+  .feature-media > :global(.device) {
+    width: min(320px, 78vw);
+  }
+
+  .feature-media > :global(.shot:not(.device)) {
+    width: min(440px, 100%);
+  }
+
+  .checks {
+    display: grid;
+    gap: 10px;
+    margin: 24px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .checks li {
+    position: relative;
+    padding-left: 28px;
+    color: var(--fg);
+    font-size: 16px;
+  }
+
+  .checks li::before {
+    content: "";
+    position: absolute;
+    top: 0.45em;
+    left: 2px;
+    width: 12px;
+    height: 7px;
+    border-bottom: 2px solid var(--success);
+    border-left: 2px solid var(--success);
+    transform: rotate(-45deg);
+  }
+
+  /* Two screenshots, the second overlapping the first's lower corner. */
+  .stacked-media {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .stacked-media > :global(.shot:not(.stacked-front)) {
+    width: min(400px, 88%);
+  }
+
+  .stacked-media > :global(.stacked-front) {
+    width: min(320px, 72%);
+    margin: calc(-1 * var(--overlap, 120px)) 0 0 auto;
+  }
+
+  .media-caption {
+    margin-top: 14px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .media-caption code {
+    color: var(--fg);
+  }
+
+  /* Terminal */
+  .terminal {
+    width: min(480px, 100%);
+    overflow: hidden;
+    border: 1px solid #2f3534;
+    border-radius: var(--radius-lg);
+    background: #181b1a;
+    color: #fafafa;
+    box-shadow: 0 30px 60px -36px rgb(0 0 0 / 0.55);
+  }
+
+  .terminal-bar {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 12px 16px;
+    border-bottom: 1px solid #252b2a;
+  }
+
+  .terminal-bar :global(svg) {
+    color: #a1a5a4;
+  }
+
+  .terminal-bar em {
+    margin-left: 10px;
+    color: #a1a5a4;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-style: normal;
+  }
+
+  .terminal pre {
+    margin: 0;
+    padding: 18px 20px 22px;
+    overflow-x: auto;
+    font-size: 13.5px;
+    line-height: 1.7;
+  }
+
+  .terminal code {
+    font-size: inherit;
+  }
+
+  .prompt {
+    color: #b5bd68;
+  }
+
+  .root {
+    color: #f7796d;
+  }
+
+  .dim {
+    color: #717574;
+  }
+
+  .accent {
+    color: #dd774e;
+  }
+
+  .cursor {
+    display: inline-block;
+    width: 0.6em;
+    height: 1.15em;
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    background: #fafafa;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .cursor {
+      animation: blink 1.1s steps(1) infinite;
+    }
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
+  /* Setup steps */
+  .setup-steps {
+    position: relative;
+    display: grid;
+    gap: 16px;
+    margin: 28px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .setup-steps::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    bottom: 14px;
+    left: 13px;
+    width: 1px;
+    background: var(--border-strong);
+  }
+
+  .setup-steps li {
+    position: relative;
+    display: flex;
+    gap: 16px;
+  }
+
+  .setup-dot {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 27px;
+    height: 27px;
+    border: 1px solid var(--border-strong);
+    border-radius: 50%;
+    background: var(--page);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .setup-steps div {
+    display: grid;
+    line-height: 1.45;
+  }
+
+  .setup-steps strong {
+    font-size: 16px;
+  }
+
+  .setup-steps span:not(.setup-dot) {
+    color: var(--muted);
+    font-size: 15px;
+  }
+
+  /* Extras */
+  .extras {
+    padding-block: clamp(64px, 9vw, 112px);
+    border-top: 1px solid var(--border);
+  }
+
+  .extras h2,
+  .faq h2 {
+    margin-top: 14px;
+    font-size: clamp(28px, 3.4vw, 40px);
+  }
+
+  .extras-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin: 40px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .extras-grid li {
+    padding: 24px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-1);
+    transition:
+      border-color 0.25s ease,
+      transform 0.35s var(--ease-out);
+  }
+
+  .extras-grid li:hover {
+    border-color: var(--border-strong);
+    transform: translateY(-2px);
+  }
+
+  .extra-icon {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .extras-grid h3 {
+    margin: 16px 0 6px;
+    font-size: 18px;
+  }
+
+  .extras-grid p {
+    color: var(--muted);
+    font-size: 15.5px;
+  }
+
+  /* FAQ */
+  .faq {
+    display: grid;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    gap: clamp(32px, 6vw, 80px);
+    padding-block: clamp(64px, 9vw, 112px);
+    border-top: 1px solid var(--border);
+  }
+
+  .faq-list {
+    border-top: 1px solid var(--border);
+  }
+
+  details {
+    border-bottom: 1px solid var(--border);
+  }
+
+  summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 0;
+    font-size: 17px;
+    font-weight: 600;
+    list-style: none;
+    cursor: pointer;
+  }
+
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  summary :global(svg) {
+    flex: none;
+    color: var(--muted);
+    transition: transform 0.3s var(--ease-out);
+  }
+
+  details[open] summary :global(svg) {
+    transform: rotate(45deg);
+  }
+
+  details p {
+    padding: 0 0 22px;
+    color: var(--muted);
+  }
+
+  /* Open and close answers smoothly where the browser can animate to auto height. */
+  @supports (interpolate-size: allow-keywords) {
+    details {
+      interpolate-size: allow-keywords;
+    }
+
+    details::details-content {
+      height: 0;
+      overflow: clip;
+      transition:
+        height 0.35s var(--ease-out),
+        content-visibility 0.35s allow-discrete;
+    }
+
+    details[open]::details-content {
+      height: auto;
+    }
+  }
+
+  /* Closing */
+  .closing {
+    display: grid;
+    justify-items: center;
+    gap: 18px;
+    padding-block: clamp(72px, 10vw, 128px);
+    border-top: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .closing-mark {
+    display: grid;
+    place-items: center;
+    width: 96px;
+    height: 96px;
+    border-radius: 26px;
+    background: var(--cream);
+  }
+
+  .closing h2 {
+    font-size: clamp(30px, 4vw, 46px);
+  }
+
+  .closing p {
+    color: var(--muted);
+  }
+
+  /* Footer */
+  .footer {
+    border-top: 1px solid var(--border);
+  }
+
+  .footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px 32px;
+    padding-block: 28px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+
+  .footer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--fg);
+    font-family: var(--mono);
+    font-weight: 700;
+    text-decoration: none;
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 22px;
+  }
+
+  .footer-links a {
+    text-decoration: none;
+  }
+
+  .footer-links a:hover {
+    color: var(--fg);
+  }
+
+  .footer-note {
+    width: 100%;
+    color: var(--muted);
+  }
+
+  @media (max-width: 900px) {
+    .hero,
+    .feature,
+    .faq {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hero {
+      text-align: center;
+    }
+
+    .lede {
+      margin-inline: auto;
+    }
+
+    .actions,
+    .facts {
+      justify-content: center;
+    }
+
+    .feature.flip .feature-copy {
+      order: 0;
+    }
+
+    .extras-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 640px) {
+    .how-steps,
+    .extras-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+</style>

@@ -1,0 +1,705 @@
+---
+// A hand-built replay of a Pipkin chat, drawn with the app's own layout, palette and icons so it stays sharp at any
+// size and weighs a few kilobytes instead of a video. Without JavaScript, or with reduced motion, it shows the
+// finished chat.
+import Icon, { type IconName } from "./Icon.astro";
+import Logo from "./Logo.astro";
+
+const prompt = "Add a dark mode toggle to my notes app and make sure the tests still pass";
+
+interface Tool {
+  icon: IconName;
+  name: string;
+  detail: string;
+  failed?: boolean;
+}
+
+// Each tool row runs for its own beat; a failing test run makes the agent go back and fix it.
+const tools: Tool[] = [
+  { icon: "brain", name: "Thinking", detail: "Planning the change" },
+  { icon: "file_text", name: "Read", detail: "src/settings.tsx" },
+  { icon: "file_pen", name: "Edit", detail: "src/theme.ts" },
+  { icon: "file_pen", name: "Edit", detail: "src/settings.tsx" },
+  { icon: "terminal", name: "Shell", detail: "npm test", failed: true },
+  { icon: "brain", name: "Thinking", detail: "A snapshot still expects light colors" },
+  { icon: "file_pen", name: "Edit", detail: "src/settings.test.tsx" },
+  { icon: "terminal", name: "Shell", detail: "npm test" },
+];
+
+const reply =
+  "Dark mode is in. The toggle lives in **Settings**, follows the system theme until you pick one, and saves your choice. All **18 tests** pass.";
+const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+---
+
+<div
+  class="phone"
+  data-demo
+  role="img"
+  aria-label="Pipkin on an Android phone: the agent reads code, edits files, runs the tests, fixes a failure and reports back."
+>
+  <div class="screen" aria-hidden="true">
+    <div class="status">
+      <span>9:41</span>
+      <span class="status-icons">
+        <svg viewBox="0 0 16 12" width="16" height="12"><path d="M8 11.5 0.6 3.6a10.5 10.5 0 0 1 14.8 0z" fill="currentColor"></path></svg>
+        <svg viewBox="0 0 12 12" width="12" height="12"><path d="M11.5 0.5v11h-11z" fill="currentColor"></path></svg>
+        <svg viewBox="0 0 8 13" width="8" height="13"><rect x="0.5" y="1.5" width="7" height="11" rx="1.4" fill="currentColor"></rect><rect x="2.5" y="0" width="3" height="2" rx="0.6" fill="currentColor"></rect></svg>
+      </span>
+    </div>
+
+    <div class="notification" data-part="notify">
+      <div class="notification-icon"><Logo size={14} /></div>
+      <div class="notification-body">
+        <div class="notification-head">Pipkin · now</div>
+        <div class="notification-title">Agent finished: Add a dark mode toggle</div>
+        <div class="notification-text">Dark mode is in. All 18 tests pass.</div>
+      </div>
+    </div>
+
+    <header class="appbar">
+      <Icon name="menu" size={18} />
+      <div class="appbar-title">
+        <span class="title-new">New chat</span>
+        <span class="title-chat">Add a dark mode toggle</span>
+        <span class="appbar-folder">~/notes-app</span>
+      </div>
+      <span class="tab-count">1</span>
+      <Icon name="ellipsis" size={18} />
+      <Icon name="panel_right" size={18} />
+    </header>
+
+    <div class="timeline">
+      <div class="empty" data-part="empty">
+        <span class="empty-mark"><Logo size={34} simmer /></span>
+        <span>Message Pipkin to start</span>
+      </div>
+
+      <div class="step" data-part="sent">
+        <div>
+          <div class="bubble">{prompt}</div>
+        </div>
+      </div>
+
+      {
+        tools.map((tool) => (
+          <div class="step tool-step" data-part="tool" data-failed={tool.failed ? "" : undefined}>
+            <div>
+              <div class="tool">
+                <span class="tool-icon">
+                  <Icon name={tool.icon} size={14} />
+                  <span class="tool-busy">
+                    <Logo size={14} simmer />
+                  </span>
+                </span>
+                <span class="tool-name">{tool.name}</span>
+                <span class="tool-detail">{tool.detail}</span>
+              </div>
+            </div>
+          </div>
+        ))
+      }
+
+      <div class="step" data-part="reply">
+        <div>
+          <p class="reply" data-reply={reply} set:html={replyHtml} />
+        </div>
+      </div>
+
+      <div class="run">
+        <span class="run-mark"><Logo size={14} simmer /></span>
+        <span class="run-time" data-part="timer">1m 12s</span>
+      </div>
+    </div>
+
+    <div class="widget-tab" data-part="widget">
+      <Icon name="square" size={12} />
+      Todos
+      <span class="dot"></span>
+    </div>
+
+    <div class="composer">
+      <div class="field">
+        <span class="typed" data-part="typed"></span><span class="caret"></span>
+        <span class="placeholder">Message Pipkin…</span>
+      </div>
+      <div class="controls">
+        <Icon name="plus" size={16} />
+        <span class="chip">Claude Sonnet</span>
+        <span class="chip"><Icon name="brain" size={13} /> Medium</span>
+        <span class="spacer"></span>
+        <svg class="context" viewBox="0 0 20 20" width="16" height="16">
+          <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" stroke-width="2" opacity="0.35"></circle>
+          <circle
+            class="context-used"
+            cx="10"
+            cy="10"
+            r="8"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            pathLength="100"
+            transform="rotate(-90 10 10)"></circle>
+        </svg>
+        <span class="send">
+          <Icon name="arrow_up" size={15} class="send-arrow" />
+          <span class="stop"></span>
+        </span>
+      </div>
+    </div>
+    <div class="gesture"></div>
+  </div>
+</div>
+<script is:inline>
+  // Runs before first paint, so the replay starts from an empty chat instead of flashing the finished one.
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    document.currentScript.previousElementSibling.classList.add("playing");
+  }
+</script>
+
+<script>
+  import { playDemo } from "../scripts/phone-demo";
+
+  for (const phone of document.querySelectorAll<HTMLElement>("[data-demo]")) playDemo(phone);
+</script>
+
+<style>
+  .phone {
+    --frame: #0c0e0d;
+    container-type: inline-size;
+    position: relative;
+    width: min(296px, 76vw);
+    aspect-ratio: 1080 / 2280;
+    padding: 9px;
+    border-radius: 46px;
+    background: var(--frame);
+    box-shadow:
+      0 0 0 1px #2a2f2d,
+      0 40px 80px -30px rgb(0 0 0 / 0.55),
+      0 18px 40px -20px rgb(0 0 0 / 0.4);
+  }
+
+  .screen {
+    /* Sizes below are Pipkin's dp values, scaled to the mock's width as if the phone were 380dp wide. */
+    --dp: calc(100cqi / 380);
+    container-type: inline-size;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 38px;
+    background: var(--app-bg);
+    color: var(--app-fg);
+    font-family: Roboto, var(--sans);
+    font-size: calc(14.5 * var(--dp));
+    line-height: 1.45;
+    text-align: start;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: calc(14 * var(--dp)) calc(26 * var(--dp)) calc(4 * var(--dp));
+    font-size: calc(13 * var(--dp));
+    font-weight: 500;
+  }
+
+  .status-icons {
+    display: flex;
+    align-items: center;
+    gap: calc(5 * var(--dp));
+  }
+
+  .status-icons svg {
+    width: auto;
+    height: calc(11 * var(--dp));
+  }
+
+  .appbar {
+    display: flex;
+    align-items: center;
+    gap: calc(16 * var(--dp));
+    padding: calc(10 * var(--dp)) calc(18 * var(--dp));
+    border-bottom: 1px solid var(--app-border);
+  }
+
+  .appbar svg {
+    flex: none;
+    width: calc(20 * var(--dp));
+    height: calc(20 * var(--dp));
+  }
+
+  .appbar-title {
+    position: relative;
+    display: grid;
+    flex: 1;
+    min-width: 0;
+    line-height: 1.3;
+  }
+
+  .title-new,
+  .title-chat {
+    grid-area: 1 / 1;
+    overflow: hidden;
+    font-size: calc(15 * var(--dp));
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    transition: opacity 0.35s ease;
+  }
+
+  .title-chat {
+    opacity: 0;
+  }
+
+  .appbar-folder {
+    color: var(--app-muted);
+    font-size: calc(12 * var(--dp));
+  }
+
+  .tab-count {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: calc(17 * var(--dp));
+    height: calc(17 * var(--dp));
+    border: 1.5px solid currentColor;
+    border-radius: calc(3 * var(--dp));
+    font-size: calc(10 * var(--dp));
+    line-height: 1;
+  }
+
+  .timeline {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 0;
+    padding: 0 calc(16 * var(--dp)) calc(6 * var(--dp));
+    overflow: hidden;
+    mask-image: linear-gradient(to bottom, transparent, black calc(28 * var(--dp)));
+  }
+
+  .empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: calc(12 * var(--dp));
+    color: var(--app-muted);
+    transition:
+      opacity 0.35s ease,
+      transform 0.5s var(--ease-out);
+  }
+
+  .empty-mark {
+    display: grid;
+    place-items: center;
+    width: calc(76 * var(--dp));
+    height: calc(76 * var(--dp));
+    border-radius: 50%;
+    background: var(--cream);
+  }
+
+  .empty-mark :global(svg) {
+    width: calc(50 * var(--dp));
+    height: calc(50 * var(--dp));
+  }
+
+  /* Steps grow from zero height, so the chat scrolls up smoothly as each one arrives. */
+  .step {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition:
+      grid-template-rows 0.45s var(--ease-out),
+      opacity 0.4s ease;
+  }
+
+  /* The gap lives on the content, inside the clipped wrapper, so a collapsed step takes no space at all. */
+  .step > div {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .step > div > * {
+    margin-top: calc(8 * var(--dp));
+  }
+
+  .bubble {
+    margin-left: calc(28 * var(--dp));
+    margin-bottom: calc(10 * var(--dp));
+    padding: calc(12 * var(--dp)) calc(16 * var(--dp));
+    border-radius: calc(16 * var(--dp));
+    background: #454847;
+    font-size: calc(15 * var(--dp));
+  }
+
+  .tool {
+    display: flex;
+    align-items: center;
+    gap: calc(10 * var(--dp));
+    height: calc(38 * var(--dp));
+    padding: 0 calc(12 * var(--dp));
+    border-radius: calc(8 * var(--dp));
+    background: var(--app-surface-1);
+    white-space: nowrap;
+  }
+
+  .tool-icon {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: calc(16 * var(--dp));
+    height: calc(16 * var(--dp));
+    color: var(--app-muted);
+  }
+
+  .tool-icon :global(svg) {
+    grid-area: 1 / 1;
+    width: 100%;
+    height: 100%;
+    transition: opacity 0.25s ease;
+  }
+
+  .tool-busy {
+    grid-area: 1 / 1;
+    display: grid;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+
+  .tool-name {
+    font-weight: 500;
+  }
+
+  .tool-detail {
+    overflow: hidden;
+    color: var(--app-muted);
+    font-size: calc(13.5 * var(--dp));
+    text-overflow: ellipsis;
+  }
+
+  .tool-step[data-failed] .tool-name,
+  .tool-step[data-failed] .tool-icon {
+    color: #f7796d;
+  }
+
+  .reply {
+    padding: calc(6 * var(--dp)) 0 calc(4 * var(--dp));
+    font-size: calc(15 * var(--dp));
+    line-height: 1.5;
+  }
+
+  .reply :global(strong) {
+    font-weight: 700;
+  }
+
+  .run {
+    display: flex;
+    align-items: center;
+    gap: calc(8 * var(--dp));
+    padding-top: calc(10 * var(--dp));
+    color: var(--app-muted);
+    font-size: calc(13 * var(--dp));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .run-mark {
+    display: none;
+  }
+
+  .widget-tab {
+    display: flex;
+    align-items: center;
+    gap: calc(6 * var(--dp));
+    align-self: flex-start;
+    margin: 0 0 -1px calc(34 * var(--dp));
+    padding: calc(5 * var(--dp)) calc(12 * var(--dp));
+    border: 1px solid var(--app-surface-3);
+    border-bottom: 0;
+    border-radius: calc(12 * var(--dp)) calc(12 * var(--dp)) 0 0;
+    background: var(--app-bg);
+    color: var(--app-muted);
+    font-size: calc(12.5 * var(--dp));
+    transition: opacity 0.4s ease;
+  }
+
+  .widget-tab :global(svg) {
+    width: calc(13 * var(--dp));
+    height: calc(13 * var(--dp));
+  }
+
+  .dot {
+    width: calc(5 * var(--dp));
+    height: calc(5 * var(--dp));
+    border-radius: 50%;
+    background: var(--app-accent);
+  }
+
+  .composer {
+    position: relative;
+    margin: 0 calc(12 * var(--dp));
+    padding: calc(12 * var(--dp)) calc(14 * var(--dp)) calc(10 * var(--dp));
+    border: 1px solid var(--app-surface-3);
+    border-radius: calc(20 * var(--dp));
+    background: var(--app-bg);
+  }
+
+  .field {
+    position: relative;
+    min-height: calc(22 * var(--dp));
+    font-size: calc(15 * var(--dp));
+  }
+
+  .placeholder {
+    position: absolute;
+    inset: 0;
+    color: var(--app-muted);
+    pointer-events: none;
+  }
+
+  .typed:not(:empty) ~ .placeholder {
+    display: none;
+  }
+
+  .caret {
+    display: none;
+    width: 1.5px;
+    height: 1.1em;
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    background: var(--app-accent);
+  }
+
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: calc(16 * var(--dp));
+    margin-top: calc(14 * var(--dp));
+    font-size: calc(13.5 * var(--dp));
+  }
+
+  .controls > :global(svg) {
+    width: calc(18 * var(--dp));
+    height: calc(18 * var(--dp));
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: calc(5 * var(--dp));
+    white-space: nowrap;
+  }
+
+  .chip :global(svg) {
+    width: calc(14 * var(--dp));
+    height: calc(14 * var(--dp));
+  }
+
+  .spacer {
+    flex: 1;
+  }
+
+  .context {
+    width: calc(18 * var(--dp));
+    height: calc(18 * var(--dp));
+    color: var(--app-muted);
+  }
+
+  .context-used {
+    stroke-dasharray: var(--context, 9) 100;
+    transition: stroke-dasharray 0.6s var(--ease-out);
+  }
+
+  .send {
+    position: relative;
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: calc(34 * var(--dp));
+    height: calc(34 * var(--dp));
+    border-radius: 50%;
+    background: var(--app-accent);
+    color: #fff;
+    transition:
+      background-color 0.25s ease,
+      transform 0.2s var(--ease-out);
+  }
+
+  .send :global(.send-arrow) {
+    width: calc(16 * var(--dp));
+    height: calc(16 * var(--dp));
+  }
+
+  .stop {
+    position: absolute;
+    width: calc(11 * var(--dp));
+    height: calc(11 * var(--dp));
+    border: 1.5px solid #fff;
+    border-radius: calc(2 * var(--dp));
+    opacity: 0;
+  }
+
+  .gesture {
+    width: 34%;
+    height: calc(4 * var(--dp));
+    margin: calc(10 * var(--dp)) auto calc(8 * var(--dp));
+    border-radius: 99px;
+    background: var(--app-muted);
+    opacity: 0.6;
+  }
+
+  .notification {
+    position: absolute;
+    z-index: 2;
+    top: calc(8 * var(--dp));
+    left: calc(10 * var(--dp));
+    right: calc(10 * var(--dp));
+    display: flex;
+    gap: calc(10 * var(--dp));
+    padding: calc(12 * var(--dp)) calc(14 * var(--dp));
+    border-radius: calc(22 * var(--dp));
+    background: #2c302f;
+    box-shadow: 0 calc(10 * var(--dp)) calc(30 * var(--dp)) rgb(0 0 0 / 0.45);
+    opacity: 0;
+    transform: translateY(-120%);
+    transition:
+      transform 0.55s var(--ease-out),
+      opacity 0.35s ease;
+  }
+
+  .notification-icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: calc(26 * var(--dp));
+    height: calc(26 * var(--dp));
+    border-radius: 50%;
+    background: var(--cream);
+  }
+
+  .notification-icon :global(svg) {
+    width: calc(18 * var(--dp));
+    height: calc(18 * var(--dp));
+  }
+
+  .notification-body {
+    min-width: 0;
+    line-height: 1.35;
+  }
+
+  .notification-head {
+    color: var(--app-muted);
+    font-size: calc(11.5 * var(--dp));
+  }
+
+  .notification-title {
+    overflow: hidden;
+    font-size: calc(13.5 * var(--dp));
+    font-weight: 500;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .notification-text {
+    color: var(--app-muted);
+    font-size: calc(13 * var(--dp));
+  }
+
+  /* The static, finished chat is the default. Once the script takes over it adds .playing and drives the parts. */
+  .phone:not(.playing) .empty,
+  .phone:not(.playing) .widget-tab {
+    opacity: 0;
+  }
+
+  .phone:not(.playing) .title-new {
+    opacity: 0;
+  }
+
+  .phone:not(.playing) .title-chat {
+    opacity: 1;
+  }
+
+  .playing .step:not(.on) {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+
+  .playing .empty.off {
+    opacity: 0;
+    transform: translateY(calc(-12 * var(--dp))) scale(0.96);
+  }
+
+  .playing .widget-tab:not(.on) {
+    opacity: 0;
+  }
+
+  .playing.typing .caret {
+    display: inline-block;
+    animation: blink 1s steps(1) infinite;
+  }
+
+  .playing:not(.typing):not(.sent) .send {
+    background: color-mix(in srgb, var(--app-accent) 45%, var(--app-bg));
+  }
+
+  .playing.sent .title-new {
+    opacity: 0;
+  }
+
+  .playing.sent .title-chat {
+    opacity: 1;
+  }
+
+  .playing.busy .send :global(.send-arrow) {
+    opacity: 0;
+  }
+
+  .playing.busy .stop {
+    opacity: 1;
+  }
+
+  .playing.busy .run-mark {
+    display: grid;
+  }
+
+  .playing:not(.sent) .run {
+    opacity: 0;
+  }
+
+  .playing .tool-step.busy .tool-icon > :global(svg) {
+    opacity: 0;
+  }
+
+  .playing .tool-step.busy .tool-busy {
+    opacity: 1;
+  }
+
+  .playing .tool-step.busy .tool-name,
+  .playing .tool-step.busy .tool-icon {
+    color: var(--app-fg);
+  }
+
+  .notification.on {
+    opacity: 1;
+    transform: none;
+  }
+
+  .playing.fading .screen > :not(.status) {
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+
+  @keyframes blink {
+    50% {
+      opacity: 0;
+    }
+  }
+</style>
