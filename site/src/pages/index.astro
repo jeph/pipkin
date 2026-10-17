@@ -19,13 +19,6 @@ const title = "Pipkin: a coding agent that lives on your Android phone";
 const description =
   "Pipkin is a native Android app for agentic coding. Built on the Pi harness and powered by Termux, it reads your code, runs commands, edits files, and checks its work, all on your phone.";
 
-const facts: { icon: IconName; text: string }[] = [
-  { icon: "plug", text: "Built on Pi" },
-  { icon: "square_terminal", text: "Runs in Termux" },
-  { icon: "panel_right", text: "Native Kotlin and Compose UI" },
-  { icon: "key_round", text: "Bring your own model" },
-];
-
 const setupSteps = [
   { title: "Install Termux", text: "From F-Droid or Google Play. Pipkin tells you which build you have." },
   { title: "Connect it to Pipkin", text: "One Android permission lets Pipkin send commands to Termux." },
@@ -162,16 +155,6 @@ const structuredData = [
           <a class="button button-primary" href={GITHUB_URL} rel="noopener">View on GitHub</a>
           <a class="button button-quiet" href="#features">See what it does</a>
         </div>
-        <ul class="facts intro" style="--i: 4">
-          {
-            facts.map((fact) => (
-              <li>
-                <Icon name={fact.icon} size={16} />
-                {fact.text}
-              </li>
-            ))
-          }
-        </ul>
       </div>
       <div class="hero-demo intro" style="--i: 2">
         <div class="glow" aria-hidden="true"></div>
@@ -180,7 +163,42 @@ const structuredData = [
     </section>
 
     <div id="features">
-      <section class="feature container" id="pi" aria-labelledby="pi-title">
+      <section class="feature container" id="on-device" aria-labelledby="on-device-title">
+        <div class="feature-copy" data-reveal>
+          <p class="eyebrow">No computer required</p>
+          <h2 id="on-device-title">On your phone, not controlled from it.</h2>
+          <p>
+            Most agents you can use from a phone are remote controls. The real work happens on a laptop or cloud server
+            somewhere else, and your phone only sends it messages. Pipkin runs the agent on the phone itself, so your
+            code, your tools, and every command stay in your pocket. There's no other machine to set up, pay for, or
+            keep awake.
+          </p>
+          <p>
+            Under the hood is <a href={TERMUX_URL} rel="noopener">Termux</a>, a Linux-like environment for Android. The
+            agent installs compilers, runtimes, and tools with <code>pkg</code>, just like on a desktop. Need something
+            that isn't packaged? <code>proot-distro</code> sets up a full Debian, Ubuntu, or Arch, and the agent can
+            install it there. When you'd rather type yourself, open a terminal tab right next to your chat.
+          </p>
+        </div>
+        <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
+          <div class="terminal" role="img" aria-label="A terminal installing Python, Node.js, Rust, and git with pkg, then logging in to Debian with proot-distro">
+            <div class="terminal-bar" aria-hidden="true">
+              <Icon name="square_terminal" size={16} />
+              <em>Terminal 1 · ~/projects</em>
+            </div>
+            <pre aria-hidden="true"><code><span class="prompt">~/projects $</span> pkg install python nodejs rust git
+<span class="dim">Setting up python ...
+Setting up nodejs ...
+Setting up rust ...
+Setting up git ...</span>
+<span class="prompt">~/projects $</span> proot-distro install debian
+<span class="prompt">~/projects $</span> proot-distro login debian
+<span class="root">root@localhost:~#</span> apt install <span class="accent">anything-else</span><span class="cursor"></span></code></pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="feature container flip" id="pi" aria-labelledby="pi-title">
         <div class="feature-copy" data-reveal>
           <p class="eyebrow">The Pi Agentic Harness</p>
           <h2 id="pi-title">Powered by Pi, vast ecosystem included</h2>
@@ -215,7 +233,7 @@ const structuredData = [
         </div>
       </section>
 
-      <section class="feature container flip" id="android" aria-labelledby="android-title">
+      <section class="feature container" id="android" aria-labelledby="android-title">
         <div class="feature-copy" data-reveal>
           <p class="eyebrow">Android-native agentic coding</p>
           <h2 id="android-title">Made for your phone. Not shrunk down to fit it.</h2>
@@ -239,7 +257,7 @@ const structuredData = [
         </div>
       </section>
 
-      <section class="feature container" id="native" aria-labelledby="native-title">
+      <section class="feature container flip" id="native" aria-labelledby="native-title">
         <div class="feature-copy" data-reveal>
           <p class="eyebrow">Native UI</p>
           <h2 id="native-title">Smooth, because it's native.</h2>
@@ -258,38 +276,6 @@ const structuredData = [
             src={fileView}
             alt="A Python file open in Pipkin's file viewer with syntax highlighting and line numbers"
           />
-        </div>
-      </section>
-
-      <section class="feature container flip" id="termux" aria-labelledby="termux-title">
-        <div class="feature-copy" data-reveal>
-          <p class="eyebrow">The full power of Termux</p>
-          <h2 id="termux-title">A real Linux toolbox under the hood.</h2>
-          <p>
-            Pipkin runs on <a href={TERMUX_URL} rel="noopener">Termux</a>, so the agent works in a real Linux
-            environment. It installs compilers, runtimes, and tools with <code>pkg</code>, just like on a desktop.
-          </p>
-          <p>
-            Need something that isn't packaged? <code>proot-distro</code> sets up a full Debian, Ubuntu, or Arch next to
-            Termux, and the agent can install it there. When you'd rather type yourself, open a terminal tab right next
-            to your chat.
-          </p>
-        </div>
-        <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
-          <div class="terminal" role="img" aria-label="A terminal installing Python, Node.js, Rust, and git with pkg, then logging in to Debian with proot-distro">
-            <div class="terminal-bar" aria-hidden="true">
-              <Icon name="square_terminal" size={16} />
-              <em>Terminal 1 · ~/projects</em>
-            </div>
-            <pre aria-hidden="true"><code><span class="prompt">~/projects $</span> pkg install python nodejs rust git
-<span class="dim">Setting up python ...
-Setting up nodejs ...
-Setting up rust ...
-Setting up git ...</span>
-<span class="prompt">~/projects $</span> proot-distro install debian
-<span class="prompt">~/projects $</span> proot-distro login debian
-<span class="root">root@localhost:~#</span> apt install <span class="accent">anything-else</span><span class="cursor"></span></code></pre>
-          </div>
         </div>
       </section>
 
@@ -455,27 +441,6 @@ Setting up git ...</span>
     flex-wrap: wrap;
     gap: 12px;
     margin-top: 32px;
-  }
-
-  .facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px 22px;
-    margin: 36px 0 0;
-    padding: 0;
-    color: var(--muted);
-    font-size: 14px;
-    list-style: none;
-  }
-
-  .facts li {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .facts :global(svg) {
-    color: var(--accent);
   }
 
   .pulse {
@@ -976,8 +941,7 @@ Setting up git ...</span>
       margin-inline: auto;
     }
 
-    .actions,
-    .facts {
+    .actions {
       justify-content: center;
     }
 
