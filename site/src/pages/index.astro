@@ -182,21 +182,20 @@ const structuredData = [
     <div id="features">
       <section class="feature container" id="pi" aria-labelledby="pi-title">
         <div class="feature-copy" data-reveal>
-          <p class="eyebrow">Built on Pi</p>
-          <h2 id="pi-title">The Pi harness, extensions included.</h2>
+          <p class="eyebrow">The Pi Coding Harness</p>
+          <h2 id="pi-title">Powered by Pi, vast ecosystem included</h2>
           <p>
-            Pipkin doesn't reinvent the agent. It runs <a href={PI_URL} rel="noopener">Pi</a>, the open-source coding
-            agent, so you get Pi's tools, sessions, skills and prompt templates, and most Pi extensions work as they
-            are.
+            Pipkin is built on <a href={PI_URL} rel="noopener">Pi</a>, the open-source agentic harness, and compatible
+            with Pi's ecosystem including skills, tools, prompt templates, and extensions.
           </p>
           <p>
-            Extensions that support Pi's RPC UI don't fall back to a terminal. Their questions, status lines and widgets
-            appear as Pipkin's own native controls, so they feel like part of the app.
+            Extensions render beautifully and natively in Pipkin's UI using native controls and displays. Questions,
+            statuses, and widgets feel like a part of the app.
           </p>
           <ul class="checks">
             <li>Choices, confirmations and text fields appear as cards above the composer</li>
             <li>Status lines, notices and widgets, like the bundled to-do list, each get a home</li>
-            <li>Install extensions the usual Pi way; Pipkin picks them up</li>
+            <li>Install extensions the usual Pi way and Pipkin picks them up</li>
           </ul>
         </div>
         <div class="feature-media stacked-media" data-reveal style="--reveal-delay: 0.1s; --overlap: 12px">
@@ -211,7 +210,7 @@ const structuredData = [
             sizes="(max-width: 720px) 70vw, 300px"
           />
           <p class="media-caption">
-            A Pi extension's <code>ctx.ui.select</code> and the bundled to-do widget, both drawn with native controls.
+            Extensions need to support Pi's RPC UI protocol to render natively.
           </p>
         </div>
       </section>
@@ -632,10 +631,6 @@ Setting up git ...</span>
     margin-top: 14px;
     color: var(--muted);
     font-size: 14px;
-  }
-
-  .media-caption code {
-    color: var(--fg);
   }
 
   /* Terminal */
