@@ -1,0 +1,60 @@
+/* Starlight theme for the guide, using the same palette and type as the landing page (src/styles/global.css). */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-bold.woff2") format("woff2");
+}
+
+:root {
+  --sl-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sl-font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --sl-color-accent-low: #2c201b;
+  --sl-color-accent: #dd774e;
+  --sl-color-accent-high: #f2b597;
+  --sl-color-white: #fafafa;
+  --sl-color-gray-1: #ececec;
+  --sl-color-gray-2: #d4d6d5;
+  --sl-color-gray-3: #a1a5a4;
+  --sl-color-gray-4: #717574;
+  --sl-color-gray-5: #2f3534;
+  --sl-color-gray-6: #1e2120;
+  --sl-color-black: #141716;
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #f7e4da;
+  --sl-color-accent: #bd5132;
+  --sl-color-accent-high: #8f3a22;
+  --sl-color-white: #1a1a1e;
+  --sl-color-gray-1: #2a2a2e;
+  --sl-color-gray-2: #3f3f46;
+  --sl-color-gray-3: #5f5f68;
+  --sl-color-gray-4: #8b8b94;
+  --sl-color-gray-5: #ddd5ca;
+  --sl-color-gray-6: #f4efe8;
+  --sl-color-gray-7: #f8f4ee;
+  --sl-color-black: #fbf7f1;
+}
+
+/* Headings use JetBrains Mono, like the landing page and Pipkin's own titles. */
+.site-title,
+h1#_top,
+.sl-markdown-content :is(h2, h3) {
+  font-family: var(--sl-font-mono);
+  letter-spacing: -0.01em;
+}
+
+.site-title img {
+  border-radius: 8px;
+}

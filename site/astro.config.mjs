@@ -1,4 +1,5 @@
 import sitemap from "@astrojs/sitemap";
+import starlight from "@astrojs/starlight";
 import { defineConfig } from "astro/config";
 
 // Canonical URLs, the sitemap and Open Graph images need an absolute origin. SITE_URL wins when set; on Vercel the
@@ -9,7 +10,33 @@ const site =
 
 export default defineConfig({
   site,
-  integrations: [sitemap()],
+  integrations: [
+    sitemap(),
+    // The guide under /docs/. Its pages come from the repository's docs/ folder; see src/content.config.ts.
+    starlight({
+      title: "Pipkin",
+      description: "How to set up Pipkin, connect a model, and configure the Pi agent on your Android phone.",
+      logo: { src: "./public/favicon.svg" },
+      favicon: "/favicon.svg",
+      social: [{ icon: "github", label: "GitHub", href: "https://github.com/jeph/pipkin" }],
+      // Link previews of guide pages use the landing page's share image.
+      head: [
+        { tag: "meta", attrs: { property: "og:image", content: new URL("/og.png", site).href } },
+        { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
+      ],
+      customCss: ["./src/styles/docs.css"],
+      markdown: { processedDirs: ["../docs/"] },
+      // Starlight's 404 page would answer for the whole site, landing page included, so Vercel's default stays.
+      disable404Route: true,
+      sidebar: [
+        { label: "Overview", slug: "docs" },
+        { label: "Get started", slug: "docs/get-started" },
+        { label: "Connect a model", slug: "docs/providers" },
+        { label: "Configure the agent", slug: "docs/configure" },
+        { label: "Extensions", slug: "docs/extensions" },
+      ],
+    }),
+  ],
   build: {
     inlineStylesheets: "always",
   },
