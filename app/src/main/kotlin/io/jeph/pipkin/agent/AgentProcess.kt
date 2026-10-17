@@ -72,7 +72,10 @@ internal sealed interface UiAnswer {
  * [restart] reconnects in place (exit banner Restart, failure Retry), [close] ends it for good.
  * Pi stops when the channel closes. Command wrappers throw [RpcError].
  */
-@Suppress("TooManyFunctions") // One typed wrapper per Pi RPC command, beside the connection they share.
+@Suppress(
+  "TooManyFunctions", // One typed wrapper per Pi RPC command, beside the connection they share.
+  "LongParameterList", // AppGraph wires each dependency in by hand, as the app has no DI container.
+)
 internal class AgentProcess(
   private val hostClient: HostClient,
   private val keepAlive: KeepAlive?,

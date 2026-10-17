@@ -91,18 +91,21 @@ internal fun stepSpec(step: SetupStep, state: OnboardingState, onAction: (SetupA
       )
     }
 
-    SetupStep.Storage -> permissionSpec(
-      step = step,
-      state = state,
-      icon = R.drawable.ic_lucide_folder,
-      title = R.string.onboarding_storage_title,
-      body = if (state.storageInSettings) R.string.onboarding_storage_body_settings else R.string.onboarding_storage_body_prompt,
-      done = R.string.onboarding_storage_done,
-      action = StepButton(
-        stringResource(if (state.storageInSettings) R.string.onboarding_storage_open_settings else R.string.onboarding_allow),
-        enabled = state.status(SetupStep.TermuxSetup) == StepStatus.Done,
-      ) { onAction(SetupAction.AllowTermuxStorage) },
-    )
+    SetupStep.Storage -> {
+      val inSettings = state.storageInSettings
+      permissionSpec(
+        step = step,
+        state = state,
+        icon = R.drawable.ic_lucide_folder,
+        title = R.string.onboarding_storage_title,
+        body = if (inSettings) R.string.onboarding_storage_body_settings else R.string.onboarding_storage_body_prompt,
+        done = R.string.onboarding_storage_done,
+        action = StepButton(
+          stringResource(if (inSettings) R.string.onboarding_storage_open_settings else R.string.onboarding_allow),
+          enabled = state.status(SetupStep.TermuxSetup) == StepStatus.Done,
+        ) { onAction(SetupAction.AllowTermuxStorage) },
+      )
+    }
 
     SetupStep.InstallPi -> installPiSpec(state, onAction)
 
@@ -123,7 +126,13 @@ private fun permissionSpec(
 ): StepSpec {
   val status = state.status(step)
   if (status == StepStatus.Done) {
-    return StepSpec(step = step, icon = icon, title = stringResource(title), body = stringResource(done), status = status)
+    return StepSpec(
+      step = step,
+      icon = icon,
+      title = stringResource(title),
+      body = stringResource(done),
+      status = status,
+    )
   }
   return StepSpec(
     step = step,
@@ -255,24 +264,19 @@ private fun termuxSetupSpec(state: OnboardingState, onAction: (SetupAction) -> U
     else -> null
   }
   val literal = state.setupLiteral
+  val done = status == StepStatus.Done
   return StepSpec(
     step = SetupStep.TermuxSetup,
     icon = R.drawable.ic_lucide_square_terminal,
     title = stringResource(R.string.onboarding_setup_title),
-    body = stringResource(if (status == StepStatus.Done) R.string.onboarding_setup_done else R.string.onboarding_setup_body),
+    body = stringResource(if (done) R.string.onboarding_setup_done else R.string.onboarding_setup_body),
     status = status,
     buttons = listOf(
       StepButton(stringResource(R.string.onboarding_setup_action), trusted) { onAction(SetupAction.CopyAndOpenTermux) },
     ),
     error = problem,
     waiting = waiting,
-    note = if (literal == null &&
-      status != StepStatus.Done
-    ) {
-      stringResource(R.string.onboarding_setup_retry_note)
-    } else {
-      null
-    },
+    note = if (literal == null && !done) stringResource(R.string.onboarding_setup_retry_note) else null,
     extra = literal?.let { { CommandBox(it) } },
   )
 }
