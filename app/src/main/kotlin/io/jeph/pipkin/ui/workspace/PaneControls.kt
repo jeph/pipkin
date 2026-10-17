@@ -18,11 +18,11 @@ internal class PaneControls(
   val onToggleExplorer: () -> Unit,
   /** Closes a tab, as from its actions sheet. */
   val onCloseTab: (WorkspaceTab) -> Unit,
-  /** Closes split screen; null in the main pane. */
+  /** Closes split screen from this pane; null unless split screen shows this pane on the end side. */
   val onCloseSplit: (() -> Unit)?,
 )
 
-/** The second pane's button that closes split screen, at the end of its screens' headers. */
+/** The end-side pane's button that closes split screen, at the end of its screens' headers. */
 @Composable
 internal fun CloseSplitButton(controls: PaneControls) {
   val onClose = controls.onCloseSplit ?: return

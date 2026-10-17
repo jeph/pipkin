@@ -73,11 +73,13 @@ internal class ShellActions(private val graph: AppGraph) {
     return show(pane) { workspaceChat(cwd, except = registry.shown.value[pane.other]) }
   }
 
-  /** Closes split screen: the second pane's chat or tab leaves the screen, and its history is forgotten. */
-  fun closeSplit() {
-    registry.shown.value[Pane.Secondary]?.let(::rememberShown)
-    graph.panes.clear(Pane.Secondary)
-    registry.show(Pane.Secondary, null)
+  /**
+   * Closes split screen from [closing]: its chat or tab leaves the screen and its history is forgotten, and the main
+   * pane shows what the other pane shows.
+   */
+  fun closeSplit(closing: Pane) {
+    registry.shown.value[closing]?.let(::rememberShown)
+    graph.panes.closeSplit(closing)
   }
 
   /**
@@ -203,7 +205,7 @@ internal class ShellActions(private val graph: AppGraph) {
     graph.panes.forgetChats(paths)
     // Not through closeTab, which would show the workspace being removed in the pane a tab leaves.
     graph.tabs.tabs.value.filter { sameFolder(it.cwd, cwd) }.forEach(graph.tabs::close)
-    if (graph.panes.itemIn(Pane.Secondary) == null) closeSplit()
+    if (graph.panes.itemIn(Pane.Secondary) == null) closeSplit(Pane.Secondary)
     if (graph.panes.itemIn(Pane.Primary) == null) openMostRecent()
     stop(open, replaceIn = null)
   }
@@ -260,13 +262,13 @@ internal class ShellActions(private val graph: AppGraph) {
   private fun replace(pane: Pane, replaceIn: String?, closing: List<Job>) {
     // Emptied first, so the stopping chat leaves the pane even when no replacement can open yet.
     registry.show(pane, null)
-    if (pane == Pane.Secondary && replaceIn == null) return closeSplit()
+    if (pane == Pane.Secondary && replaceIn == null) return closeSplit(Pane.Secondary)
     try {
       val chat = mostRecent(replaceIn, except = registry.shown.value[pane.other])
       registry.show(pane, chat)
       graph.panes.chatShown(pane, chat, previous = null)
     } catch (_: TooManyRunning) {
-      if (pane == Pane.Secondary) return closeSplit()
+      if (pane == Pane.Secondary) return closeSplit(Pane.Secondary)
       // The working chats being stopped still hold every slot; the replacement opens once they have closed, unless
       // another chat or tab was opened meanwhile.
       graph.scope.launch {

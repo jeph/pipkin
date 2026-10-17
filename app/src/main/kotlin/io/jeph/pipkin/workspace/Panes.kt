@@ -148,10 +148,18 @@ internal class Panes<P : ManagedProcess>(
     }
   }
 
-  /** Forgets [pane]'s tab and history, as when split screen closes. */
-  fun clear(pane: Pane) {
-    tabsFlow.update { it - pane }
-    historyFlow.update { it - pane }
+  /**
+   * Closes split screen from [closing], forgetting its item and history: the other pane's item and history stay, in
+   * the main pane, which the second pane's are moved to when [closing] is the main pane.
+   */
+  fun closeSplit(closing: Pane) {
+    val kept = closing.other
+    val chat = registry.shown.value[kept]
+    tabsFlow.value = tabsFlow.value[kept]?.let { mapOf(Pane.Primary to it) }.orEmpty()
+    historyFlow.value = historyFlow.value[kept]?.let { mapOf(Pane.Primary to it) }.orEmpty()
+    // The second pane lets go of its chat first, since the registry shows a chat in one pane at most.
+    registry.show(Pane.Secondary, null)
+    registry.show(Pane.Primary, chat)
   }
 
   /** Takes [item] out of [pane]'s history and shows it there instead of [previous]; false when it can't show. */

@@ -131,16 +131,52 @@ class PanesTest {
   }
 
   @Test
-  fun clearingAPaneForgetsItsHistory() = withPanes { registry, panes ->
+  fun closingSplitFromTheSecondPaneForgetsItsHistoryAndKeepsTheMainPane() = withPanes { registry, panes ->
     val a = registry.open(WORK, "/s/a.jsonl")
     val b = registry.open(WORK, "/s/b.jsonl")
+    val c = registry.open(WORK, "/s/c.jsonl")
+    panes.show(registry, Pane.Primary, c)
     panes.show(registry, Pane.Secondary, a)
     panes.show(registry, Pane.Secondary, b)
 
-    panes.clear(Pane.Secondary)
-    registry.show(Pane.Secondary, null)
+    panes.closeSplit(Pane.Secondary)
 
+    assertSame(c, registry.shown.value[Pane.Primary])
+    assertNull(panes.itemIn(Pane.Secondary))
     assertFalse(panes.back(Pane.Secondary))
+    assertNull(panes.history.value[Pane.Primary])
+  }
+
+  @Test
+  fun closingSplitFromTheMainPaneMovesTheSecondPanesChatAndHistoryToIt() = withPanes { registry, panes ->
+    val a = registry.open(WORK, "/s/a.jsonl")
+    val b = registry.open(WORK, "/s/b.jsonl")
+    val c = registry.open(WORK, "/s/c.jsonl")
+    val d = registry.open(WORK, "/s/d.jsonl")
+    panes.show(registry, Pane.Primary, c)
+    panes.show(registry, Pane.Primary, d)
+    panes.show(registry, Pane.Secondary, a)
+    panes.show(registry, Pane.Secondary, b)
+
+    panes.closeSplit(Pane.Primary)
+
+    assertSame(b, registry.shown.value[Pane.Primary])
+    assertNull(panes.itemIn(Pane.Secondary))
+    assertEquals(mapOf(Pane.Primary to listOf(PaneItem.Chat(a))), panes.history.value)
+  }
+
+  @Test
+  fun closingSplitFromTheMainPaneMovesTheSecondPanesTabToIt() = withPanes { registry, panes ->
+    val a = registry.open(WORK, "/s/a.jsonl")
+    val notes = file("notes.txt")
+    panes.show(registry, Pane.Primary, a)
+    OpenTabs(panes).show(Pane.Secondary, notes)
+
+    panes.closeSplit(Pane.Primary)
+
+    assertEquals(PaneItem.Tab(notes), panes.itemIn(Pane.Primary))
+    assertNull(registry.shown.value[Pane.Primary])
+    assertNull(panes.itemIn(Pane.Secondary))
   }
 
   @Test

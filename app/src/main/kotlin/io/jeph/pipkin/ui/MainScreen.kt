@@ -165,7 +165,9 @@ internal fun MainScreen(
   val splitAvailable = splitScreenAvailable()
   // Also when a restored layout fills the second pane after the window was found too narrow.
   val secondaryShown = items[Pane.Secondary] != null
-  LaunchedEffect(splitAvailable, secondaryShown) { if (!splitAvailable && secondaryShown) actions.closeSplit() }
+  LaunchedEffect(splitAvailable, secondaryShown) {
+    if (!splitAvailable && secondaryShown) actions.closeSplit(Pane.Secondary)
+  }
   val panels = rememberPanePanels()
   RequestedChatEffect(actions, requestedChat, onOpenArchivedChat, onShown = {
     for (pane in Pane.entries) panels.show(pane, Panel.Chat)
@@ -325,6 +327,7 @@ private fun AnchoredDraggableState<Panel>.offsetOr(width: Float): Float = offset
  * The main pane and, in split screen, the second pane beside it, each half as wide, each with its own [sidebar] and
  * explorer. Only the main pane opens chats in split screen, and the second pane slides back to its chat when it does.
  * Showing what the other pane shows swaps the panes' sides instead, which brings it to the side it was asked for on.
+ * Only the pane on the end side, whichever it is, has the button that closes split screen from it.
  * Back shows what a pane showed before, in the pane last touched first, then in the other.
  */
 @Composable
@@ -348,6 +351,7 @@ private fun WorkspacePanes(
   LaunchedEffect(split) { if (!split) panels.resetSecondary() }
   LaunchedEffect(panels.swapped) { graph.layout.setPanesSwapped(panels.swapped) }
   val shownPanes = if (split) Pane.entries else listOf(Pane.Primary)
+  val endPane = if (panels.swapped) Pane.Primary else Pane.Secondary
   ClearFocusWhenTerminalLeaves(
     shownPanes.mapNotNullTo(HashSet()) { ((items[it] as? PaneItem.Tab)?.tab as? WorkspaceTab.Terminal)?.session },
   )
@@ -368,7 +372,7 @@ private fun WorkspacePanes(
           onOpenTabs = { tabsOpen = true },
           onToggleExplorer = { panels.toggle(pane, Panel.Explorer) },
           onCloseTab = actions::closeTab,
-          onCloseSplit = if (pane == Pane.Secondary) actions::closeSplit else null,
+          onCloseSplit = { actions.closeSplit(pane) }.takeIf { split && pane == endPane },
         )
         val onShownInSplit = {
           panels.show(Pane.Secondary, Panel.Chat)
