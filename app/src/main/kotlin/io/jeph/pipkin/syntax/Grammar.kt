@@ -8,25 +8,32 @@ import java.util.concurrent.ConcurrentHashMap
  * file extensions that pick it. Its highlight query is the `syntax/<id>.scm` asset.
  */
 internal enum class Grammar(val id: String, vararg val names: String) {
-  BASH("bash", "bash", "sh", "shell", "zsh", "console"),
+  BASH("bash", "bash", "sh", "shell", "zsh", "console", "dotenv", "env"),
   C("c", "c", "h"),
   CPP("cpp", "cpp", "c++", "cc", "cxx", "hpp", "hh", "hxx"),
   C_SHARP("c_sharp", "csharp", "cs", "c#"),
+  CSS("css", "css"),
   DART("dart", "dart"),
+  DOCKERFILE("dockerfile", "dockerfile", "docker", "containerfile"),
   GO("go", "go", "golang"),
+  INI("ini", "ini", "cfg", "dosini", "properties"),
   JAVA("java", "java"),
   JAVASCRIPT("javascript", "javascript", "js", "jsx", "mjs", "cjs"),
   JSON("json", "json", "jsonc"),
   KOTLIN("kotlin", "kotlin", "kt", "kts"),
+  LUA("lua", "lua"),
+  MAKE("make", "make", "makefile", "mk", "mak"),
   PERL("perl", "perl", "pl", "pm"),
   PHP("php", "php"),
   PYTHON("python", "python", "py", "python3", "pyi"),
   RUBY("ruby", "ruby", "rb"),
   RUST("rust", "rust", "rs"),
   SWIFT("swift", "swift"),
+  TOML("toml", "toml"),
   TSX("tsx", "tsx"),
   TYPESCRIPT("typescript", "typescript", "ts", "mts", "cts"),
   XML("xml", "xml", "svg", "xsd", "xsl", "xslt", "plist"),
+  YAML("yaml", "yaml", "yml"),
   ;
 
   companion object {

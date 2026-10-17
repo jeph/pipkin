@@ -117,7 +117,9 @@ abstract class SyntaxSources : DefaultTask() {
         }
       }
       archive.delete()
-      sourcesDir.file("$name/LICENSE").get().asFile.copyTo(licenses.resolve("$name.txt"))
+      // Lua's licence is LICENSE.md.
+      val licenseFiles = listOf("LICENSE", "LICENSE.md").map { sourcesDir.file("$name/$it").get().asFile }
+      licenseFiles.first { it.exists() }.copyTo(licenses.resolve("$name.txt"))
     }
     val sources = sourcesDir.get().asFile
     for ((grammar, paths) in queries.get()) {
@@ -164,14 +166,29 @@ val syntaxSourcePins = listOf(
     "7a2c55afe3028f4105f25762ea58cc16537d1f5a1dcd9cca90410b3cd5d46051",
   ),
   SyntaxSource(
+    "css",
+    "https://github.com/tree-sitter/tree-sitter-css/releases/download/v0.25.0/tree-sitter-css.tar.gz",
+    "6e34c5a7f7a829a2f2077b782653bf3233db91b71f78f297797ec4ad20a0a494",
+  ),
+  SyntaxSource(
     "dart",
     "https://github.com/UserNobody14/tree-sitter-dart/archive/be07cf7118d3dba06236a3f19541685a68209934.tar.gz",
     "b126efb8dfeeba8b71f0c6ae1f0cd09cf8b205560786b31d44cc16b283e782f2",
   ),
   SyntaxSource(
+    "dockerfile",
+    "https://github.com/camdencheek/tree-sitter-dockerfile/archive/refs/tags/v0.2.0.tar.gz",
+    "8cbdf50838cc55e841aa9585a1a09e5b8c41454ae30ce0a93a7bd71adb140818",
+  ),
+  SyntaxSource(
     "go",
     "https://github.com/tree-sitter/tree-sitter-go/releases/download/v0.25.0/tree-sitter-go.tar.gz",
     "ac412018d59f7cd5bb72fbde557e9ebf9fdfac12c5853f2bb03669f980a953bb",
+  ),
+  SyntaxSource(
+    "ini",
+    "https://github.com/justinmk/tree-sitter-ini/archive/refs/tags/v1.4.0.tar.gz",
+    "300adc8b5db7604dff2b156a3962c1fbc955d89dc8be6da90e6dfe2adc950d9b",
   ),
   SyntaxSource(
     "java",
@@ -197,6 +214,16 @@ val syntaxSourcePins = listOf(
     "kotlin",
     "https://github.com/fwcd/tree-sitter-kotlin/archive/refs/tags/0.3.8.tar.gz",
     "7dd60975786bf9cb4be6a5176f5ccb5fed505f9929a012da30762505b1015669",
+  ),
+  SyntaxSource(
+    "lua",
+    "https://github.com/tree-sitter-grammars/tree-sitter-lua/releases/download/v0.5.0/tree-sitter-lua.tar.gz",
+    "dd6d995634ea7dc2eac687f4890f995f03c421e0c42c34b3cfcfc81c47e48d7e",
+  ),
+  SyntaxSource(
+    "make",
+    "https://github.com/tree-sitter-grammars/tree-sitter-make/archive/refs/tags/v1.1.1.tar.gz",
+    "31affca06041623cfa5f6a728cb3f0f2a8eb7fd01607e1a2681ea1f318367211",
   ),
   SyntaxSource(
     "perl",
@@ -229,6 +256,11 @@ val syntaxSourcePins = listOf(
     "c595b41459b0816f246ec27f60e08392ff453135e12ef47a1852ed37fe6705fe",
   ),
   SyntaxSource(
+    "toml",
+    "https://github.com/tree-sitter-grammars/tree-sitter-toml/archive/refs/tags/v0.7.0.tar.gz",
+    "7d52a7d4884f307aabc872867c69084d94456d8afcdc63b0a73031a8b29036dc",
+  ),
+  SyntaxSource(
     "typescript",
     "https://github.com/tree-sitter/tree-sitter-typescript/archive/refs/tags/v0.23.2.tar.gz",
     "2c4ce711ae8d1218a3b2f899189298159d672870b5b34dff5d937bed2f3e8983",
@@ -237,6 +269,11 @@ val syntaxSourcePins = listOf(
     "xml",
     "https://github.com/tree-sitter-grammars/tree-sitter-xml/archive/refs/tags/v0.7.0.tar.gz",
     "4330a6b3685c2f66d108e1df0448eb40c468518c3a66f2c1607a924c262a3eb9",
+  ),
+  SyntaxSource(
+    "yaml",
+    "https://github.com/tree-sitter-grammars/tree-sitter-yaml/releases/download/v0.7.2/tree-sitter-yaml.tar.gz",
+    "2707d9ff0556ee6c36a77299b4c08e5b2dcbd0d35f0b9688bb2ac8e276025f72",
   ),
 )
 
@@ -255,8 +292,11 @@ val syntaxSources = tasks.register<SyntaxSources>("syntaxSources") {
       "c" to listOf("c/queries/highlights.scm"),
       "c_sharp" to listOf("c-sharp/queries/highlights.scm"),
       "cpp" to listOf("c-0.23/queries/highlights.scm", "cpp/queries/highlights.scm"),
+      "css" to listOf("css/queries/highlights.scm"),
       "dart" to listOf("dart/queries/highlights.scm"),
+      "dockerfile" to listOf("dockerfile/queries/highlights.scm"),
       "go" to listOf("go/queries/highlights.scm"),
+      "ini" to listOf("ini/queries/highlights.scm"),
       "java" to listOf("java/queries/highlights.scm"),
       "javascript" to
         listOf(
@@ -266,12 +306,15 @@ val syntaxSources = tasks.register<SyntaxSources>("syntaxSources") {
         ),
       "json" to listOf("json/queries/highlights.scm"),
       "kotlin" to listOf("kotlin/queries/highlights.scm"),
+      "lua" to listOf("lua/queries/highlights.scm"),
+      "make" to listOf("make/queries/highlights.scm"),
       "perl" to listOf("perl/queries/highlights.scm"),
       "php" to listOf("php/queries/highlights.scm"),
       "python" to listOf("python/queries/highlights.scm"),
       "ruby" to listOf("ruby/queries/highlights.scm"),
       "rust" to listOf("rust/queries/highlights.scm"),
       "swift" to listOf("swift/queries/highlights.scm"),
+      "toml" to listOf("toml/queries/highlights.scm"),
       "tsx" to
         listOf(
           "typescript/queries/highlights.scm",
@@ -280,6 +323,7 @@ val syntaxSources = tasks.register<SyntaxSources>("syntaxSources") {
         ),
       "typescript" to listOf("typescript/queries/highlights.scm", "javascript-0.23/queries/highlights.scm"),
       "xml" to listOf("xml/queries/xml/highlights.scm"),
+      "yaml" to listOf("yaml/queries/highlights.scm"),
     ),
   )
   sourcesDir.set(syntaxSourcesDir)

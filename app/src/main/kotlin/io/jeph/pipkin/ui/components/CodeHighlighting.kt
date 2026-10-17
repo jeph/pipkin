@@ -73,9 +73,43 @@ internal fun withPlainTail(highlighted: AnnotatedString?, code: String): Annotat
   else -> highlighted + AnnotatedString(code.substring(highlighted.length))
 }
 
-/** The extension of [path]'s file name, which [Grammar.forName] reads like a fence name; null without one. */
-internal fun fileLanguage(path: String): String? =
-  path.substringAfterLast('/').substringAfterLast('.', "").ifEmpty { null }
+/**
+ * The language [path]'s file name picks, which [Grammar.forName] reads like a fence name: a file known by its whole
+ * name (`Makefile`, `.bashrc`, `Dockerfile.dev`, `.env.local`) picks its language, any other its extension. Null
+ * without either.
+ */
+internal fun fileLanguage(path: String): String? {
+  val name = path.substringAfterLast('/')
+  val lowercaseName = name.lowercase()
+  return when {
+    lowercaseName in FILE_NAME_LANGUAGES -> FILE_NAME_LANGUAGES.getValue(lowercaseName)
+    lowercaseName.startsWith("dockerfile.") -> "dockerfile"
+    lowercaseName.startsWith(".env.") -> "sh"
+    else -> name.substringAfterLast('.', "").ifEmpty { null }
+  }
+}
+
+/** Files with no extension, or a dotfile's name in its place, by lowercase name. */
+private val FILE_NAME_LANGUAGES = mapOf(
+  "containerfile" to "dockerfile",
+  "dockerfile" to "dockerfile",
+  "gnumakefile" to "make",
+  "makefile" to "make",
+  ".bash_login" to "sh",
+  ".bash_logout" to "sh",
+  ".bash_profile" to "sh",
+  ".bashrc" to "sh",
+  ".envrc" to "sh",
+  ".profile" to "sh",
+  ".zlogin" to "sh",
+  ".zlogout" to "sh",
+  ".zprofile" to "sh",
+  ".zshenv" to "sh",
+  ".zshrc" to "sh",
+  ".editorconfig" to "ini",
+  ".gitconfig" to "ini",
+  ".gitmodules" to "ini",
+)
 
 /**
  * Each line of this text with its styles, split at `\n`, `\r\n` or `\r` like [String.lines]. One pass over the

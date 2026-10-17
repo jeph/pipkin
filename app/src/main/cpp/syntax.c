@@ -12,21 +12,28 @@
   X(c)              \
   X(c_sharp)        \
   X(cpp)            \
+  X(css)            \
   X(dart)           \
+  X(dockerfile)     \
   X(go)             \
+  X(ini)            \
   X(java)           \
   X(javascript)     \
   X(json)           \
   X(kotlin)         \
+  X(lua)            \
+  X(make)           \
   X(perl)           \
   X(php)            \
   X(python)         \
   X(ruby)           \
   X(rust)           \
   X(swift)          \
+  X(toml)           \
   X(tsx)            \
   X(typescript)     \
-  X(xml)
+  X(xml)            \
+  X(yaml)
 
 #define DECLARE(name) const TSLanguage *tree_sitter_##name(void);
 GRAMMARS(DECLARE)

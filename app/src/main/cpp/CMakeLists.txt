@@ -17,21 +17,28 @@ set(GRAMMAR_DIRS
   c/src
   c-sharp/src
   cpp/src
+  css/src
   dart/src
+  dockerfile/src
   go/src
+  ini/src
   java/src
   javascript/src
   json/src
   kotlin/src
+  lua/src
+  make/src
   perl/src
   php/php/src
   python/src
   ruby/src
   rust/src
   swift/src
+  toml/src
   typescript/tsx/src
   typescript/typescript/src
   xml/xml/src
+  yaml/src
 )
 
 set(GRAMMAR_FILES)

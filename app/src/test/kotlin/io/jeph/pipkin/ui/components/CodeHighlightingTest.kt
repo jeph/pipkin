@@ -23,7 +23,7 @@ class CodeHighlightingTest {
 
   @Test
   fun unknownFencesStayPlain() {
-    assertNull(Grammar.forName("yaml"))
+    assertNull(Grammar.forName("markdown"))
     assertNull(Grammar.forName("text"))
     assertNull(Grammar.forName(""))
   }
@@ -40,10 +40,32 @@ class CodeHighlightingTest {
 
   @Test
   fun aFilesExtensionPicksItsLanguage() {
-    assertEquals("kt", fileLanguage("app/src/Main.kt"))
-    assertEquals("ts", fileLanguage("/home/u/.config/app/index.d.ts"))
-    assertNull(fileLanguage("/home/u/.config/Makefile"))
+    assertEquals(Grammar.KOTLIN, grammarOf("app/src/Main.kt"))
+    assertEquals(Grammar.TYPESCRIPT, grammarOf("/home/u/.config/app/index.d.ts"))
+    assertEquals(Grammar.YAML, grammarOf(".github/workflows/ci.yml"))
+    assertEquals(Grammar.DOCKERFILE, grammarOf("docker/app.Dockerfile"))
+    assertEquals(Grammar.BASH, grammarOf("/home/u/project/.env"))
     assertNull(fileLanguage("notes."))
+    assertNull(fileLanguage("/home/u/README"))
+  }
+
+  @Test
+  fun aFileKnownByItsWholeNamePicksItsLanguage() {
+    assertEquals(Grammar.MAKE, grammarOf("/home/u/project/Makefile"))
+    assertEquals(Grammar.MAKE, grammarOf("GNUmakefile"))
+    assertEquals(Grammar.DOCKERFILE, grammarOf("Containerfile"))
+    assertEquals(Grammar.DOCKERFILE, grammarOf("deploy/Dockerfile.dev"))
+    assertEquals(Grammar.BASH, grammarOf("/home/u/.bashrc"))
+    assertEquals(Grammar.BASH, grammarOf(".zshrc"))
+    assertEquals(Grammar.BASH, grammarOf(".env.local"))
+    assertEquals(Grammar.INI, grammarOf("/home/u/.gitconfig"))
+  }
+
+  @Test
+  fun aWholeNameOnlyCountsAsTheFileName() {
+    assertEquals(Grammar.YAML, grammarOf("Makefile/build.yml"))
+    assertNull(grammarOf("mydockerfile.dev"))
+    assertNull(grammarOf("/home/u/project/env.local"))
   }
 
   @Test
@@ -113,6 +135,8 @@ class CodeHighlightingTest {
     assertEquals(AnnotatedString("val"), withPlainTail(highlighted, "val"))
     assertEquals(AnnotatedString("val"), withPlainTail(null, "val"))
   }
+
+  private fun grammarOf(path: String): Grammar? = fileLanguage(path)?.let(Grammar::forName)
 
   private companion object {
     const val STRING = 0
