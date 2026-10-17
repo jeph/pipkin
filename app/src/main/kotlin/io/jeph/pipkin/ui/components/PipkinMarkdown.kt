@@ -12,7 +12,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
@@ -20,16 +19,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.compose.elements.MarkdownCodeBlock
 import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
-import com.mikepenz.markdown.compose.elements.MarkdownTable
-import com.mikepenz.markdown.compose.elements.MarkdownTableHeader
-import com.mikepenz.markdown.compose.elements.MarkdownTableRow
 import com.mikepenz.markdown.m3.Markdown
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
@@ -45,7 +40,6 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.flow.conflate
 import org.intellij.markdown.MarkdownElementTypes
-import org.intellij.markdown.ast.ASTNode
 
 /**
  * Assistant markdown styled to Paseo's message tokens: 15/21sp body, bordered horizontally scrolling code. With a
@@ -74,7 +68,6 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier, cache: Markd
           codeBackground = colors.surface2,
           inlineCodeBackground = colors.surface2,
           dividerColor = colors.border,
-          tableBackground = colors.surface1,
         ),
       typography = typography(body),
       padding = markdownPadding(block = PipkinTokens.Spacing.s6, codeBlock = PaddingValues(0.dp)),
@@ -83,7 +76,7 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier, cache: Markd
         markdownComponents(
           codeFence = { MarkdownCodeFence(it.content, it.node, style = it.typography.code, block = codeBlock) },
           codeBlock = { MarkdownCodeBlock(it.content, it.node, style = it.typography.code, block = codeBlock) },
-          table = { WrappingTable(it.content, it.node, it.typography.table) },
+          table = { MarkdownTable(it.content, it.node, it.typography.table) },
         ),
       // The library animates each text block's size by default, which relayouts every frame a streamed
       // block grows and leaves the chat's end moving after the text has landed.
@@ -91,41 +84,6 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier, cache: Markd
       annotator = imageAltAnnotator(),
     )
   }
-}
-
-/**
- * The library's table with its cells wrapping. Left to the library, each cell is one line cut with an ellipsis, and
- * the table only scrolls sideways when its columns at 160dp each don't fit, so on a wide screen long cells are lost.
- */
-@Composable
-private fun WrappingTable(content: String, node: ASTNode, style: TextStyle) {
-  MarkdownTable(
-    content = content,
-    node = node,
-    style = style,
-    headerBlock = { text, header, tableWidth, cellStyle ->
-      MarkdownTableHeader(
-        text,
-        header,
-        tableWidth,
-        cellStyle,
-        verticalAlignment = Alignment.Top,
-        maxLines = Int.MAX_VALUE,
-        overflow = TextOverflow.Clip,
-      )
-    },
-    rowBlock = { text, row, tableWidth, cellStyle ->
-      MarkdownTableRow(
-        text,
-        row,
-        tableWidth,
-        cellStyle,
-        verticalAlignment = Alignment.Top,
-        maxLines = Int.MAX_VALUE,
-        overflow = TextOverflow.Clip,
-      )
-    },
-  )
 }
 
 /**
@@ -197,7 +155,8 @@ private fun typography(body: TextStyle): MarkdownTypography {
     bullet = body,
     list = body,
     textLink = TextLinkStyles(style = SpanStyle(color = colors.accent, textDecoration = TextDecoration.Underline)),
-    table = body,
+    // The front matter table's cell type, a size under the body so more of a row fits across.
+    table = body.copy(fontSize = PipkinTokens.FontSize.base, lineHeight = 20.sp),
     alertTitle = body.copy(fontWeight = FontWeight.SemiBold),
   )
 }
