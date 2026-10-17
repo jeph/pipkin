@@ -26,18 +26,6 @@ const facts: { icon: IconName; text: string }[] = [
   { icon: "key_round", text: "Bring your own model" },
 ];
 
-const steps = [
-  { title: "Pick a folder", text: "A project in Termux, or any folder on your phone's storage." },
-  {
-    title: "Say what you want",
-    text: "Plain language is fine: “add a dark mode”, “why does this crash?”, “sort my photos by month”.",
-  },
-  {
-    title: "Watch it work",
-    text: "The agent plans, edits files and runs commands, and you see every step. Stop it or change course at any time.",
-  },
-];
-
 const setupSteps = [
   { title: "Install Termux", text: "From F-Droid or Google Play. Pipkin tells you which build you have." },
   { title: "Connect it to Pipkin", text: "One Android permission lets Pipkin send commands to Termux." },
@@ -189,21 +177,6 @@ const structuredData = [
         <div class="glow" aria-hidden="true"></div>
         <PhoneDemo />
       </div>
-    </section>
-
-    <section class="how container" aria-labelledby="how-title">
-      <h2 id="how-title" class="section-label">New to agentic coding? It's three steps.</h2>
-      <ol class="how-steps">
-        {
-          steps.map((step, index) => (
-            <li data-reveal style={`--reveal-delay: ${index * 0.08}s`}>
-              <span class="how-number">{String(index + 1).padStart(2, "0")}</span>
-              <h3>{step.title}</h3>
-              <p>{step.text}</p>
-            </li>
-          ))
-        }
-      </ol>
     </section>
 
     <div id="features">
@@ -561,50 +534,6 @@ Setting up git ...</span>
       opacity: 0;
       transform: scale(3);
     }
-  }
-
-  /* How it works */
-  .how {
-    padding-bottom: clamp(64px, 9vw, 120px);
-  }
-
-  .section-label {
-    color: var(--muted);
-    font-size: 15px;
-    font-weight: 400;
-    letter-spacing: 0;
-  }
-
-  .how-steps {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-    margin: 20px 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .how-steps li {
-    padding: 24px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--surface-1);
-  }
-
-  .how-number {
-    color: var(--accent);
-    font-family: var(--mono);
-    font-size: 14px;
-  }
-
-  .how-steps h3 {
-    margin: 10px 0 6px;
-    font-size: 20px;
-  }
-
-  .how-steps p {
-    color: var(--muted);
-    font-size: 16px;
   }
 
   /* Feature sections */
@@ -1067,7 +996,6 @@ Setting up git ...</span>
   }
 
   @media (max-width: 640px) {
-    .how-steps,
     .extras-grid {
       grid-template-columns: minmax(0, 1fr);
     }
