@@ -282,7 +282,7 @@ Setting up git ...</span>
         <p class="eyebrow">Questions</p>
         <h2 id="faq-title">Frequently Asked</h2>
       </div>
-      <div class="faq-list" data-reveal>
+      <div class="faq-list" data-reveal data-faq>
         {
           faqs.map((faq) => (
             <details name="faq">
@@ -290,17 +290,19 @@ Setting up git ...</span>
                 {faq.question}
                 <Icon name="plus" size={18} />
               </summary>
-              <p>
-                {faq.answer}
-                {faq.link && (
-                  <>
-                    {" "}
-                    <a href={faq.link.href} rel="noopener">
-                      {faq.link.text}
-                    </a>
-                  </>
-                )}
-              </p>
+              <div class="faq-answer">
+                <p>
+                  {faq.answer}
+                  {faq.link && (
+                    <>
+                      {" "}
+                      <a href={faq.link.href} rel="noopener">
+                        {faq.link.text}
+                      </a>
+                    </>
+                  )}
+                </p>
+              </div>
             </details>
           ))
         }
@@ -330,6 +332,13 @@ Setting up git ...</span>
     </div>
   </footer>
 </Base>
+
+<script>
+  import { animateFaq } from "../scripts/faq";
+
+  const faqList = document.querySelector<HTMLElement>("[data-faq]");
+  if (faqList) animateFaq(faqList);
+</script>
 
 <style>
   main {
@@ -699,32 +708,18 @@ Setting up git ...</span>
     transition: transform 0.3s var(--ease-out);
   }
 
-  details[open] summary :global(svg) {
+  /* The script marks a closing answer before its height animation ends, so the icon turns back right away. */
+  details[open]:not([data-state="closed"]) summary :global(svg) {
     transform: rotate(45deg);
   }
 
-  details p {
-    padding: 0 0 22px;
-    color: var(--muted);
+  .faq-answer {
+    overflow: hidden;
   }
 
-  /* Open and close answers smoothly where the browser can animate to auto height. */
-  @supports (interpolate-size: allow-keywords) {
-    details {
-      interpolate-size: allow-keywords;
-    }
-
-    details::details-content {
-      height: 0;
-      overflow: clip;
-      transition:
-        height 0.35s var(--ease-out),
-        content-visibility 0.35s allow-discrete;
-    }
-
-    details[open]::details-content {
-      height: auto;
-    }
+  .faq-answer p {
+    padding: 0 0 22px;
+    color: var(--muted);
   }
 
   /* Closing */
