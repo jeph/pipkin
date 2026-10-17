@@ -352,7 +352,7 @@ internal class AgentProcess(
     val kept = messageTimestamps(messages)
     timeline.restoreNotices { placed -> saved.ifEmpty { placed.filter { it.after == null || it.after in kept } } }
     path?.let { sessions.notices.put(it, timeline.savedNotices()) }
-    timeline.seed(messages)
+    seedTimeline(messages)
     refreshContextUsage()
     sessions.refresh()
     return data
@@ -386,7 +386,7 @@ internal class AgentProcess(
       null
     }
     // A run that started while get_messages was answered has delivered events; its stream supersedes this reload.
-    if (messages == null || !timeline.seed(messages, ifNoEventsSince = eventsBefore)) return
+    if (messages == null || !seedTimeline(messages, ifNoEventsSince = eventsBefore)) return
     Log.w(TAG, "Pi was idle but the chat still showed a run; reloaded its history")
     refreshContextUsage()
     sessions.refresh()
@@ -437,7 +437,7 @@ internal class AgentProcess(
     processScope.launch(Dispatchers.Default) { read(current) }
     return try {
       applyState(current.rpc.call("get_state"))
-      timeline.seed(current.rpc.call("get_messages").optJSONArray("messages") ?: JSONArray())
+      seedTimeline(current.rpc.call("get_messages").optJSONArray("messages") ?: JSONArray())
       stateFlow.value = AgentProcessState.Ready
       refreshContextUsage()
       null
@@ -451,6 +451,13 @@ internal class AgentProcess(
       rejection
     }
   }
+
+  /**
+   * [ChatTimeline.seed] off the main thread, where this process otherwise runs: a long history takes a while to turn
+   * into rows. The timeline's lock already guards it against the reader applying events meanwhile.
+   */
+  private suspend fun seedTimeline(messages: JSONArray, ifNoEventsSince: Long? = null): Boolean =
+    withContext(Dispatchers.Default) { timeline.seed(messages, ifNoEventsSince) }
 
   /** Installs the pinned Pi once after a `pi_version` refusal; false (with [state] Failed) when that failed. */
   private suspend fun install(): Boolean {

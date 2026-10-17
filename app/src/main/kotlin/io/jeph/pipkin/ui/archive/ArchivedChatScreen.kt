@@ -140,7 +140,8 @@ private fun rememberTranscript(path: String, attempt: Int): State<Transcript> {
       val messages = repository.messages(path)
       val saved = withContext(Dispatchers.IO) { repository.notices.load(path) }
       timeline.restoreNotices { saved }
-      timeline.seed(messages)
+      // Off the main thread: a long history takes a while to turn into rows.
+      withContext(Dispatchers.Default) { timeline.seed(messages) }
       Transcript.Loaded(timeline.state.value)
     } catch (error: IOException) {
       Transcript.Failed(error.message ?: failedToLoad)
