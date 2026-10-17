@@ -27,11 +27,14 @@ export async function providerModels(ctx: ModeContext): Promise<JsonObject> {
   }
   const url = `${baseUrl.replace(/\/+$/, "")}/models`;
   let response: Response;
+  let body: string;
+  // The body read shares the timeout and failure handling: a server can send headers and then stall or hang up.
   try {
     response = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(TIMEOUT_MS)]),
     });
+    body = await response.text();
   } catch (error) {
     if (error instanceof DOMException && error.name === "TimeoutError") {
       throw new HostError("timeout", `No response from ${baseUrl} within 15 s`);
@@ -40,7 +43,6 @@ export async function providerModels(ctx: ModeContext): Promise<JsonObject> {
     const cause = error instanceof Error && error.cause instanceof Error ? `: ${error.cause.message}` : "";
     throw new HostError("network", `Could not reach ${baseUrl}${cause}`);
   }
-  const body = await response.text();
   if (!response.ok) {
     const said = serverMessage(body);
     throw new HostError(httpErrorCode(response.status), `HTTP ${response.status}${said === "" ? "" : `: ${said}`}`);

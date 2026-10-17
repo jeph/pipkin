@@ -117,12 +117,9 @@ private fun loadSavedProvider(form: ProviderForm, accounts: AccountRepository, f
   var loading by remember { mutableStateOf(form.editing && !form.prefilled) }
   LaunchedEffect(form) {
     if (form.editing && !form.prefilled) {
-      try {
-        accounts.refresh()
-        accounts.status.value?.custom?.firstOrNull { it.id == form.id }?.let(form::prefill)
-      } finally {
-        loading = false
-      }
+      accounts.refresh()
+      accounts.status.value?.custom?.firstOrNull { it.id == form.id }?.let(form::prefill)
+      loading = false
     }
     // Without a suspension since the page was revealed, so its first frame already says the check is running.
     if (form.prefilled && form.check == ConnectionCheck.Idle && form.canCheck) {

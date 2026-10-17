@@ -74,6 +74,12 @@ describe("provider_models and model_defaults", () => {
 
   beforeAll(async () => {
     server = createServer((request, response) => {
+      if (request.url === "/reset/models") {
+        // Headers and the start of a body, then the connection drops.
+        response.writeHead(200, { "content-type": "application/json" });
+        response.write('{"data":[', () => request.socket.destroy());
+        return;
+      }
       const failure = FAILURES[request.url ?? ""];
       if (failure !== undefined) {
         response.writeHead(failure.status, { "content-type": failure.type });
@@ -198,6 +204,11 @@ describe("provider_models and model_defaults", () => {
       code: "network",
       error: expect.stringContaining(`Could not reach ${url}`),
     });
+  });
+
+  it("reports a server that hangs up partway through its answer as unreachable", async () => {
+    const result = await runMode("provider_models", dirs, { baseUrl: `${origin}/reset`, apiKey: "k", api: "openai-responses" });
+    expect(result).toMatchObject({ ok: false, code: "network", error: expect.stringContaining(`Could not reach ${origin}/reset`) });
   });
 
   it("returns catalogue defaults in request order, ignoring models.json", async () => {
