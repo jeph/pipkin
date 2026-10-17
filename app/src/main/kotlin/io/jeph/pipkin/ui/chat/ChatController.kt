@@ -38,9 +38,9 @@ internal class ChatActions(
 )
 
 /**
- * The chat screen's draft and actions for one [process]. Runs work on the screen's [scope] and reports
- * failures as snackbars, so a closed screen cancels its pending calls. [view] is what the screen keeps of the chat,
- * such as its stream position, which outlives the controller.
+ * The chat screen's actions for one [process]. Runs work on the screen's [scope] and reports failures as snackbars,
+ * so a closed screen cancels its pending calls. [view] is what the screen keeps of the chat, such as its stream
+ * position and the composer's [draft], which outlives the controller.
  */
 internal class ChatController(
   val process: AgentProcess,
@@ -52,7 +52,7 @@ internal class ChatController(
 ) {
   private val graph: AppGraph = context.appGraph
 
-  val draft = TextFieldState()
+  val draft: TextFieldState = view.draft
 
   /** Whether the composer's text field has focus; the slash menu only shows while it does. */
   var composerFocused by mutableStateOf(false)

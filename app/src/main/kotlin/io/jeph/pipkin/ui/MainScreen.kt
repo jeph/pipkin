@@ -51,7 +51,6 @@ import io.jeph.pipkin.agent.ChatLocation
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.chat.ChatScreen
-import io.jeph.pipkin.ui.chat.ChatViews
 import io.jeph.pipkin.ui.components.LocalPotsSimmer
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
@@ -341,8 +340,8 @@ private fun WorkspacePanes(
 ) {
   val graph = LocalContext.current.appGraph
   val items = rememberPaneItems()
-  // Shared by both panes, so a chat that moves to the other pane keeps its scroll position and parsed replies.
-  val views = remember { ChatViews() }
+  // Shared by both panes, so a chat that moves to the other pane keeps its scroll position, parsed replies and draft.
+  val views = graph.chatViews
   LaunchedEffect(views, graph.registry) { views.warmHidden(graph.registry) }
   // Not shown for the frame before a narrowed window closes split screen.
   val split = splitAvailable && items[Pane.Secondary] != null

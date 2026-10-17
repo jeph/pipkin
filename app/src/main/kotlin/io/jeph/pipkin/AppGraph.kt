@@ -25,6 +25,7 @@ import io.jeph.pipkin.host.FileHost
 import io.jeph.pipkin.host.GitHost
 import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.terminal.TerminalRegistry
+import io.jeph.pipkin.ui.chat.ChatViews
 import io.jeph.pipkin.workspace.OpenTabs
 import io.jeph.pipkin.workspace.Panes
 import io.jeph.pipkin.workspace.WorkspaceLayout
@@ -69,6 +70,9 @@ internal class AppGraph(private val application: Application) {
   val gitHost = GitHost(hostClient, scope)
   val commits = CommitTabRegistry(gitHost, tabs, preferences.trustedRepositories, scope)
   val layout = WorkspaceLayout(this)
+
+  /** What the chat screens keep of each chat, such as unsent drafts, held here so it survives rotation and folding. */
+  val chatViews = ChatViews()
 
   init {
     holdWhileWorking()

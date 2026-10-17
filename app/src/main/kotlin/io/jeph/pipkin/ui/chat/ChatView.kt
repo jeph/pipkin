@@ -1,6 +1,7 @@
 package io.jeph.pipkin.ui.chat
 
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
 import io.jeph.pipkin.agent.AgentProcess
@@ -39,16 +40,21 @@ internal class ChatScroll {
 }
 
 /**
- * What the chat screen keeps of one chat while another one shows: its [scroll] position, its replies' parsed
- * [markdown], so switching back draws the chat as it was from the first frame, and its [widgetTabs].
+ * What the chat screen keeps of one chat while another one shows or the activity is recreated, as on rotation or
+ * folding: its [scroll] position, its replies' parsed [markdown], so switching back draws the chat as it was from the
+ * first frame, its [widgetTabs], and the composer's unsent [draft].
  */
 internal class ChatView {
   val scroll = ChatScroll()
   val markdown = MarkdownCache()
   val widgetTabs = WidgetTabs()
+  val draft = TextFieldState()
 }
 
-/** Each chat's [ChatView], kept as long as its process: a parked chat keeps its own, a closed one's is dropped. */
+/**
+ * Each chat's [ChatView], kept as long as its process: a parked chat keeps its own, a closed one's is dropped. Held by
+ * the [io.jeph.pipkin.AppGraph], so it outlives the activity; nothing is saved to disk.
+ */
 internal class ChatViews {
   private val views = WeakHashMap<AgentProcess, ChatView>()
 
