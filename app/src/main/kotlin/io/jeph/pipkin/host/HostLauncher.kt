@@ -127,15 +127,32 @@ internal object HostLauncher {
     arguments: List<String>,
     stdin: String,
     resultIntent: PendingIntent,
-  ) {
-    val intent = Intent("com.termux.RUN_COMMAND").setComponent(SERVICE)
+  ) = send(
+    context,
+    Intent("com.termux.RUN_COMMAND").setComponent(SERVICE)
       .putExtra("com.termux.RUN_COMMAND_PATH", BASH)
       .putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arguments.toTypedArray())
       .putExtra("com.termux.RUN_COMMAND_STDIN", stdin)
       .putExtra("com.termux.RUN_COMMAND_BACKGROUND", true)
       .putExtra("com.termux.RUN_COMMAND_BACKGROUND_CUSTOM_LOG_LEVEL", "0")
       .putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "Pipkin: $mode")
-      .putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", resultIntent)
+      .putExtra("com.termux.RUN_COMMAND_PENDING_INTENT", resultIntent),
+  )
+
+  /**
+   * Runs [command] in a new terminal session that Termux switches to, for commands that need Termux on screen, such as
+   * its storage prompt. The caller opens Termux, since Android may not let Termux bring itself forward.
+   */
+  fun runInTerminal(context: Context, label: String, command: String) = send(
+    context,
+    Intent("com.termux.RUN_COMMAND").setComponent(SERVICE)
+      .putExtra("com.termux.RUN_COMMAND_PATH", BASH)
+      .putExtra("com.termux.RUN_COMMAND_ARGUMENTS", arrayOf("-c", command))
+      .putExtra("com.termux.RUN_COMMAND_BACKGROUND", false)
+      .putExtra("com.termux.RUN_COMMAND_COMMAND_LABEL", "Pipkin: $label"),
+  )
+
+  private fun send(context: Context, intent: Intent) {
     try {
       // A plain startService is refused while Termux is idle in the background. Termux's
       // RunCommandService calls startForeground() on every start, so this path is always allowed.
@@ -168,8 +185,7 @@ internal object HostLauncher {
 
   /**
    * `<mode> <port>` for `host.mjs`, then the host script in pieces; the token is the one stdin line.
-   * Exit codes: 70 Termux env, 72 node missing, 73 node too old, 74 npm missing,
-   * 75 shared storage unavailable, 80 token missing.
+   * Exit codes: 70 Termux env, 72 node missing, 73 node too old, 74 npm missing, 80 token missing.
    */
   private val BOOTSTRAP = $$$"""
     set -eu
@@ -181,7 +197,6 @@ internal object HostLauncher {
     command -v node >/dev/null 2>&1 || exit 72
     node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=19)?0:1)' || exit 73
     command -v npm >/dev/null 2>&1 || exit 74
-    [ -d "$HOME/storage/shared" ] && [ -w "$HOME/storage/shared" ] || exit 75
     export PIPKIN_ROOT="$HOME/.local/share/pipkin"
     export PI_CODING_AGENT_DIR="$HOME/.pipkin/pi"
     mkdir -p "$PIPKIN_ROOT" "$PI_CODING_AGENT_DIR"

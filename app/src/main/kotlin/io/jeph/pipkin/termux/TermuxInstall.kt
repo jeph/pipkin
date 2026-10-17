@@ -1,5 +1,6 @@
 package io.jeph.pipkin.termux
 
+import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
@@ -120,6 +121,15 @@ internal object TermuxInstall {
   /** Termux's app info, where the user lets it run in the background without battery restrictions. */
   fun openTermuxAppSettings(context: Context) = context.startActivity(
     Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$PACKAGE_NAME".toUri()),
+  )
+
+  /** Android 11 added the All files access page. */
+  val allFilesAccessAvailable: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+
+  /** Termux's All files access toggle, which both builds declare; the Play build has no storage prompt. */
+  @SuppressLint("InlinedApi") // Callers check allFilesAccessAvailable; the Play build requires Android 11.
+  fun openTermuxFilesAccess(context: Context) = context.startActivity(
+    Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, "package:$PACKAGE_NAME".toUri()),
   )
 
   /** Termux is exempt from battery optimization; false when it is absent. */

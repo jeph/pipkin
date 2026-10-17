@@ -89,9 +89,23 @@ class OnboardingStateTest {
 
   @Test
   fun aFailuresOwnFixCommandIsDroppedAfterAReinstall() {
-    val storage = SetupError(SetupStep.TermuxSetup, "Termux can't reach shared storage.", "termux-setup-storage")
-    assertEquals("termux-setup-storage", state(fdroid(runCommand = true), error = storage).setupLiteral)
-    assertNull(state(fdroid(runCommand = true).copy(termuxChanged = true), error = storage).setupLiteral)
+    val tooOld = HostFailure.NodeTooOld().toSetupError()
+    assertEquals("yes | pkg upgrade -y", state(fdroid(runCommand = true), error = tooOld).setupLiteral)
+    assertNull(state(fdroid(runCommand = true).copy(termuxChanged = true), error = tooOld).setupLiteral)
+  }
+
+  @Test
+  fun storageIsDoneOnlyWhenTheInstalledTermuxReportsIt() {
+    val noStorage = READY.copy(sharedStorage = false)
+    assertEquals(StepStatus.Done, state(fdroid(runCommand = true), hello = READY).status(SetupStep.Storage))
+    assertEquals(StepStatus.Pending, state(fdroid(runCommand = true), hello = noStorage).status(SetupStep.Storage))
+    val replaced = fdroid(runCommand = true).copy(termuxChanged = true)
+    assertEquals(StepStatus.Pending, state(replaced, hello = READY).status(SetupStep.Storage))
+    // Only a set-up Termux can be asked; one that reported no access is asked again.
+    assertFalse(state(fdroid(runCommand = true)).storageUnconfirmed)
+    assertTrue(state(fdroid(runCommand = true, reached = true)).storageUnconfirmed)
+    assertTrue(state(fdroid(runCommand = true), hello = noStorage).storageUnconfirmed)
+    assertFalse(state(fdroid(runCommand = true), hello = READY).storageUnconfirmed)
   }
 
   @Test
@@ -103,8 +117,8 @@ class OnboardingStateTest {
     val refused = SetupError(SetupStep.RunCommand, "Allow Pipkin to run commands in Termux.")
     assertNull(state(fdroid(), error = refused).currentError)
     assertTrue(state(fdroid(runCommand = true), complete = true, error = refused).shouldAutoInstall)
-    val storage = SetupError(SetupStep.TermuxSetup, "Termux can't reach shared storage.", "termux-setup-storage")
-    assertEquals(storage, state(fdroid(runCommand = true), error = storage).currentError)
+    val tooOld = HostFailure.NodeTooOld().toSetupError()
+    assertEquals(tooOld, state(fdroid(runCommand = true), error = tooOld).currentError)
   }
 
   @Test
@@ -161,6 +175,6 @@ class OnboardingStateTest {
 
   private companion object {
     const val PI_VERSION = "1.3.0"
-    val READY = HostHello(piVersion = PI_VERSION, nodeVersion = "22.19.0", configDir = "", home = "")
+    val READY = HostHello(piVersion = PI_VERSION, nodeVersion = "22.19.0", configDir = "", home = "", sharedStorage = true)
   }
 }

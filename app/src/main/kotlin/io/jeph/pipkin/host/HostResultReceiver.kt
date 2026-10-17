@@ -76,7 +76,6 @@ class HostResultReceiver : BroadcastReceiver() {
       exitCode == 70 -> HostFailure.TermuxNotInitialized()
       exitCode == 72 || exitCode == 74 -> HostFailure.NodeMissing()
       exitCode == 73 -> HostFailure.NodeTooOld()
-      exitCode == 75 -> HostFailure.StorageDenied()
       exitCode == 80 -> HostFailure.Internal()
       else -> HostFailure.Crashed(exitCode)
     }

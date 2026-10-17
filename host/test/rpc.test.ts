@@ -111,7 +111,15 @@ describe("rpc mode", () => {
       nodeVersion: process.versions.node,
       configDir: dirs.configDir,
       home: dirs.home,
+      sharedStorage: true,
     });
+    run.socket.end();
+    await run.exited;
+  });
+
+  it("says in hello when shared storage is out of reach", async () => {
+    const { run } = await startHost("rpc", dirs, { EXTERNAL_STORAGE: `${dirs.base}/missing` });
+    expect(await run.next()).toMatchObject({ type: "pipkin_hello", sharedStorage: false });
     run.socket.end();
     await run.exited;
   });

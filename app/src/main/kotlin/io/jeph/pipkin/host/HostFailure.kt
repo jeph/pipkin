@@ -22,7 +22,6 @@ internal sealed class HostFailure(
     TermuxNotInitialized,
     NodeMissing,
     NodeTooOld,
-    StorageDenied,
     Internal,
     Crashed,
     Timeout,
@@ -64,8 +63,6 @@ internal sealed class HostFailure(
   class NodeMissing : HostFailure(Kind.NodeMissing, NODE_MISSING)
 
   class NodeTooOld : HostFailure(Kind.NodeTooOld, NODE_TOO_OLD, "yes | pkg upgrade -y")
-
-  class StorageDenied : HostFailure(Kind.StorageDenied, STORAGE_DENIED, "termux-setup-storage")
 
   class Internal : HostFailure(Kind.Internal, INTERNAL)
 
@@ -112,8 +109,6 @@ internal sealed class HostFailure(
     const val TERMUX_NOT_INITIALIZED = "Open Termux once and let it finish installing."
     const val NODE_MISSING = "Node.js is missing in Termux. Run the setup command in Termux, then retry."
     const val NODE_TOO_OLD = "Node.js can't run or is too old. Run `yes | pkg upgrade -y` in Termux, then retry."
-    const val STORAGE_DENIED =
-      "Termux can't reach shared storage. Run `termux-setup-storage` in Termux and allow access."
     const val INTERNAL = "Pipkin's Termux helper did not receive its token. Retry."
     const val CRASHED = "Pipkin's Termux helper exited with status"
     const val TIMEOUT = "Termux did not respond in time. Open Termux once, then retry."
@@ -134,7 +129,6 @@ internal sealed class HostFailure(
       Kind.Permission,
       Kind.NodeMissing,
       Kind.NodeTooOld,
-      Kind.StorageDenied,
       Kind.TermuxNotInitialized,
       Kind.TermuxChanged,
       Kind.HelperNotPaired,

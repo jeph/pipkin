@@ -2,7 +2,7 @@
 <resources>
     <string name="onboarding_status_done">Done</string>
     <string name="onboarding_status_failed">Needs attention</string>
-    <string name="onboarding_recommended">Recommended</string>
+    <string name="onboarding_recommended">Optional but recommended</string>
     <string name="onboarding_open_settings">Open settings</string>
     <string name="onboarding_allow">Allow</string>
     <string name="onboarding_retry">Retry</string>
@@ -49,8 +49,6 @@
 
     <string name="onboarding_setup_title">Set up Termux</string>
     <string name="onboarding_setup_body">Paste the setup command into Termux.</string>
-    <string name="onboarding_setup_storage_fdroid">If Android asks for storage access, tap Allow.</string>
-    <string name="onboarding_setup_storage_play">When All\u00A0files\u00A0access opens, turn on Allow\u00A0access\u00A0to\u00A0manage\u00A0all\u00A0files for Termux, then go back to Termux.</string>
     <string name="onboarding_setup_retry_note">Android may sometimes kill large pkg installs during setup. If this happens, please retry the command. It picks up where it left off.</string>
     <string name="onboarding_setup_waiting">Waiting for Termux to finish…</string>
     <string name="onboarding_setup_connecting">Connecting to Termux…</string>
@@ -62,7 +60,7 @@
     <string name="onboarding_demo_done">Pipkin setup done</string>
 
     <string name="onboarding_notifications_title">Notifications</string>
-    <string name="onboarding_notifications_body">Pipkin tells you when a chat finishes while you\'re away, and shows a Stop button while the agent works.</string>
+    <string name="onboarding_notifications_body">Pipkin notifies you when a chat finishes while you\'re away.</string>
     <string name="onboarding_notifications_blocked">Android won\'t ask again. In settings, turn on All\u00A0Pipkin\u00A0notifications.</string>
     <string name="onboarding_notifications_blocked_note">Samsung, OnePlus, Oppo: Allow\u00A0notifications\nXiaomi: Show\u00A0notifications</string>
     <string name="onboarding_notifications_done">Notifications are on.</string>
@@ -76,6 +74,12 @@
     <string name="onboarding_termux_background_note">Samsung: Battery\u00A0→ Unrestricted\nXiaomi: Battery\u00A0saver\u00A0→ No\u00A0restrictions\nOnePlus, Oppo, Realme: Battery\u00A0usage\u00A0→ Allow\u00A0background\u00A0activity</string>
     <string name="onboarding_termux_background_allow">Open Termux\'s app info</string>
     <string name="onboarding_termux_background_done">Termux can run in the background.</string>
+
+    <string name="onboarding_storage_title">Let Termux use phone storage</string>
+    <string name="onboarding_storage_body_prompt">Needed to work on files outside Termux, such as in Downloads or Documents. When Termux asks, tap Allow.</string>
+    <string name="onboarding_storage_body_settings">Needed to work on files outside Termux, such as in Downloads or Documents. In All\u00A0files\u00A0access, turn on Allow\u00A0access\u00A0to\u00A0manage\u00A0all\u00A0files for Termux.</string>
+    <string name="onboarding_storage_open_settings">Open All files access</string>
+    <string name="onboarding_storage_done">Termux can use phone storage.</string>
 
     <string name="onboarding_install_title">Install the agent</string>
     <string name="onboarding_install_body">Pipkin installs its agent, Pi %1$s, in Termux. It takes a few minutes.</string>

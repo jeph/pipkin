@@ -22,6 +22,8 @@ export interface Dirs {
   home: string;
   /** Stands in for Termux's `$PREFIX`. */
   prefix: string;
+  /** Stands in for Android's shared storage, `$EXTERNAL_STORAGE`. */
+  shared: string;
 }
 
 export async function makeDirs(): Promise<Dirs> {
@@ -32,8 +34,11 @@ export async function makeDirs(): Promise<Dirs> {
     configDir: path.join(base, "config"),
     home: path.join(base, "home"),
     prefix: path.join(base, "prefix"),
+    shared: path.join(base, "shared"),
   };
-  await Promise.all([dirs.root, dirs.configDir, dirs.home, dirs.prefix].map((dir) => mkdir(dir, { recursive: true })));
+  await Promise.all(
+    [dirs.root, dirs.configDir, dirs.home, dirs.prefix, dirs.shared].map((dir) => mkdir(dir, { recursive: true })),
+  );
   return dirs;
 }
 
@@ -150,6 +155,7 @@ export async function startHost(
       PI_CODING_AGENT_DIR: dirs.configDir,
       HOME: dirs.home,
       PREFIX: dirs.prefix,
+      EXTERNAL_STORAGE: dirs.shared,
       ...extraEnv,
     },
     stdio: ["ignore", "inherit", "inherit"],

@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.net.toUri
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.host.HostFailure
 import io.jeph.pipkin.termux.TermuxInstall
 import io.jeph.pipkin.termux.TermuxSetup
 import io.jeph.pipkin.ui.components.HeaderBar
@@ -91,6 +92,15 @@ internal fun rememberSetupActions(
 
       SetupAction.AllowTermuxBackground -> context.startSafely { TermuxInstall.openTermuxAppSettings(context) }
 
+      SetupAction.AllowTermuxStorage -> context.startSafely {
+        if (state.storageInSettings) {
+          TermuxInstall.openTermuxFilesAccess(context)
+        } else {
+          TermuxSetup.requestFDroidStorage(context)
+          SetupProgress.markStoragePromptShown()
+        }
+      }
+
       SetupAction.AllowRunCommand -> requestPermission(TermuxInstall.RUN_COMMAND_PERMISSION)
 
       SetupAction.CopyAndOpenTermux -> scope.launch {
@@ -156,11 +166,16 @@ private fun requestBackgroundExemption(context: Context) {
   )
 }
 
-/** Runs an activity start; a device without a matching app (no browser, Termux gone) gets a toast, not a crash. */
+/**
+ * Runs an activity start; a device without a matching app (no browser, Termux gone) gets a toast, not a crash, as does
+ * a command Termux refused.
+ */
 private inline fun Context.startSafely(start: () -> Unit) {
   try {
     start()
   } catch (_: ActivityNotFoundException) {
     Toast.makeText(this, R.string.onboarding_no_activity, Toast.LENGTH_SHORT).show()
+  } catch (failure: HostFailure) {
+    Toast.makeText(this, failure.message, Toast.LENGTH_LONG).show()
   }
 }

@@ -32,6 +32,7 @@ internal enum class SetupStep(val requirement: Requirement) {
   Notifications(Requirement.Recommended),
   Background(Requirement.Recommended),
   TermuxBackground(Requirement.Recommended),
+  Storage(Requirement.Recommended),
   InstallPi(Requirement.Required),
   SignIn(Requirement.Optional),
 }
@@ -54,7 +55,6 @@ internal fun HostFailure.toSetupError(): SetupError {
     HostFailure.Kind.ExternalApps,
     HostFailure.Kind.NodeMissing,
     HostFailure.Kind.NodeTooOld,
-    HostFailure.Kind.StorageDenied,
     HostFailure.Kind.TermuxNotInitialized,
     HostFailure.Kind.TermuxChanged,
     HostFailure.Kind.HelperNotPaired,
@@ -79,7 +79,9 @@ internal object SetupProgress {
   private val installingState = MutableStateFlow(false)
   private val progressState = MutableStateFlow<List<String>>(emptyList())
   private val errorState = MutableStateFlow<SetupError?>(null)
+  private val storagePromptShownState = MutableStateFlow(false)
   private var job: Job? = null
+  private var storageCheck: Job? = null
 
   /** Permissions denied with "don't ask again"; their step opens system settings instead. */
   val blockedPermissions: StateFlow<Set<String>> = blockedPermissionsState.asStateFlow()
@@ -91,6 +93,16 @@ internal object SetupProgress {
 
   /** Why the last install failed; cleared when the next one starts. */
   val error: StateFlow<SetupError?> = errorState.asStateFlow()
+
+  /**
+   * Termux's storage prompt was opened. Termux doesn't say how it went, and Android stops showing it after two
+   * refusals, so a storage step still open after it offers All files access instead.
+   */
+  val storagePromptShown: StateFlow<Boolean> = storagePromptShownState.asStateFlow()
+
+  fun markStoragePromptShown() {
+    storagePromptShownState.value = true
+  }
 
   /**
    * [literal] when a failure names its own fix, else the installed build's setup command; the Play build's opens a
@@ -129,6 +141,22 @@ internal object SetupProgress {
         errorState.value = SetupError(SetupStep.InstallPi, failure.message)
       } finally {
         installingState.value = false
+      }
+    }
+  }
+
+  /**
+   * Starts a host to read Termux's storage access afresh from its hello, after the user may have changed it in
+   * settings. Failures are dropped: the step just stays pending, and the install or chat reports a broken Termux.
+   */
+  fun recheckStorage(graph: AppGraph) {
+    if (storageCheck?.isActive == true) return
+    storageCheck = graph.scope.launch {
+      try {
+        graph.hostClient.hello()
+      } catch (_: IOException) {
+      } catch (_: HostRejected) {
+      } catch (_: JSONException) {
       }
     }
   }

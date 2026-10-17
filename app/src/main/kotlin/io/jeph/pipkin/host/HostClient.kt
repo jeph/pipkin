@@ -112,6 +112,11 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
 
   suspend fun authStatus(): AuthStatus = AuthStatus.from(call("auth_status", JSONObject()))
 
+  /** Starts a host only for its hello, so [lastHello] reports Termux as it is now, such as its storage access. */
+  suspend fun hello() {
+    call("hello", JSONObject())
+  }
+
   /** OAuth sign-in for `anthropic` or `openai-codex`. Cancelling the caller aborts the login. */
   suspend fun login(providerId: String, ui: LoginUi) {
     call("login", JSONObject().put("providerId", providerId), LOGIN_TIMEOUT_MILLIS) { channel, line ->

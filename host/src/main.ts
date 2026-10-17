@@ -1,6 +1,6 @@
 import { connect } from "node:net";
 import { Connection } from "./connection.js";
-import { HostError, installedPiVersion, readHostEnv } from "./env.js";
+import { HostError, installedPiVersion, grantedSharedStorage, readHostEnv } from "./env.js";
 import { isObject, type JsonObject } from "./framing.js";
 import type { ModeContext } from "./mode.js";
 import { authStatus } from "./modes/auth-status.js";
@@ -77,6 +77,7 @@ async function main(): Promise<void> {
     nodeVersion: process.versions.node,
     configDir: env.configDir,
     home: env.home,
+    sharedStorage: (await grantedSharedStorage(env)) !== null,
   });
 
   const request = await conn.firstMessage(mode === "rpc", REQUEST_TIMEOUT_MS);
@@ -148,6 +149,9 @@ async function main(): Promise<void> {
       return respond(ctx, restoreBackup);
     case "backup_delete":
       return respond(ctx, deleteBackup);
+    case "hello":
+      // Answers with nothing: the hello is the point, so the app can re-read what it reports after a settings change.
+      return respond(ctx, async () => ({}));
     default:
       conn.send({ type: "pipkin_result", ok: false, error: `Unknown mode ${mode}`, code: "unknown_mode" });
       conn.finish();

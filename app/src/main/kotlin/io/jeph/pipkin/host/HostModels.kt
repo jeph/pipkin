@@ -11,6 +11,8 @@ internal data class HostHello(
   val nodeVersion: String,
   val configDir: String,
   val home: String,
+  /** Termux can write to Android's shared storage: the user gave it All files access or storage permission. */
+  val sharedStorage: Boolean = false,
 ) {
   companion object {
     fun from(hello: JSONObject) = HostHello(
@@ -18,6 +20,7 @@ internal data class HostHello(
       nodeVersion = hello.optString("nodeVersion"),
       configDir = hello.optString("configDir"),
       home = hello.optString("home"),
+      sharedStorage = hello.optBoolean("sharedStorage"),
     )
   }
 }

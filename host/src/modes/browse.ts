@@ -1,5 +1,6 @@
 import { opendir, readdir, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { type HostEnv, grantedSharedStorage } from "../env.js";
 import { SEARCH_LIMIT, type SearchRoot, searchFolders } from "../folder-search.js";
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
@@ -82,14 +83,11 @@ async function openableParent(parent: string): Promise<string | null> {
 
 type Place = { kind: "home" | "shared" | "volume"; path: string; name?: string };
 
-/** Termux home, phone storage (through `termux-setup-storage`'s link) and any other mounted volume. */
-async function places(home: string): Promise<Place[]> {
-  const found: Place[] = [{ kind: "home", path: home }];
-  try {
-    found.push({ kind: "shared", path: await realpath(join(home, "storage", "shared")) });
-  } catch {
-    // Storage access not set up yet; home is still browsable.
-  }
+/** Termux home, phone storage when Termux may read it, and any other mounted volume. */
+async function places(env: HostEnv): Promise<Place[]> {
+  const found: Place[] = [{ kind: "home", path: env.home }];
+  const shared = await grantedSharedStorage(env);
+  if (shared !== null) found.push({ kind: "shared", path: shared });
   try {
     for (const name of await readdir(STORAGE)) {
       const path = join(STORAGE, name);
@@ -118,7 +116,7 @@ async function search(query: string, found: Place[], home: string, cancelled: ()
  */
 export async function browse(ctx: ModeContext): Promise<JsonObject> {
   const home = ctx.env.home;
-  const found = await places(home);
+  const found = await places(ctx.env);
   ctx.conn.send({ type: "pipkin_places", places: found });
   let latestSearch: number | undefined;
   ctx.conn.listen((message) => {

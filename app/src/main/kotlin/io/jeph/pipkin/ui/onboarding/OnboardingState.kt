@@ -44,6 +44,8 @@ internal sealed interface SetupAction {
 
   data object AllowTermuxBackground : SetupAction
 
+  data object AllowTermuxStorage : SetupAction
+
   data object AllowRunCommand : SetupAction
 
   data object CopyAndOpenTermux : SetupAction
@@ -160,7 +162,16 @@ internal data class OnboardingState(
   val progress: List<String>,
   val error: SetupError?,
   val authStatus: AuthStatus?,
+  /** Termux's storage prompt was opened this session ([SetupProgress.storagePromptShown]). */
+  val storagePromptShown: Boolean = false,
 ) {
+  /**
+   * The storage step sends the user to All files access: Play's Termux has no storage prompt, and F-Droid's may have
+   * stopped showing it. Android 10 has no such page, so there F-Droid's prompt stays the only way.
+   */
+  val storageInSettings: Boolean
+    get() = checks.termux.isPlay || (storagePromptShown && TermuxInstall.allFilesAccessAvailable)
+
   /** A hello counts only from the installed Termux: removing or replacing it took Pi and its setup with it. */
   private val currentHello: HostHello? get() = hello.takeIf { checks.termux.isTrusted && !checks.termuxChanged }
 
@@ -175,8 +186,8 @@ internal data class OnboardingState(
     }
 
   /**
-   * A short command that fixes the setup failure, such as `termux-setup-storage`, offered in place of the setup command.
-   * It applies to the installation that failed; after a reinstall, only the full setup helps.
+   * A short command that fixes the setup failure, such as `yes | pkg upgrade -y`, offered in place of the setup
+   * command. It applies to the installation that failed; after a reinstall, only the full setup helps.
    */
   val setupLiteral: String? get() = errorFor(SetupStep.TermuxSetup)?.command?.takeUnless { checks.termuxChanged }
 
@@ -192,6 +203,16 @@ internal data class OnboardingState(
   /** The setup command was copied and Termux hasn't reported back yet. */
   val waitingForTermux: Boolean
     get() = commandCopied && status(SetupStep.TermuxSetup) == StepStatus.Pending
+
+  /**
+   * Termux can be asked about its storage access: Android reports nothing about another app's storage, so only a fresh
+   * hello from Termux can tell. An install's hello answers it too, so this waits for a running one.
+   */
+  val canCheckStorage: Boolean
+    get() = status(SetupStep.TermuxSetup) == StepStatus.Done && canLaunchHost && !installing
+
+  /** Storage access isn't confirmed by a Termux that [canCheckStorage]. */
+  val storageUnconfirmed: Boolean get() = canCheckStorage && status(SetupStep.Storage) != StepStatus.Done
 
   /** The steps this phone and Termux build need, in order. */
   val visibleSteps: List<SetupStep>
@@ -230,6 +251,7 @@ internal data class OnboardingState(
     SetupStep.Notifications -> if (checks.notificationsGranted == false) StepStatus.Pending else StepStatus.Done
     SetupStep.Background -> if (checks.backgroundAllowed) StepStatus.Done else StepStatus.Pending
     SetupStep.TermuxBackground -> if (checks.termuxBackgroundAllowed) StepStatus.Done else StepStatus.Pending
+    SetupStep.Storage -> if (currentHello?.sharedStorage == true) StepStatus.Done else StepStatus.Pending
     SetupStep.RunCommand -> runCommandStatus()
     SetupStep.TermuxSetup -> termuxSetupStatus()
     SetupStep.InstallPi -> installPiStatus()
@@ -289,6 +311,7 @@ internal fun rememberOnboardingState(graph: AppGraph, checks: DeviceChecks): Onb
   val installing by SetupProgress.installing.collectAsStateWithLifecycle()
   val progress by SetupProgress.progress.collectAsStateWithLifecycle()
   val installError by SetupProgress.error.collectAsStateWithLifecycle()
+  val storagePromptShown by SetupProgress.storagePromptShown.collectAsStateWithLifecycle()
   return OnboardingState(
     checks = checks,
     hello = hello,
@@ -302,6 +325,7 @@ internal fun rememberOnboardingState(graph: AppGraph, checks: DeviceChecks): Onb
     // A failure fixed in Termux brought the user here from elsewhere (chat, sidebar); show it on its step.
     error = installError ?: lastFailure?.takeIf { it.fixedInTermux }?.toSetupError(),
     authStatus = authStatus,
+    storagePromptShown = storagePromptShown,
   )
 }
 
@@ -317,6 +341,11 @@ internal fun AutoInstall(graph: AppGraph, state: OnboardingState) {
   }
   LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
     if (state.shouldAutoInstall) SetupProgress.install(graph)
+    // The user may be back from changing Termux's storage access in settings.
+    if (state.canCheckStorage) SetupProgress.recheckStorage(graph)
+  }
+  LaunchedEffect(state.storageUnconfirmed) {
+    if (state.storageUnconfirmed) SetupProgress.recheckStorage(graph)
   }
   LaunchedEffect(state.piReady) {
     if (state.piReady && graph.accountRepository.status.value == null) graph.accountRepository.refresh()

@@ -105,7 +105,7 @@ describe("configuration backups", () => {
       "bin/rg": "file 644 updated binary",
       "pi-debug.log": "file 644 more log",
     });
-    expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "root"]);
+    expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "root", "shared"]);
   });
 
   it("restores into a config folder that no longer exists", async () => {
@@ -165,7 +165,7 @@ describe("configuration backups", () => {
     expect(await runMode("backup_restore", dirs, { name })).toMatchObject({ ok: false, code: "bad_backup" });
 
     expect(await snapshot(dirs.configDir)).toEqual(before);
-    expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "root"]);
+    expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "root", "shared"]);
   });
 
   it.each([
@@ -188,7 +188,7 @@ describe("configuration backups", () => {
     const before = await snapshot(dirs.configDir);
     expect(await runMode("backup_restore", dirs, { name: "crafted.tar.gz" })).toMatchObject({ ok: false, code: "bad_backup" });
     expect(await snapshot(dirs.configDir)).toEqual(before);
-    expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "root"]);
+    expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "root", "shared"]);
   });
 
   it("refuses an archive without Pipkin's manifest", async () => {
@@ -241,7 +241,7 @@ describe("configuration backups", () => {
     expect(entries).toEqual(["bin", "crashes.json", "pi-debug.log", "sessions", "settings.json", "tmp"]);
     expect(await readFile(path.join(dirs.configDir, "settings.json"), "utf8")).toBe('{"restored":true}');
     expect(await readFile(path.join(dirs.configDir, "sessions/--home--/a.jsonl"), "utf8")).toBe("session a\n");
-    expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "root"]);
+    expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "root", "shared"]);
   });
 
   it("discards a restore that a crash cut short while unpacking", async () => {
@@ -251,7 +251,7 @@ describe("configuration backups", () => {
     await writeFile(path.join(staging, "settings.json"), "{ half");
     expect(await runMode("backup_create", dirs, {})).toMatchObject({ ok: true });
     expect(await snapshot(dirs.configDir)).toEqual(before);
-    expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "root"]);
+    expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "root", "shared"]);
   });
 
   it("removes a backup a crash left half-written", async () => {
@@ -307,7 +307,7 @@ describe("configuration backups", () => {
       await rm(path.join(proc, "4242"), { recursive: true });
       expect(await restore).toMatchObject({ ok: true });
       expect(await readFile(path.join(dirs.configDir, "settings.json"), "utf8")).toBe('{"theme":"dark"}');
-      expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "proc", "root"]);
+      expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "proc", "root", "shared"]);
     });
 
     it("ignores Pi running on another config folder and other programs", async () => {
@@ -324,7 +324,7 @@ describe("configuration backups", () => {
       await writeFile(path.join(dirs.configDir, "settings.json"), "{ broken");
       expect(await runMode("backup_restore", dirs, { name }, { PIPKIN_PROC_DIR: proc })).toMatchObject({ ok: false, code: "pi_running" });
       expect(await readFile(path.join(dirs.configDir, "settings.json"), "utf8")).toBe("{ broken");
-      expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "proc", "root"]);
+      expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "proc", "root", "shared"]);
     });
   });
 

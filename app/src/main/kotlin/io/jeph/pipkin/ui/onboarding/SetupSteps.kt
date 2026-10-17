@@ -87,6 +87,19 @@ internal fun stepSpec(step: SetupStep, state: OnboardingState, onAction: (SetupA
       },
     )
 
+    SetupStep.Storage -> permissionSpec(
+      step = step,
+      state = state,
+      icon = R.drawable.ic_lucide_folder,
+      title = R.string.onboarding_storage_title,
+      body = if (state.storageInSettings) R.string.onboarding_storage_body_settings else R.string.onboarding_storage_body_prompt,
+      done = R.string.onboarding_storage_done,
+      action = StepButton(
+        stringResource(if (state.storageInSettings) R.string.onboarding_storage_open_settings else R.string.onboarding_allow),
+        enabled = state.status(SetupStep.TermuxSetup) == StepStatus.Done,
+      ) { onAction(SetupAction.AllowTermuxStorage) },
+    )
+
     SetupStep.InstallPi -> installPiSpec(state, onAction)
 
     SetupStep.SignIn -> signInSpec(state, onAction)
@@ -222,7 +235,7 @@ private fun runCommandSpec(state: OnboardingState, onAction: (SetupAction) -> Un
 }
 
 /**
- * The one setup command for either build. A failure that names its own fix (`termux-setup-storage`) shows that
+ * The one setup command for either build. A failure that names its own fix (`yes | pkg upgrade -y`) shows that
  * command instead, since it's short and says what it does.
  */
 @Composable
@@ -238,20 +251,11 @@ private fun termuxSetupSpec(state: OnboardingState, onAction: (SetupAction) -> U
     else -> null
   }
   val literal = state.setupLiteral
-  val storage = if (state.checks.termux.isPlay) {
-    R.string.onboarding_setup_storage_play
-  } else {
-    R.string.onboarding_setup_storage_fdroid
-  }
   return StepSpec(
     step = SetupStep.TermuxSetup,
     icon = R.drawable.ic_lucide_square_terminal,
     title = stringResource(R.string.onboarding_setup_title),
-    body = if (status == StepStatus.Done) {
-      stringResource(R.string.onboarding_setup_done)
-    } else {
-      stringResource(R.string.onboarding_setup_body) + " " + stringResource(storage)
-    },
+    body = stringResource(if (status == StepStatus.Done) R.string.onboarding_setup_done else R.string.onboarding_setup_body),
     status = status,
     buttons = listOf(
       StepButton(stringResource(R.string.onboarding_setup_action), trusted) { onAction(SetupAction.CopyAndOpenTermux) },

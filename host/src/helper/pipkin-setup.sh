@@ -18,7 +18,7 @@ package='@PIPKIN_PACKAGE@'
 
 # Termux sessions run the shell that ~/.termux/shell links to (chsh sets it), or bash without a usable one; this picks
 # it the way $PREFIX/bin/login does. Pipkin starts its helper by opening a session, so that shell must run one of the
-# hooks written in step 4.
+# hooks written in step 3.
 login_shell=bash
 if [ -L "$HOME/.termux/shell" ]; then
   target=$(readlink "$HOME/.termux/shell")
@@ -50,20 +50,7 @@ write_file() {
   fi
 }
 
-# 2. Shared storage, so Pipkin can reach the files you work on. The instruction goes first, with a few seconds to read
-# it, since the settings page then covers Termux. Waiting for the grant brings the user back to Termux before the
-# setup ends, so the switch back to Pipkin isn't blocked. A declined prompt doesn't stop the setup.
-if [ ! -w "$HOME/storage/shared" ]; then
-  say "Android opens All files access next. Turn on Allow access to manage all files for Termux, then come back here."
-  sleep 4
-  termux-setup-storage || true
-  for ((i = 0; i < 120; i++)); do
-    [ -w "$HOME/storage/shared" ] && break
-    sleep 1
-  done
-fi
-
-# 3. Node.js 22.19 or newer.
+# 2. Node.js 22.19 or newer.
 node_ok() {
   node -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit(a > 22 || (a === 22 && b >= 19) ? 0 : 1)' \
     >/dev/null 2>&1
@@ -76,7 +63,7 @@ if ! node_ok; then
   node_ok || fail "Node.js couldn't be installed. Check your internet connection and paste the command again."
 fi
 
-# 4. The helper's files, the boot script, the shell hooks and pipkin-start.
+# 3. The helper's files, the boot script, the shell hooks and pipkin-start.
 { mkdir -p "$dir" && chmod 700 "$dir"; } || fail "Couldn't create $dir."
 fetch() { # $1 = name, $2 = sha256, $3 = mode
   local tmp="$dir/$1.$$.tmp"
@@ -154,7 +141,7 @@ if [ "$(readlink "$PREFIX/bin/pipkin-start" 2>/dev/null)" != "$dir/start.sh" ]; 
   ln -sfn "$dir/start.sh" "$PREFIX/bin/pipkin-start" || fail "Couldn't create pipkin-start."
 fi
 
-# 5. Pairing.
+# 4. Pairing.
 node "$dir/helper.mjs" pair
 case $? in
   0) ;;
@@ -165,7 +152,7 @@ case $? in
   *) exit 1 ;;
 esac
 
-# 6. Start the helper, or restart it with the new files and key.
+# 5. Start the helper, or restart it with the new files and key.
 old=
 if alive "$dir/helper.pid" helper.mjs; then
   old=$(cat "$dir/helper.pid")
@@ -188,7 +175,7 @@ for ((i = 1; i <= 40; i++)); do
 done
 $ready || fail "The helper didn't start. Paste the command again."
 
-# 7. Done; back to Pipkin. Android blocks the switch when Termux isn't on screen, so say how to get there too.
+# 6. Done; back to Pipkin. Android blocks the switch when Termux isn't on screen, so say how to get there too.
 echo "Pipkin setup done. Switch back to Pipkin if it doesn't open on its own."
 am start --user 0 -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
   -n "$package/io.jeph.pipkin.MainActivity" >/dev/null 2>&1 || true

@@ -1,5 +1,6 @@
 import type * as PiModule from "@earendil-works/pi-coding-agent";
-import { readFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, readFile, realpath } from "node:fs/promises";
 import os from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -18,6 +19,8 @@ export interface HostEnv {
   home: string;
   /** Termux's `$PREFIX`, the root of its packages. */
   prefix: string;
+  /** Android's shared storage, `$EXTERNAL_STORAGE` (`/sdcard`); Termux reaches it only with All files access. */
+  sharedStorage: string;
 }
 
 /** A failure with a machine-readable code, reported as `pipkin_result` `ok:false`. */
@@ -58,7 +61,29 @@ export function readHostEnv(): HostEnv | undefined {
   const configDir = process.env.PI_CODING_AGENT_DIR;
   const prefix = process.env.PREFIX;
   if (!token || !root || !configDir || !prefix) return undefined;
-  return { token, root, configDir, home: process.env.HOME ?? os.homedir(), prefix };
+  return {
+    token,
+    root,
+    configDir,
+    home: process.env.HOME ?? os.homedir(),
+    prefix,
+    sharedStorage: process.env.EXTERNAL_STORAGE || "/sdcard",
+  };
+}
+
+/**
+ * Shared storage's real folder when Termux has storage access, else null. Without access Android still lets an app
+ * list the folder's top level, so this asks for write access. Granting access in Android's settings creates no
+ * `~/storage` links, so this goes to the folder itself rather than through them.
+ */
+export async function grantedSharedStorage(env: HostEnv): Promise<string | null> {
+  try {
+    const path = await realpath(env.sharedStorage);
+    await access(path, constants.W_OK);
+    return path;
+  } catch {
+    return null;
+  }
 }
 
 /** The host's own variables, which Pi, shells and the commands they run never inherit. */

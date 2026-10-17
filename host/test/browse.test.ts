@@ -12,7 +12,7 @@ describe("browse mode", () => {
 
   beforeEach(async () => {
     dirs = await makeDirs();
-    shared = path.join(dirs.base, "shared");
+    shared = dirs.shared;
     await mkdir(path.join(shared, "Documents"), { recursive: true });
     await mkdir(path.join(dirs.home, "storage"), { recursive: true });
     await symlink(shared, path.join(dirs.home, "storage", "shared"));
@@ -48,7 +48,7 @@ describe("browse mode", () => {
     }
   }
 
-  it("starts with Termux home and the shared-storage link's real folder", async () => {
+  it("starts with Termux home and shared storage", async () => {
     expect(await run.next()).toEqual({
       type: "pipkin_places",
       places: [
@@ -56,6 +56,19 @@ describe("browse mode", () => {
         { kind: "shared", path: shared },
       ],
     });
+  });
+
+  it("leaves out shared storage that Termux can't write to", async () => {
+    await chmod(shared, 0o555);
+    const { run: denied } = await startHost("browse", dirs);
+    try {
+      await denied.next();
+      denied.send({ type: "pipkin_request", params: {} });
+      expect(await denied.next()).toEqual({ type: "pipkin_places", places: [{ kind: "home", path: dirs.home }] });
+    } finally {
+      denied.socket.destroy();
+      await chmod(shared, 0o755);
+    }
   });
 
   it("lists only folders, following links, with dot folders last", async () => {
