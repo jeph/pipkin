@@ -10,7 +10,6 @@ import { GITHUB_URL, PI_URL, TERMUX_URL } from "../site";
 import extensionSelect from "../assets/screens/extension-select.png";
 import fileView from "../assets/screens/file-view.png";
 import gitChanges from "../assets/screens/git-changes.png";
-import notifications from "../assets/screens/notifications.png";
 import onboarding from "../assets/screens/onboarding.png";
 import photos from "../assets/screens/photos.png";
 import todoWidget from "../assets/screens/todo-widget.png";
@@ -237,30 +236,6 @@ Setting up git ...</span>
           <p class="eyebrow">Android Native</p>
           <h2 id="android-title">Made for Android. Not shrunk down to fit.</h2>
           <p>
-            Pipkin isn't a desktop tool with a mobile companion. It is the whole setup: the agent, your files, git, and
-            a terminal, all on the phone in your pocket. No laptop to keep awake and no server to connect to.
-          </p>
-          <p>
-            Lock the screen and the work carries on; a notification tells you when it's done. On a foldable or tablet,
-            split the screen and keep a chat next to the code it's changing.
-          </p>
-        </div>
-        <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
-          <Screenshot
-            src={notifications}
-            alt="Android's notification shade showing that a Pipkin agent is still working in Termux, and that two other chats have finished"
-            sizes="(max-width: 720px) 80vw, 380px"
-          >
-            Chats keep running with the screen off, and Android tells you when each one is done.
-          </Screenshot>
-        </div>
-      </section>
-
-      <section class="feature container flip" id="native" aria-labelledby="native-title">
-        <div class="feature-copy" data-reveal>
-          <p class="eyebrow">Native UI</p>
-          <h2 id="native-title">Smooth, because it's native.</h2>
-          <p>
             Pipkin is written in Kotlin with Jetpack Compose, Android's own UI toolkit. There's no React Native, no web
             view, and no JavaScript in the interface, so scrolling, typing, and streaming replies stay smooth, even in
             long chats.
@@ -268,6 +243,10 @@ Setting up git ...</span>
           <p>
             Code gets real syntax highlighting from Tree-sitter, compiled into the app, for more than twenty languages,
             from Python and TypeScript to Rust, Kotlin, and Dockerfiles.
+          </p>
+          <p>
+            Lock the screen and the work carries on; a notification tells you when it's done. On a foldable or tablet,
+            split the screen and keep a chat next to the code it's changing.
           </p>
         </div>
         <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
@@ -278,7 +257,7 @@ Setting up git ...</span>
         </div>
       </section>
 
-      <section class="feature container" id="setup" aria-labelledby="setup-title">
+      <section class="feature container flip" id="setup" aria-labelledby="setup-title">
         <div class="feature-copy" data-reveal>
           <p class="eyebrow">Guided setup</p>
           <h2 id="setup-title">Ready in minutes. Most of it happens on its own.</h2>
@@ -310,7 +289,7 @@ Setting up git ...</span>
         </div>
       </section>
 
-      <section class="feature container flip" id="real-work" aria-labelledby="real-title">
+      <section class="feature container" id="real-work" aria-labelledby="real-title">
         <div class="feature-copy" data-reveal>
           <p class="eyebrow">A real tool</p>
           <h2 id="real-title">Built for serious work. Handy for the small stuff.</h2>
