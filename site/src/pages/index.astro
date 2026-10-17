@@ -17,7 +17,7 @@ import todoWidget from "../assets/screens/todo-widget.png";
 
 const title = "Pipkin: a coding agent that lives on your Android phone";
 const description =
-  "Pipkin is a native Android app for agentic coding. Built on the Pi harness and powered by Termux, it reads your code, runs commands, edits files and checks its work, all on your phone.";
+  "Pipkin is a native Android app for agentic coding. Built on the Pi harness and powered by Termux, it reads your code, runs commands, edits files, and checks its work, all on your phone.";
 
 const facts: { icon: IconName; text: string }[] = [
   { icon: "plug", text: "Built on Pi" },
@@ -30,7 +30,7 @@ const setupSteps = [
   { title: "Install Termux", text: "From F-Droid or Google Play. Pipkin tells you which build you have." },
   { title: "Connect it to Pipkin", text: "One Android permission lets Pipkin send commands to Termux." },
   { title: "Paste one command", text: "Pipkin copies a setup command; paste it into Termux and it prepares everything." },
-  { title: "Allow the helpful extras", text: "Notifications, background running and storage, each explained in plain words." },
+  { title: "Allow the helpful extras", text: "Notifications, background running, and storage, each explained in plain words." },
   { title: "Install the agent", text: "Pipkin installs Pi for you. It takes a few minutes." },
   { title: "Connect a model", text: "Sign in with your Claude or OpenAI subscription, or add an API." },
 ];
@@ -44,7 +44,7 @@ const extras: { icon: IconName; title: string; text: string }[] = [
   {
     icon: "columns_2",
     title: "Split panes",
-    text: "On foldables and tablets, put chats, files, diffs and terminals side by side.",
+    text: "On foldables and tablets, put chats, files, diffs, and terminals side by side.",
   },
   {
     icon: "bell",
@@ -59,7 +59,7 @@ const extras: { icon: IconName; title: string; text: string }[] = [
   {
     icon: "search",
     title: "Web search included",
-    text: "A bundled extension lets the agent search the web and read pages, docs and PDFs.",
+    text: "A bundled extension lets the agent search the web and read pages, docs, and PDFs.",
   },
   {
     icon: "image",
@@ -74,7 +74,7 @@ const extras: { icon: IconName; title: string; text: string }[] = [
   {
     icon: "refresh_cw",
     title: "Backups",
-    text: "Save your settings, sign-ins, models and extensions in one tap, and restore them when you need to.",
+    text: "Save your settings, sign-ins, models, and extensions in one tap, and restore them when you need to.",
   },
   {
     icon: "moon",
@@ -87,12 +87,12 @@ const faqs = [
   {
     question: "What is an AI coding agent?",
     answer:
-      "It's an assistant that does the work instead of only suggesting it. You describe a goal, and the agent reads your files, runs commands, makes changes and checks the result, step by step, while you watch and steer.",
+      "It's an assistant that does the work instead of only suggesting it. You describe a goal, and the agent reads your files, runs commands, makes changes, and checks the result, step by step, while you watch and steer.",
   },
   {
     question: "Do I need a computer?",
     answer:
-      "No. The agent, your files, git and a terminal all run on your phone. Pipkin was built so a phone can be your only development machine.",
+      "No. The agent, your files, git, and a terminal all run on your phone. Pipkin was built so a phone can be your only development machine.",
   },
   {
     question: "Which AI models can I use?",
@@ -107,7 +107,7 @@ const faqs = [
   {
     question: "What are Pi and Termux?",
     answer:
-      "Pi is an open-source, extensible coding agent; Pipkin runs it and gives it a native Android interface. Termux is a Linux environment for Android, which gives the agent a real shell, package manager and toolchains.",
+      "Pi is an open-source, extensible coding agent; Pipkin runs it and gives it a native Android interface. Termux is a Linux environment for Android, which gives the agent a real shell, package manager, and toolchains.",
   },
   {
     question: "Which phones does Pipkin support?",
@@ -156,7 +156,7 @@ const structuredData = [
         <h1 class="intro" style="--i: 1">A coding agent that lives on your phone.</h1>
         <p class="lede intro" style="--i: 2">
           Pipkin is a native Android app that runs the Pi coding agent in Termux. Tell it what to build or fix, and it
-          reads your code, runs commands, edits files and checks its own work. Your phone is all you need.
+          reads your code, runs commands, edits files, and checks its own work. Your phone is all you need.
         </p>
         <div class="actions intro" style="--i: 3">
           <a class="button button-primary" href={GITHUB_URL} rel="noopener">View on GitHub</a>
@@ -193,9 +193,9 @@ const structuredData = [
             statuses, and widgets feel like a part of the app.
           </p>
           <ul class="checks">
-            <li>Choices, confirmations and text fields appear as cards above the composer</li>
-            <li>Status lines, notices and widgets, like the bundled to-do list, each get a home</li>
             <li>Install extensions the usual Pi way and Pipkin picks them up</li>
+            <li>Choices, confirmations, and text fields appear as cards above the composer</li>
+            <li>Status lines, notices, and widgets, like the bundled to-do list, each get a home</li>
           </ul>
         </div>
         <div class="feature-media stacked-media" data-reveal style="--reveal-delay: 0.1s; --overlap: 12px">
@@ -220,8 +220,8 @@ const structuredData = [
           <p class="eyebrow">Android-native agentic coding</p>
           <h2 id="android-title">Made for your phone. Not shrunk down to fit it.</h2>
           <p>
-            Pipkin isn't a desktop tool with a mobile companion. It is the whole setup: the agent, your files, git and a
-            terminal, all on the phone in your pocket. No laptop to keep awake and no server to connect to.
+            Pipkin isn't a desktop tool with a mobile companion. It is the whole setup: the agent, your files, git, and
+            a terminal, all on the phone in your pocket. No laptop to keep awake and no server to connect to.
           </p>
           <p>
             Lock the screen and the work carries on; a notification tells you when it's done. On a foldable or tablet,
@@ -245,12 +245,12 @@ const structuredData = [
           <h2 id="native-title">Smooth, because it's native.</h2>
           <p>
             Pipkin is written in Kotlin with Jetpack Compose, Android's own UI toolkit. There's no React Native, no web
-            view and no JavaScript in the interface, so scrolling, typing and streaming replies stay smooth, even in
+            view, and no JavaScript in the interface, so scrolling, typing, and streaming replies stay smooth, even in
             long chats.
           </p>
           <p>
             Code gets real syntax highlighting from Tree-sitter, compiled into the app, for more than twenty languages,
-            from Python and TypeScript to Rust, Kotlin and Dockerfiles.
+            from Python and TypeScript to Rust, Kotlin, and Dockerfiles.
           </p>
         </div>
         <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
@@ -267,16 +267,16 @@ const structuredData = [
           <h2 id="termux-title">A real Linux toolbox under the hood.</h2>
           <p>
             Pipkin runs on <a href={TERMUX_URL} rel="noopener">Termux</a>, so the agent works in a real Linux
-            environment. It installs compilers, runtimes and tools with <code>pkg</code>, just like on a desktop.
+            environment. It installs compilers, runtimes, and tools with <code>pkg</code>, just like on a desktop.
           </p>
           <p>
-            Need something that isn't packaged? <code>proot-distro</code> sets up a full Debian, Ubuntu or Arch next to
+            Need something that isn't packaged? <code>proot-distro</code> sets up a full Debian, Ubuntu, or Arch next to
             Termux, and the agent can install it there. When you'd rather type yourself, open a terminal tab right next
             to your chat.
           </p>
         </div>
         <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
-          <div class="terminal" role="img" aria-label="A terminal installing Python, Node.js, Rust and git with pkg, then logging in to Debian with proot-distro">
+          <div class="terminal" role="img" aria-label="A terminal installing Python, Node.js, Rust, and git with pkg, then logging in to Debian with proot-distro">
             <div class="terminal-bar" aria-hidden="true">
               <Icon name="square_terminal" size={16} />
               <em>Terminal 1 · ~/projects</em>
@@ -336,7 +336,7 @@ Setting up git ...</span>
           </p>
           <p>
             Because the agent can reach your phone's storage, it's just as good at everyday chores. Ask it to find
-            duplicate photos, sort downloads into folders or clear out pictures you don't want, and check its work
+            duplicate photos, sort downloads into folders, or clear out pictures you don't want, then check its work
             before anything is deleted.
           </p>
         </div>
