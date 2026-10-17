@@ -126,11 +126,20 @@ internal object TermuxInstall {
   /** Android 11 added the All files access page. */
   val allFilesAccessAvailable: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
 
-  /** Termux's All files access toggle, which both builds declare; the Play build has no storage prompt. */
+  /**
+   * Termux's All files access toggle, which both builds declare; the Play build has no storage prompt. Some phones only
+   * open the list of apps, where the user picks Termux.
+   */
   @SuppressLint("InlinedApi") // Callers check allFilesAccessAvailable; the Play build requires Android 11.
-  fun openTermuxFilesAccess(context: Context) = context.startActivity(
-    Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, "package:$PACKAGE_NAME".toUri()),
-  )
+  fun openTermuxFilesAccess(context: Context) {
+    try {
+      context.startActivity(
+        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, "package:$PACKAGE_NAME".toUri()),
+      )
+    } catch (_: ActivityNotFoundException) {
+      context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+    }
+  }
 
   /** Termux is exempt from battery optimization; false when it is absent. */
   fun termuxBackgroundAllowed(context: Context): Boolean =

@@ -34,13 +34,14 @@ internal object TermuxSetup {
 
   /**
    * F-Droid: Termux's own storage prompt, shown in front by the session [requestFDroidStorage] opens. The broadcast in
-   * `termux-setup-storage` only reaches a Termux on screen, so it waits a moment for Termux to open; its `y` answers
-   * the question about rebuilding an existing `~/storage`, which holds only links. Pipkin comes back once access is
-   * granted, or after a minute; the line it prints is what a user who declined sees meanwhile.
+   * `termux-setup-storage` only reaches a Termux on screen, so it waits a moment for Termux to open. Its question about
+   * rebuilding an existing `~/storage` stays the user's to answer: Termux empties that folder, files included. Pipkin
+   * comes back once access is granted, after a minute, or at once on a "no"; the line it prints is what a user who
+   * declined the prompt sees meanwhile. The wait checks shared storage itself, as the host does.
    */
   private const val FDROID_STORAGE_COMMAND = "echo \"Pipkin: waiting for storage access. Switch back to Pipkin " +
-    "any time.\"; sleep 1; echo y | termux-setup-storage >/dev/null; " +
-    "for i in $(seq 60); do [ -w ~/storage/shared ] && break; sleep 1; done; " +
+    "any time.\"; sleep 1; termux-setup-storage && " +
+    "for i in $(seq 60); do [ -w \"${'$'}{EXTERNAL_STORAGE:-/sdcard}\" ] && break; sleep 1; done; " +
     "am start -n io.jeph.pipkin/.MainActivity >/dev/null"
 
   /** Opens Termux on a session that shows its storage prompt; F-Droid's build only, as it needs RUN_COMMAND. */
