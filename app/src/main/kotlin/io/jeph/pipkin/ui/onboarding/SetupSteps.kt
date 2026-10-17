@@ -74,18 +74,22 @@ internal fun stepSpec(step: SetupStep, state: OnboardingState, onAction: (SetupA
       action = StepButton(stringResource(R.string.onboarding_allow)) { onAction(SetupAction.AllowBackground) },
     )
 
-    SetupStep.TermuxBackground -> permissionSpec(
-      step = step,
-      state = state,
-      icon = R.drawable.ic_lucide_battery_charging,
-      title = R.string.onboarding_termux_background_title,
-      body = R.string.onboarding_termux_background_body,
-      done = R.string.onboarding_termux_background_done,
-      note = R.string.onboarding_termux_background_note,
-      action = StepButton(stringResource(R.string.onboarding_termux_background_allow)) {
-        onAction(SetupAction.AllowTermuxBackground)
-      },
-    )
+    SetupStep.TermuxBackground -> {
+      // Without Android's prompt, the step leads to Termux's app info and names the setting there.
+      val prompt = state.checks.termuxBackgroundPromptable
+      permissionSpec(
+        step = step,
+        state = state,
+        icon = R.drawable.ic_lucide_battery_charging,
+        title = R.string.onboarding_termux_background_title,
+        body = if (prompt) R.string.onboarding_termux_background_body else R.string.onboarding_termux_background_steps,
+        done = R.string.onboarding_termux_background_done,
+        note = if (prompt) null else R.string.onboarding_termux_background_note,
+        action = StepButton(
+          stringResource(if (prompt) R.string.onboarding_allow else R.string.onboarding_termux_background_open),
+        ) { onAction(SetupAction.AllowTermuxBackground) },
+      )
+    }
 
     SetupStep.Storage -> permissionSpec(
       step = step,

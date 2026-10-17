@@ -13,9 +13,10 @@ class OnboardingStateTest {
   @Test
   fun eachBuildGetsOnlyItsOwnTermuxStep() {
     assertTrue(SetupStep.RunCommand in state(fdroid()).visibleSteps)
-    assertFalse(SetupStep.TermuxBackground in state(fdroid()).visibleSteps)
-    assertTrue(SetupStep.TermuxBackground in state(play()).visibleSteps)
     assertFalse(SetupStep.RunCommand in state(play()).visibleSteps)
+    // Pi runs inside Termux with either build, so both ask to keep Termux running.
+    assertTrue(SetupStep.TermuxBackground in state(fdroid()).visibleSteps)
+    assertTrue(SetupStep.TermuxBackground in state(play()).visibleSteps)
     // Below Android 13 there is no notification permission to ask for.
     assertFalse(SetupStep.Notifications in state(fdroid().copy(notificationsGranted = null)).visibleSteps)
   }
@@ -30,7 +31,7 @@ class OnboardingStateTest {
 
   @Test
   fun skippedStepsStaySkippedButRequiredOnesComeBackWhenTheyBreak() {
-    val passed = setOf(SetupStep.Notifications.name, SetupStep.Background.name)
+    val passed = setOf(SetupStep.Notifications.name, SetupStep.Background.name, SetupStep.TermuxBackground.name)
     val done = state(fdroid(runCommand = true, reached = true), passed = passed, hello = READY)
     assertEquals(SetupStep.SignIn, done.nextOpenStep())
     // Revoking the RUN_COMMAND grant reopens its step even though later steps were finished.
@@ -147,6 +148,7 @@ class OnboardingStateTest {
     notificationsGranted = false,
     backgroundAllowed = false,
     termuxBackgroundAllowed = false,
+    termuxBackgroundPromptable = true,
     helperPaired = false,
     termuxChanged = false,
     termuxReached = false,

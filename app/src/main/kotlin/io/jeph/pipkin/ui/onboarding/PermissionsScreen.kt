@@ -90,7 +90,7 @@ internal fun rememberSetupActions(
 
       SetupAction.AllowBackground -> context.startSafely { requestBackgroundExemption(context) }
 
-      SetupAction.AllowTermuxBackground -> context.startSafely { TermuxInstall.openTermuxAppSettings(context) }
+      SetupAction.AllowTermuxBackground -> context.startSafely { TermuxInstall.requestBackground(context) }
 
       SetupAction.AllowTermuxStorage -> context.startSafely {
         if (state.storageInSettings) {

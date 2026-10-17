@@ -1,5 +1,6 @@
 package io.jeph.pipkin.termux
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -44,6 +45,9 @@ internal object TermuxInstall {
 
   /** The first Play build Pipkin was tested with. Play keeps the app current, so an older one only asks for an update. */
   private const val PLAY_VERSION_MIN = "2026.10.09"
+
+  /** AOSP Settings' per-app battery page; exported but not in the SDK. */
+  private const val BATTERY_USAGE_DETAIL = "android.settings.VIEW_ADVANCED_POWER_USAGE_DETAIL"
 
   // Both signing certificates come from upstream TermuxConstants:
   // https://github.com/termux/termux-app/blob/master/termux-shared/src/main/java/com/termux/shared/termux/TermuxConstants.java
@@ -118,10 +122,34 @@ internal object TermuxInstall {
   fun requestUninstall(context: Context) =
     context.startActivity(Intent(Intent.ACTION_DELETE, "package:$PACKAGE_NAME".toUri()))
 
-  /** Termux's app info, where the user lets it run in the background without battery restrictions. */
-  fun openTermuxAppSettings(context: Context) = context.startActivity(
-    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:$PACKAGE_NAME".toUri()),
-  )
+  /**
+   * Android's prompt to exempt Termux from battery optimization when Termux [canPromptBackground]. Otherwise Termux's
+   * battery page, an undocumented Settings action some phones lack, and failing that its app info.
+   */
+  @SuppressLint("BatteryLife") // Pipkin isn't on Google Play; Termux runs its agent, which must not stop mid-task.
+  fun requestBackground(context: Context) {
+    val termux = "package:$PACKAGE_NAME".toUri()
+    if (canPromptBackground(context)) {
+      context.startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, termux))
+      return
+    }
+    try {
+      context.startActivity(Intent(BATTERY_USAGE_DETAIL, termux))
+    } catch (_: SecurityException) {
+      // The action isn't in the SDK, so a phone's Settings may guard it with a permission Pipkin lacks.
+      context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, termux))
+    } catch (_: ActivityNotFoundException) {
+      context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, termux))
+    }
+  }
+
+  /**
+   * Android's exemption prompt checks the permission of the app it exempts, not of the app asking, and closes without
+   * a word when that app doesn't hold it.
+   */
+  fun canPromptBackground(context: Context): Boolean =
+    context.packageManager.checkPermission(Manifest.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, PACKAGE_NAME) ==
+      PackageManager.PERMISSION_GRANTED
 
   /** Android 11 added the All files access page. */
   val allFilesAccessAvailable: Boolean get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R

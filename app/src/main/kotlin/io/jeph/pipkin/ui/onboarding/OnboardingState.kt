@@ -68,8 +68,10 @@ internal data class DeviceChecks(
   val notificationsGranted: Boolean?,
   /** Pipkin is exempt from battery optimization, so Android keeps its connection to the agent while the screen is off. */
   val backgroundAllowed: Boolean,
-  /** Termux is exempt from battery optimization; only asked for with the Play build, whose helper runs all the time. */
+  /** Termux is exempt from battery optimization, so Android doesn't stop it, and Pi running in it, mid-task. */
   val termuxBackgroundAllowed: Boolean,
+  /** Android can ask for [termuxBackgroundAllowed] in a prompt, rather than the user finding it in Termux's app info. */
+  val termuxBackgroundPromptable: Boolean,
   /** Pipkin holds a pairing key for a helper in the Play build of Termux. */
   val helperPaired: Boolean,
   /** Termux was reinstalled or swapped since a host last ran, so its setup is gone. */
@@ -91,6 +93,7 @@ internal data class DeviceChecks(
       backgroundAllowed = context.getSystemService(PowerManager::class.java)
         .isIgnoringBatteryOptimizations(context.packageName),
       termuxBackgroundAllowed = TermuxInstall.termuxBackgroundAllowed(context),
+      termuxBackgroundPromptable = TermuxInstall.canPromptBackground(context),
       helperPaired = HelperPairing.isPaired(context),
       termuxChanged = TermuxIdentity.changed(context),
       termuxReached = TermuxIdentity.reached(context),
@@ -219,7 +222,6 @@ internal data class OnboardingState(
     get() = SetupStep.entries.filter { step ->
       when (step) {
         SetupStep.Notifications -> checks.notificationsGranted != null
-        SetupStep.TermuxBackground -> checks.termux.isPlay
         SetupStep.RunCommand -> !checks.termux.isPlay
         else -> true
       }

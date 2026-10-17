@@ -70,9 +70,10 @@
     <string name="onboarding_background_done">Pipkin can run in the background.</string>
 
     <string name="onboarding_termux_background_title">Let Termux run in the background</string>
-    <string name="onboarding_termux_background_body">Keeps Pipkin\'s helper in Termux running, so Pipkin starts without opening Termux. In Termux\'s app info:\n\nApp\u00A0battery\u00A0usage\u00A0→ Allow\u00A0background\u00A0usage\u00A0→ Unrestricted</string>
+    <string name="onboarding_termux_background_body">The agent runs inside Termux. Without this, Android can stop Termux to save battery and cut a chat off mid-task. When Android asks, tap Allow.</string>
+    <string name="onboarding_termux_background_steps">The agent runs inside Termux. Without this, Android can stop Termux to save battery and cut a chat off mid-task. In Termux\'s battery settings:\n\nAllow\u00A0background\u00A0usage\u00A0→ Unrestricted</string>
     <string name="onboarding_termux_background_note">Samsung: Battery\u00A0→ Unrestricted\nXiaomi: Battery\u00A0saver\u00A0→ No\u00A0restrictions\nOnePlus, Oppo, Realme: Battery\u00A0usage\u00A0→ Allow\u00A0background\u00A0activity</string>
-    <string name="onboarding_termux_background_allow">Open Termux\'s app info</string>
+    <string name="onboarding_termux_background_open">Open Termux\'s battery settings</string>
     <string name="onboarding_termux_background_done">Termux can run in the background.</string>
 
     <string name="onboarding_storage_title">Let Termux use phone storage</string>
