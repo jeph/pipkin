@@ -67,7 +67,7 @@ On a foldable or tablet, open chats, files, changes, and terminals side by side 
 
 ## If something goes wrong
 
-**The setup command stops partway.** Paste it into Termux again; it resumes where it left off. If it says packages need upgrading, run the command it shows, such as `yes | pkg upgrade -y`, then paste the setup command again.
+**The setup command stops partway.** Paste it into Termux again; it resumes where it left off. If it says Node.js couldn't be installed, check your internet connection, then paste the command again.
 
 **Android won't ask for the Termux permission again.** Grant it from Pipkin's app info: **Permissions → Additional permissions → Run commands in Termux environment → Allow**.
 

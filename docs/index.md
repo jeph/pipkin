@@ -7,7 +7,7 @@ Pipkin is an AI coding agent that runs on your Android phone. Tell it what to bu
 
 ## How it fits together
 
-Pipkin has three parts, and setup installs all of them for you:
+Pipkin has three parts. You install the app and Termux, and setup installs Pi for you:
 
 - **The Pipkin app** is what you see and tap: chats, files, code changes, terminals, and settings.
 - **[Termux](https://termux.dev)** is a Linux-like environment for Android. The agent works there, so it can install and run real tools with `pkg`, the same way it would on a computer.
