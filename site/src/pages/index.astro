@@ -296,7 +296,7 @@ Setting up git ...</span>
     <section class="faq container" id="faq" aria-labelledby="faq-title">
       <div class="faq-head" data-reveal>
         <p class="eyebrow">Questions</p>
-        <h2 id="faq-title">Good to know</h2>
+        <h2 id="faq-title">Frequently Asked</h2>
       </div>
       <div class="faq-list" data-reveal>
         {
@@ -515,6 +515,10 @@ Setting up git ...</span>
   .stacked-media {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .stacked-media > :global(.shot:not(.stacked-front)) {
+    width: min(400px, 88%);
   }
 
   .stacked-media > :global(.stacked-front) {
