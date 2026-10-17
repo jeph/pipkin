@@ -103,7 +103,8 @@ internal sealed class HostFailure(
     const val MISSING_TERMUX = "Termux is not installed. Install it from F-Droid or Google Play."
     const val UNTRUSTED_TERMUX = "For your security, Pipkin only runs in the official F-Droid or Google Play build " +
       "of Termux, and the Termux on this phone is neither. Reinstall Termux from F-Droid or Google Play."
-    const val PERMISSION = "Allow Pipkin to run commands in Termux in Android settings, then retry."
+    const val PERMISSION = "Pipkin isn't allowed to run commands in Termux. In Pipkin's app info, go to Permissions → " +
+      "Additional permissions → Run commands in Termux environment → Allow, then retry."
     const val EXTERNAL_APPS = "Termux blocked Pipkin's commands. Run the setup command in Termux, then retry."
     const val BACKGROUND = "Android blocked starting Termux in the background. Open Pipkin and retry."
     const val INTERRUPTED = "Termux stopped while starting Pipkin's helper. Retry."

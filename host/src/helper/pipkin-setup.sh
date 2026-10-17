@@ -54,7 +54,7 @@ write_file() {
 # before the setup ends, so the switch back to Pipkin isn't blocked. A declined prompt doesn't stop the setup.
 if [ ! -w "$HOME/storage/shared" ]; then
   termux-setup-storage || true
-  say "Allow storage access for Termux, then come back here."
+  say "In All files access, tap Termux and turn on Allow access to manage all files, then come back here."
   for ((i = 0; i < 120; i++)); do
     [ -w "$HOME/storage/shared" ] && break
     sleep 1

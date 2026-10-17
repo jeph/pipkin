@@ -81,6 +81,7 @@ internal fun stepSpec(step: SetupStep, state: OnboardingState, onAction: (SetupA
       title = R.string.onboarding_termux_background_title,
       body = R.string.onboarding_termux_background_body,
       done = R.string.onboarding_termux_background_done,
+      note = R.string.onboarding_termux_background_note,
       action = StepButton(stringResource(R.string.onboarding_termux_background_allow)) {
         onAction(SetupAction.AllowTermuxBackground)
       },
@@ -91,6 +92,7 @@ internal fun stepSpec(step: SetupStep, state: OnboardingState, onAction: (SetupA
     SetupStep.SignIn -> signInSpec(state, onAction)
   }
 
+/** [note] names the same setting on other phones' settings apps; it shows until the step is done. */
 @Composable
 private fun permissionSpec(
   step: SetupStep,
@@ -100,15 +102,20 @@ private fun permissionSpec(
   body: Int,
   done: Int,
   action: StepButton,
+  note: Int? = null,
 ): StepSpec {
   val status = state.status(step)
+  if (status == StepStatus.Done) {
+    return StepSpec(step = step, icon = icon, title = stringResource(title), body = stringResource(done), status = status)
+  }
   return StepSpec(
     step = step,
     icon = icon,
     title = stringResource(title),
-    body = stringResource(if (status == StepStatus.Done) done else body),
+    body = stringResource(body),
     status = status,
-    buttons = if (status == StepStatus.Done) emptyList() else listOf(action),
+    buttons = listOf(action),
+    note = note?.let { stringResource(it) },
   )
 }
 
@@ -121,9 +128,10 @@ private fun notificationsSpec(state: OnboardingState, onAction: (SetupAction) ->
     state = state,
     icon = R.drawable.ic_lucide_bell,
     title = R.string.onboarding_notifications_title,
-    body = R.string.onboarding_notifications_body,
+    body = if (blocked) R.string.onboarding_notifications_blocked else R.string.onboarding_notifications_body,
     done = R.string.onboarding_notifications_done,
     action = StepButton(stringResource(label)) { onAction(SetupAction.AllowNotifications) },
+    note = if (blocked) R.string.onboarding_notifications_blocked_note else null,
   )
 }
 
@@ -230,19 +238,20 @@ private fun termuxSetupSpec(state: OnboardingState, onAction: (SetupAction) -> U
     else -> null
   }
   val literal = state.setupLiteral
+  val storage = if (state.checks.termux.isPlay) {
+    R.string.onboarding_setup_storage_play
+  } else {
+    R.string.onboarding_setup_storage_fdroid
+  }
   return StepSpec(
     step = SetupStep.TermuxSetup,
     icon = R.drawable.ic_lucide_square_terminal,
     title = stringResource(R.string.onboarding_setup_title),
-    body = stringResource(
-      if (status ==
-        StepStatus.Done
-      ) {
-        R.string.onboarding_setup_done
-      } else {
-        R.string.onboarding_setup_body
-      },
-    ),
+    body = if (status == StepStatus.Done) {
+      stringResource(R.string.onboarding_setup_done)
+    } else {
+      stringResource(R.string.onboarding_setup_body) + " " + stringResource(storage)
+    },
     status = status,
     buttons = listOf(
       StepButton(stringResource(R.string.onboarding_setup_action), trusted) { onAction(SetupAction.CopyAndOpenTermux) },

@@ -43,11 +43,14 @@
 
     <string name="onboarding_run_command_title">Let Pipkin use Termux</string>
     <string name="onboarding_run_command_body">Pipkin starts by sending commands to Termux.</string>
-    <string name="onboarding_run_command_blocked">Android won\'t ask again. In settings, open Permissions, then Additional permissions if it\'s there, and allow \"Run commands in Termux environment\".</string>
+    <!-- Settings labels are joined with \u00A0, inside them and before each →, so a path only wraps after an arrow. -->
+    <string name="onboarding_run_command_blocked">Android won\'t ask again. In settings:\n\nPermissions\u00A0→ Additional\u00A0permissions\u00A0→ Run\u00A0commands\u00A0in\u00A0Termux\u00A0environment\u00A0→ Allow</string>
     <string name="onboarding_run_command_done">Pipkin can run commands in Termux.</string>
 
     <string name="onboarding_setup_title">Set up Termux</string>
-    <string name="onboarding_setup_body">Paste the setup command into Termux. Also allow storage access if asked.</string>
+    <string name="onboarding_setup_body">Paste the setup command into Termux.</string>
+    <string name="onboarding_setup_storage_fdroid">If Android asks for storage access, tap Allow.</string>
+    <string name="onboarding_setup_storage_play">When All\u00A0files\u00A0access opens, tap Termux, turn on Allow\u00A0access\u00A0to\u00A0manage\u00A0all\u00A0files, then go back to Termux.</string>
     <string name="onboarding_setup_retry_note">Android may sometimes kill large pkg installs during setup. If this happens, please retry the command. It picks up where it left off.</string>
     <string name="onboarding_setup_waiting">Waiting for Termux to finish…</string>
     <string name="onboarding_setup_connecting">Connecting to Termux…</string>
@@ -60,14 +63,17 @@
 
     <string name="onboarding_notifications_title">Notifications</string>
     <string name="onboarding_notifications_body">Pipkin tells you when a chat finishes while you\'re away, and shows a Stop button while the agent works.</string>
+    <string name="onboarding_notifications_blocked">Android won\'t ask again. In settings, turn on All\u00A0Pipkin\u00A0notifications.</string>
+    <string name="onboarding_notifications_blocked_note">Samsung, OnePlus, Oppo: Allow\u00A0notifications\nXiaomi: Show\u00A0notifications</string>
     <string name="onboarding_notifications_done">Notifications are on.</string>
 
     <string name="onboarding_background_title">Run in the background</string>
-    <string name="onboarding_background_body">Keeps a chat going while the screen is off or you\'re in another app. Without it, Android can cut the agent off mid-task.</string>
+    <string name="onboarding_background_body">Keeps a chat going while the screen is off or you\'re in another app. Without it, Android can cut the agent off mid-task. When Android asks, tap Allow.</string>
     <string name="onboarding_background_done">Pipkin can run in the background.</string>
 
     <string name="onboarding_termux_background_title">Let Termux run in the background</string>
-    <string name="onboarding_termux_background_body">Keeps Pipkin\'s helper in Termux running, so Pipkin starts without opening Termux. In Termux\'s app info, open App battery usage and choose Unrestricted.</string>
+    <string name="onboarding_termux_background_body">Keeps Pipkin\'s helper in Termux running, so Pipkin starts without opening Termux. In Termux\'s app info:\n\nApp\u00A0battery\u00A0usage\u00A0→ Allow\u00A0background\u00A0usage\u00A0→ Unrestricted</string>
+    <string name="onboarding_termux_background_note">Samsung: Battery\u00A0→ Unrestricted\nXiaomi: Battery\u00A0saver\u00A0→ No\u00A0restrictions\nOnePlus, Oppo, Realme: Battery\u00A0usage\u00A0→ Allow\u00A0background\u00A0activity</string>
     <string name="onboarding_termux_background_allow">Open Termux\'s app info</string>
     <string name="onboarding_termux_background_done">Termux can run in the background.</string>
 
