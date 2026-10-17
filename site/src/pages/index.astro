@@ -25,8 +25,8 @@ const extras: { icon: IconName; title: string; text: string }[] = [
   },
   {
     icon: "columns_2",
-    title: "Split panes",
-    text: "On foldables and tablets, put chats, files, diffs, and terminals side by side.",
+    title: "Optimized for foldables and tablets",
+    text: "Use the extra room with split panes: put chats, files, diffs, and terminals side by side.",
   },
   {
     icon: "bell",
@@ -226,19 +226,19 @@ Setting up git ...</span>
             typing, and streaming replies stay smooth, even in long chats.
           </p>
           <p>
-            Code gets real syntax highlighting for more than twenty languages, from Python and TypeScript to Rust,
-            Kotlin, and Dockerfiles.
-          </p>
-          <p>
             Work continues in your pocket. Pipkin notifies you when it's done. On a foldable or tablet, split screen lets
             you see things side by side.
           </p>
         </div>
-        <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
+        <div class="feature-media captioned-media" data-reveal style="--reveal-delay: 0.1s">
           <Screenshot
             src={fileView}
             alt="A Python file open in Pipkin's file viewer with syntax highlighting and line numbers"
           />
+          <p class="media-caption">
+            Code gets real syntax highlighting for more than twenty languages, from Python and TypeScript to Rust,
+            Kotlin, and Dockerfiles.
+          </p>
         </div>
       </section>
 
@@ -522,6 +522,15 @@ Setting up git ...</span>
 
   .stacked-media > :global(.stacked-front) {
     margin: calc(-1 * var(--overlap, 120px)) 0 0 auto;
+  }
+
+  .captioned-media {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .captioned-media > .media-caption {
+    width: min(440px, 100%);
   }
 
   .media-caption {
