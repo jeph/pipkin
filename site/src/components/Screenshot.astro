@@ -5,16 +5,14 @@ import { Picture } from "astro:assets";
 interface Props {
   src: ImageMetadata;
   alt: string;
-  /** Shows the whole phone screen with rounded device corners instead of a cropped card. */
-  device?: boolean;
   sizes?: string;
   class?: string;
 }
 
-const { src, alt, device = false, sizes = "(max-width: 720px) 90vw, 400px", class: className } = Astro.props;
+const { src, alt, sizes = "(max-width: 720px) 90vw, 400px", class: className } = Astro.props;
 ---
 
-<figure class:list={["shot", { device }, className]}>
+<figure class:list={["shot", className]}>
   <Picture
     src={src}
     alt={alt}
@@ -25,7 +23,6 @@ const { src, alt, device = false, sizes = "(max-width: 720px) 90vw, 400px", clas
     loading="lazy"
     decoding="async"
   />
-  {Astro.slots.has("default") && <figcaption><slot /></figcaption>}
 </figure>
 
 <style>
@@ -41,20 +38,5 @@ const { src, alt, device = false, sizes = "(max-width: 720px) 90vw, 400px", clas
     border-radius: var(--radius-lg);
     background: var(--app-bg);
     box-shadow: 0 30px 60px -36px rgb(0 0 0 / 0.5);
-  }
-
-  .device :global(img) {
-    border: 7px solid #0c0e0d;
-    border-radius: 34px;
-    box-shadow:
-      0 0 0 1px #2a2f2d,
-      0 30px 60px -30px rgb(0 0 0 / 0.5);
-  }
-
-  figcaption {
-    margin-top: 12px;
-    color: var(--muted);
-    font-size: 14px;
-    line-height: 1.5;
   }
 </style>

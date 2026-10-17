@@ -10,7 +10,6 @@ import { GITHUB_URL, PI_URL, TERMUX_URL } from "../site";
 import extensionSelect from "../assets/screens/extension-select.png";
 import fileView from "../assets/screens/file-view.png";
 import gitChanges from "../assets/screens/git-changes.png";
-import onboarding from "../assets/screens/onboarding.png";
 import photos from "../assets/screens/photos.png";
 import todoWidget from "../assets/screens/todo-widget.png";
 
@@ -18,20 +17,11 @@ const title = "Pipkin: a coding agent that lives on your Android phone";
 const description =
   "Pipkin is a native Android app for agentic coding. Built on the Pi harness and powered by Termux, it reads your code, runs commands, edits files, and checks its work, all on your phone.";
 
-const setupSteps = [
-  { title: "Install Termux", text: "From F-Droid or Google Play. Pipkin tells you which build you have." },
-  { title: "Connect it to Pipkin", text: "One Android permission lets Pipkin send commands to Termux." },
-  { title: "Paste one command", text: "Pipkin copies a setup command; paste it into Termux and it prepares everything." },
-  { title: "Allow the helpful extras", text: "Notifications, background running, and storage, each explained in plain words." },
-  { title: "Install the agent", text: "Pipkin installs Pi for you. It takes a few minutes." },
-  { title: "Connect a model", text: "Sign in with your Claude or OpenAI subscription, or add an API." },
-];
-
 const extras: { icon: IconName; title: string; text: string }[] = [
   {
-    icon: "pencil",
-    title: "Steer while it works",
-    text: "Send a message mid-task to correct course. The agent picks it up without starting over.",
+    icon: "circle_check",
+    title: "Guided setup",
+    text: "Ready in minutes. A step-by-step guide sets up Termux and installs Pi for you, explaining each permission.",
   },
   {
     icon: "columns_2",
@@ -75,7 +65,7 @@ const extras: { icon: IconName; title: string; text: string }[] = [
   },
 ];
 
-const faqs = [
+const faqs: { question: string; answer: string; link?: { href: string; text: string } }[] = [
   {
     question: "What is an AI coding agent?",
     answer:
@@ -94,12 +84,7 @@ const faqs = [
   {
     question: "Does the AI model run on my phone?",
     answer:
-      "The agent and every command it runs are on your phone. The model's thinking happens at the provider you connect, so you need a network connection while a chat is working.",
-  },
-  {
-    question: "What are Pi and Termux?",
-    answer:
-      "Pi is an open-source, extensible coding agent; Pipkin runs it and gives it a native Android interface. Termux is a Linux environment for Android, which gives the agent a real shell, package manager, and toolchains.",
+      "The agent and every command it runs are on your phone. The model's thinking happens at the provider you connect, so you need a network connection while a chat is working. Local LLM support is on the roadmap though!",
   },
   {
     question: "Which phones does Pipkin support?",
@@ -107,7 +92,8 @@ const faqs = [
   },
   {
     question: "Is Pipkin open source?",
-    answer: "It will be. The source is going public on GitHub soon.",
+    answer: "Yes. Pipkin is open source under the MIT license.",
+    link: { href: GITHUB_URL, text: "View the source on GitHub." },
   },
 ];
 
@@ -257,39 +243,7 @@ Setting up git ...</span>
         </div>
       </section>
 
-      <section class="feature container flip" id="setup" aria-labelledby="setup-title">
-        <div class="feature-copy" data-reveal>
-          <p class="eyebrow">Guided setup</p>
-          <h2 id="setup-title">Ready in minutes. Most of it happens on its own.</h2>
-          <p>
-            A step-by-step guide walks you through installing Termux and connecting it to Pipkin. Each permission comes
-            with a plain explanation of why it's needed, and optional steps can be skipped.
-          </p>
-          <ol class="setup-steps">
-            {
-              setupSteps.map((step, index) => (
-                <li>
-                  <span class="setup-dot" aria-hidden="true">{index + 1}</span>
-                  <div>
-                    <strong>{step.title}</strong>
-                    <span>{step.text}</span>
-                  </div>
-                </li>
-              ))
-            }
-          </ol>
-        </div>
-        <div class="feature-media" data-reveal style="--reveal-delay: 0.1s">
-          <Screenshot
-            device
-            src={onboarding}
-            alt="Pipkin's setup screen asking to allow notifications, with a progress indicator and Allow and Skip for now buttons"
-            sizes="(max-width: 720px) 70vw, 320px"
-          />
-        </div>
-      </section>
-
-      <section class="feature container" id="real-work" aria-labelledby="real-title">
+      <section class="feature container flip" id="real-work" aria-labelledby="real-title">
         <div class="feature-copy" data-reveal>
           <p class="eyebrow">A real tool</p>
           <h2 id="real-title">Built for serious work. Handy for the small stuff.</h2>
@@ -352,7 +306,17 @@ Setting up git ...</span>
                 {faq.question}
                 <Icon name="plus" size={18} />
               </summary>
-              <p>{faq.answer}</p>
+              <p>
+                {faq.answer}
+                {faq.link && (
+                  <>
+                    {" "}
+                    <a href={faq.link.href} rel="noopener">
+                      {faq.link.text}
+                    </a>
+                  </>
+                )}
+              </p>
             </details>
           ))
         }
@@ -362,7 +326,6 @@ Setting up git ...</span>
     <section class="closing container" aria-labelledby="closing-title" data-reveal>
       <span class="closing-mark"><Logo size={56} simmer /></span>
       <h2 id="closing-title">Your next project fits in your pocket.</h2>
-      <p>Pipkin is getting ready for its public release. Follow along on GitHub.</p>
       <a class="button button-primary" href={GITHUB_URL} rel="noopener">View on GitHub</a>
     </section>
   </main>
@@ -517,11 +480,7 @@ Setting up git ...</span>
     justify-content: center;
   }
 
-  .feature-media > :global(.device) {
-    width: min(320px, 78vw);
-  }
-
-  .feature-media > :global(.shot:not(.device)) {
+  .feature-media > :global(.shot) {
     width: min(440px, 100%);
   }
 
@@ -558,12 +517,7 @@ Setting up git ...</span>
     align-items: flex-start;
   }
 
-  .stacked-media > :global(.shot:not(.stacked-front)) {
-    width: min(400px, 88%);
-  }
-
   .stacked-media > :global(.stacked-front) {
-    width: min(320px, 72%);
     margin: calc(-1 * var(--overlap, 120px)) 0 0 auto;
   }
 
@@ -651,60 +605,6 @@ Setting up git ...</span>
     50% {
       opacity: 0;
     }
-  }
-
-  /* Setup steps */
-  .setup-steps {
-    position: relative;
-    display: grid;
-    gap: 16px;
-    margin: 28px 0 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .setup-steps::before {
-    content: "";
-    position: absolute;
-    top: 14px;
-    bottom: 14px;
-    left: 13px;
-    width: 1px;
-    background: var(--border-strong);
-  }
-
-  .setup-steps li {
-    position: relative;
-    display: flex;
-    gap: 16px;
-  }
-
-  .setup-dot {
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: 27px;
-    height: 27px;
-    border: 1px solid var(--border-strong);
-    border-radius: 50%;
-    background: var(--page);
-    color: var(--accent);
-    font-family: var(--mono);
-    font-size: 12px;
-  }
-
-  .setup-steps div {
-    display: grid;
-    line-height: 1.45;
-  }
-
-  .setup-steps strong {
-    font-size: 16px;
-  }
-
-  .setup-steps span:not(.setup-dot) {
-    color: var(--muted);
-    font-size: 15px;
   }
 
   /* Extras */
@@ -851,10 +751,6 @@ Setting up git ...</span>
 
   .closing h2 {
     font-size: clamp(30px, 4vw, 46px);
-  }
-
-  .closing p {
-    color: var(--muted);
   }
 
   /* Footer */
