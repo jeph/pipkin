@@ -50,11 +50,13 @@ write_file() {
   fi
 }
 
-# 2. Shared storage, so Pipkin can reach the files you work on. Waiting for the grant brings the user back to Termux
-# before the setup ends, so the switch back to Pipkin isn't blocked. A declined prompt doesn't stop the setup.
+# 2. Shared storage, so Pipkin can reach the files you work on. The instruction goes first, with a few seconds to read
+# it, since the settings page then covers Termux. Waiting for the grant brings the user back to Termux before the
+# setup ends, so the switch back to Pipkin isn't blocked. A declined prompt doesn't stop the setup.
 if [ ! -w "$HOME/storage/shared" ]; then
+  say "Android opens All files access next. Turn on Allow access to manage all files for Termux, then come back here."
+  sleep 4
   termux-setup-storage || true
-  say "In All files access, tap Termux and turn on Allow access to manage all files, then come back here."
   for ((i = 0; i < 120; i++)); do
     [ -w "$HOME/storage/shared" ] && break
     sleep 1

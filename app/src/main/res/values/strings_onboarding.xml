@@ -50,7 +50,7 @@
     <string name="onboarding_setup_title">Set up Termux</string>
     <string name="onboarding_setup_body">Paste the setup command into Termux.</string>
     <string name="onboarding_setup_storage_fdroid">If Android asks for storage access, tap Allow.</string>
-    <string name="onboarding_setup_storage_play">When All\u00A0files\u00A0access opens, tap Termux, turn on Allow\u00A0access\u00A0to\u00A0manage\u00A0all\u00A0files, then go back to Termux.</string>
+    <string name="onboarding_setup_storage_play">When All\u00A0files\u00A0access opens, turn on Allow\u00A0access\u00A0to\u00A0manage\u00A0all\u00A0files for Termux, then go back to Termux.</string>
     <string name="onboarding_setup_retry_note">Android may sometimes kill large pkg installs during setup. If this happens, please retry the command. It picks up where it left off.</string>
     <string name="onboarding_setup_waiting">Waiting for Termux to finish…</string>
     <string name="onboarding_setup_connecting">Connecting to Termux…</string>
