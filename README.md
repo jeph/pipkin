@@ -42,7 +42,7 @@ your code, and every command it runs on the phone itself:
 - **Android native.** Pipkin is written in Jetpack Compose with no web view, so scrolling, typing, and
   streaming replies stay smooth in long chats. On foldables and tablets, split panes put chats,
   files, diffs, and terminals side by side.
-- **A real workbench.** Review changes in the built-in git diff viewer, browse and edit files with
+- **A real workbench.** Review changes in the built-in git diff viewer, browse and read files with
   tree-sitter syntax highlighting for more than twenty languages, look back through commits, and
   open terminals without leaving the app.
 - **Your model, your plan.** Sign in with a Claude Pro or Max subscription or an OpenAI Codex
@@ -82,8 +82,9 @@ builds of Termux.
 
 ## Installation
 
-Prebuilt releases aren't published yet. Build and install Pipkin from source; see
-[Development](#development) for the toolchain.
+Prebuilt releases aren't published yet. Build and install Pipkin from source. The build needs the
+Android SDK, plus Node.js and pnpm on your `PATH`; see [Development](#development) for the exact
+toolchain.
 
 ```sh
 git clone https://github.com/jeph/pipkin.git
