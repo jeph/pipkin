@@ -82,9 +82,9 @@ builds of Termux.
 
 ## Installation
 
-Prebuilt releases aren't published yet. Build and install Pipkin from source. The build needs the
-Android SDK, plus Node.js and pnpm on your `PATH`; see [Development](#development) for the exact
-toolchain.
+Prebuilt releases aren't published yet. Build and install Pipkin from source. The build needs a
+JDK, the Android SDK, and Node.js and pnpm on your `PATH`; see [Development](#development) for the
+exact toolchain.
 
 ```sh
 git clone https://github.com/jeph/pipkin.git
@@ -165,6 +165,7 @@ for the setup command, tap **Set up Termux** in Pipkin.
 
 Building Pipkin needs:
 
+- A JDK 17 or newer, through `JAVA_HOME` or `java` on your `PATH`, to start Gradle.
 - The Android SDK with API level 37, NDK `30.0.16248370`, and CMake `4.1.2`. Point Gradle at the SDK
   with `ANDROID_HOME` or `sdk.dir` in `local.properties`.
 - Node.js 22.19 or newer and [pnpm](https://pnpm.io), which build the host bundle.
