@@ -2,14 +2,14 @@ package io.jeph.pipkin.ui.settings
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -23,18 +23,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.host.ProviderConfig
 import io.jeph.pipkin.ui.components.SimmeringPot
-import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
@@ -58,25 +56,22 @@ internal fun ProviderEditorScreen(
   var confirmRemove by remember { mutableStateOf(false) }
   var confirmDiscard by remember { mutableStateOf(false) }
   val leave = { if (form.dirty) confirmDiscard = true else onBack() }
-  // Reads Pi's files afresh, so changes made outside Pipkin (for example by the agent) show here.
-  LaunchedEffect(form) {
-    if (!form.editing || form.prefilled) return@LaunchedEffect
-    accounts.refresh()
-    accounts.status.value?.custom?.firstOrNull { it.id == form.id }?.let(form::prefill)
-  }
-  // A saved provider's connection is checked on opening, so models can be added straight away.
-  LaunchedEffect(form.prefilled) {
-    if (form.prefilled && form.check == ConnectionCheck.Idle && form.canCheck) form.checkConnection(accounts, failed)
-  }
+  val loading = loadSavedProvider(form, accounts, failed)
   BackHandler(enabled = form.dirty) { confirmDiscard = true }
   SettingsPage(
     title = if (form.editing) form.id else stringResource(R.string.provider_title_new),
     onBack = leave,
   ) {
+    if (loading) {
+      Box(modifier = Modifier.fillMaxWidth().padding(top = PipkinTokens.Spacing.s48), Alignment.Center) {
+        SimmeringPot(size = PipkinTokens.IconSize.lg)
+      }
+      return@SettingsPage
+    }
     IdAndUrlFields(form = form)
     ApiKeyField(form = form)
     ApiTypeField(form = form)
-    ConnectionCheckRow(form = form, onCheck = { scope.launch { form.checkConnection(accounts, failed) } })
+    ConnectionSection(form = form, onCheck = { scope.launch { form.checkConnection(accounts, failed) } })
     ModelsSection(
       draft = form,
       emptyText = stringResource(
@@ -112,10 +107,34 @@ internal fun ProviderEditorScreen(
   }
 }
 
+/**
+ * Reads a saved provider's details afresh, so changes made outside Pipkin (for example by the agent) show, then checks
+ * its connection so models can be added straight away. True until the details are in: the page waits for them instead
+ * of showing an empty form that fills in a moment later.
+ */
+@Composable
+private fun loadSavedProvider(form: ProviderForm, accounts: AccountRepository, fallbackError: String): Boolean {
+  var loading by remember { mutableStateOf(form.editing && !form.prefilled) }
+  LaunchedEffect(form) {
+    if (form.editing && !form.prefilled) {
+      try {
+        accounts.refresh()
+        accounts.status.value?.custom?.firstOrNull { it.id == form.id }?.let(form::prefill)
+      } finally {
+        loading = false
+      }
+    }
+    // Without a suspension since the page was revealed, so its first frame already says the check is running.
+    if (form.prefilled && form.check == ConnectionCheck.Idle && form.canCheck) {
+      form.checkConnection(accounts, fallbackError)
+    }
+  }
+  return loading
+}
+
 @Composable
 private fun IdAndUrlFields(form: ProviderForm) {
-  val invalidId = stringResource(R.string.provider_id_invalid)
-  val idError = form.idError ?: invalidId.takeIf { form.id.isNotEmpty() && !form.idValid }
+  val idError = form.idError
   Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
     FieldLabel(stringResource(R.string.provider_id))
     OutlinedTextField(
@@ -124,8 +143,19 @@ private fun IdAndUrlFields(form: ProviderForm) {
       modifier = Modifier.fillMaxWidth(),
       readOnly = form.editing,
       placeholder = { Text(stringResource(R.string.provider_id_hint)) },
-      supportingText = idError?.let { { Text(it) } },
-      isError = idError != null,
+      // The rule stays under a new provider's field and turns red when broken, so typing never adds or drops a line.
+      supportingText = when {
+        idError != null -> {
+          { Text(idError) }
+        }
+
+        form.editing -> null
+
+        else -> {
+          { Text(stringResource(R.string.provider_id_invalid)) }
+        }
+      },
+      isError = idError != null || (form.id.isNotEmpty() && !form.idValid),
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Next),
       singleLine = true,
     )
@@ -192,37 +222,9 @@ private fun ApiTypeField(form: ProviderForm) {
 }
 
 @Composable
-private fun ConnectionCheckRow(form: ProviderForm, onCheck: () -> Unit) {
-  val colors = pipkinColors
-  val check = form.check
-  Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
-    OutlinedButton(onClick = onCheck, modifier = Modifier.fillMaxWidth(), enabled = form.canCheck) {
-      if (check is ConnectionCheck.Checking) SimmeringPot() else Text(stringResource(R.string.provider_check))
-    }
-    when (check) {
-      is ConnectionCheck.Ok -> Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
-      ) {
-        StatusDot(color = colors.dotSuccess)
-        Text(
-          text = pluralStringResource(R.plurals.provider_connected, check.models.size, check.models.size),
-          color = colors.foregroundMuted,
-          fontSize = PipkinTokens.FontSize.sm,
-        )
-      }
-
-      is ConnectionCheck.Failed -> SettingsCaption(text = check.message, color = colors.destructive)
-
-      ConnectionCheck.Idle, is ConnectionCheck.Checking -> Unit
-    }
-  }
-}
-
-@Composable
 private fun ProviderActions(form: ProviderForm, onSave: () -> Unit, onRemove: () -> Unit) {
   val colors = pipkinColors
-  form.formError?.let { SettingsCaption(text = it, color = colors.destructive) }
+  form.formError?.let { ErrorPanel(title = null, message = it) }
   Button(onClick = onSave, modifier = Modifier.fillMaxWidth(), enabled = form.canSave) {
     if (form.saving) SimmeringPot(tint = colors.accentForeground) else Text(stringResource(R.string.provider_save))
   }

@@ -51,14 +51,35 @@ function success(models: unknown[]): JsonObject {
   return { type: "pipkin_result", ok: true, data: { models } };
 }
 
+/** Endpoints that fail the way real servers do, keyed by `/models` path. */
+const FAILURES: Record<string, { status: number; type: string; body: string }> = {
+  "/openai/models": {
+    status: 403,
+    type: "application/json",
+    body: JSON.stringify({ error: { message: "Invalid API key", type: "authentication_error" } }),
+  },
+  "/site/models": { status: 404, type: "text/html", body: "<!DOCTYPE html><html><body>Not Found</body></html>" },
+  "/busy/models": { status: 429, type: "application/json", body: JSON.stringify({ detail: "Slow down" }) },
+  "/down/models": { status: 502, type: "text/plain", body: "upstream unavailable\n" },
+  "/teapot/models": { status: 418, type: "text/plain", body: "" },
+  "/page/models": { status: 200, type: "text/html", body: "<html><body>Welcome</body></html>" },
+};
+
 describe("provider_models and model_defaults", () => {
   let dirs: Dirs;
   let server: Server;
+  let origin: string;
   let baseUrl: string;
   let entries: unknown[] = [];
 
   beforeAll(async () => {
     server = createServer((request, response) => {
+      const failure = FAILURES[request.url ?? ""];
+      if (failure !== undefined) {
+        response.writeHead(failure.status, { "content-type": failure.type });
+        response.end(failure.body);
+        return;
+      }
       const authorized = request.headers.authorization === "Bearer sk-test" && request.url === "/v1/models";
       response.writeHead(authorized ? 200 : 401, { "content-type": "application/json" });
       response.end(JSON.stringify(authorized ? { object: "list", data: entries } : { error: "nope" }));
@@ -68,7 +89,8 @@ describe("provider_models and model_defaults", () => {
     await listening.promise;
     const address = server.address();
     if (address === null || typeof address === "string") throw new Error("No server address");
-    baseUrl = `http://127.0.0.1:${address.port}/v1/`;
+    origin = `http://127.0.0.1:${address.port}`;
+    baseUrl = `${origin}/v1/`;
   });
 
   afterAll(() => {
@@ -138,9 +160,44 @@ describe("provider_models and model_defaults", () => {
     }]));
   });
 
-  it("reports HTTP errors", async () => {
-    const result = await runMode("provider_models", dirs, { baseUrl, apiKey: "wrong", api: "openai-responses" });
-    expect(result).toMatchObject({ ok: false, code: "http_error", error: 'HTTP 401: {"error":"nope"}' });
+  it.each([
+    ["/v1", "unauthorized", "HTTP 401: nope"],
+    ["/openai", "unauthorized", "HTTP 403: Invalid API key"],
+    ["/site", "not_found", "HTTP 404"],
+    ["/busy", "rate_limited", "HTTP 429: Slow down"],
+    ["/down", "server_error", "HTTP 502: upstream unavailable"],
+    ["/teapot", "http_error", "HTTP 418"],
+  ])("reports HTTP errors from %s by cause, with what the server said", async (prefix, code, error) => {
+    const result = await runMode("provider_models", dirs, { baseUrl: origin + prefix, apiKey: "wrong", api: "openai-responses" });
+    expect(result).toMatchObject({ ok: false, code, error });
+  });
+
+  it("rejects a web page in place of the models list", async () => {
+    const result = await runMode("provider_models", dirs, { baseUrl: `${origin}/page`, apiKey: "k", api: "openai-responses" });
+    expect(result).toMatchObject({ ok: false, code: "bad_response", error: `${origin}/page/models returned a web page, not JSON` });
+  });
+
+  it.each(["api.example.com/v1", "ftp://example.com/v1", "https://"])("rejects %s as a base URL", async (url) => {
+    const result = await runMode("provider_models", dirs, { baseUrl: url, apiKey: "k", api: "openai-responses" });
+    expect(result).toMatchObject({ ok: false, code: "bad_url" });
+  });
+
+  it("reports an endpoint nothing listens on as unreachable", async () => {
+    const closed = createServer();
+    const listening = Promise.withResolvers<void>();
+    closed.listen(0, "127.0.0.1", listening.resolve);
+    await listening.promise;
+    const address = closed.address();
+    if (address === null || typeof address === "string") throw new Error("No server address");
+    const stopped = Promise.withResolvers<void>();
+    closed.close(() => stopped.resolve());
+    await stopped.promise;
+    const url = `http://127.0.0.1:${address.port}/v1`;
+    expect(await runMode("provider_models", dirs, { baseUrl: url, apiKey: "k", api: "openai-responses" })).toMatchObject({
+      ok: false,
+      code: "network",
+      error: expect.stringContaining(`Could not reach ${url}`),
+    });
   });
 
   it("returns catalogue defaults in request order, ignoring models.json", async () => {

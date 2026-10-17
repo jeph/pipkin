@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,10 +33,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -134,6 +140,91 @@ internal fun SettingsCaption(text: String, modifier: Modifier = Modifier, color:
     fontSize = PipkinTokens.FontSize.sm,
   )
 }
+
+/**
+ * An error on a settings page, washed in the destructive colour: an optional bold [title], what to do in [message],
+ * and the raw [detail] (a server's own words) in a selectable code font. [standalone], it is a rounded card with an
+ * alert icon; otherwise it fills the bottom of a settings card, its text lined up with the row titles above it, whose
+ * status icon already marks the error.
+ */
+@Composable
+internal fun ErrorPanel(
+  title: String?,
+  message: String,
+  modifier: Modifier = Modifier,
+  detail: String? = null,
+  standalone: Boolean = true,
+) {
+  val colors = pipkinColors
+  val wash = colors.destructive.copy(alpha = if (colors.isDark) DARK_ERROR_WASH else LIGHT_ERROR_WASH)
+  Row(
+    modifier =
+      modifier
+        .fillMaxWidth()
+        .background(wash, if (standalone) RoundedCornerShape(PipkinTokens.Radius.lg) else RectangleShape)
+        .padding(
+          start = if (standalone) PipkinTokens.Spacing.s12 else CARD_TEXT_START,
+          top = PipkinTokens.Spacing.s12,
+          end = if (standalone) PipkinTokens.Spacing.s12 else PipkinTokens.Spacing.s16,
+          bottom = PipkinTokens.Spacing.s12,
+        ),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+  ) {
+    if (standalone) {
+      LucideIcon(
+        icon = R.drawable.ic_lucide_circle_alert,
+        contentDescription = null,
+        modifier = Modifier.padding(top = PipkinTokens.Spacing.s2),
+        tint = colors.destructive,
+      )
+    }
+    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4)) {
+      if (title != null) {
+        Text(
+          text = title,
+          color = colors.foreground,
+          fontSize = PipkinTokens.FontSize.base,
+          fontWeight = FontWeight.Medium,
+        )
+      }
+      // Without a title the message is the headline.
+      Text(
+        text = message,
+        color = if (title == null) colors.foreground else colors.foregroundMuted,
+        fontSize = if (title == null) PipkinTokens.FontSize.base else PipkinTokens.FontSize.sm,
+        lineHeight = if (title == null) 20.sp else 17.sp,
+      )
+      if (detail != null) ErrorDetail(detail)
+    }
+  }
+}
+
+/** A server's own words, on an inset in the code font, selectable for copying into a bug report or search. */
+@Composable
+private fun ErrorDetail(detail: String) {
+  val colors = pipkinColors
+  SelectionContainer(modifier = Modifier.padding(top = PipkinTokens.Spacing.s4)) {
+    Text(
+      text = detail,
+      modifier =
+        Modifier
+          .fillMaxWidth()
+          .background(colors.surface0.copy(alpha = DETAIL_BACKGROUND_ALPHA), RoundedCornerShape(PipkinTokens.Radius.md))
+          .padding(horizontal = PipkinTokens.Spacing.s8, vertical = PipkinTokens.Spacing.s6),
+      color = colors.foreground,
+      fontFamily = FontFamily.Monospace,
+      fontSize = PipkinTokens.FontSize.code,
+      lineHeight = PipkinTokens.LineHeight.code,
+    )
+  }
+}
+
+private const val DARK_ERROR_WASH = 0.14f
+private const val LIGHT_ERROR_WASH = 0.08f
+private const val DETAIL_BACKGROUND_ALPHA = 0.7f
+
+/** Where a [SettingsRow]'s text starts after its leading icon: the row's padding, the 20dp icon box and the gap. */
+private val CARD_TEXT_START = PipkinTokens.Spacing.s16 + 20.dp + PipkinTokens.Spacing.s12
 
 /** Paseo's segmented control: a surface2 track with the selected segment raised on surface3. */
 @Composable

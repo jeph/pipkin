@@ -23,7 +23,11 @@ internal sealed interface ConnectionCheck {
 
   data class Ok(val connection: Connection, val models: List<ModelConfig>) : ConnectionCheck
 
-  data class Failed(val connection: Connection, val message: String) : ConnectionCheck
+  /**
+   * [code] is the host's cause (`unauthorized`, `not_found`, `network`, …), or null when the check didn't reach the
+   * host; [message] is what the host or the server said.
+   */
+  data class Failed(val connection: Connection, val code: String?, val message: String) : ConnectionCheck
 }
 
 /**
@@ -46,6 +50,13 @@ internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraf
   var prefilled by mutableStateOf(false)
     private set
   private var lastCheck by mutableStateOf<ConnectionCheck>(ConnectionCheck.Idle)
+
+  /**
+   * The latest failed check, kept through edits and the next check until one succeeds, so the error stays in place
+   * while the user fixes what it describes instead of disappearing and coming back.
+   */
+  var lastFailure by mutableStateOf<ConnectionCheck.Failed?>(null)
+    private set
   private var baseline = snapshot()
 
   private val connection: Connection get() = Connection(baseUrl.trim(), apiKey.trim(), api)
@@ -61,15 +72,17 @@ internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraf
 
   val connected: Boolean get() = check is ConnectionCheck.Ok
 
+  /** A check ran, but the URL, key or API type changed since. */
+  val checkOutdated: Boolean get() = lastCheck != ConnectionCheck.Idle && check == ConnectionCheck.Idle
+
   /** What the endpoint listed in the current check. */
   val fetched: List<ModelConfig> get() = (check as? ConnectionCheck.Ok)?.models.orEmpty()
 
   val idValid: Boolean get() = ID_PATTERN.matches(id)
-  val canCheck: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank() && check !is ConnectionCheck.Checking
+  val hasConnectionDetails: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank()
+  val canCheck: Boolean get() = hasConnectionDetails && check !is ConnectionCheck.Checking
   val canSave: Boolean
-    get() =
-      idValid && baseUrl.isNotBlank() && apiKey.isNotBlank() && models.isNotEmpty() && models.all { it.valid } &&
-        !saving
+    get() = idValid && hasConnectionDetails && models.isNotEmpty() && models.all { it.valid } && !saving
   val dirty: Boolean get() = snapshot() != baseline
 
   /** Fills the draft from the stored provider once; later status updates do not overwrite edits. */
@@ -92,13 +105,20 @@ internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraf
     try {
       result = ConnectionCheck.Ok(target, accounts.providerModels(target.baseUrl, target.apiKey, target.api))
     } catch (rejected: HostRejected) {
-      result = ConnectionCheck.Failed(target, rejected.error)
+      result = ConnectionCheck.Failed(target, rejected.code, rejected.error)
     } catch (failure: IOException) {
-      result = ConnectionCheck.Failed(target, failure.message ?: fallbackError)
+      result = ConnectionCheck.Failed(target, null, failure.message ?: fallbackError)
     } finally {
       // Cancelled with its screen, the check goes back to idle rather than staying "checking";
       // a check superseded by a newer one leaves that one's state alone.
-      if (lastCheck === checking) lastCheck = result
+      if (lastCheck === checking) {
+        lastCheck = result
+        when (result) {
+          is ConnectionCheck.Ok -> lastFailure = null
+          is ConnectionCheck.Failed -> lastFailure = result
+          else -> Unit
+        }
+      }
     }
   }
 
