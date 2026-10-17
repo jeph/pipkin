@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.input.TextFieldDecorator
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,12 +42,20 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.layout.MultiContentMeasurePolicy
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.ExtensionUiRequest
@@ -108,44 +117,100 @@ internal fun ExtensionUiCard(
 
 /**
  * Stacks [header], [answers] and [buttons], with the buttons always whole. Pi puts no limit on a title or a message,
- * so when the header and answers together outgrow the card, each part that needs less than half the room keeps its
- * full height and the other gets the rest, scrolling inside it; when both need more, they split the room evenly.
+ * so when the header and answers together outgrow the card, each first keeps a floor: the header two lines, and the
+ * answers two lines inside a field's padding when [answersScroll], or all of them when they can't scroll, as a one-line
+ * field can't. What's left over is split evenly, and a part that needs less than its share gives the rest to the
+ * other; a part shorter than its need scrolls inside it. When even the floors don't fit, answers that can't scroll stay
+ * whole and the header gets the rest, and otherwise the two floors split the room the same way. The floors make the
+ * card's min intrinsic height, so [ChatStack] can make room for them.
  */
 @Composable
 private fun CardLayout(
   header: @Composable () -> Unit,
   answers: @Composable () -> Unit,
   buttons: @Composable () -> Unit,
+  answersScroll: Boolean,
   modifier: Modifier,
 ) {
-  Layout(contents = listOf(header, answers, buttons), modifier = modifier) { (h, a, b), constraints ->
+  // Measured rather than counted in sp: Android scales large sizes less, so 2 × 24sp isn't two lines of 24sp text.
+  val measurer = rememberTextMeasurer(cacheSize = 0)
+  val style = LocalTextStyle.current.merge(TextStyle(fontSize = PipkinTokens.FontSize.base))
+  val twoLines = remember(measurer, style) { measurer.measure("\n", style).size.height }
+  val policy = remember(twoLines, answersScroll) { CardMeasurePolicy(twoLines, answersScroll) }
+  Layout(contents = listOf(header, answers, buttons), modifier = modifier, measurePolicy = policy)
+}
+
+/** [twoLines] is the height of two lines of the card's text, the floor of the header and of scrolling answers. */
+private class CardMeasurePolicy(private val twoLines: Int, private val answersScroll: Boolean) :
+  MultiContentMeasurePolicy {
+  override fun MeasureScope.measure(measurables: List<List<Measurable>>, constraints: Constraints): MeasureResult {
+    val (header, answers, buttons) = measurables.map { it.single() }
     val width = constraints.maxWidth
     val gap = CARD_GAP.roundToPx()
-    val fixedWidth = Constraints(minWidth = width, maxWidth = width)
-    val buttonsPlaced = b.single().measure(fixedWidth)
-    val headerNeed = h.single().maxIntrinsicHeight(width)
-    val answersNeed = a.single().maxIntrinsicHeight(width)
+    val fixedWidth = Constraints.fixedWidth(width)
+    val buttonsPlaced = buttons.measure(fixedWidth)
+    val headerNeed = header.maxIntrinsicHeight(width)
+    val answersNeed = answers.maxIntrinsicHeight(width)
     val room = if (constraints.hasBoundedHeight) {
       (constraints.maxHeight - buttonsPlaced.height - 2 * gap).coerceAtLeast(0)
     } else {
       headerNeed + answersNeed
     }
-    val half = room / 2
-    val headerHeight = when {
-      headerNeed + answersNeed <= room || headerNeed <= half -> headerNeed
-      answersNeed <= half -> room - answersNeed
-      else -> half
-    }
-    val answersHeight = minOf(answersNeed, room - headerHeight)
-    val headerPlaced = h.single().measure(fixedWidth.copy(maxHeight = headerHeight))
-    val answersPlaced = a.single().measure(fixedWidth.copy(maxHeight = answersHeight))
+    val headerHeight = headerHeight(headerNeed, answersNeed, room)
+    val headerPlaced = header.measure(fixedWidth.copy(maxHeight = headerHeight))
+    val answersPlaced = answers.measure(fixedWidth.copy(maxHeight = minOf(answersNeed, room - headerHeight)))
     val height = headerPlaced.height + answersPlaced.height + buttonsPlaced.height + 2 * gap
-    layout(width, height) {
+    return layout(width, height) {
       headerPlaced.place(0, 0)
       answersPlaced.place(0, headerPlaced.height + gap)
       buttonsPlaced.place(0, headerPlaced.height + answersPlaced.height + 2 * gap)
     }
   }
+
+  override fun IntrinsicMeasureScope.minIntrinsicHeight(
+    measurables: List<List<IntrinsicMeasurable>>,
+    width: Int,
+  ): Int {
+    val (header, answers, buttons) = measurables.map { it.single() }
+    val headerNeed = header.maxIntrinsicHeight(width)
+    val answersNeed = answers.maxIntrinsicHeight(width)
+    return headerFloor(headerNeed) + answersFloor(answersNeed) + buttons.maxIntrinsicHeight(width) +
+      2 * CARD_GAP.roundToPx()
+  }
+
+  private fun headerFloor(need: Int) = minOf(need, twoLines)
+
+  private fun Density.answersFloor(need: Int) =
+    if (answersScroll) minOf(need, twoLines + 2 * PipkinTokens.Spacing.s12.roundToPx()) else need
+
+  private fun Density.headerHeight(headerNeed: Int, answersNeed: Int, room: Int) =
+    cardHeaderHeight(headerNeed, answersNeed, room, headerFloor(headerNeed), answersFloor(answersNeed), answersScroll)
+}
+
+/**
+ * The header's height in [CardLayout]'s [room] for the header and the answers, from what each needs and its floor; the
+ * answers get the rest. Answers that can't scroll ([answersScroll] false) have their need as their floor.
+ */
+internal fun cardHeaderHeight(
+  headerNeed: Int,
+  answersNeed: Int,
+  room: Int,
+  headerFloor: Int,
+  answersFloor: Int,
+  answersScroll: Boolean,
+): Int {
+  if (headerNeed + answersNeed <= room) return headerNeed
+  if (headerFloor + answersFloor > room) {
+    return if (answersScroll) split(room, headerFloor, answersFloor) else (room - answersNeed).coerceAtLeast(0)
+  }
+  return headerFloor + split(room - headerFloor - answersFloor, headerNeed - headerFloor, answersNeed - answersFloor)
+}
+
+/** The header's part of [room] split evenly with the answers, where a part that wants less gives the rest away. */
+private fun split(room: Int, headerWants: Int, answersWants: Int) = when {
+  headerWants <= room / 2 -> headerWants
+  answersWants <= room / 2 -> room - answersWants
+  else -> room / 2
 }
 
 /**
@@ -228,6 +293,7 @@ private fun ChoiceCard(
       }
     },
     buttons = { SubmitButtons(canSubmit = picked >= 0, onSubmit = { onSubmit(picked) }, onDismiss = onDismiss) },
+    answersScroll = true,
     modifier = modifier,
   )
 }
@@ -265,9 +331,9 @@ private fun ChoiceRow(label: String, picked: Boolean, onPick: () -> Unit) {
 }
 
 /**
- * A filled field with the cursor after the `prefill` and the keyboard up, one line for `input` and several for
- * `editor`, scrolling when [CardLayout] gives it less than its height; Submit is off while the text is blank. The
- * keyboard's action key does not submit, only the button.
+ * A filled field with the cursor after the `prefill` and the keyboard up: one line for `input`, which [CardLayout]
+ * always gives its full height, and several for `editor`, scrolling when [CardLayout] gives it less than its height.
+ * Submit is off while the text is blank. The keyboard's action key does not submit, only the button.
  */
 @Composable
 private fun TextCard(
@@ -321,6 +387,7 @@ private fun TextCard(
         onDismiss = { onAnswer(UiAnswer.Cancelled) },
       )
     },
+    answersScroll = multiline,
     modifier = modifier,
   )
 }
