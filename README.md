@@ -69,9 +69,24 @@ your code, and every command it runs on the phone itself:
 
 ## Installation
 
-Prebuilt releases aren't published yet. Build and install Pipkin from source. The build needs a
-JDK, the Android SDK, and Node.js and pnpm on your `PATH`; see [Development](#development) for the
-exact toolchain.
+### Download a release
+
+[Download the latest APK](https://github.com/jeph/pipkin/releases/latest) from the releases page on
+your phone and open it to install. Android asks you to allow installs from your browser or file
+manager the first time. Later releases install over it as updates and keep your chats and settings.
+
+Each release also lists the APK's SHA-256 checksum in `SHA256SUMS`, and you can confirm that GitHub
+Actions built it from this repository with the [GitHub CLI](https://cli.github.com):
+
+```sh
+sha256sum --check SHA256SUMS
+gh attestation verify pipkin-v<VERSION>.apk --repo jeph/pipkin
+```
+
+### Build from source
+
+The build needs a JDK, the Android SDK, and Node.js and pnpm on your `PATH`; see
+[Development](#development) for the exact toolchain.
 
 ```sh
 git clone https://github.com/jeph/pipkin.git
@@ -82,6 +97,10 @@ cd pipkin
 `installDebug` installs on the device or emulator that `adb` is connected to. To build an APK
 without installing it, run `./gradlew :app:assembleDebug` and find it in
 `app/build/outputs/apk/debug/`.
+
+A build from source is signed with your own debug key, not the release key, so Android won't install
+it over a downloaded release or the other way around. Uninstall one before installing the other;
+uninstalling removes Pipkin's own settings, but your files and chats in Termux stay.
 
 ## Usage
 

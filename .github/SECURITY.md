@@ -2,16 +2,16 @@
 
 ## Supported versions
 
-Pipkin is in early development and has no published releases yet. Only the latest commit on the
-`dev` branch receives security fixes.
+Pipkin is in early development. Only the latest published release receives security fixes.
 
 | Version | Security updates |
 | --- | --- |
-| Latest `dev` commit | Supported |
-| Older commits | Not supported |
+| Latest release | Supported |
+| Older releases | Not supported |
+| Unreleased commits | Not supported |
 
-Before reporting a problem, reproduce it with a build of the latest `dev` commit when it is safe to
-do so.
+Before reporting a problem, reproduce it with the
+[latest release](https://github.com/jeph/pipkin/releases/latest) when it is safe to do so.
 
 ## Reporting a vulnerability
 
