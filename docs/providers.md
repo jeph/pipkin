@@ -33,7 +33,7 @@ To sign out, open the subscription in **Settings → Providers** and tap **Sign 
 
 ### Use your Claude plan
 
-Anthropic bills Claude Pro and Max sign-ins used outside Claude Code as extra usage, at API rates. After you sign in to Claude, Pipkin offers [pi-anthropic-auth](https://github.com/gotgenes/pi-anthropic-auth), a third-party Pi plugin that makes Pipkin's requests look like Claude Code's so your plan covers them. This breaks Anthropic's terms and could get your account suspended.
+Anthropic bills Claude Pro and Max sign-ins used by third-party harnesses as extra usage, at API rates. After you sign in to Claude, Pipkin offers [pi-anthropic-auth](https://github.com/gotgenes/pi-anthropic-auth), a third-party Pi plugin that makes Pipkin's requests look like Claude Code's so you can use your plan's token quotas with Pipkin. The practice is common in other harnesses but technically breaks Anthropic's terms of service; Pipkin offers the one-click install as a setup convenience.
 
 Tap **Install plugin** to install it, or **Skip** to keep paying for extra usage. Once it's installed, Pipkin stops offering it. To remove it, uninstall `npm:@gotgenes/pi-anthropic-auth` as described in [Extensions](/docs/extensions/).
 
