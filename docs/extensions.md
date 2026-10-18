@@ -3,24 +3,24 @@ title: Extensions, skills, and prompts
 description: Install Pi packages in Pipkin, write your own extensions, add skills and prompt templates, and see how extensions appear in Pipkin's interface.
 ---
 
-Pipkin runs [Pi](https://pi.dev), so it works with Pi's extensions, skills, and prompt templates. Everything below goes in Pipkin's config folder, `~/.pipkin/pi` in Termux. See [Configure the agent](/docs/configure/) for how to edit files there.
+Pipkin supports Pi's extensions, skills, and prompt templates. They go in Pipkin's config folder, `~/.pipkin/pi`. See [Configure the agent](/docs/configure/) for editing files there.
 
 ## Bundled extensions
 
-Pipkin installs two extensions of its own alongside Pi:
+Pipkin bundles extensions for ease of use, or where the experience it wants isn't possible through Pi's RPC protocol. The current bundled extensions are:
 
-- **Pipkin todo** keeps a to-do list for the agent's current task, shown as a tab on the message box. The list is saved with the chat.
-- **Pipkin web access** lets the agent search the web and read pages, docs, and PDFs. Type `/websearch` to open its search curator. It's a copy of [pi-web-access](https://github.com/nicobailon/pi-web-access), and it reads its settings, such as search provider API keys, from `~/.pipkin/pi/web-search.json`. The upstream README lists the options.
+- **Pipkin todo** keeps a to-do list for the agent's current task, shown as a tab on the message box. The list is saved with the chat, and `/todos` shows it. It showcases Pipkin's [widgets](#how-extensions-look-in-pipkin). Its tool matches [rpiv-todo](https://github.com/juicesharp/rpiv-mono)'s.
+- **Pipkin web access** lets the agent search the web and read pages, docs, and PDFs. `/websearch` opens its search curator. It's a copy of [pi-web-access](https://github.com/nicobailon/pi-web-access), changed to start faster on Android. Its settings, such as search API keys, go in `~/.pipkin/pi/web-search.json`; the [pi-web-access README](https://github.com/nicobailon/pi-web-access#readme) lists them.
 
-Turn either one off under **Settings → Pipkin extensions**. Idle chats reload to pick up the change; a working chat picks it up the next time its agent starts.
+Turn them off in **Settings → Pipkin extensions**. Idle chats reload to apply the change; working chats apply it when their agent next starts.
 
-If you install `npm:pi-web-access` yourself, Pipkin leaves out its bundled copy so the two don't clash.
+If you install `npm:pi-web-access` yourself, Pipkin drops its bundled copy.
 
 ## Install a Pi package
 
-Pi packages bundle extensions, skills, prompts, and themes, and come from npm or git. There are two ways to install one.
+Pi packages bundle extensions, skills, prompts, and themes from npm or git. Install one in either of two ways.
 
-**Add it to `settings.json`.** List the package under `packages` in `~/.pipkin/pi/settings.json`:
+**List it in `settings.json`** under `packages`:
 
 ```json
 {
@@ -28,9 +28,9 @@ Pi packages bundle extensions, skills, prompts, and themes, and come from npm or
 }
 ```
 
-Then reload the chat with **Chat actions → Reload agent** or `/reload`. Pi installs any listed package that's missing when the agent starts.
+Then reload the chat with **Chat actions → Reload agent** or `/reload`. Pi installs missing packages when the agent starts.
 
-**Use Pi's install command.** Pipkin's copy of Pi isn't on the terminal's `PATH`, and the terminal doesn't point Pi at Pipkin's config folder, so give both explicitly. In a terminal tab:
+**Run Pi's install command** in a terminal tab. Pipkin's Pi isn't on the terminal's `PATH`, so give its path and config folder:
 
 ```sh
 PI_CODING_AGENT_DIR=~/.pipkin/pi \
@@ -38,17 +38,17 @@ PI_CODING_AGENT_DIR=~/.pipkin/pi \
   install npm:@example/pi-tools
 ```
 
-Swap `install` for `remove` to uninstall, or `list` to see what's installed, then reload the chat. Without `PI_CODING_AGENT_DIR`, Pi installs into `~/.pi/agent`, which Pipkin doesn't read.
+Use `remove` to uninstall or `list` to list packages, then reload the chat. Without `PI_CODING_AGENT_DIR`, Pi installs into `~/.pi/agent`, which Pipkin ignores.
 
-Pi's [packages documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md) covers git sources, version pinning, and loading only part of a package. Packages run code on your phone with the agent's permissions, so review a package before installing it.
+Pi's [packages documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md) covers git sources, version pinning, and partial loading. Packages run code with the agent's permissions; review them before installing.
 
 ## Write your own extension
 
-Put a TypeScript file in `~/.pipkin/pi/extensions/`, such as `~/.pipkin/pi/extensions/hello.ts`, and reload the chat. Pi's [extensions documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md) explains the API. An extension's commands show up when you type `/`.
+Put a TypeScript file in `~/.pipkin/pi/extensions/`, such as `hello.ts`, and reload the chat. Pi's [extensions documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md) covers the API. Extension commands appear when you type `/`.
 
 ## How extensions look in Pipkin
 
-Pipkin talks to Pi through Pi's RPC mode, and draws an extension's interface with its own native controls instead of a terminal:
+Pipkin talks to Pi over Pi's RPC mode and draws extension UI with native controls:
 
 | An extension calls | Pipkin shows |
 | --- | --- |
@@ -59,17 +59,17 @@ Pipkin talks to Pi through Pi's RPC mode, and draws an extension's interface wit
 | `setTitle` | The chat's title |
 | `sendMessage` | A message in the chat |
 
-When a `select`, `confirm`, `input`, or `editor` card comes up in a chat you can't see, Pipkin sends a notification, **Agent needs your answer**, with the chat's name and the question. That covers being in another app, having the screen off, and looking at another chat, a terminal, a file, the sidebar, or settings. Tap it to open the chat and answer. The notification goes away once the chat is on screen, or once the question is answered or expires.
+If a `select`, `confirm`, `input`, or `editor` card appears in a chat that isn't on screen, Pipkin sends an **Agent needs your answer** notification with the chat's name and the question. Tap it to open the chat. It clears once the chat is on screen or the question is answered or expires.
 
-Pi's RPC mode doesn't support everything a terminal can draw. Custom components, custom headers, footers, and editors, and widgets built from components don't appear in Pipkin; the rest of the extension still works. Pi's [RPC extension UI notes](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/rpc-extension-ui.md) list the details.
+RPC mode can't show custom components, headers, footers, editors, or component widgets; the rest of the extension works. See Pi's [RPC extension UI notes](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/rpc-extension-ui.md).
 
 ## Skills
 
-A skill is a folder with a `SKILL.md` file that teaches the agent a task. Put skills in `~/.pipkin/pi/skills/`. Skills in a project's `.agents/skills/` or `.pi/skills/` load only once you [trust the project](/docs/configure/#project-settings). Pi offers skills to the agent on its own, and you can run one directly by typing `/skill:` and its name.
+A skill is a folder with a `SKILL.md` that teaches the agent a task. Put skills in `~/.pipkin/pi/skills/`. Skills in a project's `.agents/skills/` or `.pi/skills/` load only from [trusted projects](/docs/configure/#project-settings). The agent uses skills on its own; type `/skill:` and a name to run one.
 
 ## Prompt templates
 
-A prompt template is a Markdown file you run as a command. Save `~/.pipkin/pi/prompts/review.md`:
+A prompt template is a Markdown file run as a command. Save `~/.pipkin/pi/prompts/review.md`:
 
 ```markdown
 ---
@@ -80,4 +80,4 @@ Review the uncommitted changes in this repository. Point out bugs first, then st
 
 Reload the chat, then type `/review`. Pi's [prompt template documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/prompt-templates.md) covers arguments such as `$1` and `$@`.
 
-After adding or changing skills or prompts, reload the chat so they appear in the `/` menu.
+Reload the chat after adding or changing skills or prompts.
