@@ -31,6 +31,12 @@ The other options are useful when the browser flow doesn't work on your phone:
 
 To sign out, open the subscription in **Settings → Providers** and tap **Sign out**.
 
+### Use your Claude plan
+
+Anthropic bills a Claude Pro or Max sign-in used outside Claude Code as extra usage, at API rates, rather than against your plan's limits. After you sign in to Claude, Pipkin offers to install [pi-anthropic-auth](https://github.com/gotgenes/pi-anthropic-auth), a third-party Pi plugin that makes Pipkin's requests look like Claude Code's so your plan covers them. This goes against Anthropic's terms and could get your account suspended, though many coding tools do the same.
+
+Tap **Install plugin** to install it as a Pi package, or **Skip** to keep paying for extra usage. Pipkin doesn't offer it again once it's installed. To remove it later, uninstall `npm:@gotgenes/pi-anthropic-auth` as described in [Extensions](/docs/extensions/).
+
 ## Add a Gemini, Z.ai or Kimi key
 
 1. Choose **Gemini**, **Z.ai** or **Kimi**.
