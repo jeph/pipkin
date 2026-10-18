@@ -5,6 +5,8 @@
 <h1 align="center">Pipkin</h1>
 
 <p align="center">
+  <a href="https://github.com/jeph/pipkin/actions/workflows/release.yml"><img src="https://github.com/jeph/pipkin/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+  <a href="https://github.com/jeph/pipkin/releases/latest"><img src="https://img.shields.io/github/v/release/jeph/pipkin" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/jeph/pipkin" alt="License"></a>
 </p>
 
