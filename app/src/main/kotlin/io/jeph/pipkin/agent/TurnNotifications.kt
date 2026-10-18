@@ -5,16 +5,9 @@ import android.app.Application
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.os.Bundle
-import io.jeph.pipkin.MainActivity
 import io.jeph.pipkin.R
-import io.jeph.pipkin.ui.sidebar.projectName
-
-/** A chat a notification opens: its project folder and session file. */
-internal data class ChatLocation(val cwd: String, val sessionPath: String)
 
 /**
  * Tells the user a chat's run ended while Pipkin was in the background, as a heads-up notification naming the chat,
@@ -67,9 +60,6 @@ internal class TurnNotifications(application: Application, private val home: () 
   /** Posts [process]'s result, replacing the chat's earlier one; nothing while Pipkin is on screen. */
   fun runEnded(process: AgentProcess) {
     if (onScreen) return
-    val timeline = process.timeline.state.value
-    val chatTitle = process.sessionName.value?.takeIf { it.isNotBlank() }
-      ?: timeline.items.firstNotNullOfOrNull { (it as? TimelineItem.User)?.text?.takeIf(String::isNotBlank) }
     val processState = process.state.value
     val outcome = context.getString(
       when (processState) {
@@ -78,33 +68,13 @@ internal class TurnNotifications(application: Application, private val home: () 
         else -> R.string.turn_notification_finished
       },
     )
-    val title = chatTitle?.let { context.getString(R.string.turn_notification_title, outcome, it) } ?: outcome
-    val text = (processState as? AgentProcessState.Failed)?.message ?: lastReply(timeline.items)
-    val project = projectName(process.cwd, home().orEmpty())
-    val model = timeline.model?.optString("id")?.takeIf { it.isNotBlank() }
-    val sessionPath = process.sessionFile.value
-    val open = Intent(context, MainActivity::class.java)
-      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-    sessionPath?.let { open.putExtra(EXTRA_CWD, process.cwd).putExtra(EXTRA_SESSION, it) }
-    // Pi names the session file before a run ends, so the tag and request code are one per chat.
-    val tag = sessionPath ?: process.cwd
-    val notification = Notification.Builder(context, CHANNEL)
-      .setSmallIcon(R.drawable.ic_launcher_foreground)
-      .setContentTitle(title)
+    val text = (processState as? AgentProcessState.Failed)?.message ?: lastReply(process.timeline.state.value.items)
+    val notification = ChatNotification.builder(context, CHANNEL, process, home().orEmpty())
+      .setContentTitle(ChatNotification.title(context, process, outcome))
       .setContentText(text)
-      .setSubText(listOfNotNull(project, model).joinToString(" · "))
       .setStyle(Notification.BigTextStyle().bigText(text))
-      .setContentIntent(
-        PendingIntent.getActivity(
-          context,
-          tag.hashCode(),
-          open,
-          PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        ),
-      )
-      .setAutoCancel(true)
       .build()
-    manager.notify(tag, NOTIFICATION_ID, notification)
+    manager.notify(ChatNotification.tag(process), NOTIFICATION_ID, notification)
   }
 
   /** The run's last reply or error, looking back no further than the user's message that started it. */
@@ -124,14 +94,5 @@ internal class TurnNotifications(application: Application, private val home: () 
     private const val CHANNEL = "finished_chats"
     private const val LEGACY_CHANNEL = "turns"
     private const val NOTIFICATION_ID = 2
-    private const val EXTRA_CWD = "io.jeph.pipkin.extra.CWD"
-    private const val EXTRA_SESSION = "io.jeph.pipkin.extra.SESSION"
-
-    /** The chat a tapped notification asks to open, or null for any other launch. */
-    fun chatLocation(intent: Intent): ChatLocation? {
-      val cwd = intent.getStringExtra(EXTRA_CWD) ?: return null
-      val sessionPath = intent.getStringExtra(EXTRA_SESSION) ?: return null
-      return ChatLocation(cwd, sessionPath)
-    }
   }
 }

@@ -49,7 +49,7 @@ your code, and every command it runs on the phone itself:
   subscription, add a Gemini, Z.ai Coding Plan or Kimi Code API key, or add any OpenAI-compatible
   API, including hosted gateways and servers you run yourself. Add several and switch per chat.
 - **Runs in the background.** Lock your phone or switch apps; a notification tells you when the chat
-  is done.
+  is done or needs your answer.
 - **Guided setup.** A step-by-step guide sets up Termux and installs Pi for you, explaining each
   permission it asks for.
 - **Bundled extensions.** Pipkin ships web search and page fetching (a vendored copy of

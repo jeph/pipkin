@@ -10,6 +10,7 @@ import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.AgentService
+import io.jeph.pipkin.agent.DialogNotifications
 import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.agent.TurnNotifications
 import io.jeph.pipkin.data.AccountRepository
@@ -59,6 +60,7 @@ internal class AppGraph(private val application: Application) {
     ) { cwd, sessionPath ->
       AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository, preferences.disabledExtensions)
     }
+  val dialogNotifications = DialogNotifications(application, registry, scope) { hostClient.lastHello.value?.home }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
   val configBackups = ConfigBackups(hostClient, registry, keepAlive, accountRepository, sessionRepository, scope)
   val modelDefaults = ModelDefaults(hostClient)

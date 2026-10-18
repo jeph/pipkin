@@ -59,6 +59,8 @@ Pipkin talks to Pi through Pi's RPC mode, and draws an extension's interface wit
 | `setTitle` | The chat's title |
 | `sendMessage` | A message in the chat |
 
+When a `select`, `confirm`, `input`, or `editor` card comes up in a chat you can't see, Pipkin sends a notification, **Agent needs your answer**, with the chat's name and the question. That covers being in another app, having the screen off, and looking at another chat, a terminal, a file, the sidebar, or settings. Tap it to open the chat and answer. The notification goes away once the chat is on screen, or once the question is answered or expires.
+
 Pi's RPC mode doesn't support everything a terminal can draw. Custom components, custom headers, footers, and editors, and widgets built from components don't appear in Pipkin; the rest of the extension still works. Pi's [RPC extension UI notes](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/rpc-extension-ui.md) list the details.
 
 ## Skills

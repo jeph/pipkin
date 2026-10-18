@@ -356,6 +356,8 @@ private fun WorkspacePanes(
     shownPanes.mapNotNullTo(HashSet()) { ((items[it] as? PaneItem.Tab)?.tab as? WorkspaceTab.Terminal)?.session },
   )
   PaneHistoryBack(panels, shownPanes)
+  val uncovered = shownPanes.filter { panels[it].targetValue == Panel.Chat }
+  ChatsOnScreen(uncovered.mapNotNullTo(HashSet()) { (items[it] as? PaneItem.Chat)?.process })
   PaneRow(panels.swapped) {
     for (pane in shownPanes) {
       if (pane == Pane.Secondary) VerticalDivider(thickness = 1.dp, color = pipkinColors.border)
@@ -397,10 +399,7 @@ private fun WorkspacePanes(
           },
         )
         if (tabsOpen && item != null) {
-          WorkspaceTabsSheet(pane, item.cwd, actions, snackbar, onShownInSplit, swapPanes, onDismiss = {
-            tabsOpen =
-              false
-          })
+          WorkspaceTabsSheet(pane, item.cwd, actions, snackbar, onShownInSplit, swapPanes) { tabsOpen = false }
         }
       }
     }

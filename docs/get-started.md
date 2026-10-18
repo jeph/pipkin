@@ -31,7 +31,7 @@ Open Pipkin and tap **Get started**. Each step shows **Done** once it's complete
 1. **Install Termux.** Pipkin links to F-Droid and Google Play. Install Termux, then come back to Pipkin. If you have a copy of Termux from somewhere else, Pipkin asks you to uninstall it first.
 2. **Let Pipkin use Termux** (F-Droid build only). Allow **Run commands in Termux environment** when Android asks. This is how Pipkin starts the agent in Termux.
 3. **Set up Termux.** Tap **Copy command & open Termux**. In Termux, long-press, tap **Paste**, and press Enter. The command installs Node.js and connects Termux to Pipkin, then switches back to Pipkin on its own. Android sometimes stops large installs partway; if that happens, paste the command again and it picks up where it left off.
-4. **Notifications** (optional but recommended). Pipkin lets you know when a chat finishes while you're away.
+4. **Notifications** (optional but recommended). Pipkin lets you know when a chat finishes or needs your answer while you're away.
 5. **Run in the background** (optional but recommended). Keeps a chat going while the screen is off or you're in another app.
 6. **Let Termux run in the background** (optional but recommended). The agent runs inside Termux, so Termux needs the same allowance. If Android can't ask directly, Pipkin shows where the setting is on your phone.
 7. **Let Termux use phone storage** (optional but recommended). Lets the agent work on files outside Termux, such as in Downloads or Documents.

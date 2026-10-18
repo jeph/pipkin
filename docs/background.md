@@ -39,7 +39,7 @@ Some phones name the setting differently:
 | Xiaomi | **Battery saver → No restrictions** |
 | OnePlus, Oppo, Realme | **Battery usage → Allow background activity** |
 
-Also turn on **Notifications** in **Settings → Permissions**. Without them, Pipkin can't tell you when a chat finishes or stops while you're away.
+Also turn on **Notifications** in **Settings → Permissions**. Without them, Pipkin can't tell you when a chat finishes, stops, or [asks you something](/docs/extensions/#how-extensions-look-in-pipkin) while you're away.
 
 ## What Android can still stop
 

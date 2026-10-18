@@ -60,7 +60,7 @@
     <string name="onboarding_demo_done">Pipkin setup done</string>
 
     <string name="onboarding_notifications_title">Notifications</string>
-    <string name="onboarding_notifications_body">Pipkin notifies you when a chat finishes while you\'re away.</string>
+    <string name="onboarding_notifications_body">Pipkin notifies you when a chat finishes or needs your answer while you\'re away.</string>
     <string name="onboarding_notifications_blocked">Android won\'t ask again. In settings, turn on All\u00A0Pipkin\u00A0notifications.</string>
     <string name="onboarding_notifications_blocked_note">Samsung, OnePlus, Oppo: Allow\u00A0notifications\nXiaomi: Show\u00A0notifications</string>
     <string name="onboarding_notifications_done">Notifications are on.</string>

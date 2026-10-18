@@ -2,6 +2,7 @@ package io.jeph.pipkin.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleStartEffect
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.chat.ChatScreen
@@ -30,6 +31,19 @@ internal fun WorkspacePane(
 
     is PaneItem.Chat, null ->
       ChatScreen(item?.process, actions, views, controls, onOpenSettings, onOpenProviders, onOpenOnboarding)
+  }
+}
+
+/**
+ * Tells the dialog notifications which [chats] the user sees: those shown in a pane with no side panel over them,
+ * while Pipkin is on screen and no other screen covers the panes.
+ */
+@Composable
+internal fun ChatsOnScreen(chats: Set<AgentProcess>) {
+  val notifications = LocalContext.current.appGraph.dialogNotifications
+  LifecycleStartEffect(chats) {
+    notifications.setChatsOnScreen(chats)
+    onStopOrDispose { notifications.setChatsOnScreen(emptySet()) }
   }
 }
 

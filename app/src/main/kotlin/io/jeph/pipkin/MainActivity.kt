@@ -36,7 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.agent.ChatLocation
-import io.jeph.pipkin.agent.TurnNotifications
+import io.jeph.pipkin.agent.ChatNotification
 import io.jeph.pipkin.host.TermuxWaker
 import io.jeph.pipkin.ui.AppNavigator
 import io.jeph.pipkin.ui.Destination
@@ -71,7 +71,7 @@ class MainActivity : ComponentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     // A recreated activity gets its launch intent again, but that chat was opened the first time.
-    if (savedInstanceState == null) requestedChat.value = TurnNotifications.chatLocation(intent)
+    if (savedInstanceState == null) requestedChat.value = ChatNotification.location(intent)
     enableEdgeToEdge()
     val graph = appGraph
     setContent {
@@ -86,7 +86,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
-    requestedChat.value = TurnNotifications.chatLocation(intent)
+    requestedChat.value = ChatNotification.location(intent)
   }
 
   override fun onStart() {
