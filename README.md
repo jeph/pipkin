@@ -8,6 +8,10 @@
   <a href="LICENSE"><img src="https://img.shields.io/github/license/jeph/pipkin" alt="License"></a>
 </p>
 
+<p align="center">
+  <a href="https://pipkin.jeph.io">Website</a> · <a href="https://pipkin.jeph.io/docs/">Docs</a>
+</p>
+
 **Pipkin** is a native Android app for agentic coding. Tell it what to build or fix, and it reads your
 code, runs commands, edits files, and checks its own work, all on your phone. It's built on the
 [Pi](https://pi.dev) agent harness and runs in [Termux](https://termux.dev), so there's no laptop or
@@ -18,6 +22,7 @@ cloud server doing the work somewhere else.
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
+- [Usage](#usage)
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
@@ -77,6 +82,21 @@ cd pipkin
 `installDebug` installs on the device or emulator that `adb` is connected to. To build an APK
 without installing it, run `./gradlew :app:assembleDebug` and find it in
 `app/build/outputs/apk/debug/`.
+
+## Usage
+
+The [Pipkin guide](https://pipkin.jeph.io/docs/) covers using the app:
+
+- [Get started](https://pipkin.jeph.io/docs/get-started/): install Termux, walk through setup, and
+  start your first chat.
+- [Connect a model](https://pipkin.jeph.io/docs/providers/): sign in with a Claude or OpenAI
+  subscription, add an API key or an OpenAI-compatible API, and choose models per chat.
+- [Configure the agent](https://pipkin.jeph.io/docs/configure/): edit Pi's configuration, give the
+  agent standing instructions, and use backups.
+- [Extensions](https://pipkin.jeph.io/docs/extensions/): install Pi packages, write your own
+  extensions, and add skills and prompt templates.
+- [Run in the background](https://pipkin.jeph.io/docs/background/): keep chats and terminal commands
+  running when you leave the app or lock the screen.
 
 ## Development
 
