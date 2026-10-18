@@ -36,6 +36,12 @@
 
     <string name="settings_reload_agents">Reload all agents</string>
     <string name="settings_reload_agents_done">Idle agents reloaded</string>
+    <string name="settings_update_extensions">Update Pi extensions</string>
+    <string name="settings_update_extensions_running">Updating Pi extensions…</string>
+    <string name="settings_update_extensions_title">Update Pi extensions?</string>
+    <string name="settings_update_extensions_text">Pi updates every package installed in its settings to the latest version, except packages pinned to a version. Chats can\'t start until the update finishes. Afterwards, idle chats reload with the new versions, and working chats pick them up when they next start.</string>
+    <string name="settings_update_extensions_confirm">Update</string>
+    <string name="settings_update_extensions_done">Pi extensions updated</string>
     <string name="settings_config_folder">Config folder</string>
     <string name="settings_config_folder_unknown">Known once Termux connects</string>
 

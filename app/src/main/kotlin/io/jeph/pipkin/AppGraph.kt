@@ -17,6 +17,7 @@ import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.data.ConfigBackups
 import io.jeph.pipkin.data.ModelDefaults
 import io.jeph.pipkin.data.NoticeStore
+import io.jeph.pipkin.data.PiExtensionUpdate
 import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.data.SessionArchive
 import io.jeph.pipkin.data.SessionRepository
@@ -63,6 +64,7 @@ internal class AppGraph(private val application: Application) {
   val dialogNotifications = DialogNotifications(application, registry, scope) { hostClient.lastHello.value?.home }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
   val configBackups = ConfigBackups(hostClient, registry, keepAlive, accountRepository, sessionRepository, scope)
+  val piExtensionUpdate = PiExtensionUpdate(hostClient, registry, keepAlive, sessionRepository, scope)
   val modelDefaults = ModelDefaults(hostClient)
   val panes = Panes(registry, sessionArchive::isArchived)
   val tabs = OpenTabs(panes)

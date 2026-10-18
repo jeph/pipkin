@@ -211,6 +211,11 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     call("backup_delete", JSONObject().put("name", name))
   }
 
+  /** Runs `pi update --extensions`, which updates every package in Pi's settings that isn't pinned to a version. */
+  suspend fun updateExtensions(onProgress: (String) -> Unit) {
+    call("update_extensions", JSONObject(), EXTENSIONS_UPDATE_TIMEOUT_MILLIS, progress(onProgress))
+  }
+
   private fun progress(onProgress: (String) -> Unit): suspend (HostChannel, JSONObject) -> Unit = { _, line ->
     if (line.optString("type") == HostProtocol.PROGRESS) onProgress(line.optString("line"))
   }
@@ -374,6 +379,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     const val ENSURE_TIMEOUT_MILLIS = 15 * 60_000L
     const val BACKUP_TIMEOUT_MILLIS = 15 * 60_000L
     const val PACKAGE_INSTALL_TIMEOUT_MILLIS = 15 * 60_000L
+    const val EXTENSIONS_UPDATE_TIMEOUT_MILLIS = 15 * 60_000L
     const val LOGIN_TIMEOUT_MILLIS = 10 * 60_000L
     const val REQUEST_HOST_START_TIMEOUT_MILLIS = 15_000L
   }

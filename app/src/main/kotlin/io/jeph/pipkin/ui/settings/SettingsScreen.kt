@@ -31,11 +31,15 @@ import io.jeph.pipkin.AppGraph
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.data.BundledExtension
+import io.jeph.pipkin.data.PiExtensionUpdate
+import io.jeph.pipkin.data.PiExtensionUpdateOutcome
 import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.ui.auth.LoginSheet
+import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -152,6 +156,8 @@ private fun AgentSection(graph: AppGraph, snackbar: SnackbarStackState, onOpenBa
       },
     )
     SettingsDivider()
+    UpdateExtensionsRow(update = graph.piExtensionUpdate, snackbar = snackbar)
+    SettingsDivider()
     SettingsRow(
       title = configFolder,
       subtitle = configDir ?: stringResource(R.string.settings_config_folder_unknown),
@@ -179,6 +185,51 @@ private fun AgentSection(graph: AppGraph, snackbar: SnackbarStackState, onOpenBa
     ) {
       Chevron()
     }
+  }
+}
+
+/**
+ * Runs `pi update --extensions` once confirmed, showing Pi's latest output while it runs and how it ended in a
+ * snackbar, including when it ended while settings were closed.
+ */
+@Composable
+private fun UpdateExtensionsRow(update: PiExtensionUpdate, snackbar: SnackbarStackState) {
+  val scope = rememberCoroutineScope()
+  val running by update.running.collectAsStateWithLifecycle()
+  val progress by update.progress.collectAsStateWithLifecycle()
+  val outcome by update.outcome.collectAsStateWithLifecycle()
+  var confirming by rememberSaveable { mutableStateOf(false) }
+  val updated = stringResource(R.string.settings_update_extensions_done)
+  val failed = stringResource(R.string.provider_failed)
+  LaunchedEffect(outcome) {
+    val ended = outcome ?: return@LaunchedEffect
+    val message = when (ended) {
+      PiExtensionUpdateOutcome.Updated -> updated
+      is PiExtensionUpdateOutcome.Failed -> ended.message ?: failed
+    }
+    // Acknowledging changes this effect's key and cancels it, so the snackbar shows from the row's own scope.
+    scope.launch { snackbar.show(message) }
+    update.acknowledge()
+  }
+  SettingsRow(
+    title = stringResource(R.string.settings_update_extensions),
+    subtitle = if (running) progress ?: stringResource(R.string.settings_update_extensions_running) else null,
+    enabled = !running,
+    onClick = { confirming = true },
+  ) {
+    if (running) SimmeringPot()
+  }
+  if (confirming) {
+    ConfirmDialog(
+      title = stringResource(R.string.settings_update_extensions_title),
+      text = stringResource(R.string.settings_update_extensions_text),
+      confirmLabel = stringResource(R.string.settings_update_extensions_confirm),
+      onConfirm = {
+        confirming = false
+        update.start()
+      },
+      onDismiss = { confirming = false },
+    )
   }
 }
 

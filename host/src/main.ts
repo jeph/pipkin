@@ -24,6 +24,7 @@ import { sessionMessages } from "./modes/session-messages.js";
 import { sessions } from "./modes/sessions.js";
 import { subscriptionSave } from "./modes/subscription-save.js";
 import { terminal } from "./modes/terminal.js";
+import { updateExtensions } from "./modes/update-extensions.js";
 
 const PROTOCOL = 1;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -152,6 +153,8 @@ async function main(): Promise<void> {
       return respond(ctx, restoreBackup);
     case "backup_delete":
       return respond(ctx, deleteBackup);
+    case "update_extensions":
+      return respond(ctx, updateExtensions);
     case "hello":
       // Answers with nothing: the hello is the point, so the app can re-read what it reports after a settings change.
       return respond(ctx, async () => ({}));

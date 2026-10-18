@@ -13,9 +13,10 @@ import { forwardLines } from "./ensure.js";
  */
 export async function packageInstall(ctx: ModeContext): Promise<JsonObject> {
   const source = stringParam(ctx.params, "source");
-  // A restore swaps the configuration while it holds the lock, which would drop the settings Pi writes.
+  // A restore swaps the configuration while it holds the lock, which would drop the settings Pi writes, and an
+  // extension update runs npm in the same folder Pi installs into.
   if (await isConfigLocked(ctx.env)) {
-    throw new HostError("config_busy", "Pipkin is backing up or restoring the configuration; try again in a moment");
+    throw new HostError("config_busy", "Pipkin is backing up, restoring or updating the configuration; try again in a moment");
   }
   let lastLine = "";
   const send = (line: string): void => {

@@ -137,9 +137,10 @@ export async function rpc(ctx: ModeContext): Promise<void> {
     fail(ctx, "cwd_missing", `Folder not found: ${cwd}`);
     return;
   }
-  // A restore swaps the configuration while it holds the lock; Pi must start on one side of the swap or the other.
+  // A restore swaps the configuration while it holds the lock, and an extension update rewrites the packages Pi loads;
+  // Pi must start on one side of the change or the other.
   if (await isConfigLocked(ctx.env)) {
-    fail(ctx, "config_busy", "Pipkin is backing up or restoring the configuration; try again in a moment");
+    fail(ctx, "config_busy", "Pipkin is backing up, restoring or updating the configuration; try again in a moment");
     return;
   }
 
