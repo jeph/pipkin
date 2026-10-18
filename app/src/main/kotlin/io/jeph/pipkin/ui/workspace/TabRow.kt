@@ -220,14 +220,14 @@ internal fun sessionTitle(session: SessionInfo): String = session.name?.takeIf {
   ?: session.firstMessage.takeIf { it.isNotBlank() }
   ?: stringResource(R.string.shell_session_untitled)
 
-/** The simmering pot while Pi works, a danger dot after Pi exited with a failure, otherwise [IdleMark]. */
+/** The simmering pot while the chat works, a danger dot after Pi exited with a failure, otherwise [IdleMark]. */
 @Composable
 private fun ActivityMark(process: AgentProcess) {
-  val busy by process.busy.collectAsStateWithLifecycle()
+  val working by process.working.collectAsStateWithLifecycle()
   val state by process.state.collectAsStateWithLifecycle()
   val crashed = (state as? AgentProcessState.Exited)?.code.let { it != null && it != 0 }
   when {
-    busy -> SimmeringPot()
+    working -> SimmeringPot()
     crashed -> StatusDot(pipkinColors.dotDanger)
     else -> IdleMark()
   }

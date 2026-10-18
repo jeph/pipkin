@@ -147,7 +147,7 @@ private fun ChatContent(
 ) {
   val process = controller.process
   val timeline by process.screenTimeline.collectAsStateWithLifecycle()
-  val busy by process.busy.collectAsStateWithLifecycle()
+  val working by process.working.collectAsStateWithLifecycle()
   val keyboard = LocalSoftwareKeyboardController.current
   val focus = LocalFocusManager.current
   val dismissKeyboard = remember(keyboard, focus) {
@@ -180,7 +180,7 @@ private fun ChatContent(
           controller = controller,
           model = timeline.model,
           thinkingLevel = timeline.thinkingLevel,
-          busy = busy,
+          working = working,
           tight = tight,
           onSheet = onSheet,
         )
@@ -202,6 +202,7 @@ private fun StreamArea(
 ) {
   val process = controller.process
   val processState by process.state.collectAsStateWithLifecycle()
+  val backgroundTasks by process.backgroundTasks.collectAsStateWithLifecycle()
   Box(modifier = Modifier.fillMaxSize().onUnhandledTap(dismissKeyboard)) {
     ChatStream(
       timeline = timeline,
@@ -211,6 +212,7 @@ private fun StreamArea(
       onOpenProviders = onOpenProviders,
       onOpenOnboarding = onOpenOnboarding,
       onRestart = process::restart,
+      backgroundTasks = backgroundTasks,
     )
     SnackbarStack(snackbar, Modifier.align(Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16))
     SlashMenuHost(controller, ready = processState == AgentProcessState.Ready, Modifier.align(Alignment.BottomCenter))

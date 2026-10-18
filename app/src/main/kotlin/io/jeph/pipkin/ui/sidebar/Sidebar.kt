@@ -348,11 +348,11 @@ private fun WorkspaceList(
   }
 }
 
-/** Whether any of [processes] has a Pi run going. */
+/** Whether any of [processes] [works][AgentProcess.working]: a Pi run, or background tasks it waits on. */
 @Composable
 private fun anyWorking(processes: List<AgentProcess>): Boolean {
   val working = remember(processes) {
-    if (processes.isEmpty()) flowOf(false) else combine(processes.map { it.busy }) { busy -> busy.any { it } }
+    if (processes.isEmpty()) flowOf(false) else combine(processes.map { it.working }) { states -> states.any { it } }
   }
   return working.collectAsStateWithLifecycle(initialValue = false).value
 }

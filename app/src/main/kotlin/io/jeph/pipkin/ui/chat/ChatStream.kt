@@ -85,8 +85,9 @@ private const val LAUNCHER_MASK_SCALE = 1.5f
  * Keeps the end in view while the user is at the bottom; dragging away stops following. Opens where [view] says the
  * chat was left, with the replies it has parsed, and records where it is when it leaves. While Pi starts under a
  * history already shown, a pinned [LoadingPill] replaces the banner. [onRestart] retries a failed start and restarts
- * an exited Pi.
+ * an exited Pi. The last run's footer shows the [backgroundTasks] the chat still waits on.
  */
+@Suppress("LongParameterList") // One parameter per thing the stream shows or hands back to the chat.
 @Composable
 internal fun ChatStream(
   timeline: TimelineState,
@@ -96,6 +97,7 @@ internal fun ChatStream(
   onOpenProviders: () -> Unit,
   onOpenOnboarding: () -> Unit,
   onRestart: () -> Unit,
+  backgroundTasks: Int,
   modifier: Modifier = Modifier,
 ) {
   val scope = rememberCoroutineScope()
@@ -120,7 +122,17 @@ internal fun ChatStream(
     derivedStateOf { listState.distanceFromBottom() > threshold }
   }
   Box(modifier = modifier.fillMaxSize()) {
-    StreamList(listState, timeline.items, banner, follow, view.markdown, onRestart, onOpenOnboarding, onOpenTool)
+    StreamList(
+      listState,
+      timeline.items,
+      banner,
+      follow,
+      view.markdown,
+      backgroundTasks,
+      onRestart,
+      onOpenOnboarding,
+      onOpenTool,
+    )
     if (timeline.items.isEmpty() && processState == AgentProcessState.Ready) {
       EmptyState(noModel = timeline.model == null, onOpenProviders, Modifier.align(Alignment.Center))
     }
@@ -181,6 +193,7 @@ private fun AutoFollow(listState: LazyListState, follow: MutableState<Boolean>) 
   )
 }
 
+@Suppress("LongParameterList") // ChatStream's state, passed on whole.
 @Composable
 private fun StreamList(
   listState: LazyListState,
@@ -188,6 +201,7 @@ private fun StreamList(
   banner: AgentProcessState?,
   follow: State<Boolean>,
   markdownCache: MarkdownCache,
+  backgroundTasks: Int,
   onRestart: () -> Unit,
   onOpenOnboarding: () -> Unit,
   onOpenTool: (key: String) -> Unit,
@@ -203,6 +217,7 @@ private fun StreamList(
   }
   val firstItemIndex = if (banner != null) 1 else 0
   val itemCount = items.size + firstItemIndex
+  val lastFooterKey = remember(items) { items.lastOrNull { it is TimelineItem.TurnFooter }?.key }
   LazyColumn(
     state = listState,
     modifier = Modifier
@@ -233,6 +248,7 @@ private fun StreamList(
       StreamItem(
         item = item,
         markdownCache = markdownCache,
+        backgroundTasks = if (item.key == lastFooterKey) backgroundTasks else 0,
         onOpenTool = onOpenTool,
         onRestart = onRestart,
         modifier = Modifier.contentWidth().padding(top = gapBefore(items.getOrNull(index - 1), item)),
@@ -321,10 +337,12 @@ private class BottomAnchor(
   }
 }
 
+/** [backgroundTasks] is what a [TimelineItem.TurnFooter] shows the chat still waits on. */
 @Composable
 private fun StreamItem(
   item: TimelineItem,
   markdownCache: MarkdownCache,
+  backgroundTasks: Int,
   onOpenTool: (key: String) -> Unit,
   onRestart: () -> Unit,
   modifier: Modifier,
@@ -338,7 +356,7 @@ private fun StreamItem(
     is TimelineItem.ToolCall -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
     is TimelineItem.Error -> ErrorRow(item.message, modifier)
     is TimelineItem.Notice -> NoticeRow(item.text, modifier)
-    is TimelineItem.TurnFooter -> TurnFooterRow(item, modifier)
+    is TimelineItem.TurnFooter -> TurnFooterRow(item, backgroundTasks, modifier)
     is TimelineItem.ExitBanner -> ExitBannerCard(item, onRestart, modifier)
   }
 }

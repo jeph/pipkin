@@ -220,6 +220,7 @@ private fun TranscriptBody(transcript: Transcript, onRetry: () -> Unit, onOpenTo
         onOpenProviders = {},
         onOpenOnboarding = {},
         onRestart = {},
+        backgroundTasks = 0,
       )
     }
   }

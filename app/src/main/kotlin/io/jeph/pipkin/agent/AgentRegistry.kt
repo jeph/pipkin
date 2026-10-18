@@ -88,14 +88,15 @@ internal class TooManyRunning(open: Int, limit: Int, shownIdle: Boolean = false)
  * process shown least recently, never one a pane shows: its Pi ends, but the chat and its history are kept, so opening
  * its session again shows the history while Pi restarts. A changed idle delay counts from the change. Lowering
  * [maxRunning] parks hidden idle processes down to it at once, and the rest as they let go of their Pi or more chats
- * open. At most [MAX_PARKED] chats stay parked; the least recently parked is closed for good. [onRunEnded] hears each
- * time an open process stops being busy. Main thread only.
+ * open. At most [MAX_PARKED] chats stay parked; the least recently parked is closed for good. [onWorkEnded] hears each
+ * time an open process lets go of its Pi: its run ended with no background task left, or its last task ended without
+ * waking it. Main thread only.
  */
 internal class AgentRegistry<P : ManagedProcess>(
   private val scope: CoroutineScope,
   private val maxRunning: StateFlow<Int> = MutableStateFlow(DEFAULT_MAX_RUNNING),
   private val idleParkMillis: Flow<Long?> = flowOf(IdleStop.Default.millis),
-  private val onRunEnded: (P) -> Unit = {},
+  private val onWorkEnded: (P) -> Unit = {},
   private val factory: (cwd: String, sessionPath: String?) -> P,
 ) {
   private class Entry(var lastShown: Long) {
@@ -298,17 +299,17 @@ internal class AgentRegistry<P : ManagedProcess>(
   }
 
   private suspend fun watch(process: P) = coroutineScope {
-    // One collector, so a run's end is reported before a lowered limit parks the chat, which stops watching it.
+    // One collector, so the end of a chat's work is reported before a lowered limit parks it, which stops watching it.
     launch {
-      var wasBusy = false
       var wasHolding = false
-      combine(process.busy, process.holdsPi, ::Pair).collect { (busy, holding) ->
+      combine(process.busy, process.holdsPi, ::Pair).collect { (_, holding) ->
         updateBusy()
         updateHolding()
-        if (wasBusy && !busy) onRunEnded(process)
-        // A limit lowered while chats held their Pi applies once they let go.
-        if (wasHolding && !holding) parkPastLimit()
-        wasBusy = busy
+        if (wasHolding && !holding) {
+          onWorkEnded(process)
+          // A limit lowered while chats held their Pi applies once they let go.
+          parkPastLimit()
+        }
         wasHolding = holding
       }
     }

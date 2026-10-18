@@ -157,11 +157,24 @@ class AgentRegistryTest {
     settle()
     assertFalse(registry.busy.value)
     assertTrue(registry.holding.value)
-    // Background tasks ending isn't a run ending.
     waiting.backgroundTasks.value = 0
     settle()
     assertFalse(registry.holding.value)
-    assertFalse(ended.contains(waiting))
+  }
+
+  @Test
+  fun aRunThatLeavesBackgroundTasksRunningIsReportedOnlyOnceTheyEnd() = registryTest { registry ->
+    val chat = registry.open(CWD, "/s/chat.jsonl")
+    chat.busy.value = true
+    chat.backgroundTasks.value = 1
+    settle()
+    chat.busy.value = false
+    settle()
+    assertEquals(emptyList<FakeProcess>(), ended)
+
+    chat.backgroundTasks.value = 0
+    settle()
+    assertEquals(listOf(chat), ended)
   }
 
   @Test

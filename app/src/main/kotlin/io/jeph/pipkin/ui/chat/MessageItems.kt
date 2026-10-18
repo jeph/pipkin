@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -245,9 +246,12 @@ internal fun NoticeRow(text: String, modifier: Modifier = Modifier) {
   )
 }
 
-/** Live `m:ss` while the run works, then how long it took. */
+/**
+ * Live `m:ss` while the run works, then how long it took. While the chat waits on [backgroundTasks], the simmering
+ * pot stays, saying how many.
+ */
 @Composable
-internal fun TurnFooterRow(item: TimelineItem.TurnFooter, modifier: Modifier = Modifier) {
+internal fun TurnFooterRow(item: TimelineItem.TurnFooter, backgroundTasks: Int, modifier: Modifier = Modifier) {
   Row(
     modifier = modifier.fillMaxWidth().heightIn(min = 28.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -256,10 +260,17 @@ internal fun TurnFooterRow(item: TimelineItem.TurnFooter, modifier: Modifier = M
     val duration = item.durationMillis
     if (duration != null) {
       Text(text = durationText(duration), color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
-      return@Row
+      if (backgroundTasks > 0) SimmeringPot(size = PipkinTokens.IconSize.sm)
+    } else {
+      SimmeringPot(size = PipkinTokens.IconSize.sm)
+      RunningElapsed(item.startedAt)
     }
-    SimmeringPot(size = PipkinTokens.IconSize.sm)
-    RunningElapsed(item.startedAt)
+    if (backgroundTasks == 0) return@Row
+    Text(
+      text = pluralStringResource(R.plurals.chat_background_tasks_running, backgroundTasks, backgroundTasks),
+      color = pipkinColors.foregroundMuted,
+      fontSize = PipkinTokens.FontSize.meta,
+    )
   }
 }
 

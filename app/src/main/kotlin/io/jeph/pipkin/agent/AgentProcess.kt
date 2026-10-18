@@ -206,15 +206,20 @@ internal class AgentProcess(
     timelineState.busy && processState == AgentProcessState.Ready
   }.stateIn(processScope, SharingStarted.Eagerly, false)
 
+  /** The `pipkin-background` extension's running tasks, plus finished ones whose result the agent hasn't started on. */
+  val backgroundTasks: StateFlow<Int> = backgroundTasksState.asStateFlow()
+
+  /** Whether the chat shows as working: a run is [busy], or the agent waits on [backgroundTasks]. */
+  val working: StateFlow<Boolean> = combine(busy, backgroundTasksState) { running, tasks -> running || tasks > 0 }
+    .stateIn(processScope, SharingStarted.Eagerly, false)
+
   /**
-   * Lets go [HOLD_GRACE_MILLIS] late: a task's start and end reach the app on Pipkin's channel, apart from Pi's events,
-   * so a run settling and a task starting, or a task ending and the run it wakes, can arrive a moment apart, and
-   * neither the keep-alive nor the registry may let go of Pi in between.
+   * [working], let go [HOLD_GRACE_MILLIS] late: a task's start and end reach the app on Pipkin's channel, apart from
+   * Pi's events, so a run settling and a task starting, or a task ending and the run it wakes, can arrive a moment
+   * apart, and neither the keep-alive nor the registry may let go of Pi in between.
    */
   override val holdsPi: StateFlow<Boolean> =
-    combine(busy, backgroundTasksState) { working, tasks -> working || tasks > 0 }
-      .releasedAfter(HOLD_GRACE_MILLIS)
-      .stateIn(processScope, SharingStarted.Eagerly, false)
+    working.releasedAfter(HOLD_GRACE_MILLIS).stateIn(processScope, SharingStarted.Eagerly, false)
 
   init {
     // One reader, conflated: a burst of turn ends costs one get_session_stats, and answers never land out of order.

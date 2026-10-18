@@ -98,7 +98,7 @@ internal fun Composer(
   controller: ChatController,
   model: JSONObject?,
   thinkingLevel: String?,
-  busy: Boolean,
+  working: Boolean,
   tight: Boolean,
   onSheet: (ChatSheet) -> Unit,
   modifier: Modifier = Modifier,
@@ -154,7 +154,7 @@ internal fun Composer(
           controller = controller,
           model = model,
           thinkingLevel = thinkingLevel,
-          busy = busy,
+          working = working,
           onSend = { if (controller.send()) hideKeyboard() },
           onOpenModelSheet = { onSheet(ChatSheet.Model()) },
           onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
@@ -173,7 +173,7 @@ private fun ComposerToolbar(
   controller: ChatController,
   model: JSONObject?,
   thinkingLevel: String?,
-  busy: Boolean,
+  working: Boolean,
   onSend: () -> Unit,
   onOpenModelSheet: () -> Unit,
   onOpenThinkingSheet: () -> Unit,
@@ -198,21 +198,23 @@ private fun ComposerToolbar(
     ContextMeter(contextUsage, controller.contextDetailsOpen) { controller.contextDetailsOpen = it }
     trailingControls()
     val processState by controller.process.state.collectAsStateWithLifecycle()
-    PrimaryButton(primaryAction(controller, busy, processState.starting), onSend = onSend, onStop = controller::abort)
+    val action = primaryAction(controller, working, processState.starting)
+    PrimaryButton(action, onSend = onSend, onStop = controller::abort)
   }
 }
 
 /**
- * Pi answers a prompt within moments by starting its run, so Stop shows from the press on. A photo-only steer
- * greys out Send rather than showing Stop, which a tap meant as sending would otherwise press. So does Pi [starting],
- * which could not take the prompt or most built-in commands yet.
+ * Pi answers a prompt within moments by starting its run, so Stop shows from the press on, and stays while the chat
+ * [works][io.jeph.pipkin.agent.AgentProcess.working], background tasks included. A photo-only steer greys out Send
+ * rather than showing Stop, which a tap meant as sending would otherwise press. So does Pi [starting], which could not
+ * take the prompt or most built-in commands yet.
  */
-private fun primaryAction(controller: ChatController, busy: Boolean, starting: Boolean): PrimaryAction = when {
+private fun primaryAction(controller: ChatController, working: Boolean, starting: Boolean): PrimaryAction = when {
   controller.sendingCommand -> PrimaryAction.Sending
   controller.sending -> PrimaryAction.Stop
   controller.canSend && !starting -> PrimaryAction.Send
   controller.photosOnlySteer -> PrimaryAction.Idle
-  busy -> PrimaryAction.Stop
+  working -> PrimaryAction.Stop
   else -> PrimaryAction.Idle
 }
 

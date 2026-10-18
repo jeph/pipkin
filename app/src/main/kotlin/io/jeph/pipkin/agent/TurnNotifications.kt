@@ -10,8 +10,9 @@ import android.os.Bundle
 import io.jeph.pipkin.R
 
 /**
- * Tells the user a chat's run ended while Pipkin was in the background, as a heads-up notification naming the chat,
- * its project and model, and the run's last reply. Tapping it opens that chat. Main thread only.
+ * Tells the user a chat's work ended while Pipkin was in the background, as a heads-up notification naming the chat,
+ * its project and model, and the last run's reply. Work ends once the run and the background tasks it waits on are
+ * over, so a run that leaves tasks running isn't announced. Tapping it opens that chat. Main thread only.
  */
 internal class TurnNotifications(application: Application, private val home: () -> String?) {
   private val context: Context = application
@@ -58,7 +59,7 @@ internal class TurnNotifications(application: Application, private val home: () 
   }
 
   /** Posts [process]'s result, replacing the chat's earlier one; nothing while Pipkin is on screen. */
-  fun runEnded(process: AgentProcess) {
+  fun workEnded(process: AgentProcess) {
     if (onScreen) return
     val processState = process.state.value
     val outcome = context.getString(

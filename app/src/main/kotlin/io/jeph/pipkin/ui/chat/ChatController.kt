@@ -220,10 +220,13 @@ internal class ChatController(
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Pipkin", text))
   }
 
-  /** Stops the run; pressed while a prompt is sending, it also stops the run that prompt starts. */
+  /**
+   * Stops the run; pressed while a prompt is sending, it also stops the run that prompt starts. With no run, it stops
+   * the background tasks the chat waits on.
+   */
   fun abort() {
     if (sending) stopRequested = true
-    launchRpc { process.abort() }
+    launchRpc { if (sending || process.busy.value) process.abort() else process.stopBackgroundTasks() }
   }
 
   fun rename(name: String) = launchRpc { process.setSessionName(name.trim()) }

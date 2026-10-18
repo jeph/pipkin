@@ -57,7 +57,7 @@ internal class AppGraph(private val application: Application) {
       scope,
       maxRunning = preferences.maxRunningChats,
       idleParkMillis = preferences.idleStop.map { it.millis },
-      onRunEnded = turnNotifications::runEnded,
+      onWorkEnded = turnNotifications::workEnded,
     ) { cwd, sessionPath ->
       AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository, preferences.disabledExtensions)
     }
