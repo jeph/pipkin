@@ -54,6 +54,15 @@
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* A theme picked in the nav's theme menu overrides the system's; Base.astro sets data-theme. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
 *,
 *::before,
 *::after {

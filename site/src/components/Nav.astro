@@ -1,5 +1,6 @@
 ---
 import Logo from "./Logo.astro";
+import ThemeSelect from "./ThemeSelect.astro";
 import { GITHUB_URL } from "../site";
 ---
 
@@ -22,6 +23,7 @@ import { GITHUB_URL } from "../site";
         </svg>
         <span>GitHub</span>
       </a>
+      <ThemeSelect />
     </div>
   </nav>
 </header>
@@ -118,6 +120,22 @@ import { GITHUB_URL } from "../site";
   @media (max-width: 560px) {
     .hide-small {
       display: none;
+    }
+  }
+
+  /* Room for the theme menu on narrow phones: the GitHub link keeps only its icon, and its name as a label. */
+  @media (max-width: 400px) {
+    .links .github {
+      padding: 8px;
+    }
+
+    .links .github span {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
   }
 </style>

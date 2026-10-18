@@ -50,6 +50,44 @@ const ogImage = new URL("/og.png", Astro.site);
 
     <script is:inline>
       document.documentElement.classList.add("js");
+
+      // Applies the theme picked in the nav before the page paints, so a saved choice never flashes the system's
+      // theme first. It shares Starlight's storage key, so one choice covers the landing page and the guide. Auto, the
+      // default, leaves data-theme unset, and the page's light-dark() colors follow the system theme.
+      window.pipkinTheme = (() => {
+        const key = "starlight-theme";
+        const browserBar = { dark: "#141716", light: "#fbf7f1" };
+        const root = document.documentElement;
+        const apply = (theme) => {
+          root.dataset.themeChoice = theme;
+          if (theme === "auto") delete root.dataset.theme;
+          else root.dataset.theme = theme;
+          for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
+            const systemTheme = meta.media.includes("dark") ? "dark" : "light";
+            meta.content = browserBar[theme === "auto" ? systemTheme : theme];
+          }
+        };
+        const stored = () => {
+          try {
+            const theme = localStorage.getItem(key);
+            return theme === "dark" || theme === "light" ? theme : "auto";
+          } catch {
+            return "auto";
+          }
+        };
+        apply(stored());
+        return {
+          stored,
+          choose(theme) {
+            apply(theme);
+            try {
+              localStorage.setItem(key, theme === "auto" ? "" : theme);
+            } catch {
+              // Storage is blocked; the choice lasts until the page is left.
+            }
+          },
+        };
+      })();
     </script>
   </head>
   <body>

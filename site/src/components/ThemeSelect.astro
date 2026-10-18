@@ -1,0 +1,84 @@
+---
+import Icon from "./Icon.astro";
+---
+
+<!-- An icon button over a native select, so phones get the system's own picker. Hidden without JavaScript. -->
+<label class="theme-select" title="Theme">
+  <span class="visually-hidden">Theme</span>
+  <span class="theme-icon auto"><Icon name="laptop" size={18} /></span>
+  <span class="theme-icon light"><Icon name="sun" size={18} /></span>
+  <span class="theme-icon dark"><Icon name="moon" size={18} /></span>
+  <select>
+    <option value="dark">Dark</option>
+    <option value="light">Light</option>
+    <option value="auto" selected>Auto</option>
+  </select>
+</label>
+
+<script>
+  import { connectThemeSelect } from "../scripts/theme-select";
+
+  for (const select of document.querySelectorAll<HTMLSelectElement>(".theme-select select")) {
+    connectThemeSelect(select);
+  }
+</script>
+
+<style>
+  .theme-select {
+    position: relative;
+    display: none;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    color: var(--fg);
+    transition: background-color 0.2s ease;
+  }
+
+  :global(.js) .theme-select {
+    display: grid;
+  }
+
+  .theme-select:hover {
+    background: var(--surface-2);
+  }
+
+  .theme-select:has(select:focus-visible) {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  /* The select covers the button invisibly, so a tap anywhere on it opens the menu. */
+  select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    font-size: 16px;
+  }
+
+  /* Shows the icon for the current choice, which Base.astro keeps in data-theme-choice. */
+  .theme-icon {
+    display: none;
+    grid-area: 1 / 1;
+  }
+
+  :global(:root:not([data-theme-choice])) .theme-icon.auto,
+  :global(:root[data-theme-choice="auto"]) .theme-icon.auto,
+  :global(:root[data-theme-choice="light"]) .theme-icon.light,
+  :global(:root[data-theme-choice="dark"]) .theme-icon.dark {
+    display: grid;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+</style>
