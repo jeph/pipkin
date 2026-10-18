@@ -14,6 +14,7 @@ import { git } from "./modes/git.js";
 import { login } from "./modes/login.js";
 import { logout } from "./modes/logout.js";
 import { modelDefaults } from "./modes/model-defaults.js";
+import { packageInstall } from "./modes/package-install.js";
 import { providerModels } from "./modes/provider-models.js";
 import { providerRemove } from "./modes/provider-remove.js";
 import { providerSave } from "./modes/provider-save.js";
@@ -139,6 +140,8 @@ async function main(): Promise<void> {
       return respond(ctx, providerRemove);
     case "subscription_save":
       return respond(ctx, subscriptionSave);
+    case "package_install":
+      return respond(ctx, packageInstall);
     case "default_model":
       return respond(ctx, defaultModel);
     case "backups":

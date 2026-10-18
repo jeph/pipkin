@@ -126,6 +126,7 @@ describe("modes backed by the Pi SDK", () => {
           },
         ],
         scope: null,
+        npmPackages: [],
       },
     });
   });
@@ -157,6 +158,7 @@ describe("modes backed by the Pi SDK", () => {
           },
         ],
         scope: null,
+        npmPackages: [],
         // Pi itself rejects this models.json; the error is passed through for the app to show.
         modelsError: expect.any(String),
       },

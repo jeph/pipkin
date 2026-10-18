@@ -3,13 +3,13 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import type { Socket } from "node:net";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
-import { installedPiVersion, loadPi, piPackageDir } from "../env.js";
+import { installedPiVersion, loadPi, piEntry } from "../env.js";
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { nullableStringParam, stringParam } from "../params.js";
 import { installedPipkinExtensionFiles, pipkinExtensionFingerprintsParam } from "../pipkin-extensions.js";
 import { SYSTEM_APPEND } from "../prompt.js";
-import { openSettingsIfValid } from "../settings.js";
+import { openSettingsIfValid, readGlobalSettings, userNpmPackages } from "../settings.js";
 import { termuxSessionEnv } from "../termux-session.js";
 import { isConfigLocked } from "../config-lock.js";
 
@@ -62,39 +62,6 @@ function forwardOutput(output: Readable, socket: Socket): void {
   });
   socket.on("drain", () => output.resume());
   socket.on("close", () => output.resume());
-}
-
-async function piEntry(root: string): Promise<string> {
-  const dir = piPackageDir(root);
-  const manifest = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as unknown;
-  const bin = isObject(manifest) ? manifest.bin : undefined;
-  const entry = typeof bin === "string" ? bin : isObject(bin) ? bin.pi : undefined;
-  if (typeof entry !== "string") throw new Error("Agent package.json has no bin.pi");
-  return join(dir, entry);
-}
-
-/** The user's global Pi settings as parsed JSON; null when the file is missing or malformed, which Pi reports itself. */
-async function readGlobalSettings(configDir: string): Promise<unknown> {
-  return readFile(join(configDir, "settings.json"), "utf8")
-    .then((text) => JSON.parse(text.replace(/^\uFEFF/, "")) as unknown)
-    .catch(() => null);
-}
-
-/**
- * npm package names the user's global Pi settings install. Pi parses `npm:<name>[@version]` sources with this same
- * pattern and identifies npm packages by name. Project settings are left out: Pi loads them only after a trust
- * decision that extensions, `trust.json` and prompts can make, which the host cannot predict.
- */
-function userNpmPackages(settings: unknown): Set<string> {
-  const names = new Set<string>();
-  if (!isObject(settings) || !Array.isArray(settings.packages)) return names;
-  for (const entry of settings.packages as unknown[]) {
-    const source = isObject(entry) ? entry.source : entry;
-    if (typeof source !== "string" || !source.startsWith("npm:")) continue;
-    const spec = source.slice("npm:".length).trim();
-    names.add(/^(@?[^@]+(?:\/[^@]+)?)(?:@.+)?$/.exec(spec)?.[1] ?? spec);
-  }
-  return names;
 }
 
 /**

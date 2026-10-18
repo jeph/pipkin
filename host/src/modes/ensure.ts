@@ -18,7 +18,8 @@ export function isNpmNetworkError(line: string): boolean {
   return NETWORK_ERROR.test(line);
 }
 
-function forwardLines(stream: Readable, send: (line: string) => void): void {
+/** Sends each line of [stream] to [send], cut to `MAX_PROGRESS_LINE`. */
+export function forwardLines(stream: Readable, send: (line: string) => void): void {
   let carry = "";
   stream.setEncoding("utf8");
   stream.on("data", (chunk: string) => {

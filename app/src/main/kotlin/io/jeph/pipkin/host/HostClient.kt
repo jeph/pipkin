@@ -166,6 +166,11 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     call("provider_remove", JSONObject().put("id", id))
   }
 
+  /** Runs `pi install [source]`, adding a Pi package that chats load when their Pi next starts. */
+  suspend fun installPackage(source: String, onProgress: (String) -> Unit) {
+    call("package_install", JSONObject().put("source", source), PACKAGE_INSTALL_TIMEOUT_MILLIS, progress(onProgress))
+  }
+
   /** Makes new Pi sessions start with this model while it stays available and in scope. */
   suspend fun setDefaultModel(provider: String, modelId: String) {
     call("default_model", JSONObject().put("provider", provider).put("modelId", modelId))
@@ -368,6 +373,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     const val DEFAULT_TIMEOUT_MILLIS = 60_000L
     const val ENSURE_TIMEOUT_MILLIS = 15 * 60_000L
     const val BACKUP_TIMEOUT_MILLIS = 15 * 60_000L
+    const val PACKAGE_INSTALL_TIMEOUT_MILLIS = 15 * 60_000L
     const val LOGIN_TIMEOUT_MILLIS = 10 * 60_000L
     const val REQUEST_HOST_START_TIMEOUT_MILLIS = 15_000L
   }

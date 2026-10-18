@@ -4,6 +4,7 @@ import { access, readFile, realpath } from "node:fs/promises";
 import os from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { isObject } from "./framing.js";
 
 export const PI_PACKAGE = "@earendil-works/pi-coding-agent";
 
@@ -35,6 +36,16 @@ export class HostError extends Error {
 
 export function piPackageDir(root: string): string {
   return join(root, "pi", "node_modules", PI_PACKAGE);
+}
+
+/** The pinned Pi's CLI script, from its manifest's `bin.pi`. */
+export async function piEntry(root: string): Promise<string> {
+  const dir = piPackageDir(root);
+  const manifest = JSON.parse(await readFile(join(dir, "package.json"), "utf8")) as unknown;
+  const bin = isObject(manifest) ? manifest.bin : undefined;
+  const entry = typeof bin === "string" ? bin : isObject(bin) ? bin.pi : undefined;
+  if (typeof entry !== "string") throw new Error("Agent package.json has no bin.pi");
+  return join(dir, entry);
 }
 
 /** The installed Pi version, or null when Pipkin has not installed Pi yet. */

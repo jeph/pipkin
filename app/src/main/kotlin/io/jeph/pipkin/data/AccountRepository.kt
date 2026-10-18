@@ -86,6 +86,12 @@ internal class AccountRepository(
     changed()
   }
 
+  /** Installs a Pi package with `pi install`; idle chats restart to load it. Cancelling the caller aborts it. */
+  suspend fun installPackage(source: String, onProgress: (String) -> Unit) {
+    keepAlive.acquire("Pi install").use { hostClient.installPackage(source, onProgress) }
+    changed()
+  }
+
   private suspend fun changed() {
     refresh()
     // The registry is main-thread confined.

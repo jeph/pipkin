@@ -53,7 +53,7 @@ import kotlinx.coroutines.launch
 /**
  * Sign-in to a provider Pi ships: OAuth for a subscription, or Pi asking for the API key. The login
  * runs while the sheet is shown; dismissing it cancels the login, which closes the host channel and
- * aborts Pi's flow.
+ * aborts Pi's flow. A Claude sign-in then offers pi-anthropic-auth unless Pi already installs it.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +64,14 @@ internal fun LoginSheet(providerId: String, onDismiss: () -> Unit) {
   val currentOnDismiss by rememberUpdatedState(onDismiss)
   var attempt by remember { mutableIntStateOf(0) }
   val flow = remember(attempt) { LoginFlowState() }
+  var offerClaudePlugin by remember(attempt) { mutableStateOf(false) }
+  val scope = rememberCoroutineScope()
+  val close: () -> Unit = {
+    scope.launch {
+      sheetState.hide()
+      currentOnDismiss()
+    }
+  }
   val noBrowser = stringResource(R.string.login_no_browser)
   val provider = subscriptions.firstOrNull { it.id == providerId }
   val open: (String) -> Unit = { url ->
@@ -71,11 +79,16 @@ internal fun LoginSheet(providerId: String, onDismiss: () -> Unit) {
   }
   LaunchedEffect(flow) {
     flow.run(accounts, providerId)
-    if (flow.outcome == LoginOutcome.SignedIn) {
-      delay(1_000)
-      sheetState.hide()
-      currentOnDismiss()
+    if (flow.outcome != LoginOutcome.SignedIn) return@LaunchedEffect
+    // Signing in refreshed the status, so it shows whether Pi already installs the plugin.
+    val installed = accounts.status.value?.npmPackages.orEmpty()
+    if (providerId == CLAUDE_PROVIDER && CLAUDE_PLUGIN_PACKAGE !in installed) {
+      offerClaudePlugin = true
+      return@LaunchedEffect
     }
+    delay(1_000)
+    sheetState.hide()
+    currentOnDismiss()
   }
   val browserUrl = flow.browser?.url
   // Pi waits for the browser round trip, so open the page as soon as it is known.
@@ -98,6 +111,7 @@ internal fun LoginSheet(providerId: String, onDismiss: () -> Unit) {
         onOpen = open,
         onRetry = { attempt += 1 },
       )
+      if (offerClaudePlugin) ClaudePluginOffer(onOpen = open, onDone = close)
     }
   }
 }
@@ -236,7 +250,7 @@ private fun TextPrompt(prompt: PendingPrompt, onAnswer: (String) -> Unit) {
 
 /** A 14sp line with a 16dp leading icon or spinner. */
 @Composable
-private fun LeadingRow(text: String, color: Color = pipkinColors.foreground, leading: @Composable () -> Unit) {
+internal fun LeadingRow(text: String, color: Color = pipkinColors.foreground, leading: @Composable () -> Unit) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),

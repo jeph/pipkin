@@ -5,7 +5,7 @@ import { type ModelDef, objectsById, parseModelDef } from "../model-def.js";
 import { readModelsJson } from "../models-json.js";
 import { BUILTIN_PROVIDERS, createRuntime } from "../runtime.js";
 import { type ScopeRef, scopeResolver, scopeUniverse } from "../scope.js";
-import { openSettings } from "../settings.js";
+import { openSettings, readGlobalSettings, userNpmPackages } from "../settings.js";
 
 export async function authStatus(ctx: ModeContext): Promise<JsonObject> {
   const pi = await loadPi(ctx.env.root);
@@ -69,6 +69,7 @@ export async function authStatus(ctx: ModeContext): Promise<JsonObject> {
     builtin,
     custom,
     scope: scope?.map((ref) => `${ref.provider}/${ref.id}`) ?? null,
+    npmPackages: [...userNpmPackages(await readGlobalSettings(ctx.env.configDir))],
     ...(modelsError === undefined ? {} : { modelsError }),
     ...(settingsError === undefined ? {} : { settingsError }),
   };

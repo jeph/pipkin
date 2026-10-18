@@ -115,6 +115,14 @@
     <string name="login_key_saved">Key saved</string>
     <string name="login_failed">Sign-in failed.</string>
     <string name="login_try_again">Try again</string>
+    <string name="claude_plugin_warning">Your Pro or Max plan won\'t cover Pipkin without a plugin. Anthropic bills other apps as extra usage, at API rates.</string>
+    <string name="claude_plugin_explanation">The pi-anthropic-auth plugin makes Pipkin\'s requests look like Claude Code\'s, so your plan covers them. That breaks Anthropic\'s terms and could get your account suspended, but many coding tools already do it, so it\'s likely safe.</string>
+    <string name="claude_plugin_link">github.com/gotgenes/pi-anthropic-auth</string>
+    <string name="claude_plugin_skip">Skip</string>
+    <string name="claude_plugin_install">Install plugin</string>
+    <string name="claude_plugin_installing">Installing plugin…</string>
+    <string name="claude_plugin_installed">Plugin installed</string>
+    <string name="claude_plugin_failed">Couldn\'t install the plugin.</string>
 
     <string name="provider_title_new">Add OpenAI-compatible API</string>
     <string name="provider_id">Provider ID</string>

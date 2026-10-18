@@ -112,6 +112,8 @@ internal data class AuthStatus(
   val settingsError: String? = null,
   /** `provider/id` of every model `enabledModels` shows; null when every model shows. */
   val scope: Set<String>? = null,
+  /** Names of the npm packages Pi's global settings install, such as `pi install npm:…` adds. */
+  val npmPackages: Set<String> = emptySet(),
 ) {
   val anyConfigured: Boolean get() = custom.isNotEmpty() || builtin.any { it.configured }
 
@@ -140,6 +142,7 @@ internal data class AuthStatus(
       modelsError = json.opt("modelsError") as? String,
       settingsError = json.opt("settingsError") as? String,
       scope = json.optJSONArray("scope")?.strings()?.toSet(),
+      npmPackages = json.optJSONArray("npmPackages").strings().toSet(),
     )
   }
 }
