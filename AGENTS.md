@@ -26,6 +26,14 @@ The user's phone is sometimes reachable over `adb`, but it's their own phone, no
 
 Leave code you change better than you found it, and limit the cleanup to that code: don't refactor whole files or unrelated parts of the codebase. Where a change touches a function or block, flatten its nesting where you can, using early returns and guards and reordering conditions so the common path reads straight down, and simplify what's there. Some nesting is unavoidable; keep it when flattening would make the code harder to follow. Rename variables, properties, and functions in that code whose names no longer match what they hold or do, or could say it more precisely.
 
+## Text the user sees
+
+Pipkin is set up for translation, so every text the app itself shows comes from a string resource in `app/src/main/res/values/strings_*.xml`: labels, errors, notices, notifications, and snackbars alike. Text from Pi or the model is shown as Pi sends it. In Compose, use `stringResource` or `pluralStringResource`; code without a `Context` uses `AppStrings`. An exception whose message reaches the UI, like `HostFailure` or `RpcError`, resolves its message when it's read, so it's never stored in English. Give a string with placeholders a comment saying what each one holds. Format numbers, times, and dates with the locale (`NumberFormat`, `DateFormat`, `DateUtils`), not fixed patterns or English suffixes.
+
+The Termux host writes its messages in English, and each one the app may show also carries an `i18n` object, `{ key, args }`, beside the English: `i18n` on a failure, `<field>I18n` beside a text field such as `error` or `line`. `app/src/main/kotlin/io/jeph/pipkin/host/HostText.kt` maps each key to a resource in `strings_host.xml` and falls back to the English for a key it doesn't know. When the host gets a new message, add its key, the mapping, and the resource together.
+
+Debug builds include pseudo-locales. Set Pipkin's language to English (XA) to find text that skips resources, which stays plain English while everything else turns accented, or to Arabic (XB) to check right-to-left layouts, for example with `adb -s emulator-<port> shell cmd locale set-app-locales io.jeph.pipkin --locales en-XA`.
+
 ## Commits
 
 Write commit messages in the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format: `<type>(<optional scope>): <description>`, for example `feat(composer): add a context window meter next to the send button`. Use `feat` for new behavior, `fix` for bug fixes, `docs` for documentation-only changes, and `refactor`, `perf`, `test`, `build`, `ci`, or `chore` where they fit. Mark breaking changes with `!` after the type or scope and a `BREAKING CHANGE:` footer.
