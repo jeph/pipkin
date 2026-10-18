@@ -21,7 +21,6 @@ cloud server doing the work somewhere else.
 - [Usage](#usage)
 - [Troubleshooting](#troubleshooting)
 - [Development](#development)
-- [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -193,14 +192,6 @@ cd site
 pnpm install --frozen-lockfile
 pnpm run dev
 ```
-
-## Roadmap
-
-Pipkin is in early development (version 0.1.0), and its behavior and settings may change between
-versions. Planned work includes:
-
-- **Prebuilt releases.** Publish signed APKs so Pipkin can be installed without building it.
-- **Local models.** Run models on the phone itself, so chats can work without a network connection.
 
 ## Contributing
 
