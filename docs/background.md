@@ -46,10 +46,56 @@ Also turn on **Notifications** in **Settings → Permissions**. Without them, Pi
 None of this makes Pipkin or Termux impossible to stop. Android can still end them in these cases:
 
 - **The phone runs low on memory.** When memory gets tight, Android stops apps to free it, and it can stop Termux, with every chat and terminal in it, even while Pipkin's notification is showing. Background exemptions and the foreground service make this less likely, but nothing an app can do rules it out. Closing other heavy apps and running fewer chats at once help.
-- **Too many processes are running.** On Android 12 and later, Android stops apps' child processes once there are more than 32 of them across all apps. Every chat runs a few processes in Termux, more while it works, and so does each terminal. **Settings → Advanced → Running chats** caps how many chats keep their agent running at once (6 by default). On Android 14 and later, you can turn this limit off in Developer options with **Disable child process restrictions**. On Android 12 and 13, it takes `adb`; [this guide](https://github.com/agnostic-apollo/Android-Docs/blob/master/en/docs/apps/processes/phantom-cached-and-empty-processes.md) explains how.
+- **Too many processes are running.** On Android 12 and later, Android stops child processes once more than 32 are running across all apps. See [The 32-process limit](#the-32-process-limit) below.
 - **You exit Termux.** Tapping **Exit** in Termux's notification stops everything running in Termux, including the agent. Leave Termux running while chats are working.
 
 Commands you start yourself in the Termux app, outside Pipkin, don't count as Pipkin's work, so Pipkin's wake lock doesn't cover them. To keep one running with the screen off, run `termux-wake-lock` in Termux, or tap **Acquire wakelock** in Termux's notification, and release it with `termux-wake-unlock` when you're done.
+
+### The 32-process limit
+
+Android 12 added a limit on child processes: programs an app starts itself, rather than the app's own process. Everything the agent runs is one, because Termux starts it. Once more than 32 are running across all apps combined, Android stops the extra ones, oldest first, even with plenty of memory free. Android also stops child processes that use a lot of CPU while their app is in the background.
+
+In Pipkin, these count toward the limit:
+
+- **Each running chat**: a few processes for the agent, plus every command and tool it runs while it works.
+- **Each open terminal**: its shell, plus whatever runs in it.
+- **Anything else running in Termux**, such as commands you start in the Termux app, servers left running in the background, and other apps' child processes.
+
+When a chat's agent is stopped this way, the chat shows **Agent stopped** (see [When a chat stops](#when-a-chat-stops)).
+
+#### Stay under the limit
+
+These work on any Android version and change nothing outside Pipkin:
+
+- Lower **Settings → Advanced → Running chats**, which caps how many chats keep their agent running at once (6 by default, up to 16).
+- Shorten **Settings → Advanced → Stop idle chats after**, so chats you've left stop their agent sooner. Their history stays.
+- Close terminals you aren't using, and stop servers or watchers you started once you're done with them.
+
+#### Turn the limit off
+
+How to turn it off depends on the Android version. Each change below affects every app on the phone, not just Pipkin and Termux.
+
+- **Android 14 and later**: in **Settings → System → Developer options**, turn on **Disable child process restrictions**. This also stops Android killing child processes for heavy CPU use. To show Developer options, tap **Build number** seven times; it's usually in **Settings → About phone**. If you turn Developer options off again, the restriction comes back.
+- **Android 12L and 13**: there's no switch, but one `adb` command turns off both the limit and the CPU check, and the change persists across restarts:
+
+  ```sh
+  adb shell settings put global settings_enable_monitor_phantom_procs false
+  ```
+
+  To undo it, run `adb shell settings delete global settings_enable_monitor_phantom_procs`. This command also works on Android 14 and later, and keeps working if you later turn Developer options off.
+- **Android 12**: only the 32-process cap can be raised, through `device_config`. On phones with Google Play services this also means turning off syncing of Android's device configuration, which can stop Android recovering from bad settings. [This guide](https://github.com/agnostic-apollo/Android-Docs/blob/master/en/docs/apps/processes/phantom-cached-and-empty-processes.md#commands-for-android-12) explains the commands and the risks.
+
+#### Run adb on the phone itself
+
+You don't need a computer for the `adb` commands. On Android 11 and later, Termux can connect to the phone's own wireless debugging:
+
+1. Connect to Wi-Fi. In **Developer options**, turn on **Wireless debugging**.
+2. In Termux, run `pkg install android-tools`.
+3. In **Wireless debugging**, tap **Pair device with pairing code**. Use split screen or a floating window so the code stays visible. In Termux, run `adb pair localhost:<port>` with the port shown with the code, then enter the code.
+4. Run `adb connect localhost:<port>` with the port on the main **Wireless debugging** screen, which differs from the pairing port.
+5. Run the command for your Android version as shown above.
+
+You can turn wireless debugging off again afterwards; the setting stays.
 
 ## When a chat stops
 
