@@ -467,7 +467,7 @@ internal class AgentProcess(
     val channel = try {
       hostClient.openRpc(cwd, sessionFileState.value, disabled)
     } catch (failure: HostFailure) {
-      stateFlow.value = AgentProcessState.Failed(failure.message.orEmpty(), failure)
+      stateFlow.value = AgentProcessState.Failed(failure.message, failure)
       return null
     }
     val current = Connection(channel)

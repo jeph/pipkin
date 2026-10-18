@@ -52,7 +52,9 @@ internal class PiExtensionUpdate(
     scope.launch {
       var updateRan = true
       val outcome = try {
-        keepAlive.acquire("updating extensions").use { hostClient.updateExtensions { progressState.value = it } }
+        keepAlive.acquire("updating extensions").use {
+          hostClient.updateExtensions { progress -> progressState.value = progress }
+        }
         PiExtensionUpdateOutcome.Updated
       } catch (failure: IOException) {
         PiExtensionUpdateOutcome.Failed(failure.message)

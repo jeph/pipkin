@@ -24,13 +24,14 @@ internal data class HostText(val english: String, val key: String? = null, val a
     val values = template.argNames.map { name ->
       val value = args[name] ?: return english
       if (value is HostText) value.resolve() else value
-    }.toTypedArray()
+    }
+    // Android's string APIs take only varargs; spreading an array built in place skips the copy a spread makes.
     return when (template) {
-      is Template.Text -> AppStrings.get(template.id, *values)
+      is Template.Text -> AppStrings.get(template.id, *Array(values.size, values::get))
 
       is Template.Plural -> {
         val count = (values[0] as? Number)?.toInt() ?: return english
-        AppStrings.plural(template.id, count, *values)
+        AppStrings.plural(template.id, count, *Array(values.size, values::get))
       }
     }
   }
@@ -42,13 +43,13 @@ internal data class HostText(val english: String, val key: String? = null, val a
     val values = template.argNames.map { name ->
       val value = args[name] ?: return english
       if (value is HostText) value.localized() else value
-    }.toTypedArray()
+    }
     return when (template) {
-      is Template.Text -> stringResource(template.id, *values)
+      is Template.Text -> stringResource(template.id, *Array(values.size, values::get))
 
       is Template.Plural -> {
         val count = (values[0] as? Number)?.toInt() ?: return english
-        pluralStringResource(template.id, count, *values)
+        pluralStringResource(template.id, count, *Array(values.size, values::get))
       }
     }
   }

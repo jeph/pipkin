@@ -12,14 +12,12 @@ import java.io.IOException
  */
 internal sealed class HostFailure(
   val kind: Kind,
-  @StringRes private val messageRes: Int,
+  @StringRes protected val messageRes: Int,
   val command: String? = null,
   cause: Throwable? = null,
 ) : IOException(null, cause) {
-  override val message: String get() = AppStrings.get(messageRes, *messageArgs())
-
-  /** The values of [messageRes]'s placeholders. */
-  protected open fun messageArgs(): Array<Any> = emptyArray()
+  /** A failure whose [messageRes] has placeholders overrides this to fill them. */
+  override val message: String get() = AppStrings.get(messageRes)
 
   enum class Kind {
     MissingTermux,
@@ -71,13 +69,13 @@ internal sealed class HostFailure(
   class NodeMissing : HostFailure(Kind.NodeMissing, R.string.host_failure_node_missing)
 
   class NodeTooOld : HostFailure(Kind.NodeTooOld, R.string.host_failure_node_too_old, UPGRADE_COMMAND) {
-    override fun messageArgs(): Array<Any> = arrayOf(UPGRADE_COMMAND)
+    override val message: String get() = AppStrings.get(messageRes, UPGRADE_COMMAND)
   }
 
   class Internal : HostFailure(Kind.Internal, R.string.host_failure_internal)
 
   class Crashed(val exitCode: Int) : HostFailure(Kind.Crashed, R.string.host_failure_crashed) {
-    override fun messageArgs(): Array<Any> = arrayOf(exitCode)
+    override val message: String get() = AppStrings.get(messageRes, exitCode)
   }
 
   class Timeout : HostFailure(Kind.Timeout, R.string.host_failure_timeout)

@@ -129,7 +129,7 @@ internal class TerminalSession(
     val channel = try {
       hostClient.openTerminal(cwd, rows, columns)
     } catch (failure: HostFailure) {
-      stateFlow.value = TerminalState.Failed(failure.message.orEmpty())
+      stateFlow.value = TerminalState.Failed(failure.message)
       return
     }
     stateFlow.value = TerminalState.Running
