@@ -1,3 +1,5 @@
+JetBrains Mono 2.304 (https://github.com/JetBrains/JetBrainsMono), SIL Open Font License 1.1. The app's code font.
+
 Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

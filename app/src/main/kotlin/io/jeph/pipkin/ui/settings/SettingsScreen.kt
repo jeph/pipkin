@@ -55,6 +55,7 @@ internal fun SettingsScreen(
   onOpenProviders: () -> Unit,
   onOpenBackups: () -> Unit,
   onOpenAdvanced: () -> Unit,
+  onOpenLicenses: () -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
   val snackbar = remember { SnackbarStackState() }
@@ -77,6 +78,7 @@ internal fun SettingsScreen(
         onOpenPermissions = onOpenPermissions,
         onOpenBackups = onOpenBackups,
         onOpenAdvanced = onOpenAdvanced,
+        onOpenLicenses = onOpenLicenses,
       )
     }
     SnackbarStack(
@@ -94,6 +96,7 @@ private fun SettingsContent(
   onOpenPermissions: () -> Unit,
   onOpenBackups: () -> Unit,
   onOpenAdvanced: () -> Unit,
+  onOpenLicenses: () -> Unit,
 ) {
   Column(
     modifier =
@@ -114,7 +117,7 @@ private fun SettingsContent(
       AppearanceSection(preferences = graph.preferences)
       TermuxSection(graph = graph, onOpenPermissions = onOpenPermissions)
       AdvancedSection(onOpenAdvanced = onOpenAdvanced)
-      AboutSection()
+      AboutSection(onOpenLicenses = onOpenLicenses)
     }
   }
 }
@@ -316,13 +319,22 @@ private fun AdvancedSection(onOpenAdvanced: () -> Unit) {
   }
 }
 
+/** The app's version, and a row into the open-source licences it ships. */
 @Composable
-private fun AboutSection() {
+private fun AboutSection(onOpenLicenses: () -> Unit) {
   val context = LocalContext.current
   val version = remember(context) {
     context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
   }
   SettingsSection(title = stringResource(R.string.settings_section_about)) {
     SettingsRow(title = stringResource(R.string.settings_version)) { SettingsValue(version) }
+    SettingsDivider()
+    SettingsRow(title = stringResource(R.string.settings_licenses), onClick = onOpenLicenses) {
+      LucideIcon(
+        icon = R.drawable.ic_lucide_chevron_right,
+        contentDescription = null,
+        tint = pipkinColors.foregroundMuted,
+      )
+    }
   }
 }

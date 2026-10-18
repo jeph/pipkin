@@ -71,7 +71,8 @@ val hostCheck = tasks.register<Exec>("hostCheck") {
 /**
  * Downloads each of [urls] into [sourcesDir]/<name>, checked against [sha256s]; GitHub's tag and commit
  * archives wrap their files in one directory, which is dropped. Each grammar's highlight query, its
- * [queries] files joined in order, and every source's licence go to [assetsDir] as APK assets.
+ * [queries] files joined in order, and every source's licence go to [assetsDir] as APK assets, with the
+ * [notices] of third-party code inside a source that its own licence doesn't cover.
  */
 abstract class SyntaxSources : DefaultTask() {
   @get:Input
@@ -82,6 +83,10 @@ abstract class SyntaxSources : DefaultTask() {
 
   @get:Input
   abstract val queries: MapProperty<String, List<String>>
+
+  /** A licence asset name to the file under [sourcesDir] holding it; a C header gives its leading comment. */
+  @get:Input
+  abstract val notices: MapProperty<String, String>
 
   @get:OutputDirectory
   abstract val sourcesDir: DirectoryProperty
@@ -122,6 +127,11 @@ abstract class SyntaxSources : DefaultTask() {
       licenseFiles.first { it.exists() }.copyTo(licenses.resolve("$name.txt"))
     }
     val sources = sourcesDir.get().asFile
+    for ((name, path) in notices.get()) {
+      val text = sources.resolve(path).readText()
+      val notice = if (path.endsWith(".h")) text.substringBefore("*/") + "*/\n" else text
+      licenses.resolve("$name.txt").writeText(notice)
+    }
     for ((grammar, paths) in queries.get()) {
       val query = paths.joinToString("\n") { sources.resolve(it).readText() }
       assetsDir.file("syntax/$grammar.scm").get().asFile.writeText(query)
@@ -326,6 +336,8 @@ val syntaxSources = tasks.register<SyntaxSources>("syntaxSources") {
       "yaml" to listOf("yaml/queries/highlights.scm"),
     ),
   )
+  // tree-sitter compiles ICU's UTF-8 and UTF-16 macros in, and the Perl scanner a BSD-licensed bsearch from libiberty.
+  notices.set(mapOf("tree-sitter-icu" to "tree-sitter/lib/src/unicode/LICENSE", "perl-bsearch" to "perl/src/bsearch.h"))
   sourcesDir.set(syntaxSourcesDir)
 }
 

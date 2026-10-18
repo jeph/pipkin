@@ -52,6 +52,8 @@ import io.jeph.pipkin.ui.settings.AddModelsScreen
 import io.jeph.pipkin.ui.settings.AddProviderScreen
 import io.jeph.pipkin.ui.settings.AdvancedScreen
 import io.jeph.pipkin.ui.settings.BackupsScreen
+import io.jeph.pipkin.ui.settings.LicenseScreen
+import io.jeph.pipkin.ui.settings.LicensesScreen
 import io.jeph.pipkin.ui.settings.ModelEditorScreen
 import io.jeph.pipkin.ui.settings.ProviderDrafts
 import io.jeph.pipkin.ui.settings.ProviderEditorScreen
@@ -175,19 +177,9 @@ private fun Screen(
 
     Destination.Archive, is Destination.ArchivedChat -> ArchivePage(top, navigator, actions, requestedChat)
 
-    Destination.Settings -> SettingsScreen(
-      onBack = { navigator.pop() },
-      onOpenPermissions = { navigator.push(Destination.Permissions) },
-      onOpenProviders = { navigator.push(Destination.Providers) },
-      onOpenBackups = { navigator.push(Destination.Backups) },
-      onOpenAdvanced = { navigator.push(Destination.Advanced) },
-    )
-
-    Destination.Permissions -> PermissionsScreen(onBack = { navigator.pop() })
-
-    Destination.Backups -> BackupsScreen(onBack = { navigator.pop() })
-
-    Destination.Advanced -> AdvancedScreen(onBack = { navigator.pop() })
+    Destination.Settings, Destination.Permissions, Destination.Backups, Destination.Advanced, Destination.Licenses,
+    is Destination.License,
+    -> SettingsPages(top, navigator)
 
     Destination.Providers -> ProvidersScreen(
       onBack = { navigator.pop() },
@@ -230,6 +222,34 @@ private fun Screen(
       onAddProvider = { navigator.push(Destination.ProviderEditor(null)) },
       // Before setup finishes the wizard is the root; opened from the main screen later, it can be closed.
       onClose = if (shown.size > 1) ({ navigator.pop() }) else null,
+    )
+  }
+}
+
+/** Settings, or one of the pages reached from it that needs nothing but the navigator. */
+@Composable
+private fun SettingsPages(top: Destination, navigator: AppNavigator) {
+  when (top) {
+    Destination.Permissions -> PermissionsScreen(onBack = { navigator.pop() })
+
+    Destination.Backups -> BackupsScreen(onBack = { navigator.pop() })
+
+    Destination.Advanced -> AdvancedScreen(onBack = { navigator.pop() })
+
+    Destination.Licenses -> LicensesScreen(
+      onBack = { navigator.pop() },
+      onOpenLicense = { navigator.push(Destination.License(it)) },
+    )
+
+    is Destination.License -> LicenseScreen(path = top.path, onBack = { navigator.pop() })
+
+    else -> SettingsScreen(
+      onBack = { navigator.pop() },
+      onOpenPermissions = { navigator.push(Destination.Permissions) },
+      onOpenProviders = { navigator.push(Destination.Providers) },
+      onOpenBackups = { navigator.push(Destination.Backups) },
+      onOpenAdvanced = { navigator.push(Destination.Advanced) },
+      onOpenLicenses = { navigator.push(Destination.Licenses) },
     )
   }
 }

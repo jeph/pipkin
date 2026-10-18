@@ -20,6 +20,12 @@ sealed interface Destination {
   /** Backups of Pi's configuration in Termux, reached from Settings. */
   data object Backups : Destination
 
+  /** The third-party licences the app ships, reached from Settings › About. */
+  data object Licenses : Destination
+
+  /** The licence asset at [path], one of [Licenses]. */
+  data class License(val path: String) : Destination
+
   /** The list of added providers. */
   data object Providers : Destination
 
@@ -90,6 +96,8 @@ class AppNavigator(initial: List<Destination>) {
       Destination.Permissions -> PERMISSIONS
       Destination.Advanced -> ADVANCED
       Destination.Backups -> BACKUPS
+      Destination.Licenses -> LICENSES
+      is Destination.License -> LICENSE + d.path
       Destination.Onboarding -> ONBOARDING
       Destination.Providers -> PROVIDERS
       Destination.AddProvider -> ADD_PROVIDER
@@ -107,6 +115,8 @@ class AppNavigator(initial: List<Destination>) {
       key == PERMISSIONS -> Destination.Permissions
       key == ADVANCED -> Destination.Advanced
       key == BACKUPS -> Destination.Backups
+      key == LICENSES -> Destination.Licenses
+      key.startsWith(LICENSE) -> Destination.License(key.removePrefix(LICENSE))
       key == ONBOARDING -> Destination.Onboarding
       key == PROVIDERS -> Destination.Providers
       key == ADD_PROVIDER -> Destination.AddProvider
@@ -124,6 +134,8 @@ class AppNavigator(initial: List<Destination>) {
     private const val PERMISSIONS = "permissions"
     private const val ADVANCED = "advanced"
     private const val BACKUPS = "backups"
+    private const val LICENSES = "licenses"
+    private const val LICENSE = "license:"
     private const val ONBOARDING = "onboarding"
     private const val PROVIDER = "provider:"
     private const val PROVIDERS = "providers"
