@@ -342,8 +342,9 @@ android {
     applicationId = "io.jeph.pipkin"
     minSdk = 29
     targetSdk = 37
-    versionCode = 1
-    versionName = "0.1.0"
+    // Release builds get both from .github/workflows/release.yml; local builds keep these placeholders.
+    versionCode = providers.gradleProperty("pipkin.versionCode").map(String::toInt).getOrElse(1)
+    versionName = providers.gradleProperty("pipkin.versionName").getOrElse("0.0.0-dev")
     // 64-bit phones and the emulator; every ABI adds the grammars' whole native library.
     ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     externalNativeBuild {
