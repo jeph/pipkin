@@ -19,6 +19,12 @@ code, runs commands, edits files, and checks its own work, all on your phone. It
 [Pi](https://pi.dev) agent harness and runs in [Termux](https://termux.dev), so there's no laptop or
 cloud server doing the work somewhere else.
 
+<p align="center">
+  <img src="site/src/assets/screens/photos.png" alt="A finished chat in which Pipkin found and moved duplicate photos" height="320">
+  <img src="site/src/assets/screens/git-changes.png" alt="The Changes view showing an uncommitted diff" height="320">
+  <img src="site/src/assets/screens/file-view.png" alt="A Python file open with syntax highlighting" height="320">
+</p>
+
 ## Contents
 
 - [Features](#features)
