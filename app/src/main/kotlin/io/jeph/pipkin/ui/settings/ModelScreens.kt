@@ -168,6 +168,8 @@ internal fun modelSubtitle(config: ModelConfig): String? {
 @Composable
 internal fun formatTokens(count: Long): String {
   val numbers = NumberFormat.getNumberInstance().apply {
+    // A compact count reads as one short figure: 1000K, not 1,000K.
+    isGroupingUsed = false
     maximumFractionDigits = 2
     roundingMode = RoundingMode.HALF_UP
   }

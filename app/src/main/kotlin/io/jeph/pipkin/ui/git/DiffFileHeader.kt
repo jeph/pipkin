@@ -87,7 +87,8 @@ internal fun DiffStat(additions: Int, deletions: Int) {
 @Composable
 private fun compactCount(value: Int): String {
   val (scaled, unit) = compactScale(value)
-  val number = NumberFormat.getNumberInstance().format(scaled)
+  // A compact count reads as one short figure: 2147.5m, not 2,147.5m.
+  val number = NumberFormat.getNumberInstance().apply { isGroupingUsed = false }.format(scaled)
   return when (unit) {
     CountUnit.One -> number
     CountUnit.Thousand -> stringResource(R.string.git_count_thousands, number)

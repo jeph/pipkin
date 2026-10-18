@@ -142,8 +142,9 @@
     <string name="provider_show_key">Show</string>
     <string name="provider_hide_key">Hide</string>
     <string name="provider_api_type">API type</string>
-    <string name="provider_api_completions">Chat Completions</string>
-    <string name="provider_api_responses">Responses</string>
+    <!-- The names of OpenAI's two APIs, kept in English like the API itself. -->
+    <string name="provider_api_completions" translatable="false">Chat Completions</string>
+    <string name="provider_api_responses" translatable="false">Responses</string>
     <string name="provider_connection">Connection</string>
     <string name="provider_check">Check</string>
     <string name="provider_status_unchecked">Not checked</string>
