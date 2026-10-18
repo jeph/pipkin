@@ -300,6 +300,15 @@ class ChatTimeline(
     }
   }
 
+  /** Adds a notice of Pipkin's own, saved with the extensions' notices so it stays through the reload that follows. */
+  fun addNotice(notice: AppNotice, level: NoticeLevel) {
+    synchronized(lock) {
+      append(SavedNotice(level, message = "", after = lastMessageAt, afterRun = runEnded, appNotice = notice))
+      saveNotices()
+      publish()
+    }
+  }
+
   /** Drops dialog [id] once it is answered, or once Pi stopped waiting on it; other dialogs stay queued. */
   fun dismissDialog(id: String) {
     synchronized(lock) {
@@ -581,16 +590,21 @@ class ChatTimeline(
       notices[lastIndex] = notices[lastIndex].copy(message = message)
       items[items.lastIndex] = last.copy(message = message)
     } else {
-      val notice = SavedNotice(level, message, after = lastMessageAt, afterRun = runEnded)
-      items += notice.item(notices.size)
-      notices += notice
+      append(SavedNotice(level, message, after = lastMessageAt, afterRun = runEnded))
     }
-    // The notices awaiting the next seed belong to the history it brings, so they are saved with it.
-    onNoticesChanged(notices.subList(0, firstUnseeded ?: notices.size).toList())
+    saveNotices()
   }
 
+  private fun append(notice: SavedNotice) {
+    items += notice.item(notices.size)
+    notices += notice
+  }
+
+  /** The notices awaiting the next seed belong to the history it brings, so they are saved with it. */
+  private fun saveNotices() = onNoticesChanged(notices.subList(0, firstUnseeded ?: notices.size).toList())
+
   /** The row of the session's notice at [index]; the same index gives the same key on every reload. */
-  private fun SavedNotice.item(index: Int) = ExtensionNotice("$NOTICE_KEY$index", level, message)
+  private fun SavedNotice.item(index: Int) = ExtensionNotice("$NOTICE_KEY$index", level, message, appNotice)
 
   /** Shows [kind] in the notice [key], creating a new notice when [key] is null. Returns the notice's key. */
   private fun showNotice(key: String?, kind: NoticeKind): String {

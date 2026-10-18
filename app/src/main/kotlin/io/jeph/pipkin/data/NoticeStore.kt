@@ -1,6 +1,7 @@
 package io.jeph.pipkin.data
 
 import android.util.Log
+import io.jeph.pipkin.agent.AppNotice
 import io.jeph.pipkin.agent.NoticeLevel
 import io.jeph.pipkin.agent.SavedNotice
 import java.io.File
@@ -78,7 +79,7 @@ internal class NoticeStore(private val dir: File, private val writer: Executor =
       Log.w(TAG, "Notices in $file are malformed", error)
       emptyList()
     } catch (error: IllegalArgumentException) {
-      Log.w(TAG, "Notices in $file have an unknown level", error)
+      Log.w(TAG, "Notices in $file have an unknown level or kind", error)
       emptyList()
     }
   }
@@ -95,7 +96,8 @@ private fun List<SavedNotice>.toJson(): JSONArray = JSONArray().also { array ->
         .put("level", notice.level.name)
         .put("message", notice.message)
         .put("after", notice.after ?: JSONObject.NULL)
-        .put("afterRun", notice.afterRun),
+        .put("afterRun", notice.afterRun)
+        .put("appNotice", notice.appNotice?.name ?: JSONObject.NULL),
     )
   }
 }
@@ -105,4 +107,5 @@ private fun savedNotice(json: JSONObject) = SavedNotice(
   message = json.getString("message"),
   after = if (json.isNull("after")) null else json.getLong("after"),
   afterRun = json.getBoolean("afterRun"),
+  appNotice = if (json.isNull("appNotice")) null else AppNotice.valueOf(json.getString("appNotice")),
 )

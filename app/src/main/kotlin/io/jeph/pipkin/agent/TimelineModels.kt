@@ -79,10 +79,16 @@ sealed interface TimelineItem {
   ) : TimelineItem
 
   /**
-   * A message an extension showed with `ctx.ui.notify`. Pi keeps no record of it, so Pipkin saves it as a
-   * [SavedNotice] and puts it back whenever the chat reloads its history.
+   * A message an extension showed with `ctx.ui.notify`, or a notice of Pipkin's own ([appNotice]) shown the same way.
+   * Pi keeps no record of either, so Pipkin saves it as a [SavedNotice] and puts it back whenever the chat reloads its
+   * history.
    */
-  data class ExtensionNotice(override val key: String, val level: NoticeLevel, val message: String) : TimelineItem
+  data class ExtensionNotice(
+    override val key: String,
+    val level: NoticeLevel,
+    val message: String,
+    val appNotice: AppNotice? = null,
+  ) : TimelineItem
 
   data class Notice(override val key: String, val kind: NoticeKind) : TimelineItem
 
@@ -97,6 +103,12 @@ enum class NoticeKind {
   Retrying,
   Compacting,
   Compacted,
+}
+
+/** A notice of Pipkin's own among a session's saved notices; it's shown in the app's language, whenever that changed. */
+enum class AppNotice {
+  /** The connection to Termux dropped without word of Pi exiting. */
+  ConnectionLost,
 }
 
 /** What failed in a [TimelineItem.Error]. The messages are Pi's own words, which Pipkin shows as they are. */
@@ -133,9 +145,16 @@ enum class NoticeLevel {
 /**
  * An extension notice as saved with its session, placed back after the message whose Pi `timestamp` is [after], or
  * first when it came before any message or that message is no longer in the history (a compaction drops the oldest).
- * One that came [afterRun], once the run that message ended had finished, follows that run's footer.
+ * One that came [afterRun], once the run that message ended had finished, follows that run's footer. A notice of
+ * Pipkin's own has its [appNotice] and no [message].
  */
-data class SavedNotice(val level: NoticeLevel, val message: String, val after: Long?, val afterRun: Boolean)
+data class SavedNotice(
+  val level: NoticeLevel,
+  val message: String,
+  val after: Long?,
+  val afterRun: Boolean,
+  val appNotice: AppNotice? = null,
+)
 
 enum class ToolStatus { Pending, Running, Done }
 

@@ -119,7 +119,7 @@ You can turn wireless debugging off again afterwards; the setting stays.
 
 If the agent stops while a chat is working, the reply in progress ends there. Its history up to that point is saved.
 
-- **The connection dropped.** Pipkin reconnects on its own and reloads the chat's history. If it drops again within a minute, Pipkin stops trying and shows **Agent stopped** instead.
+- **The connection dropped.** The chat shows **Lost the connection to Termux** where it happened. Pipkin reconnects on its own and reloads the chat's history. If it drops again within a minute, Pipkin stops trying and shows **Agent stopped** instead.
 - **The agent stopped.** The chat shows **Agent stopped** with a **Restart** button, which starts the agent again with the same chat. Then ask it to continue where it left off.
 
 If you were away when it happened, Pipkin sends a notification: **Agent finished**, **Agent failed**, or **Pi exited**, with the chat's name. Tap it to open the chat.

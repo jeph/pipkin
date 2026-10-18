@@ -528,15 +528,17 @@ internal class AgentProcess(
 
   /**
    * The connection ended unasked. Without the host's `pipkin_exit` the connection dropped rather than Pi exiting,
-   * so a connection that was working reconnects and reloads the history; Pi stopped with it, so no run survives.
-   * Otherwise, or on a second drop within [AUTO_RECONNECT_INTERVAL_MILLIS] (so a failing host cannot loop), the
-   * timeline shows an exit banner.
+   * which the chat notes: what ended it, Termux or the host alone, isn't known. A connection that was working
+   * reconnects and reloads the history; Pi stopped with it, so no run survives. Otherwise, or on a second drop within
+   * [AUTO_RECONNECT_INTERVAL_MILLIS] (so a failing host cannot loop), the timeline shows an exit banner.
    */
   private fun onConnectionEnded(current: Connection) {
     val exit = current.exit
+    val dropped = exit == null && stateFlow.value == AgentProcessState.Ready
+    if (dropped) timeline.addNotice(AppNotice.ConnectionLost, NoticeLevel.Warning)
     val now = SystemClock.elapsedRealtime()
     val recentlyReconnected = lastAutoReconnectAt?.let { now - it < AUTO_RECONNECT_INTERVAL_MILLIS } ?: false
-    if (exit == null && stateFlow.value == AgentProcessState.Ready && !recentlyReconnected) {
+    if (dropped && !recentlyReconnected) {
       Log.w(TAG, "Connection to Pi dropped without an exit record; reconnecting")
       lastAutoReconnectAt = now
       timeline.clearDialogs()

@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.NoticeLevel
 import io.jeph.pipkin.agent.TimelineItem
+import io.jeph.pipkin.agent.text
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.MarkdownCache
 import io.jeph.pipkin.ui.components.PipkinMarkdown
@@ -179,7 +180,7 @@ internal fun ExtensionNoticeCard(item: TimelineItem.ExtensionNotice, modifier: M
       FoldedContent(item.key, NOTICE_LINE_HEIGHT, fadeTo = background) {
         SelectionContainer {
           Text(
-            text = item.message,
+            text = item.appNotice?.let { stringResource(it.text) } ?: item.message,
             color = colors.foreground,
             fontSize = PipkinTokens.FontSize.base,
             lineHeight = NOTICE_LINE_HEIGHT,

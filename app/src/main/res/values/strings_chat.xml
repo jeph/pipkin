@@ -55,6 +55,8 @@
     <string name="chat_notice_retrying">Retrying…</string>
     <string name="chat_notice_compacting">Compacting context…</string>
     <string name="chat_notice_compacted">Context compacted</string>
+    <!-- The connection to the Termux side dropped without word of Pi exiting; what ended it isn't known. -->
+    <string name="chat_notice_connection_lost">Lost the connection to Termux</string>
     <!-- Error rows in the chat, shown when Pi gives no reason of its own. -->
     <string name="chat_error_request_failed">Request failed</string>
     <string name="chat_error_compaction_failed">Compaction failed</string>
