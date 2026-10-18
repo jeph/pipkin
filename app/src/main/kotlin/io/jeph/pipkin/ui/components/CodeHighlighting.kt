@@ -230,7 +230,10 @@ private val TOKENS = mapOf(
   "none" to Token.Plain,
 )
 
-/** Paseo's syntax palette (GitHub's Primer), by token. */
+/**
+ * Paseo's syntax palette (GitHub's Primer), by token; Paseo commit b26b923, Apache License 2.0
+ * (`assets/licenses/paseo.txt`).
+ */
 private val DarkPalette = mapOf(
   Token.Plain to Color.Unspecified,
   Token.Keyword to Color(0xFFFF7B72),

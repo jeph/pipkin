@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- material-icon-theme icon "javascript" (material-icon-theme 5.32.0, MIT licence), colours toned as Paseo's file-icon-svg.ts does. -->
+<!-- material-icon-theme icon "javascript" (material-icon-theme 5.32.0), MIT License, Copyright (c) 2025 Material Extensions; colours toned as Paseo's file-icon-svg.ts does (Paseo commit b26b923, Apache License 2.0). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="16dp"
     android:height="16dp"

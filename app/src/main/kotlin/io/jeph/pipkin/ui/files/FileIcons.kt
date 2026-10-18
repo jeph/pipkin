@@ -8,8 +8,11 @@ import io.jeph.pipkin.R
  *
  * The extension table is Paseo's `EXTENSION_TO_ICON` from
  * `packages/app/src/components/material-file-icons.ts`, and the drawables are its material-icon-theme
- * SVGs with the colour toning from `file-icon-svg.ts` baked in. They carry their own colours, so
- * render them with `Image(painterResource(...))` rather than a tinted `Icon`.
+ * SVGs with the colour toning from `file-icon-svg.ts` baked in, as of Paseo commit b26b923
+ * (https://github.com/getpaseo/paseo; Copyright (c) 2025-present Mohamed Boudra, Apache License 2.0, see
+ * `assets/licenses/paseo.txt`; the icons are material-icon-theme's, MIT, see
+ * `assets/licenses/material-icon-theme.txt`). They carry their own colours, so render them with
+ * `Image(painterResource(...))` rather than a tinted `Icon`.
  */
 private val extensionToIcon: Map<String, Int> = mapOf(
   "astro" to R.drawable.ic_file_astro,

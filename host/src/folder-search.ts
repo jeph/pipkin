@@ -1,5 +1,5 @@
 /*
- * Ported from Paseo's directory search: `searchDirectoryEntries` in
+ * Ported from Paseo's directory search (https://github.com/getpaseo/paseo, commit b26b923): `searchDirectoryEntries` in
  * packages/server/src/utils/directory-suggestions.ts and `scorePathMatch` in
  * packages/protocol/src/search/text-match.ts. Copyright (c) 2025-present Mohamed Boudra,
  * licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0).

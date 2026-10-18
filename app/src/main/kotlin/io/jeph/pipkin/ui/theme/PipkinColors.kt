@@ -3,7 +3,10 @@ package io.jeph.pipkin.ui.theme
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 
-/** Paseo's palette with the accent swapped for the launcher icon's terracotta. */
+/**
+ * Paseo's palette with the accent swapped for the launcher icon's terracotta (https://github.com/getpaseo/paseo,
+ * commit b26b923; Copyright (c) 2025-present Mohamed Boudra, Apache License 2.0, see `assets/licenses/paseo.txt`).
+ */
 @Immutable
 data class PipkinColors(
   val isDark: Boolean,
