@@ -4,7 +4,8 @@
   "git": {
     "deploymentEnabled": {
       "*": false,
-      "dev": true
+      "dev": true,
+      "main": true
     }
   },
   "headers": [
