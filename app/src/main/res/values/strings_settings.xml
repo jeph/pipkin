@@ -14,9 +14,18 @@
     <string name="settings_claude_subtitle">Pro / Max subscription</string>
     <string name="settings_openai">OpenAI</string>
     <string name="settings_openai_subtitle">Codex subscription</string>
+    <string name="settings_gemini">Gemini</string>
+    <string name="settings_gemini_subtitle">Gemini API key</string>
+    <string name="settings_zai">Z.ai</string>
+    <string name="settings_zai_subtitle">GLM Coding Plan API key</string>
+    <string name="settings_kimi">Kimi</string>
+    <string name="settings_kimi_subtitle">Kimi Code API key</string>
     <string name="settings_sign_in">Sign in</string>
     <string name="settings_signed_in">Signed in</string>
     <string name="settings_sign_out">Sign out</string>
+    <string name="settings_add_key">Add key</string>
+    <string name="settings_key_saved">Key saved</string>
+    <string name="settings_remove_key">Remove key</string>
 
     <string name="providers_title">Providers</string>
     <string name="providers_empty">No providers yet. Add one to start chatting.</string>
@@ -90,6 +99,9 @@
 
     <string name="login_title_claude">Sign in to Claude</string>
     <string name="login_title_openai">Sign in to OpenAI</string>
+    <string name="login_title_gemini">Add a Gemini API key</string>
+    <string name="login_title_zai">Add a Z.ai Coding Plan key</string>
+    <string name="login_title_kimi">Add a Kimi Code API key</string>
     <string name="login_starting">Starting sign-in…</string>
     <string name="login_browser">Finish signing in with your browser</string>
     <string name="login_open_again">Open again</string>
@@ -100,6 +112,7 @@
     <string name="login_continue">Continue</string>
     <string name="login_manual_code_helper">Paste the code or the full redirect URL if the browser didn\'t return automatically.</string>
     <string name="login_signed_in">Signed in</string>
+    <string name="login_key_saved">Key saved</string>
     <string name="login_failed">Sign-in failed.</string>
     <string name="login_try_again">Try again</string>
 
@@ -190,7 +203,7 @@
     <string name="model_summary_images">Images</string>
     <string name="model_summary_context">%1$s context</string>
 
-    <string name="subscription_models_empty">No models selected. Add models to use this subscription.</string>
+    <string name="subscription_models_empty">No models selected. Add models to use this provider.</string>
     <string name="provider_save">Save</string>
     <string name="provider_remove">Remove provider</string>
     <string name="provider_remove_title">Remove %1$s?</string>

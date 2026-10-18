@@ -31,14 +31,14 @@ function override(def: ModelDef, base: ModelDef, stored: JsonObject | undefined)
 }
 
 /**
- * Saves a subscription's per-model settings and which of its models show. Built-in models get
- * `providers.<id>.modelOverrides`, other ids `providers.<id>.models`; visibility is settings.json
+ * Saves the per-model settings of a provider Pi ships and which of its models show. Built-in models
+ * get `providers.<id>.modelOverrides`, other ids `providers.<id>.models`; visibility is settings.json
  * `enabledModels`, rebuilt so other providers keep exactly the models they had.
  */
 export async function subscriptionSave(ctx: ModeContext): Promise<JsonObject> {
   const providerId = stringParam(ctx.params, "providerId");
-  if (!(BUILTIN_PROVIDERS as readonly string[]).includes(providerId)) {
-    throw new HostError("bad_params", `${providerId} is not a subscription provider`);
+  if (!BUILTIN_PROVIDERS.includes(providerId)) {
+    throw new HostError("bad_params", `${providerId} is not a provider Pipkin connects`);
   }
   const enabled = stringArrayParam(ctx.params, "enabled");
   const models = modelDefsParam(ctx.params, "models");

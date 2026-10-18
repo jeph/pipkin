@@ -34,8 +34,9 @@ import java.io.IOException
 import kotlinx.coroutines.launch
 
 /**
- * One subscription: its sign-in state, which of its models show and their settings, and sign-out.
- * Model edits stay a draft until Save; [onBack] asks first when there are unsaved edits.
+ * One provider Pi ships: its sign-in state, which of its models show and their settings, and
+ * sign-out (or, for an API key, removing the key). Model edits stay a draft until Save; [onBack]
+ * asks first when there are unsaved edits.
  */
 @Composable
 internal fun SubscriptionScreen(
@@ -78,6 +79,7 @@ internal fun SubscriptionScreen(
       SubscriptionModels(
         form = form,
         busy = busy,
+        usesApiKey = subscription?.usesApiKey == true,
         onSave = { scope.launch { if (form.save(accounts, failed)) onBack() } },
         onSignOut = signOut,
         onAddModels = onAddModels,
@@ -100,7 +102,7 @@ internal fun SubscriptionScreen(
   }
 }
 
-/** The subscription's logo and name, with its sign-in state. */
+/** The provider's logo and name, with its sign-in state. */
 @Composable
 private fun SubscriptionHeader(id: String, loading: Boolean, signedIn: Boolean?, onSignIn: () -> Unit) {
   val subscription = subscriptions.firstOrNull { it.id == id }
@@ -110,16 +112,17 @@ private fun SubscriptionHeader(id: String, loading: Boolean, signedIn: Boolean?,
       subtitle = subscription?.let { stringResource(it.subtitle) },
       leading = { ProviderLogo(id) },
     ) {
-      SubscriptionStatus(loading, signedIn, onSignIn)
+      SubscriptionStatus(loading, signedIn, usesApiKey = subscription?.usesApiKey == true, onSignIn)
     }
   }
 }
 
-/** A signed-in subscription's models, Save, and sign-out. */
+/** A signed-in provider's models, Save, and sign-out. */
 @Composable
 private fun SubscriptionModels(
   form: SubscriptionForm,
   busy: Boolean,
+  usesApiKey: Boolean,
   onSave: () -> Unit,
   onSignOut: () -> Unit,
   onAddModels: () -> Unit,
@@ -141,7 +144,7 @@ private fun SubscriptionModels(
   }
   SettingsSection(title = null) {
     SettingsRow(
-      title = stringResource(R.string.settings_sign_out),
+      title = stringResource(if (usesApiKey) R.string.settings_remove_key else R.string.settings_sign_out),
       titleColor = pipkinColors.destructive,
       enabled = !busy,
       onClick = onSignOut,
@@ -159,18 +162,23 @@ private suspend fun signOut(accounts: AccountRepository, id: String, fallbackErr
   rejected.error
 }
 
-/** The loading pot while [loading], the signed-in badge, or a sign-in button; nothing when status is unknown. */
+/**
+ * The loading pot while [loading], the signed-in badge, or a sign-in button; nothing when status is
+ * unknown. An API-key provider shows its key as saved and offers to add one instead.
+ */
 @Composable
-private fun SubscriptionStatus(loading: Boolean, signedIn: Boolean?, onSignIn: () -> Unit) {
+private fun SubscriptionStatus(loading: Boolean, signedIn: Boolean?, usesApiKey: Boolean, onSignIn: () -> Unit) {
+  val signedInLabel = stringResource(if (usesApiKey) R.string.settings_key_saved else R.string.settings_signed_in)
+  val signInLabel = stringResource(if (usesApiKey) R.string.settings_add_key else R.string.settings_sign_in)
   when {
     loading -> SimmeringPot()
-    signedIn == true -> SignedInBadge()
-    signedIn == false -> SmallButton(label = stringResource(R.string.settings_sign_in), onClick = onSignIn)
+    signedIn == true -> SignedInBadge(signedInLabel)
+    signedIn == false -> SmallButton(label = signInLabel, onClick = onSignIn)
   }
 }
 
 @Composable
-private fun SignedInBadge() {
+private fun SignedInBadge(label: String) {
   val colors = pipkinColors
   Row(
     verticalAlignment = Alignment.CenterVertically,
@@ -178,7 +186,7 @@ private fun SignedInBadge() {
   ) {
     StatusDot(color = colors.dotSuccess)
     Text(
-      text = stringResource(R.string.settings_signed_in),
+      text = label,
       color = colors.foregroundMuted,
       fontSize = PipkinTokens.FontSize.base,
     )

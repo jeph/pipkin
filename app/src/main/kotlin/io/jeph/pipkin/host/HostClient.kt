@@ -117,7 +117,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     call("hello", JSONObject())
   }
 
-  /** OAuth sign-in for `anthropic` or `openai-codex`. Cancelling the caller aborts the login. */
+  /** Sign-in to a provider Pi ships: OAuth, or Pi prompting for an API key. Cancelling the caller aborts the login. */
   suspend fun login(providerId: String, ui: LoginUi) {
     call("login", JSONObject().put("providerId", providerId), LOGIN_TIMEOUT_MILLIS) { channel, line ->
       when (line.optString("type")) {

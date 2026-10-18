@@ -87,7 +87,7 @@ describe("modes backed by the Pi SDK", () => {
     expect(await runMode("session_messages", dirs, { path: gone })).toMatchObject({ ok: false, code: "not_found" });
   });
 
-  const BUILTIN = ["anthropic", "openai-codex"].map((id) => ({
+  const BUILTIN = ["anthropic", "openai-codex", "google", "zai", "kimi-coding"].map((id) => ({
     id,
     name: expect.any(String),
     configured: false,
@@ -97,7 +97,7 @@ describe("modes backed by the Pi SDK", () => {
     enabled: null,
   }));
 
-  it("reports subscription providers and custom providers with their model settings", async () => {
+  it("reports Pipkin's built-in providers and custom providers with their model settings", async () => {
     const provider = {
       baseUrl: "https://example.test/v1",
       api: "openai-responses",

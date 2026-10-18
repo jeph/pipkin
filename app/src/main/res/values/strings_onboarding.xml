@@ -91,10 +91,8 @@
     <string name="onboarding_install_action">Install</string>
 
     <string name="onboarding_signin_title">Connect a model</string>
-    <string name="onboarding_signin_body">Sign in with a subscription or add an API. You can add more in Settings later.</string>
+    <string name="onboarding_signin_body">Sign in with a subscription or add an API key. You can add more in Settings later.</string>
     <string name="onboarding_signin_needs_pi">Available once the agent is installed.</string>
-    <string name="onboarding_signin_claude">Claude</string>
-    <string name="onboarding_signin_openai">OpenAI</string>
     <string name="onboarding_signin_api">OpenAI-compatible API</string>
     <string name="onboarding_signed_in">Signed in</string>
 </resources>

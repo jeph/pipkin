@@ -3,7 +3,7 @@ import { HostError, loadPi } from "../env.js";
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { stringParam } from "../params.js";
-import { BUILTIN_PROVIDERS, createRuntime } from "../runtime.js";
+import { createRuntime, loginType } from "../runtime.js";
 import { keepProviderInScope, scopeResolver, scopeUniverse } from "../scope.js";
 import { openSettingsIfValid, saveEnabledModels } from "../settings.js";
 
@@ -79,19 +79,19 @@ function bridge(ctx: ModeContext): AuthInteraction {
 
 export async function login(ctx: ModeContext): Promise<JsonObject> {
   const providerId = stringParam(ctx.params, "providerId");
-  if (!(BUILTIN_PROVIDERS as readonly string[]).includes(providerId)) {
-    throw new HostError("bad_params", `Pipkin cannot sign in to ${providerId}`);
-  }
+  const type = loginType(providerId);
+  if (type === undefined) throw new HostError("bad_params", `Pipkin cannot sign in to ${providerId}`);
   const pi = await loadPi(ctx.env.root);
   const runtime = await createRuntime(ctx);
   // ChatGPT sign-in needs a stable device ID, kept in Pipkin's own Pi settings.
   const settings = pi.SettingsManager.create(ctx.env.home, ctx.env.configDir);
   try {
-    await runtime.login(providerId, "oauth", bridge(ctx), { getDeviceId: () => settings.getOrCreateDeviceId() });
+    // An API-key login is Pi prompting for the key, which the app answers like any other prompt.
+    await runtime.login(providerId, type, bridge(ctx), { getDeviceId: () => settings.getOrCreateDeviceId() });
   } finally {
     await settings.flush();
   }
-  // A scope written before sign-in may match none of this subscription's models; they must show now.
+  // A scope written before sign-in may match none of this provider's models; they must show now.
   const scope = openSettingsIfValid(ctx, pi);
   if (scope !== undefined && scope.enabledModels.length > 0) {
     const resolve = scopeResolver(pi, await scopeUniverse(runtime, ctx.signal));

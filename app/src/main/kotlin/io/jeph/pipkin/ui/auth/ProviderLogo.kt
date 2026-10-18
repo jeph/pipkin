@@ -8,29 +8,25 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** Claude's brand orange; the OpenAI mark is monochrome, so it follows the theme's foreground. */
+/** Claude's brand orange; the other marks are monochrome, so they follow the theme's foreground. */
 private val ClaudeOrange = Color(0xFFD97757)
 
-/** The brand mark beside a subscription's sign-in option; nothing for other providers. */
+/** The brand mark beside a provider Pi ships; nothing for other providers. */
 @Composable
 internal fun ProviderLogo(providerId: String, modifier: Modifier = Modifier) {
-  when (providerId) {
-    "anthropic" ->
-      LucideIcon(
-        icon = R.drawable.ic_brand_claude,
-        contentDescription = null,
-        modifier = modifier,
-        size = PipkinTokens.IconSize.lg,
-        tint = ClaudeOrange,
-      )
-
-    "openai-codex" ->
-      LucideIcon(
-        icon = R.drawable.ic_brand_openai,
-        contentDescription = null,
-        modifier = modifier,
-        size = PipkinTokens.IconSize.lg,
-        tint = pipkinColors.foreground,
-      )
+  val icon = when (providerId) {
+    "anthropic" -> R.drawable.ic_brand_claude
+    "openai-codex" -> R.drawable.ic_brand_openai
+    "google" -> R.drawable.ic_brand_gemini
+    "zai" -> R.drawable.ic_brand_zai
+    "kimi-coding" -> R.drawable.ic_brand_kimi
+    else -> return
   }
+  LucideIcon(
+    icon = icon,
+    contentDescription = null,
+    modifier = modifier,
+    size = PipkinTokens.IconSize.lg,
+    tint = if (providerId == "anthropic") ClaudeOrange else pipkinColors.foreground,
+  )
 }

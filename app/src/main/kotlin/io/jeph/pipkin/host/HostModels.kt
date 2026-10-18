@@ -78,10 +78,11 @@ internal data class SessionInfo(
 }
 
 /**
- * A provider Pi ships: `anthropic` or `openai-codex`. [type] is the configured credential type, if
- * any. [models] are every model Pi offers for it with `models.json` overrides applied; [extraIds]
- * are the ones `models.json` adds. [enabled] lists the ids settings.json `enabledModels` shows,
- * or is null when that list is empty and every model shows.
+ * A provider Pi ships that Pipkin connects (`BUILTIN_PROVIDERS` in the host). [type] is the
+ * configured credential type, `oauth` or `api_key`, if any. [models] are every model Pi offers for
+ * it with `models.json` overrides applied; [extraIds] are the ones `models.json` adds. [enabled]
+ * lists the ids settings.json `enabledModels` shows, or is null when that list is empty and every
+ * model shows.
  */
 internal data class BuiltinProvider(
   val id: String,

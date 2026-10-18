@@ -54,7 +54,7 @@ internal class AccountRepository(
     }
   }
 
-  /** OAuth sign-in for `anthropic` or `openai-codex`; cancelling the caller aborts it. */
+  /** Sign-in to a provider Pi ships, by OAuth or API key; cancelling the caller aborts it. */
   suspend fun login(providerId: String, ui: LoginUi) {
     keepAlive.acquire("sign-in").use { hostClient.login(providerId, ui) }
     changed()

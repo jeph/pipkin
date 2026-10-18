@@ -44,14 +44,16 @@ import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.settings.copyToClipboard
+import io.jeph.pipkin.ui.settings.subscriptions
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * OAuth sign-in for `anthropic` or `openai-codex`. The login runs while the sheet is shown;
- * dismissing it cancels the login, which closes the host channel and aborts Pi's flow.
+ * Sign-in to a provider Pi ships: OAuth for a subscription, or Pi asking for the API key. The login
+ * runs while the sheet is shown; dismissing it cancels the login, which closes the host channel and
+ * aborts Pi's flow.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +65,7 @@ internal fun LoginSheet(providerId: String, onDismiss: () -> Unit) {
   var attempt by remember { mutableIntStateOf(0) }
   val flow = remember(attempt) { LoginFlowState() }
   val noBrowser = stringResource(R.string.login_no_browser)
+  val provider = subscriptions.firstOrNull { it.id == providerId }
   val open: (String) -> Unit = { url ->
     if (!openUrl(context, url)) flow.status = AuthStatusLine(noBrowser, emptyList())
   }
@@ -85,20 +88,27 @@ internal fun LoginSheet(providerId: String, onDismiss: () -> Unit) {
       verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
     ) {
       Text(
-        text = stringResource(if (providerId == CLAUDE) R.string.login_title_claude else R.string.login_title_openai),
+        text = provider?.let { stringResource(it.loginTitle) } ?: providerId,
         color = pipkinColors.foreground,
         fontSize = PipkinTokens.FontSize.lg,
       )
-      LoginBody(flow = flow, onOpen = open, onRetry = { attempt += 1 })
+      LoginBody(
+        flow = flow,
+        usesApiKey = provider?.usesApiKey == true,
+        onOpen = open,
+        onRetry = { attempt += 1 },
+      )
     }
   }
 }
 
 @Composable
-private fun LoginBody(flow: LoginFlowState, onOpen: (String) -> Unit, onRetry: () -> Unit) {
+private fun LoginBody(flow: LoginFlowState, usesApiKey: Boolean, onOpen: (String) -> Unit, onRetry: () -> Unit) {
   val colors = pipkinColors
   when (val outcome = flow.outcome) {
-    LoginOutcome.SignedIn -> LeadingRow(text = stringResource(R.string.login_signed_in)) {
+    LoginOutcome.SignedIn -> LeadingRow(
+      text = stringResource(if (usesApiKey) R.string.login_key_saved else R.string.login_signed_in),
+    ) {
       LucideIcon(icon = R.drawable.ic_lucide_check, contentDescription = null, tint = colors.accent)
     }
 
@@ -242,5 +252,3 @@ private fun openUrl(context: Context, url: String): Boolean = try {
 } catch (_: ActivityNotFoundException) {
   false
 }
-
-private const val CLAUDE = "anthropic"

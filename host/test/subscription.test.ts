@@ -133,7 +133,7 @@ describe("subscription model settings and scope", () => {
       theme: "dark",
       defaultProvider: "my-lb",
       defaultModel: "lb-1",
-      enabledModels: ["my-lb/lb-1", "openai-codex/*", "my-lb/*", "anthropic/claude-opus-4-8"],
+      enabledModels: ["my-lb/lb-1", "google/*", "kimi-coding/*", "openai-codex/*", "zai/*", "my-lb/*", "anthropic/claude-opus-4-8"],
     });
   });
 
@@ -178,6 +178,9 @@ describe("subscription model settings and scope", () => {
         models: expect.arrayContaining([expect.objectContaining({ id: "claude-opus-4-8", name: "Claude Opus 4.8", contextWindow: 200_000 })]),
       }),
       expect.objectContaining({ id: "openai-codex", enabled: [], extraIds: [] }),
+      expect.objectContaining({ id: "google", enabled: [], extraIds: [] }),
+      expect.objectContaining({ id: "zai", enabled: [], extraIds: [] }),
+      expect.objectContaining({ id: "kimi-coding", enabled: [], extraIds: [] }),
     ]);
     expect(data.custom).toEqual([expect.objectContaining({ id: "my-lb" })]);
   });
@@ -186,7 +189,7 @@ describe("subscription model settings and scope", () => {
     await writeFile(settingsPath, "{");
     const data = await status();
     expect(data).toMatchObject({ scope: null, settingsError: expect.any(String) });
-    expect(data.builtin).toEqual([expect.objectContaining({ enabled: null }), expect.objectContaining({ enabled: null })]);
+    expect(data.builtin).toEqual(Array.from({ length: 5 }, () => expect.objectContaining({ enabled: null })));
   });
 
   it("rejects an invalid settings.json without writing either file", async () => {

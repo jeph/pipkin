@@ -12,13 +12,13 @@ const GLOB = /[*?[]/;
 
 /**
  * The models Pi matches `enabledModels` against at startup (those it can use now), plus every
- * subscription model so they can be scoped before sign-in.
+ * model of the providers Pipkin connects, so they can be scoped before sign-in.
  */
 export async function scopeUniverse(runtime: ModelRuntime, signal: AbortSignal): Promise<ScopeModel[]> {
   const available = new Set((await runtime.getAvailable(undefined, { signal })).map((model) => `${model.provider}/${model.id}`));
   return runtime
     .getModels()
-    .filter((model) => available.has(`${model.provider}/${model.id}`) || (BUILTIN_PROVIDERS as readonly string[]).includes(model.provider));
+    .filter((model) => available.has(`${model.provider}/${model.id}`) || BUILTIN_PROVIDERS.includes(model.provider));
 }
 
 /** `universe` with `provider`'s models replaced, e.g. by the list a save is about to write. */

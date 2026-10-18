@@ -46,7 +46,7 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import java.io.IOException
 import kotlinx.coroutines.launch
 
-/** The added providers: signed-in subscriptions, then custom OpenAI-compatible endpoints. */
+/** The added providers: signed-in providers Pi ships, then custom OpenAI-compatible endpoints. */
 @Composable
 internal fun ProvidersScreen(
   onBack: () -> Unit,
@@ -96,8 +96,8 @@ internal fun ProvidersScreen(
 }
 
 /**
- * The kinds of provider to add. A subscription signs in over a sheet and [onAdded] runs once Pi
- * holds its credential; the OpenAI-compatible option continues to the provider editor.
+ * The kinds of provider to add. A provider Pi ships signs in (or takes its API key) over a sheet and
+ * [onAdded] runs once Pi holds its credential; the OpenAI-compatible option continues to the provider editor.
  */
 @Composable
 internal fun AddProviderScreen(onBack: () -> Unit, onAddCompatible: () -> Unit, onAdded: () -> Unit) {

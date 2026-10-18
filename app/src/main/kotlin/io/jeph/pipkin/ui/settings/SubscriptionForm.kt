@@ -12,7 +12,7 @@ import io.jeph.pipkin.host.ModelConfig
 import java.io.IOException
 
 /**
- * Draft of a subscription's models: every model Pi offers for it, which of them show (Pi's
+ * Draft of the models of a provider Pi ships: every model Pi offers for it, which of them show (Pi's
  * `enabledModels`), and their settings (`modelOverrides`, or extra models Pi doesn't know).
  */
 @Stable
@@ -27,7 +27,7 @@ internal class SubscriptionForm(val providerId: String) : ModelDraft {
   var formError by mutableStateOf<String?>(null)
     private set
   private var baseline = snapshot()
-  override val api: String = SUBSCRIPTION_APIS[providerId].orEmpty()
+  override val api: String = subscriptions.firstOrNull { it.id == providerId }?.api.orEmpty()
 
   override val canAddModels: Boolean get() = prefilled
   override val available: List<ModelConfig> get() = forms.map(ModelForm::preview)
@@ -93,8 +93,4 @@ internal class SubscriptionForm(val providerId: String) : ModelDraft {
   }
 
   private fun snapshot(): List<Any?> = listOf(enabled.toSet(), extraIds.toList(), forms.map { it.snapshot() })
-
-  private companion object {
-    val SUBSCRIPTION_APIS = mapOf("anthropic" to "anthropic-messages", "openai-codex" to "openai-codex-responses")
-  }
 }

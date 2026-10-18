@@ -23,10 +23,12 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.host.AuthStatus
 import io.jeph.pipkin.ui.auth.ProviderLogo
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.settings.isSignedIn
+import io.jeph.pipkin.ui.settings.subscriptions
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** The ways to reach a model: the two subscriptions Pipkin signs in to, or an OpenAI-compatible API. */
+/** The ways to reach a model: the providers Pi ships that Pipkin connects, or an OpenAI-compatible API. */
 @Composable
 internal fun SignInChoices(authStatus: AuthStatus?, enabled: Boolean, onAction: (SetupAction) -> Unit) {
   val colors = pipkinColors
@@ -34,18 +36,14 @@ internal fun SignInChoices(authStatus: AuthStatus?, enabled: Boolean, onAction: 
   Column(
     modifier = Modifier.fillMaxWidth().background(colors.surface1, shape).padding(vertical = PipkinTokens.Spacing.s4),
   ) {
-    SignInRow(
-      label = stringResource(R.string.onboarding_signin_claude),
-      signedIn = authStatus.isSignedIn(ANTHROPIC),
-      enabled = enabled,
-      onClick = { onAction(SetupAction.Login(ANTHROPIC)) },
-    ) { ProviderLogo(ANTHROPIC) }
-    SignInRow(
-      label = stringResource(R.string.onboarding_signin_openai),
-      signedIn = authStatus.isSignedIn(OPENAI_CODEX),
-      enabled = enabled,
-      onClick = { onAction(SetupAction.Login(OPENAI_CODEX)) },
-    ) { ProviderLogo(OPENAI_CODEX) }
+    subscriptions.forEach { subscription ->
+      SignInRow(
+        label = stringResource(subscription.title),
+        signedIn = authStatus?.isSignedIn(subscription.id) == true,
+        enabled = enabled,
+        onClick = { onAction(SetupAction.Login(subscription.id)) },
+      ) { ProviderLogo(subscription.id) }
+    }
     SignInRow(
       label = stringResource(R.string.onboarding_signin_api),
       signedIn = authStatus?.custom?.isNotEmpty() == true,
@@ -95,9 +93,3 @@ private fun SignInRow(
     }
   }
 }
-
-private fun AuthStatus?.isSignedIn(providerId: String): Boolean =
-  this?.builtin?.any { it.id == providerId && it.configured } == true
-
-private const val ANTHROPIC = "anthropic"
-private const val OPENAI_CODEX = "openai-codex"
