@@ -6,8 +6,8 @@ async function resolveExisting(path: string): Promise<string> {
   try {
     return await realpath(path);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new HostError("not_found", `Session not found: ${path}`);
-    throw error;
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    throw new HostError("not_found", `Session not found: ${path}`, { key: "session_not_found", args: { path } });
   }
 }
 

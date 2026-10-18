@@ -45,9 +45,11 @@ export async function waitForPiExit(configDir: string, signal: AbortSignal, time
     const running = await runningPi(configDir);
     if (running.length === 0) return;
     if (Date.now() >= deadline) {
+      const processes = running.join(", ");
       throw new HostError(
         "pi_running",
-        `Pi is still running (process ${running.join(", ")}). Stop it, for example by quitting pi in a terminal, and try again.`,
+        `Pi is still running (process ${processes}). Stop it, for example by quitting pi in a terminal, and try again.`,
+        { key: "pi_running", args: { processes } },
       );
     }
     await sleep(POLL_MS, undefined, { signal });

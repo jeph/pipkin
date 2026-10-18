@@ -3,6 +3,7 @@ package io.jeph.pipkin.ui.files
 import androidx.compose.runtime.saveable.SaverScope
 import io.jeph.pipkin.host.FileEntry
 import io.jeph.pipkin.host.FileError
+import io.jeph.pipkin.host.HostText
 import io.jeph.pipkin.host.WorkspaceFolders
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
@@ -31,7 +32,7 @@ class FileExplorerStateTest {
 
     override suspend fun list(root: String, path: String): List<FileEntry> {
       if (path in stalled) awaitCancellation()
-      return folders[path] ?: throw FileError("This file or folder no longer exists.")
+      return folders[path] ?: throw FileError(HostText("This file or folder no longer exists."))
     }
 
     override suspend fun createFolder(root: String, parent: String, name: String) = error("unused")

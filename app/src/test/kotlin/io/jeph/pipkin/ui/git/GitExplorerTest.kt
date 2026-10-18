@@ -84,12 +84,14 @@ class GitExplorerTest {
   }
 
   @Test
-  fun `counts shorten like Paseo's compact numbers`() {
-    assertEquals("999", compactCount(999))
-    assertEquals("1k", compactCount(1_000))
-    assertEquals("1.2k", compactCount(1_234))
-    assertEquals("12.3k", compactCount(12_345))
-    assertEquals("1m", compactCount(999_999))
-    assertEquals("1.5m", compactCount(1_500_000))
+  fun `counts shorten to a tenth of a thousand or a million like Paseo's`() {
+    val scale = { value: Int -> compactScale(value).let { (number, unit) -> "${number.toPlainString()} $unit" } }
+    assertEquals("999 One", scale(999))
+    assertEquals("1 Thousand", scale(1_000))
+    assertEquals("1.2 Thousand", scale(1_234))
+    assertEquals("12.3 Thousand", scale(12_345))
+    assertEquals("999.9 Thousand", scale(999_949))
+    assertEquals("1 Million", scale(999_950))
+    assertEquals("1.5 Million", scale(1_500_000))
   }
 }

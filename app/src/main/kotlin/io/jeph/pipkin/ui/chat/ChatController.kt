@@ -185,7 +185,7 @@ internal class ChatController(
     block()
     null
   } catch (error: RpcError) {
-    error.error
+    error.message
   } catch (error: HostRejected) {
     error.error
   } catch (error: IOException) {
@@ -256,7 +256,7 @@ internal class ChatController(
   suspend fun <T> query(block: suspend AgentProcess.() -> T): T? = try {
     process.block()
   } catch (error: RpcError) {
-    show(error.error)
+    show(error.message)
     null
   }
 

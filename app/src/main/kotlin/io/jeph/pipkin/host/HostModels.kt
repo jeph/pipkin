@@ -34,7 +34,7 @@ internal data class BackupInfo(
   val size: Long,
   val createdAt: Long,
   val piVersion: String?,
-  val error: String?,
+  val error: HostText?,
 ) {
   companion object {
     fun from(json: JSONObject) = BackupInfo(
@@ -42,7 +42,7 @@ internal data class BackupInfo(
       size = json.optLong("size"),
       createdAt = runCatching { Instant.parse(json.optString("createdAt")).toEpochMilli() }.getOrDefault(0L),
       piVersion = json.opt("piVersion") as? String,
-      error = json.opt("error") as? String,
+      error = HostText.field(json, "error"),
     )
   }
 }
@@ -107,9 +107,9 @@ internal data class AuthStatus(
   val builtin: List<BuiltinProvider>,
   val custom: List<CustomProvider>,
   /** Set when `models.json` exists but could not be loaded. */
-  val modelsError: String?,
+  val modelsError: HostText?,
   /** Set when settings.json exists but could not be loaded. */
-  val settingsError: String? = null,
+  val settingsError: HostText? = null,
   /** `provider/id` of every model `enabledModels` shows; null when every model shows. */
   val scope: Set<String>? = null,
   /** Names of the npm packages Pi's global settings install, such as `pi install npm:…` adds. */
@@ -139,8 +139,8 @@ internal data class AuthStatus(
           models = it.optJSONArray("models").objects().map(ModelConfig::from),
         )
       },
-      modelsError = json.opt("modelsError") as? String,
-      settingsError = json.opt("settingsError") as? String,
+      modelsError = HostText.field(json, "modelsError"),
+      settingsError = HostText.field(json, "settingsError"),
       scope = json.optJSONArray("scope")?.strings()?.toSet(),
       npmPackages = json.optJSONArray("npmPackages").strings().toSet(),
     )

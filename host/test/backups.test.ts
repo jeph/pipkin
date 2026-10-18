@@ -131,7 +131,7 @@ describe("configuration backups", () => {
       data: {
         dir: backups,
         backups: [
-          { name: "notes.tar.gz", error: expect.any(String) },
+          { name: "notes.tar.gz", error: expect.any(String), errorI18n: { key: "backup_unreadable" } },
           { name: second, error: null, piVersion: null, size: expect.any(Number) },
           { name: first, error: null },
         ],
@@ -322,7 +322,11 @@ describe("configuration backups", () => {
     it("gives up, changing nothing, when Pi does not exit", { timeout: 40_000 }, async () => {
       const name = await backUp();
       await writeFile(path.join(dirs.configDir, "settings.json"), "{ broken");
-      expect(await runMode("backup_restore", dirs, { name }, { PIPKIN_PROC_DIR: proc })).toMatchObject({ ok: false, code: "pi_running" });
+      expect(await runMode("backup_restore", dirs, { name }, { PIPKIN_PROC_DIR: proc })).toMatchObject({
+        ok: false,
+        code: "pi_running",
+        i18n: { key: "pi_running", args: { processes: expect.any(String) } },
+      });
       expect(await readFile(path.join(dirs.configDir, "settings.json"), "utf8")).toBe("{ broken");
       expect((await readdir(dirs.base)).toSorted()).toEqual(["backups", "config", "home", "prefix", "proc", "root", "shared"]);
     });

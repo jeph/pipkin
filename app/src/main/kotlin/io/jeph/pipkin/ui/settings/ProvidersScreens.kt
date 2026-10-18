@@ -90,7 +90,7 @@ internal fun ProvidersScreen(
       }
     }
     DashedActionRow(label = stringResource(R.string.providers_add), icon = R.drawable.ic_lucide_plus, onClick = onAdd)
-    current?.modelsError?.let { SettingsCaption(text = it, color = pipkinColors.destructive) }
+    current?.modelsError?.let { SettingsCaption(text = it.localized(), color = pipkinColors.destructive) }
     refreshError?.let { SettingsCaption(text = it, color = pipkinColors.destructive) }
   }
 }

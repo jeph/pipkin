@@ -95,7 +95,7 @@ internal class BuiltinCommands(private val controller: ChatController, private v
       try {
         process.compact(instructions)
       } catch (error: RpcError) {
-        if (process.state.value != AgentProcessState.Ready) controller.show(error.error)
+        if (process.state.value != AgentProcessState.Ready) controller.show(error.message)
       }
     }
   }

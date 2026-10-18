@@ -3,6 +3,8 @@ package io.jeph.pipkin.ui.git
 import io.jeph.pipkin.host.GitChanges
 import io.jeph.pipkin.host.GitDetection
 import io.jeph.pipkin.host.GitDiffMode
+import java.math.BigDecimal
+import java.math.RoundingMode
 
 /** The Explorer panel's tabs, Changes first as in Paseo. */
 internal enum class ExplorerTab { Changes, Files }
@@ -58,16 +60,14 @@ internal fun committedDescription(branch: String?, baseRef: String?): String? {
   return if (branchName == baseName) null else "$branchName -> $baseName"
 }
 
-/** Paseo's compact diff count: `999`, `1.2k`, `12.3k`, `1.5m`. */
-internal fun compactCount(value: Int): String {
-  if (value < 1_000) return value.toString()
-  var scaled = value / 1_000.0
-  var unit = "k"
-  if (Math.round(scaled * 10) >= 10_000) {
-    scaled = value / 1_000_000.0
-    unit = "m"
-  }
-  val tenths = Math.round(scaled * 10)
-  val text = if (tenths % 10 == 0L) (tenths / 10).toString() else "${tenths / 10}.${tenths % 10}"
-  return text + unit
+/** The unit [compactScale] shortens a count to. */
+internal enum class CountUnit { One, Thousand, Million }
+
+/** Paseo's compact diff count, to a tenth of its unit: `999`, `1.2` thousand, `12.3` thousand, `1.5` million. */
+internal fun compactScale(value: Int): Pair<BigDecimal, CountUnit> {
+  if (value < 1_000) return BigDecimal.valueOf(value.toLong()) to CountUnit.One
+  val thousands = BigDecimal.valueOf(value.toLong(), 3).setScale(1, RoundingMode.HALF_UP)
+  if (thousands < BigDecimal.valueOf(1_000)) return thousands.stripTrailingZeros() to CountUnit.Thousand
+  val millions = BigDecimal.valueOf(value.toLong(), 6).setScale(1, RoundingMode.HALF_UP)
+  return millions.stripTrailingZeros() to CountUnit.Million
 }

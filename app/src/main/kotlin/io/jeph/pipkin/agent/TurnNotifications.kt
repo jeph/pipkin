@@ -83,7 +83,7 @@ internal class TurnNotifications(application: Application, private val home: () 
     for (item in items.asReversed()) {
       when (item) {
         is TimelineItem.AssistantText -> if (item.markdown.isNotBlank()) return item.markdown
-        is TimelineItem.Error -> return item.message
+        is TimelineItem.Error -> return item.cause.text(context.resources)
         is TimelineItem.User -> return null
         else -> Unit
       }

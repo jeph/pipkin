@@ -65,7 +65,7 @@ sealed interface TimelineItem {
     val argsStreaming: Boolean = false,
   ) : TimelineItem
 
-  data class Error(override val key: String, val message: String) : TimelineItem
+  data class Error(override val key: String, val cause: ErrorCause) : TimelineItem
 
   /**
    * A message an extension added with `pi.sendMessage` and `display` set: Pi sends its [markdown] and [images] to the
@@ -84,12 +84,31 @@ sealed interface TimelineItem {
    */
   data class ExtensionNotice(override val key: String, val level: NoticeLevel, val message: String) : TimelineItem
 
-  data class Notice(override val key: String, val text: String) : TimelineItem
+  data class Notice(override val key: String, val kind: NoticeKind) : TimelineItem
 
   /** Closes a run that started at [startedAt]; [durationMillis] is null while Pi is still working. */
   data class TurnFooter(override val key: String, val startedAt: Long, val durationMillis: Long?) : TimelineItem
 
   data class ExitBanner(override val key: String, val code: Int?, val stderr: String) : TimelineItem
+}
+
+/** What a [TimelineItem.Notice] says about Pi's own work on the chat. */
+enum class NoticeKind {
+  Retrying,
+  Compacting,
+  Compacted,
+}
+
+/** What failed in a [TimelineItem.Error]. The messages are Pi's own words, which Pipkin shows as they are. */
+sealed interface ErrorCause {
+  /** A request to the model failed; [message] is null when Pi gave no reason. */
+  data class Request(val message: String?) : ErrorCause
+
+  /** Compacting the context failed; [message] is null when Pi gave no reason. */
+  data class Compaction(val message: String?) : ErrorCause
+
+  /** An extension's command threw [error]; [path] is how Pi names the extension. */
+  data class Extension(val path: String, val error: String) : ErrorCause
 }
 
 /** A base64-encoded image attached to a user message. */

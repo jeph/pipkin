@@ -45,7 +45,7 @@ class AgentRegistryTest {
 
     override suspend fun abort() {
       aborts += 1
-      if (abortFails) throw RpcError("abort", "The agent did not answer abort in time.")
+      if (abortFails) throw RpcError("abort", RpcError.Reason.TimedOut)
       busy.value = false
     }
 
@@ -434,10 +434,9 @@ class AgentRegistryTest {
 
     assertFalse(shown.parked)
     assertSame(shown, registry.shown.value[Pane.Primary])
-    assertEquals(
-      "4 chats are working or on screen. That's more than the limit of 2, so stop some to open another.",
-      refused.message,
-    )
+    assertEquals(4, refused.open)
+    assertEquals(2, refused.limit)
+    assertTrue(refused.shownIdle)
   }
 
   @Test

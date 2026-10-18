@@ -1,11 +1,11 @@
 import { spawn } from "node:child_process";
-import { isConfigLocked } from "../config-lock.js";
+import { configBusy, isConfigLocked } from "../config-lock.js";
 import { HostError, piEntry } from "../env.js";
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { stringParam } from "../params.js";
 import { termuxSessionEnv } from "../termux-session.js";
-import { forwardLines } from "./ensure.js";
+import { commandFailed, forwardLines } from "./ensure.js";
 
 /**
  * Tries `pi install` this many times. A failure is often transient (a dropped connection, or an npm cache entry whose
@@ -22,18 +22,16 @@ export async function packageInstall(ctx: ModeContext): Promise<JsonObject> {
   const source = stringParam(ctx.params, "source");
   // A restore swaps the configuration while it holds the lock, which would drop the settings Pi writes, and an
   // extension update runs npm in the same folder Pi installs into.
-  if (await isConfigLocked(ctx.env)) {
-    throw new HostError("config_busy", "Pipkin is backing up, restoring or updating the configuration; try again in a moment");
-  }
+  if (await isConfigLocked(ctx.env)) throw configBusy();
   const args = [await piEntry(ctx.env.root), "install", source];
   const env = await termuxSessionEnv(ctx.env);
-  let failure = "";
+  let result = { code: null as number | null, lastLine: "" };
   for (let attempt = 1; attempt <= ATTEMPTS; attempt++) {
-    const result = await runPi(ctx, args, env);
+    result = await runPi(ctx, args, env);
     if (result.code === 0) return {};
-    failure = result.lastLine || `pi install failed (exit ${result.code ?? "signal"})`;
   }
-  throw new HostError("install_failed", failure);
+  if (result.lastLine !== "") throw new HostError("install_failed", result.lastLine);
+  throw commandFailed("install_failed", "pi install", result.code);
 }
 
 /** One run of Pi, forwarding its output as progress lines; returns its exit code and last non-blank line. */

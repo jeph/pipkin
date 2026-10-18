@@ -1,5 +1,7 @@
 package io.jeph.pipkin.agent
 
+import io.jeph.pipkin.AppStrings
+import io.jeph.pipkin.R
 import io.jeph.pipkin.workspace.Pane
 import java.util.IdentityHashMap
 import java.util.UUID
@@ -70,17 +72,19 @@ internal value class ChatKey(val value: String) {
 /**
  * Opening another chat would need a Pi process past [limit] while not enough of the [open] ones are idle and hidden,
  * since a chat a pane shows keeps its Pi. [shownIdle] says an idle chat in a pane held a slot. [open] is above [limit]
- * after the limit was lowered while chats were working.
+ * after the limit was lowered while chats were working. [message] is user-presentable, in the app's language.
  */
-internal class TooManyRunning(open: Int, limit: Int, shownIdle: Boolean = false) :
-  IllegalStateException(
-    "$open chats are ${if (shownIdle) "working or on screen" else "working"}. " +
-      if (open > limit) {
-        "That's more than the limit of $limit, so stop some to open another."
-      } else {
-        "Stop one to open another."
-      },
-  )
+internal class TooManyRunning(val open: Int, val limit: Int, val shownIdle: Boolean = false) : IllegalStateException() {
+  override val message: String get() {
+    val busy = if (shownIdle) R.plurals.agent_too_many_shown else R.plurals.agent_too_many_working
+    val advice = if (open > limit) {
+      AppStrings.plural(R.plurals.agent_too_many_over_limit, limit, limit)
+    } else {
+      AppStrings.get(R.string.agent_too_many_stop_one)
+    }
+    return AppStrings.get(R.string.agent_too_many, AppStrings.plural(busy, open, open), advice)
+  }
+}
 
 /**
  * The app's open agent processes, at most [maxRunning]. A process that neither [holds its Pi][ManagedProcess.holdsPi]

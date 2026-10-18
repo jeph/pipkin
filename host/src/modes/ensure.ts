@@ -32,6 +32,12 @@ export function forwardLines(stream: Readable, send: (line: string) => void): vo
   });
 }
 
+/** `<command> failed` for a [command] that exited with [exit], or that a signal killed when it's null; under [code]. */
+export function commandFailed(code: string, command: string, exit: number | null): HostError {
+  if (exit === null) return new HostError(code, `${command} failed (exit signal)`, { key: "command_killed", args: { command } });
+  return new HostError(code, `${command} failed (exit ${exit})`, { key: "command_failed", args: { command, exit } });
+}
+
 async function npmCi(ctx: ModeContext, cwd: string): Promise<void> {
   let offline = false;
   const send = (line: string): void => {
@@ -53,8 +59,12 @@ async function npmCi(ctx: ModeContext, cwd: string): Promise<void> {
   child.on("close", resolve);
   const code = await promise;
   if (code === 0) return;
-  if (offline) throw new HostError("npm_offline", "Couldn't download the agent. Check your internet connection, then retry.");
-  throw new HostError("npm_failed", `npm ci failed (exit ${code ?? "signal"})`);
+  if (offline) {
+    throw new HostError("npm_offline", "Couldn't download the agent. Check your internet connection, then retry.", {
+      key: "agent_download_offline",
+    });
+  }
+  throw commandFailed("npm_failed", "npm ci", code);
 }
 
 export async function ensure(ctx: ModeContext): Promise<JsonObject> {

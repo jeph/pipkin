@@ -3,7 +3,7 @@ import { readdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
-import { HostError, withoutHostVariables } from "../env.js";
+import { folderNotFound, withoutHostVariables } from "../env.js";
 import type { ModeContext } from "../mode.js";
 import { positiveIntParam, stringParam } from "../params.js";
 
@@ -220,7 +220,7 @@ export async function terminal(ctx: ModeContext): Promise<void> {
     (stats) => stats.isDirectory(),
     () => false,
   );
-  if (!isDirectory) throw new HostError("cwd_missing", `Folder not found: ${cwd}`);
+  if (!isDirectory) throw folderNotFound("cwd_missing", cwd);
 
   const deviceFile = join(ctx.env.root, `terminal-tty-${process.pid}`);
   const base = withoutHostVariables(process.env);

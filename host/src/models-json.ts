@@ -24,11 +24,11 @@ export async function readModelsJson(configDir: string): Promise<ModelsJson> {
   try {
     root = JSON.parse(text);
   } catch {
-    throw new HostError("models_invalid", MODELS_INVALID);
+    throw new HostError("models_invalid", MODELS_INVALID, { key: "models_invalid" });
   }
-  if (!isObject(root)) throw new HostError("models_invalid", MODELS_INVALID);
+  if (!isObject(root)) throw new HostError("models_invalid", MODELS_INVALID, { key: "models_invalid" });
   const providers = root.providers ?? {};
-  if (!isObject(providers)) throw new HostError("models_invalid", MODELS_INVALID);
+  if (!isObject(providers)) throw new HostError("models_invalid", MODELS_INVALID, { key: "models_invalid" });
   return { root, providers };
 }
 

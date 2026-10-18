@@ -5,6 +5,7 @@ import { access, copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rm, stat }
 import os from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { parsePatch, type StructuredPatch } from "diff";
+import type { HostText } from "../env.js";
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 
@@ -38,11 +39,12 @@ const SHA = /^[0-9a-f]{4,64}$/i;
 
 type ErrorCode = "not_repo" | "no_git" | "failed" | "commit_not_found";
 
-/** A failure the reply reports as `{error, code}`. */
+/** A failure the reply reports as `{error, code, errorI18n}`; git's own stderr has no [i18n]. */
 class GitError extends Error {
   constructor(
     readonly code: ErrorCode,
     message: string,
+    readonly i18n?: HostText,
   ) {
     super(message);
   }
@@ -54,7 +56,12 @@ class TooLarge extends Error {}
 /** Git ran past [GIT_TIMEOUT_MS]. A diff that slow is reported as `tooLarge`; anything else as a failure. */
 class TimedOut extends GitError {
   constructor(command: string | undefined) {
-    super("failed", `git ${command ?? ""} took longer than ${String(GIT_TIMEOUT_MS / 1000)} seconds.`);
+    const gitCommand = `git ${command ?? ""}`;
+    const seconds = GIT_TIMEOUT_MS / 1000;
+    super("failed", `${gitCommand} took longer than ${String(seconds)} seconds.`, {
+      key: "git_timed_out",
+      args: { command: gitCommand, seconds },
+    });
   }
 }
 
@@ -159,7 +166,7 @@ function run(repo: Repo, args: string[], options: RunOptions = {}): Promise<RunR
   child.on("error", (error) => {
     settle();
     const missing = "code" in error && (error.code === "ENOENT" || error.code === "EACCES");
-    reject(missing ? new GitError("no_git", "git isn't installed in Termux.") : error);
+    reject(missing ? new GitError("no_git", "git isn't installed in Termux.", { key: "git_missing" }) : error);
   });
   child.on("close", (exitCode) => {
     settle();
@@ -169,7 +176,11 @@ function run(repo: Repo, args: string[], options: RunOptions = {}): Promise<RunR
     const truncated = killedFor === "truncated";
     const result = { exitCode, stdout: Buffer.concat(stdout).toString("utf8"), truncated };
     if (truncated || exitCode === 0 || options.anyExit === true) return done(result);
-    reject(new GitError("failed", stderr.trim() || `git ${args[0]} exited with ${String(exitCode)}.`));
+    const stderrText = stderr.trim();
+    if (stderrText !== "") return reject(new GitError("failed", stderrText));
+    const command = `git ${args[0]}`;
+    const exit = String(exitCode);
+    reject(new GitError("failed", `${command} exited with ${exit}.`, { key: "git_exited", args: { command, exit } }));
   });
   return promise;
 }
@@ -186,13 +197,13 @@ async function hasDotGit(root: string): Promise<boolean> {
 
 async function openRepo(ctx: ModeContext, root: string): Promise<Repo> {
   const binary = join(ctx.env.prefix, "bin", "git");
-  if (!(await isExecutable(binary))) throw new GitError("no_git", "git isn't installed in Termux.");
+  if (!(await isExecutable(binary))) throw new GitError("no_git", "git isn't installed in Termux.", { key: "git_missing" });
   let realRoot: string;
   try {
     if (!isAbsolute(root)) throw new Error();
     realRoot = await realpath(root);
   } catch {
-    throw new GitError("not_repo", `Folder not found: ${root}`);
+    throw new GitError("not_repo", `Folder not found: ${root}`, { key: "folder_not_found", args: { path: root } });
   }
   const safeArgs = ["-c", `safe.directory=${root}`];
   if (realRoot !== root) safeArgs.push("-c", `safe.directory=${realRoot}`);
@@ -243,7 +254,7 @@ async function requireRepo(repo: Repo): Promise<GitPaths> {
     const lines = stdout.split("\n");
     return { index: resolve(repo.root, lines[1] ?? ""), objects: resolve(repo.root, lines[2] ?? "") };
   } catch (error) {
-    if (error instanceof GitError && error.code === "failed") throw new GitError("not_repo", error.message);
+    if (error instanceof GitError && error.code === "failed") throw new GitError("not_repo", error.message, error.i18n);
     throw error;
   }
 }
@@ -629,7 +640,7 @@ function fingerprinted(body: JsonObject, known: unknown): JsonObject {
 }
 
 function failure(error: unknown): JsonObject {
-  if (error instanceof GitError) return { error: error.message, code: error.code };
+  if (error instanceof GitError) return { error: error.message, code: error.code, errorI18n: error.i18n };
   return { error: error instanceof Error ? error.message : String(error), code: "failed" };
 }
 
@@ -724,7 +735,7 @@ async function commitDiff(ctx: ModeContext, root: string, sha: string, ignoreWhi
  * - `pipkin_git_commits {known?}` with `pipkin_git_commits_result {fingerprint, baseRef, total, commits}`
  *   (at most 500 `{sha, subject, authorTime}`, newest first, of `total`), or `{fingerprint, unchanged: true}`.
  * - `pipkin_git_commit_diff {sha, ignoreWhitespace}` with `pipkin_git_commit_diff_result {files, tooLarge?}`.
- * Failures are `{error, code}` in the reply: `not_repo`, `no_git`, `commit_not_found` or `failed`.
+ * Failures are `{error, code, errorI18n?}` in the reply: `not_repo`, `no_git`, `commit_not_found` or `failed`.
  */
 export async function git(ctx: ModeContext): Promise<JsonObject> {
   ctx.conn.send({ type: "pipkin_git_ready" });

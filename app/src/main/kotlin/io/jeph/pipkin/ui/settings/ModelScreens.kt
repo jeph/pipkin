@@ -39,6 +39,7 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.text.NumberFormat
 import kotlinx.coroutines.launch
 
 /** The provider page's models: the add-models button and one row per added model. */
@@ -160,22 +161,25 @@ internal fun modelSubtitle(config: ModelConfig): String? {
     if (config.images == true) add(stringResource(R.string.model_summary_images))
     config.contextWindow?.let { add(stringResource(R.string.model_summary_context, formatTokens(it))) }
   }
-  return parts.joinToString(" · ").ifEmpty { null }
+  return parts.joinToString(stringResource(R.string.separator_dot)).ifEmpty { null }
 }
 
-/** 272000 → "272K", 1050000 → "1.05M". */
-internal fun formatTokens(count: Long): String = when {
-  count >= MILLION -> scaled(count, MILLION) + "M"
-  count >= THOUSAND -> scaled(count, THOUSAND) + "K"
-  else -> count.toString()
+/** 272000 → "272K", 1050000 → "1.05M", with the app language's digits and unit. */
+@Composable
+internal fun formatTokens(count: Long): String {
+  val numbers = NumberFormat.getNumberInstance().apply {
+    maximumFractionDigits = 2
+    roundingMode = RoundingMode.HALF_UP
+  }
+  return when {
+    count >= MILLION -> stringResource(R.string.model_tokens_millions, numbers.format(BigDecimal.valueOf(count, 6)))
+    count >= THOUSAND -> stringResource(R.string.model_tokens_thousands, numbers.format(BigDecimal.valueOf(count, 3)))
+    else -> numbers.format(count)
+  }
 }
 
 private const val THOUSAND = 1_000L
 private const val MILLION = 1_000_000L
-
-private fun scaled(count: Long, unit: Long): String = BigDecimal.valueOf(
-  count,
-).divide(BigDecimal.valueOf(unit), 2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 
 @Composable
 private fun ModelPickList(models: List<ModelConfig>, draft: ModelDraft) {

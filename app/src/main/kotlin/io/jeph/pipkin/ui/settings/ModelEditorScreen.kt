@@ -27,6 +27,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.ModelConfig
+import io.jeph.pipkin.ui.chat.thinkingLevelLabel
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -98,7 +99,7 @@ private fun ThinkingLevels(model: ModelForm) {
       ) {
         Checkbox(checked = enabled, onCheckedChange = null)
         Text(
-          text = stringResource(levelLabel(level)),
+          text = thinkingLevelLabel(level),
           modifier = Modifier.padding(start = PipkinTokens.Spacing.s8),
           color = pipkinColors.foreground,
           fontSize = PipkinTokens.FontSize.base,
@@ -106,16 +107,6 @@ private fun ThinkingLevels(model: ModelForm) {
       }
     }
   }
-}
-
-private fun levelLabel(level: String): Int = when (level) {
-  "off" -> R.string.model_level_off
-  "minimal" -> R.string.model_level_minimal
-  "low" -> R.string.model_level_low
-  "medium" -> R.string.model_level_medium
-  "high" -> R.string.model_level_high
-  "xhigh" -> R.string.model_level_xhigh
-  else -> R.string.model_level_max
 }
 
 @Composable

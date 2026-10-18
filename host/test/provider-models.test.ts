@@ -180,7 +180,8 @@ describe("provider_models and model_defaults", () => {
 
   it("rejects a web page in place of the models list", async () => {
     const result = await runMode("provider_models", dirs, { baseUrl: `${origin}/page`, apiKey: "k", api: "openai-responses" });
-    expect(result).toMatchObject({ ok: false, code: "bad_response", error: `${origin}/page/models returned a web page, not JSON` });
+    const url = `${origin}/page/models`;
+    expect(result).toMatchObject({ ok: false, code: "bad_response", error: `${url} returned a web page, not JSON`, i18n: { key: "provider_web_page", args: { url } } });
   });
 
   it.each(["api.example.com/v1", "ftp://example.com/v1", "https://"])("rejects %s as a base URL", async (url) => {

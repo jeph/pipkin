@@ -2,6 +2,8 @@ package io.jeph.pipkin.ui.onboarding
 
 import android.content.Context
 import io.jeph.pipkin.AppGraph
+import io.jeph.pipkin.AppStrings
+import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.HostFailure
 import io.jeph.pipkin.host.HostRejected
@@ -38,10 +40,25 @@ internal enum class SetupStep(val requirement: Requirement) {
 }
 
 /**
- * A failed attempt pinned to the step that fixes it. A null [message] means the generic install
- * failure text; [command], a literal command, replaces the setup command shown in that step.
+ * A failed attempt pinned to the step that fixes it: [failure] when Termux or Pipkin's helper caused it, else
+ * [detail], the install's own reason. Neither means the generic install failure text. [command], a literal command,
+ * replaces the setup command shown in that step.
  */
-internal data class SetupError(val step: SetupStep, val message: String?, val command: String? = null)
+internal data class SetupError(
+  val step: SetupStep,
+  val detail: String? = null,
+  val failure: HostFailure? = null,
+  val command: String? = null,
+) {
+  /** What went wrong, in the app's language; null for the generic install failure. */
+  val message: String?
+    get() {
+      // Opening Termux didn't start the helper, so setup asks for its command rather than for opening Termux again.
+      val helperDidntStart = failure?.kind == HostFailure.Kind.HelperUnreachable
+      if (helperDidntStart) return AppStrings.get(R.string.onboarding_helper_didnt_start)
+      return failure?.message ?: detail
+    }
+}
 
 internal fun HostFailure.toSetupError(): SetupError {
   val step = when (kind) {
@@ -50,8 +67,7 @@ internal fun HostFailure.toSetupError(): SetupError {
     HostFailure.Kind.Permission -> SetupStep.RunCommand
 
     // Opening Termux didn't start the helper; whatever Termux reports, the setup command fixes.
-    HostFailure.Kind.HelperUnreachable -> return SetupError(SetupStep.TermuxSetup, HELPER_DIDNT_START)
-
+    HostFailure.Kind.HelperUnreachable,
     HostFailure.Kind.ExternalApps,
     HostFailure.Kind.NodeMissing,
     HostFailure.Kind.NodeTooOld,
@@ -63,10 +79,8 @@ internal fun HostFailure.toSetupError(): SetupError {
 
     else -> SetupStep.InstallPi
   }
-  return SetupError(step, message, command)
+  return SetupError(step, failure = this, command = command)
 }
-
-private const val HELPER_DIDNT_START = "Pipkin's helper didn't start in Termux. Paste the setup command again."
 
 /**
  * Onboarding progress that outlives the screen, kept in memory for the process: which permissions Android stopped

@@ -60,7 +60,10 @@ internal sealed interface GitReply<out T> {
 
   class Loaded<T>(val value: T) : GitReply<T>
 
-  class Failed(val code: GitErrorCode, val message: String) : GitReply<Nothing>
+  /** [message] is why, in the app's language, or empty when git gave no reason. */
+  class Failed(val code: GitErrorCode, private val reason: HostText) : GitReply<Nothing> {
+    val message: String get() = reason.resolve()
+  }
 }
 
 /**
@@ -165,7 +168,9 @@ internal fun parseGitCommitDiff(reply: JSONObject): GitReply<GitDiff> = parseRep
 private fun <T> parseReply(reply: JSONObject, loaded: () -> T): GitReply<T> {
   val code = reply.optNullableString("code")
   val error = reply.optNullableString("error")
-  if (code != null || error != null) return GitReply.Failed(errorCode(code), error.orEmpty())
+  if (code != null || error != null) {
+    return GitReply.Failed(errorCode(code), HostText.of(error.orEmpty(), reply.optJSONObject("errorI18n")))
+  }
   if (reply.optBoolean("unchanged")) return GitReply.Unchanged
   return GitReply.Loaded(loaded())
 }

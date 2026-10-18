@@ -19,10 +19,12 @@ export interface PiSettings {
 /** Throws `settings_invalid` when settings.json cannot be parsed or `enabledModels` is not a list of strings. */
 export function openSettings(ctx: ModeContext, pi: PiSdk): PiSettings {
   const manager = pi.SettingsManager.create(ctx.env.home, ctx.env.configDir);
-  if (manager.drainErrors().some((error) => error.scope === "global")) throw new HostError("settings_invalid", SETTINGS_INVALID);
+  if (manager.drainErrors().some((error) => error.scope === "global")) {
+    throw new HostError("settings_invalid", SETTINGS_INVALID, { key: "settings_invalid" });
+  }
   const enabledModels: unknown = manager.getEnabledModels() ?? [];
   if (!Array.isArray(enabledModels) || !enabledModels.every((pattern) => typeof pattern === "string")) {
-    throw new HostError("settings_invalid", SETTINGS_INVALID);
+    throw new HostError("settings_invalid", SETTINGS_INVALID, { key: "settings_invalid" });
   }
   const provider = manager.getDefaultProvider();
   const model = manager.getDefaultModel();

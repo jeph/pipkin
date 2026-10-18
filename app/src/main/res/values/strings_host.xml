@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Texts the Termux helper (the host) reports, shown wherever the app shows its failures. The host sends a key and
+    named arguments; HostText.kt maps each key to the resource host_<key> and its arguments to the placeholders in order.
+    "Pi" and "pi" are the agent program and its command, "Termux" the Android terminal app; neither is translated.
+-->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <!-- Shown when the helper refused an operation without saying why. -->
+    <string name="host_rejected_without_reason">The Termux helper failed.</string>
+
+    <!-- Configuration changes -->
+    <string name="host_config_busy">Pipkin is backing up, restoring or updating the configuration; try again in a moment</string>
+    <string name="host_config_lock_busy">Another backup, restore or extension update is running.</string>
+    <!-- %1$s: the ids of the running Pi processes, such as "4242, 4343". "pi" is the command the user started in a terminal. -->
+    <string name="host_pi_running">Pi is still running (process <xliff:g id="processes" example="4242">%1$s</xliff:g>). Stop it, for example by quitting <xliff:g id="command">pi</xliff:g> in a terminal, and try again.</string>
+    <!-- %1$s: the path of the chat's session file in Termux. -->
+    <string name="host_session_not_found">Session not found: <xliff:g id="path" example="/data/data/com.termux/files/home/.pipkin/pi/sessions/a.jsonl">%1$s</xliff:g></string>
+    <string name="host_models_invalid"><xliff:g id="file">models.json</xliff:g> is not valid JSON. Ask the agent to fix it.</string>
+    <string name="host_settings_invalid"><xliff:g id="file">settings.json</xliff:g> is not valid. Ask the agent to fix it.</string>
+    <!-- %1$s: the folder's path in Termux. -->
+    <string name="host_folder_not_found">Folder not found: <xliff:g id="path" example="/sdcard/projects/app">%1$s</xliff:g></string>
+
+    <!-- The agent (Pi) Pipkin installs in Termux -->
+    <string name="host_agent_not_installed">The agent is not installed</string>
+    <!-- %1$s: the agent version this Pipkin needs, such as 1.3.0. -->
+    <string name="host_agent_not_installed_needs">The agent is not installed; Pipkin needs <xliff:g id="version" example="1.3.0">%1$s</xliff:g></string>
+    <!-- %1$s: the agent version installed in Termux; %2$s: the version this Pipkin needs. -->
+    <string name="host_agent_version_mismatch">Agent <xliff:g id="installed" example="1.2.0">%1$s</xliff:g> is installed; Pipkin needs <xliff:g id="expected" example="1.3.0">%2$s</xliff:g></string>
+    <string name="host_agent_packages_outdated">The agent\'s packages are out of date</string>
+    <string name="host_agent_extensions_outdated">The agent\'s bundled extensions are out of date</string>
+    <string name="host_agent_download_offline">Couldn\'t download the agent. Check your internet connection, then retry.</string>
+    <string name="host_extensions_download_offline">Couldn\'t download the extensions. Check your internet connection, then retry.</string>
+    <!-- %1$s: the command that failed, such as "npm ci" or "pi install"; %2$s: its exit code. -->
+    <string name="host_command_failed"><xliff:g id="command" example="npm ci">%1$s</xliff:g> failed (exit <xliff:g id="exit" example="1">%2$s</xliff:g>)</string>
+    <!-- %1$s: the command that failed, such as "npm ci" or "pi install", which a signal stopped before it exited. -->
+    <string name="host_command_killed"><xliff:g id="command" example="npm ci">%1$s</xliff:g> failed (exit signal)</string>
+
+    <!-- Custom model providers (Settings > Models) -->
+    <string name="host_provider_id_invalid">Use 1–40 lowercase letters, digits or dashes, starting with a letter or digit</string>
+    <!-- %1$s: the provider ID the user typed, such as "openai". -->
+    <string name="host_provider_id_builtin">\"<xliff:g id="id" example="openai">%1$s</xliff:g>\" is a built-in provider; choose another ID</string>
+    <!-- %1$s: the base URL the user entered. -->
+    <string name="host_provider_unreachable">Could not reach <xliff:g id="url" example="https://api.example.com/v1">%1$s</xliff:g></string>
+    <!-- %1$s: the base URL the user entered; %2$s: the network error, in English, such as "getaddrinfo ENOTFOUND api.example.com". -->
+    <string name="host_provider_unreachable_because">Could not reach <xliff:g id="url" example="https://api.example.com/v1">%1$s</xliff:g>: <xliff:g id="cause" example="getaddrinfo ENOTFOUND api.example.com">%2$s</xliff:g></string>
+    <!-- %1$s: the HTTP status code the server answered with, such as 401. -->
+    <string name="host_provider_http_status">HTTP <xliff:g id="status" example="401">%1$s</xliff:g></string>
+    <!-- %1$s: the HTTP status code the server answered with; %2$s: the error message the server sent, in its own language. -->
+    <string name="host_provider_http_status_said">HTTP <xliff:g id="status" example="401">%1$s</xliff:g>: <xliff:g id="message" example="Invalid API key">%2$s</xliff:g></string>
+    <!-- %1$s: the URL Pipkin asked for its list of models, ending in /models. -->
+    <string name="host_provider_web_page"><xliff:g id="url" example="https://example.com/models">%1$s</xliff:g> returned a web page, not JSON</string>
+    <!-- %1$s: the start of what the server answered instead. -->
+    <string name="host_provider_not_json">The server did not return JSON: <xliff:g id="body" example="Not Found">%1$s</xliff:g></string>
+    <string name="host_provider_no_data_list">The server\'s <xliff:g id="path">/models</xliff:g> response has no data list</string>
+
+    <!-- Configuration backups (Settings > Backups) -->
+    <!-- Progress of a backup under way: how many files and folders it has backed up so far. -->
+    <plurals name="host_backup_progress_backed_up">
+        <item quantity="one">Backed up %1$d item</item>
+        <item quantity="other">Backed up %1$d items</item>
+    </plurals>
+    <!-- Progress of a restore under way: how many files and folders it has restored so far. -->
+    <plurals name="host_backup_progress_restored">
+        <item quantity="one">Restored %1$d item</item>
+        <item quantity="other">Restored %1$d items</item>
+    </plurals>
+    <string name="host_backup_not_pipkin">This file is not a Pipkin configuration backup</string>
+    <string name="host_backup_from_newer_pipkin">This backup is from a newer Pipkin; update Pipkin to restore it</string>
+    <string name="host_backup_unreadable">This file can\'t be read as a backup</string>
+    <string name="host_backup_missing">This backup no longer exists</string>
+    <!-- %1$s: a path inside the backup file. -->
+    <string name="host_backup_path_outside_config">The backup holds a file outside the configuration: <xliff:g id="path" example="other/settings.json">%1$s</xliff:g></string>
+    <!-- %1$s: a path inside the backup file, such as one with ".." in it. -->
+    <string name="host_backup_path_unsafe">The backup holds an unsafe path: <xliff:g id="path" example="config/../escape.json">%1$s</xliff:g></string>
+    <!-- %1$s: a file or folder name in Pi's configuration folder that a restore keeps, such as "sessions". -->
+    <string name="host_backup_holds_excluded">The backup holds <xliff:g id="name" example="sessions">%1$s</xliff:g>, which a restore never replaces</string>
+    <!-- %1$s: a path in Pi's configuration folder. -->
+    <string name="host_backup_path_twice">The backup holds <xliff:g id="path" example="settings.json">%1$s</xliff:g> twice</string>
+    <!-- %1$s: a path in Pi's configuration folder; a symlink is a file that points to another file or folder. -->
+    <string name="host_backup_path_beneath_symlink">The backup holds <xliff:g id="path" example="skills/a/SKILL.md">%1$s</xliff:g> beneath a symlink</string>
+    <!-- %1$s: the path of a symlink in Pi's configuration folder. -->
+    <string name="host_backup_files_beneath_symlink">The backup holds files beneath the symlink <xliff:g id="path" example="skills">%1$s</xliff:g></string>
+    <!-- %1$s: why the backup can't be read: one of the host_archive_* texts below, or, in English, why the compressed file can't be read, such as "incorrect header check". -->
+    <string name="host_backup_damaged">The backup is damaged: <xliff:g id="reason" example="The archive has a damaged header">%1$s</xliff:g></string>
+    <!-- The backup file is a tar archive; these say how it is damaged. -->
+    <string name="host_archive_truncated">The archive ends in the middle of an entry</string>
+    <string name="host_archive_trailing_data">The archive has data after its end</string>
+    <string name="host_archive_header">The archive has a damaged header</string>
+    <string name="host_archive_not_tar">The file is not a tar archive</string>
+    <string name="host_archive_pax_header">The archive has a damaged pax header</string>
+    <string name="host_archive_oversized_pax_header">The archive has an oversized pax header</string>
+    <!-- %1$s: the path of an entry in the archive that isn't a file, folder or symlink. -->
+    <string name="host_archive_unsupported_entry">The archive holds an unsupported entry: <xliff:g id="path" example="config/fifo">%1$s</xliff:g></string>
+    <string name="host_archive_empty">The archive is empty</string>
+
+    <!-- The file explorer, and the folder browser for adding a workspace -->
+    <string name="host_not_a_folder">This isn\'t a folder.</string>
+    <string name="host_files_no_access">Termux can\'t open this.</string>
+    <string name="host_files_gone">This file or folder no longer exists.</string>
+    <string name="host_files_is_folder">This is a folder.</string>
+    <string name="host_files_link_loop">This link goes round in circles.</string>
+    <string name="host_files_read_only">This storage is read-only.</string>
+    <string name="host_files_device_full">The device is full.</string>
+    <!-- %1$s: the system's error code, such as EIO. -->
+    <string name="host_files_unreadable">Can\'t read this (<xliff:g id="code" example="EIO">%1$s</xliff:g>).</string>
+    <string name="host_files_unreadable_unknown">Can\'t read this (unknown error).</string>
+    <string name="host_files_outside_workspace">That path is outside the workspace.</string>
+    <!-- A file that is a device or a pipe rather than a regular file. -->
+    <string name="host_files_not_regular">This isn\'t a regular file.</string>
+    <string name="host_files_folder_name_invalid">Folder names can\'t be empty, contain <xliff:g id="slash">/</xliff:g> or be <xliff:g id="dot">.</xliff:g> or <xliff:g id="dots">..</xliff:g></string>
+    <!-- %1$s: the name the user typed for the new folder. -->
+    <string name="host_files_name_taken">A file or folder named <xliff:g id="name" example="src">%1$s</xliff:g> already exists.</string>
+    <string name="host_browse_no_access">Termux can\'t open this folder.</string>
+    <string name="host_browse_folder_missing">This folder doesn\'t exist.</string>
+    <!-- "~" is Termux's home folder. -->
+    <string name="host_browse_path_not_absolute">Paths start with <xliff:g id="root">/</xliff:g> or <xliff:g id="home">~</xliff:g>.</string>
+    <!-- %1$s: the system's error code, such as EIO. -->
+    <string name="host_browse_unlistable">Can\'t list this folder (<xliff:g id="code" example="EIO">%1$s</xliff:g>).</string>
+    <string name="host_browse_unlistable_unknown">Can\'t list this folder (unknown error).</string>
+
+    <!-- The Changes tab, which shows a workspace's git changes -->
+    <string name="host_git_missing"><xliff:g id="command">git</xliff:g> isn\'t installed in Termux.</string>
+    <!-- %1$s: the git command, such as "git diff"; %2$s: its exit code. -->
+    <string name="host_git_exited"><xliff:g id="command" example="git diff">%1$s</xliff:g> exited with <xliff:g id="exit" example="128">%2$s</xliff:g>.</string>
+    <!-- %1$s: the git command, such as "git diff"; %2$s: how many seconds it was given. -->
+    <string name="host_git_timed_out"><xliff:g id="command" example="git diff">%1$s</xliff:g> took longer than <xliff:g id="seconds" example="30">%2$s</xliff:g> seconds.</string>
+</resources>

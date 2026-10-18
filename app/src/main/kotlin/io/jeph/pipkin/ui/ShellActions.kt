@@ -159,7 +159,7 @@ internal class ShellActions(private val graph: AppGraph) {
       try {
         process.setSessionName(name)
       } catch (error: RpcError) {
-        notify(ShellNotice.Failure(error.error))
+        notify(ShellNotice.Failure(error.message))
       }
     }
   }

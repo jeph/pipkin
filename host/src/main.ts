@@ -35,9 +35,8 @@ const EXIT_USAGE = 64;
 const EXIT_NO_REQUEST = 2;
 
 function failure(error: unknown): JsonObject {
-  const message = error instanceof Error ? error.message : String(error);
-  const code = error instanceof HostError ? error.code : "failed";
-  return { type: "pipkin_result", ok: false, error: message, code };
+  if (error instanceof HostError) return { type: "pipkin_result", ok: false, error: error.message, code: error.code, i18n: error.i18n };
+  return { type: "pipkin_result", ok: false, error: error instanceof Error ? error.message : String(error), code: "failed" };
 }
 
 /** Runs a non-rpc mode and reports its outcome as the single `pipkin_result` line. */

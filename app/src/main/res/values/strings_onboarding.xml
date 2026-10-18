@@ -89,6 +89,8 @@
     <string name="onboarding_install_done">Pi %1$s is installed.</string>
     <string name="onboarding_install_failed">Installing the agent failed.</string>
     <string name="onboarding_install_action">Install</string>
+    <!-- Shown on the Termux setup step when opening Termux didn't start Pipkin's helper there. -->
+    <string name="onboarding_helper_didnt_start">Pipkin\'s helper didn\'t start in Termux. Paste the setup command again.</string>
 
     <string name="onboarding_signin_title">Connect a model</string>
     <string name="onboarding_signin_body">Sign in with a subscription or add an API key. You can add more in Settings later.</string>

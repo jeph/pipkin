@@ -8,6 +8,7 @@ class PipkinApplication : Application() {
 
   override fun onCreate() {
     super.onCreate()
+    AppStrings.init(this)
     graph = AppGraph(this)
   }
 }

@@ -89,8 +89,7 @@ internal fun ThinkingSheet(
     Column(modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
       shown.forEach { level ->
         SheetRow(
-          // Pi's own level names, which are lowercase (`low`, `xhigh`).
-          label = level,
+          label = thinkingLevelLabel(level),
           onClick = {
             controller.setThinkingLevel(level)
             onDismiss()

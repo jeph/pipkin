@@ -1,5 +1,8 @@
 package io.jeph.pipkin.agent
 
+import io.jeph.pipkin.AppStrings
+import io.jeph.pipkin.R
+import io.jeph.pipkin.host.HostRejected
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -9,14 +12,34 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
 /**
- * A Pi RPC command failed: Pi answered `success:false`, did not answer in time ([timedOut]), or is not running.
+ * A Pi RPC command failed for [reason]. [message] is user-presentable: Pi's own [piError] when it rejected the command
+ * with one, else Pipkin's explanation in the app's language when it is read.
  */
 internal class RpcError(
   val command: String,
-  val error: String,
+  val reason: Reason,
+  private val piError: String = "",
   cause: Throwable? = null,
-  val timedOut: Boolean = false,
-) : Exception(error, cause)
+) : Exception(null, cause) {
+  enum class Reason {
+    /** Pi answered `success:false`. */
+    Rejected,
+    TimedOut,
+    NotRunning,
+
+    /** The host refused to run Pi; the [HostRejected] cause says why. */
+    HostRefused,
+  }
+
+  val timedOut: Boolean get() = reason == Reason.TimedOut
+
+  override val message: String get() = when (reason) {
+    Reason.Rejected -> piError.ifEmpty { AppStrings.get(R.string.agent_rpc_rejected, command) }
+    Reason.TimedOut -> AppStrings.get(R.string.agent_rpc_timed_out, command)
+    Reason.NotRunning -> AppStrings.get(R.string.agent_not_running)
+    Reason.HostRefused -> cause?.message ?: AppStrings.get(R.string.agent_not_running)
+  }
+}
 
 /**
  * Correlates Pi RPC commands with their `response` records. Ids are `r<counter>`; every caller
@@ -28,7 +51,7 @@ internal class RpcClient(
 ) {
   private class Pending(val command: String, val reply: CompletableDeferred<JSONObject>)
 
-  private class Closed(val message: String, val cause: Throwable?)
+  private class Closed(val refusal: HostRejected?)
 
   private val counter = AtomicLong()
   private val pending = ConcurrentHashMap<String, Pending>()
@@ -48,20 +71,19 @@ internal class RpcClient(
     pending[id] = Pending(command, reply)
     try {
       // Checked after registering, so a concurrent close either sees this call or this call sees it.
-      closed.get()?.let { throw RpcError(command, it.message, it.cause) }
+      closed.get()?.let { throw it.error(command) }
       try {
         send(params.put("type", command).put("id", id))
       } catch (error: IOException) {
-        throw RpcError(command, NOT_RUNNING, error)
+        throw RpcError(command, RpcError.Reason.NotRunning, cause = error)
       }
       val response = if (timeoutMillis == null) {
         reply.await()
       } else {
-        withTimeoutOrNull(timeoutMillis) { reply.await() }
-          ?: throw RpcError(command, "The agent did not answer $command in time.", timedOut = true)
+        withTimeoutOrNull(timeoutMillis) { reply.await() } ?: throw RpcError(command, RpcError.Reason.TimedOut)
       }
       if (!response.optBoolean("success")) {
-        throw RpcError(command, response.optString("error").ifEmpty { "The agent rejected $command." })
+        throw RpcError(command, RpcError.Reason.Rejected, piError = response.optString("error"))
       }
       return response.optJSONObject("data") ?: JSONObject()
     } finally {
@@ -76,20 +98,25 @@ internal class RpcClient(
   }
 
   /**
-   * Fails every waiting and later caller with an [RpcError]. The first close's [message] and [cause]
-   * win, so a host refusal is not masked by the disconnect that follows it.
+   * Fails every waiting and later caller with an [RpcError]: [RpcError.Reason.HostRefused] for a host [refusal], else
+   * [RpcError.Reason.NotRunning]. The first close wins, so a host refusal is not masked by the disconnect that follows.
    */
-  fun close(message: String, cause: Throwable? = null) {
-    closed.compareAndSet(null, Closed(message, cause))
-    val reason = closed.get() ?: return
+  fun close(refusal: HostRejected? = null) {
+    closed.compareAndSet(null, Closed(refusal))
+    val first = closed.get() ?: return
     for (id in pending.keys.toList()) {
       val entry = pending.remove(id) ?: continue
-      entry.reply.completeExceptionally(RpcError(entry.command, reason.message, reason.cause))
+      entry.reply.completeExceptionally(first.error(entry.command))
     }
+  }
+
+  private fun Closed.error(command: String): RpcError = if (refusal == null) {
+    RpcError(command, RpcError.Reason.NotRunning)
+  } else {
+    RpcError(command, RpcError.Reason.HostRefused, cause = refusal)
   }
 
   companion object {
     const val TIMEOUT_MILLIS = 30_000L
-    const val NOT_RUNNING = "The agent is not running."
   }
 }

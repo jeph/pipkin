@@ -8,11 +8,12 @@ import type { ModeContext } from "../mode.js";
 /** Where Android mounts shared storage volumes; `emulated` and `self` there are not volumes themselves. */
 const STORAGE = "/storage";
 
-const MESSAGES: Record<string, string> = {
-  EACCES: "Termux can't open this folder.",
-  EPERM: "Termux can't open this folder.",
-  ENOENT: "This folder doesn't exist.",
-  ENOTDIR: "This isn't a folder.",
+/** What the folder browser shows for Node's error codes, with the key of its string resource. */
+const MESSAGES: Record<string, { error: string; key: string }> = {
+  EACCES: { error: "Termux can't open this folder.", key: "browse_no_access" },
+  EPERM: { error: "Termux can't open this folder.", key: "browse_no_access" },
+  ENOENT: { error: "This folder doesn't exist.", key: "browse_folder_missing" },
+  ENOTDIR: { error: "This isn't a folder.", key: "not_a_folder" },
 };
 
 /** `~` and `~/…` are Termux home; anything else must be absolute. `..` segments are normalised. */
@@ -60,14 +61,21 @@ async function canonical(path: string, home: string): Promise<string> {
 
 async function listing(raw: string, home: string): Promise<JsonObject> {
   const resolved = resolveBrowsePath(raw, home);
-  if (resolved === undefined) return { path: raw, parent: null, dirs: [], error: "Paths start with / or ~." };
+  if (resolved === undefined) {
+    return { path: raw, parent: null, dirs: [], error: "Paths start with / or ~.", errorI18n: { key: "browse_path_not_absolute" } };
+  }
   const path = await canonical(resolved, home);
   const parent = path === "/" ? null : await openableParent(dirname(path));
   try {
     return { path, parent, dirs: await subfolders(path) };
   } catch (error) {
     const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "";
-    return { path, parent, dirs: [], error: MESSAGES[code] ?? `Can't list this folder (${code || "unknown error"}).` };
+    const known = MESSAGES[code];
+    if (known !== undefined) return { path, parent, dirs: [], error: known.error, errorI18n: { key: known.key } };
+    if (code === "") {
+      return { path, parent, dirs: [], error: "Can't list this folder (unknown error).", errorI18n: { key: "browse_unlistable_unknown" } };
+    }
+    return { path, parent, dirs: [], error: `Can't list this folder (${code}).`, errorI18n: { key: "browse_unlistable", args: { code } } };
   }
 }
 

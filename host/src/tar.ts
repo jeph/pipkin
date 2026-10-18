@@ -4,6 +4,8 @@
  * backups need is supported: files, folders and symlinks, with paths and link targets of any length in pax headers.
  */
 
+import type { HostText } from "./env.js";
+
 const BLOCK = 512;
 /** Largest size or time an 11-digit octal header field holds. */
 const MAX_OCTAL = 0o77777777777;
@@ -15,7 +17,15 @@ export type TarEntry =
   | { type: "directory"; path: string; mode: number; mtime: number }
   | { type: "symlink"; path: string; target: string; mtime: number };
 
-export class TarError extends Error {}
+/** A damaged or unsupported archive; [i18n] names [message] for the app. */
+export class TarError extends Error {
+  constructor(
+    message: string,
+    readonly i18n: HostText,
+  ) {
+    super(message);
+  }
+}
 
 const TYPE_FLAG: Record<TarEntry["type"], string> = { file: "0", directory: "5", symlink: "2" };
 
@@ -121,7 +131,7 @@ class ByteReader {
     let remaining = length;
     while (remaining > 0) {
       const part = await this.some(remaining);
-      if (part === null) throw new TarError("The archive ends in the middle of an entry");
+      if (part === null) throw new TarError("The archive ends in the middle of an entry", { key: "archive_truncated" });
       parts.push(part);
       remaining -= part.length;
     }
@@ -132,7 +142,7 @@ class ByteReader {
     let remaining = length;
     while (remaining > 0) {
       const part = await this.some(remaining);
-      if (part === null) throw new TarError("The archive ends in the middle of an entry");
+      if (part === null) throw new TarError("The archive ends in the middle of an entry", { key: "archive_truncated" });
       remaining -= part.length;
     }
   }
@@ -142,7 +152,7 @@ class ByteReader {
     for (;;) {
       const part = await this.some(64 * 1024);
       if (part === null) return;
-      if (part.some((byte) => byte !== 0)) throw new TarError("The archive has data after its end");
+      if (part.some((byte) => byte !== 0)) throw new TarError("The archive has data after its end", { key: "archive_trailing_data" });
     }
   }
 }
@@ -156,15 +166,17 @@ function readString(header: Buffer, offset: number, length: number): string {
 function readOctal(header: Buffer, offset: number, length: number): number {
   const text = header.subarray(offset, offset + length).toString("ascii").replace(/[\0 ]+$/, "").trim();
   if (text === "") return 0;
-  if (!/^[0-7]+$/.test(text)) throw new TarError("The archive has a damaged header");
+  if (!/^[0-7]+$/.test(text)) throw new TarError("The archive has a damaged header", { key: "archive_header" });
   return Number.parseInt(text, 8);
 }
 
 function checkHeader(header: Buffer): void {
   let sum = 0;
   for (let index = 0; index < BLOCK; index++) sum += index >= 148 && index < 156 ? 0x20 : (header[index] as number);
-  if (readOctal(header, 148, 8) !== sum) throw new TarError("The archive has a damaged header");
-  if (header.subarray(257, 262).toString("ascii") !== "ustar") throw new TarError("The file is not a tar archive");
+  if (readOctal(header, 148, 8) !== sum) throw new TarError("The archive has a damaged header", { key: "archive_header" });
+  if (header.subarray(257, 262).toString("ascii") !== "ustar") {
+    throw new TarError("The file is not a tar archive", { key: "archive_not_tar" });
+  }
 }
 
 function parsePax(records: Buffer): Record<string, string> {
@@ -174,11 +186,11 @@ function parsePax(records: Buffer): Record<string, string> {
     const space = records.indexOf(0x20, offset);
     const length = Number(records.subarray(offset, space).toString("ascii"));
     if (space < 0 || !Number.isInteger(length) || length <= 0 || offset + length > records.length) {
-      throw new TarError("The archive has a damaged pax header");
+      throw new TarError("The archive has a damaged pax header", { key: "archive_pax_header" });
     }
     const record = records.subarray(space + 1, offset + length - 1).toString("utf8");
     const equals = record.indexOf("=");
-    if (equals < 0) throw new TarError("The archive has a damaged pax header");
+    if (equals < 0) throw new TarError("The archive has a damaged pax header", { key: "archive_pax_header" });
     values[record.slice(0, equals)] = record.slice(equals + 1);
     offset += length;
   }
@@ -206,13 +218,13 @@ export async function* readTar(source: AsyncIterable<Buffer>): AsyncGenerator<Ta
     const path = (pax.path ?? (prefix === "" ? headerName : `${prefix}/${headerName}`)).replace(/\/+$/, "");
     const target = pax.linkpath ?? readString(header, 157, 100);
     const size = pax.size === undefined ? readOctal(header, 124, 12) : Number(pax.size);
-    if (!Number.isSafeInteger(size) || size < 0) throw new TarError("The archive has a damaged header");
+    if (!Number.isSafeInteger(size) || size < 0) throw new TarError("The archive has a damaged header", { key: "archive_header" });
     const mode = readOctal(header, 100, 8);
     const mtime = pax.mtime === undefined ? readOctal(header, 136, 12) : Math.floor(Number(pax.mtime));
     pax = {};
 
     if (type === "x") {
-      if (size > MAX_PAX) throw new TarError("The archive has an oversized pax header");
+      if (size > MAX_PAX) throw new TarError("The archive has an oversized pax header", { key: "archive_oversized_pax_header" });
       pax = parsePax(await reader.exactly(size));
       await reader.skip((BLOCK - (size % BLOCK)) % BLOCK);
       continue;
@@ -230,13 +242,15 @@ export async function* readTar(source: AsyncIterable<Buffer>): AsyncGenerator<Ta
       yield { type: "symlink", path, target, mtime };
       continue;
     }
-    if (type !== "0" && type !== "\0") throw new TarError(`The archive holds an unsupported entry: ${path}`);
+    if (type !== "0" && type !== "\0") {
+      throw new TarError(`The archive holds an unsupported entry: ${path}`, { key: "archive_unsupported_entry", args: { path } });
+    }
 
     let remaining = size;
     async function* content(): AsyncGenerator<Buffer> {
       while (remaining > 0) {
         const part = await reader.some(Math.min(remaining, 64 * 1024));
-        if (part === null) throw new TarError("The archive ends in the middle of an entry");
+        if (part === null) throw new TarError("The archive ends in the middle of an entry", { key: "archive_truncated" });
         remaining -= part.length;
         yield part;
       }

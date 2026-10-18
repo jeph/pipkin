@@ -86,7 +86,7 @@ internal fun SubscriptionScreen(
         onOpenModel = onOpenModel,
       )
     }
-    listOfNotNull(status?.settingsError, status?.modelsError, refreshError).forEach {
+    listOfNotNull(status?.settingsError?.localized(), status?.modelsError?.localized(), refreshError).forEach {
       SettingsCaption(text = it, color = pipkinColors.destructive)
     }
   }

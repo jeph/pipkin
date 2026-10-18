@@ -54,7 +54,8 @@ class RpcClientTest {
 
     val error = call.await()
     assertEquals("set_model", error.command)
-    assertEquals("Model not found: x/y", error.error)
+    assertEquals(RpcError.Reason.Rejected, error.reason)
+    assertEquals("Model not found: x/y", error.message)
   }
 
   @Test
@@ -64,6 +65,7 @@ class RpcClientTest {
     rpc.onResponse(response(id, "get_messages", JSONObject()))
 
     assertEquals("get_messages", error.command)
+    assertEquals(RpcError.Reason.TimedOut, error.reason)
   }
 
   @Test
@@ -71,12 +73,13 @@ class RpcClientTest {
     val waiting = async { rpcError { rpc.call("get_state") } }
     sent.receive()
     val refusal = HostRejected("pi_version", "Pi 1.0.0 is installed")
-    rpc.close(refusal.error, refusal)
-    rpc.close(RpcClient.NOT_RUNNING)
+    rpc.close(refusal)
+    rpc.close()
 
     assertSame(refusal, waiting.await().cause)
     val later = rpcError { rpc.call("get_messages") }
     assertEquals("get_messages", later.command)
+    assertEquals(RpcError.Reason.HostRefused, later.reason)
     assertSame(refusal, later.cause)
   }
 
@@ -86,7 +89,7 @@ class RpcClientTest {
 
     val error = rpcError { broken.call("prompt") }
 
-    assertEquals(RpcClient.NOT_RUNNING, error.error)
+    assertEquals(RpcError.Reason.NotRunning, error.reason)
     assertTrue(error.cause is IOException)
   }
 

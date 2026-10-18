@@ -120,9 +120,18 @@ describe("browse mode", () => {
   });
 
   it("reports unreadable paths in the listing instead of failing the session", async () => {
-    expect(await list(path.join(dirs.home, "missing"))).toMatchObject({ dirs: [], error: "This folder doesn't exist." });
+    expect(await list(path.join(dirs.home, "missing"))).toMatchObject({
+      dirs: [],
+      error: "This folder doesn't exist.",
+      errorI18n: { key: "browse_folder_missing" },
+    });
     expect(await list(path.join(dirs.home, "notes.txt"))).toMatchObject({ dirs: [], error: "This isn't a folder." });
-    expect(await list("relative/path")).toMatchObject({ parent: null, dirs: [], error: "Paths start with / or ~." });
+    expect(await list("relative/path")).toMatchObject({
+      parent: null,
+      dirs: [],
+      error: "Paths start with / or ~.",
+      errorI18n: { key: "browse_path_not_absolute" },
+    });
     expect(await list("~")).toMatchObject({ path: dirs.home });
   });
 

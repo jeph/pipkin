@@ -342,13 +342,13 @@ class ChatTimeline(
 
       "queue_update" -> queue = event.optJSONArray("steering").strings() + event.optJSONArray("followUp").strings()
 
-      "auto_retry_start" -> retryNoticeKey = showNotice(retryNoticeKey, "Retrying…")
+      "auto_retry_start" -> retryNoticeKey = showNotice(retryNoticeKey, NoticeKind.Retrying)
 
       "auto_retry_end" -> clearRetryNotice()
 
       "compaction_start" -> {
         compacting = true
-        compactionNoticeKey = showNotice(compactionNoticeKey, "Compacting context…")
+        compactionNoticeKey = showNotice(compactionNoticeKey, NoticeKind.Compacting)
       }
 
       "compaction_end" -> compactionEnd(event)
@@ -360,7 +360,7 @@ class ChatTimeline(
       // Pi catches a failing extension command and still answers its prompt as handled, so this is the only report.
       "extension_error" -> items += TimelineItem.Error(
         "e${itemSeq++}",
-        "Extension \"${event.optString("extensionPath")}\" error: ${event.optString("error")}",
+        ErrorCause.Extension(event.optString("extensionPath"), event.optString("error")),
       )
     }
   }
@@ -534,9 +534,9 @@ class ChatTimeline(
     compactionNoticeKey = null
     val replacement =
       when {
-        event.optJSONObject("result") != null -> Notice(key, "Context compacted")
+        event.optJSONObject("result") != null -> Notice(key, NoticeKind.Compacted)
         event.optBoolean("aborted") -> null
-        else -> TimelineItem.Error(key, event.optStringOrNull("errorMessage") ?: "Compaction failed")
+        else -> TimelineItem.Error(key, ErrorCause.Compaction(event.optStringOrNull("errorMessage")))
       }
     put(key, replacement)
   }
@@ -592,10 +592,10 @@ class ChatTimeline(
   /** The row of the session's notice at [index]; the same index gives the same key on every reload. */
   private fun SavedNotice.item(index: Int) = ExtensionNotice("$NOTICE_KEY$index", level, message)
 
-  /** Shows [text] in the notice [key], creating a new notice when [key] is null. Returns the notice's key. */
-  private fun showNotice(key: String?, text: String): String {
+  /** Shows [kind] in the notice [key], creating a new notice when [key] is null. Returns the notice's key. */
+  private fun showNotice(key: String?, kind: NoticeKind): String {
     val noticeKey = key ?: "n${itemSeq++}"
-    put(noticeKey, Notice(noticeKey, text))
+    put(noticeKey, Notice(noticeKey, kind))
     return noticeKey
   }
 
@@ -759,7 +759,7 @@ private fun assistantItems(message: JSONObject, prefix: String, settled: Boolean
       }
     }
     if (message.optString("stopReason") == "error") {
-      add(TimelineItem.Error("$prefix.error", message.optStringOrNull("errorMessage") ?: "Request failed"))
+      add(TimelineItem.Error("$prefix.error", ErrorCause.Request(message.optStringOrNull("errorMessage"))))
     }
   }
 

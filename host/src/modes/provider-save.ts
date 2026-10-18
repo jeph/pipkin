@@ -22,7 +22,9 @@ export async function providerSave(ctx: ModeContext): Promise<JsonObject> {
   const apiKey = stringParam(ctx.params, "apiKey");
   const models = modelDefsParam(ctx.params, "models");
   if (!PROVIDER_ID.test(id)) {
-    throw new HostError("bad_id", "Use 1–40 lowercase letters, digits or dashes, starting with a letter or digit");
+    throw new HostError("bad_id", "Use 1–40 lowercase letters, digits or dashes, starting with a letter or digit", {
+      key: "provider_id_invalid",
+    });
   }
   if (!APIS.includes(api)) throw new HostError("bad_params", `Unsupported API type ${api}`);
 
@@ -30,7 +32,7 @@ export async function providerSave(ctx: ModeContext): Promise<JsonObject> {
   // Built-in ids (including the subscriptions, whose overrides also live under `providers`) are never custom.
   const builtin = await createRuntime(ctx, { builtinOnly: true });
   if (builtin.getProviders().some((provider) => provider.id === id)) {
-    throw new HostError("builtin_id", `"${id}" is a built-in provider; choose another ID`);
+    throw new HostError("builtin_id", `"${id}" is a built-in provider; choose another ID`, { key: "provider_id_builtin", args: { id } });
   }
   if (apiKey === "") throw new HostError("bad_params", "An API key is required");
 

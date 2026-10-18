@@ -51,6 +51,16 @@
         <item quantity="other">%1$d background tasks running</item>
     </plurals>
 
+    <!-- Notes in the chat while Pi works on the conversation itself. -->
+    <string name="chat_notice_retrying">Retrying…</string>
+    <string name="chat_notice_compacting">Compacting context…</string>
+    <string name="chat_notice_compacted">Context compacted</string>
+    <!-- Error rows in the chat, shown when Pi gives no reason of its own. -->
+    <string name="chat_error_request_failed">Request failed</string>
+    <string name="chat_error_compaction_failed">Compaction failed</string>
+    <!-- %1$s is how Pi names the extension, such as command:deploy; %2$s is the extension's own error message. -->
+    <string name="chat_error_extension">Extension \"%1$s\" error: %2$s</string>
+
     <!-- Tool calls -->
     <string name="chat_thinking">Thinking</string>
     <string name="chat_tool_shell">Shell</string>

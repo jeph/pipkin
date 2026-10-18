@@ -2,6 +2,8 @@ package io.jeph.pipkin.agent
 
 import android.os.SystemClock
 import android.util.Log
+import io.jeph.pipkin.AppStrings
+import io.jeph.pipkin.R
 import io.jeph.pipkin.data.SessionRepository
 import io.jeph.pipkin.host.HostChannel
 import io.jeph.pipkin.host.HostClient
@@ -406,7 +408,7 @@ internal class AgentProcess(
     val data = try {
       call("get_state", timeoutMillis = RESYNC_TIMEOUT_MILLIS)
     } catch (error: RpcError) {
-      Log.w(TAG, "Re-sync get_state failed (timedOut=${error.timedOut}): ${error.error}")
+      Log.w(TAG, "Re-sync get_state failed: ${error.reason}")
       if (error.timedOut && stateFlow.value == AgentProcessState.Ready) restart()
       return
     }
@@ -418,7 +420,7 @@ internal class AgentProcess(
     val messages = try {
       getMessages()
     } catch (error: RpcError) {
-      Log.w(TAG, "Re-sync get_messages failed: ${error.error}")
+      Log.w(TAG, "Re-sync get_messages failed: ${error.reason}")
       null
     }
     // A run that started while get_messages was answered has delivered events; its stream supersedes this reload.
@@ -483,7 +485,7 @@ internal class AgentProcess(
       val rejection = current.rejection ?: error.cause as? HostRejected
       // An exit while starting was already reported by the reader.
       if (rejection == null && stateFlow.value !is AgentProcessState.Exited) {
-        stateFlow.value = AgentProcessState.Failed(error.error)
+        stateFlow.value = AgentProcessState.Failed(error.message)
       }
       rejection
     }
@@ -505,11 +507,11 @@ internal class AgentProcess(
       }
       return true
     } catch (failure: HostFailure) {
-      stateFlow.value = AgentProcessState.Failed(failure.message.orEmpty(), failure)
+      stateFlow.value = AgentProcessState.Failed(failure.message, failure)
     } catch (rejected: HostRejected) {
       stateFlow.value = AgentProcessState.Failed(rejected.error, code = rejected.code)
-    } catch (error: JSONException) {
-      stateFlow.value = AgentProcessState.Failed(error.message ?: "Installing the Pipkin agent failed.")
+    } catch (_: JSONException) {
+      stateFlow.value = AgentProcessState.Failed(AppStrings.get(R.string.agent_install_failed))
     }
     return false
   }
@@ -520,7 +522,7 @@ internal class AgentProcess(
       if (!current.closing && current.rejection == null && connection === current) onConnectionEnded(current)
     } finally {
       // After onConnectionEnded, so a command failing on this exit sees the Exited state.
-      current.rpc.close(RpcClient.NOT_RUNNING)
+      current.rpc.close()
     }
   }
 
@@ -561,7 +563,7 @@ internal class AgentProcess(
 
       HostProtocol.RESULT -> HostRejected.from(line)?.let { rejection ->
         current.rejection = rejection
-        current.rpc.close(rejection.error, rejection)
+        current.rpc.close(rejection)
       }
 
       else -> onEvent(line)
@@ -742,7 +744,7 @@ internal class AgentProcess(
     params: JSONObject = JSONObject(),
     timeoutMillis: Long? = RpcClient.TIMEOUT_MILLIS,
   ): JSONObject {
-    val rpc = connection?.rpc ?: throw RpcError(command, RpcClient.NOT_RUNNING)
+    val rpc = connection?.rpc ?: throw RpcError(command, RpcError.Reason.NotRunning)
     return rpc.call(command, params, timeoutMillis)
   }
 

@@ -221,7 +221,7 @@ private fun BackupRow(backup: BackupInfo, enabled: Boolean, onRestore: () -> Uni
   val size = Formatter.formatShortFileSize(context, backup.size)
   val subtitle =
     when {
-      backup.error != null -> stringResource(R.string.backups_unreadable, backup.name, backup.error)
+      backup.error != null -> stringResource(R.string.backups_unreadable, backup.name, backup.error.localized())
       backup.piVersion != null -> "$size · ${stringResource(R.string.settings_pi_version, backup.piVersion)}"
       else -> size
     }

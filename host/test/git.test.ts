@@ -178,7 +178,13 @@ describe("git mode", () => {
       await initRepo();
       await unlink(path.join(dirs.prefix, "bin", "git"));
       expect(await detect(true)).toMatchObject({ repo: true, git: false });
-      expect(await changes()).toEqual({ type: "pipkin_git_changes_result", id: nextId, error: "git isn't installed in Termux.", code: "no_git" });
+      expect(await changes()).toEqual({
+        type: "pipkin_git_changes_result",
+        id: nextId,
+        error: "git isn't installed in Termux.",
+        code: "no_git",
+        errorI18n: { key: "git_missing" },
+      });
       expect(await commits()).toMatchObject({ code: "no_git" });
     });
   });
@@ -358,8 +364,10 @@ describe("git mode", () => {
     it("refuses a folder git doesn't read as a repo", async () => {
       await mkdir(workspace);
       expect(await changes()).toMatchObject({ code: "not_repo", error: expect.stringContaining("not a git repository") });
-      expect(await request("pipkin_git_changes", { root: path.join(dirs.base, "nowhere"), mode: "uncommitted", ignoreWhitespace: false })).toMatchObject({
+      const nowhere = path.join(dirs.base, "nowhere");
+      expect(await request("pipkin_git_changes", { root: nowhere, mode: "uncommitted", ignoreWhitespace: false })).toMatchObject({
         code: "not_repo",
+        errorI18n: { key: "folder_not_found", args: { path: nowhere } },
       });
     });
   });

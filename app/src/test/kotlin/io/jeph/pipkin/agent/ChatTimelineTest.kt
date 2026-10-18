@@ -255,7 +255,7 @@ class ChatTimelineTest {
     assertEquals("a\nb", tool.output)
     assertTrue(tool.isError)
     assertEquals(ToolStatus.Done, tool.status)
-    assertEquals(TimelineItem.Error("m2.error", "boom"), items[4])
+    assertEquals(TimelineItem.Error("m2.error", ErrorCause.Request("boom")), items[4])
     val bash = items[5] as ToolCall
     assertEquals("bash", bash.toolName)
     assertEquals("pwd", bash.args?.getString("command"))
@@ -506,14 +506,14 @@ class ChatTimelineTest {
   fun retryAndCompactionNotices() {
     apply("""{"type":"auto_retry_start","attempt":1,"maxAttempts":3,"delayMs":2000,"errorMessage":"529"}""")
     apply("""{"type":"auto_retry_start","attempt":2,"maxAttempts":3,"delayMs":2000,"errorMessage":"529"}""")
-    assertEquals(listOf(Notice("n0", "Retrying…")), items)
+    assertEquals(listOf(Notice("n0", NoticeKind.Retrying)), items)
     apply("""{"type":"auto_retry_end","success":true,"attempt":2}""")
     assertEquals(emptyList<TimelineItem>(), items)
 
     apply("""{"type":"compaction_start","reason":"threshold"}""")
-    assertEquals(listOf(Notice("n1", "Compacting context…")), items)
+    assertEquals(listOf(Notice("n1", NoticeKind.Compacting)), items)
     apply("""{"type":"compaction_end","reason":"threshold","result":{"summary":"s"},"aborted":false}""")
-    assertEquals(listOf(Notice("n1", "Context compacted")), items)
+    assertEquals(listOf(Notice("n1", NoticeKind.Compacted)), items)
   }
 
   @Test
@@ -555,7 +555,7 @@ class ChatTimelineTest {
   fun failingExtensionCommandShowsItsError() {
     apply("""{"type":"extension_error","extensionPath":"command:boom","event":"command","error":"kaput"}""")
 
-    assertEquals(listOf(TimelineItem.Error("e0", "Extension \"command:boom\" error: kaput")), items)
+    assertEquals(listOf(TimelineItem.Error("e0", ErrorCause.Extension("command:boom", "kaput"))), items)
     assertFalse(timeline.state.value.busy)
   }
 

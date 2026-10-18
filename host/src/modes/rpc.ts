@@ -11,7 +11,7 @@ import {
   HELLO_TOPIC,
   OutputMerger,
 } from "../channel.js";
-import { installedPiVersion, loadPi, piEntry } from "../env.js";
+import { folderNotFound, HostError, installedPiVersion, loadPi, piEntry } from "../env.js";
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { nullableStringParam, stringParam } from "../params.js";
@@ -19,7 +19,7 @@ import { installedPipkinExtensionFiles, pipkinExtensionFingerprintsParam } from 
 import { SYSTEM_APPEND } from "../prompt.js";
 import { openSettingsIfValid, readGlobalSettings, userNpmPackages } from "../settings.js";
 import { termuxSessionEnv } from "../termux-session.js";
-import { isConfigLocked } from "../config-lock.js";
+import { configBusy, isConfigLocked } from "../config-lock.js";
 
 const STDERR_TAIL = 16 * 1024;
 const TERM_AFTER_MS = 5000;
@@ -110,8 +110,8 @@ async function defaultSteeringToAll(ctx: ModeContext, settings: unknown): Promis
 }
 
 /** Error results for rpc; success has no result line, only `pipkin_exit`. */
-function fail(ctx: ModeContext, code: string, error: string): void {
-  ctx.conn.send({ type: "pipkin_result", ok: false, error, code });
+function fail(ctx: ModeContext, refusal: HostError): void {
+  ctx.conn.send({ type: "pipkin_result", ok: false, error: refusal.message, code: refusal.code, i18n: refusal.i18n });
   ctx.conn.finish();
 }
 
@@ -127,19 +127,28 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const pipkinExtensions = pipkinExtensionFingerprintsParam(ctx.params);
   const installed = await installedPiVersion(ctx.env.root);
   if (installed !== expectedVersion) {
-    const found = installed === null ? "The agent is not installed" : `Agent ${installed} is installed`;
-    fail(ctx, "pi_version", `${found}; Pipkin needs ${expectedVersion}`);
+    const refusal =
+      installed === null
+        ? new HostError("pi_version", `The agent is not installed; Pipkin needs ${expectedVersion}`, {
+            key: "agent_not_installed_needs",
+            args: { expected: expectedVersion },
+          })
+        : new HostError("pi_version", `Agent ${installed} is installed; Pipkin needs ${expectedVersion}`, {
+            key: "agent_version_mismatch",
+            args: { installed, expected: expectedVersion },
+          });
+    fail(ctx, refusal);
     return;
   }
   // The runtime's packages and Pipkin's extensions can change while Pi's version stays put; ensure installs both.
   const installedPackageJson = await readFile(join(ctx.env.root, "pi", "package.json"), "utf8").catch(() => null);
   if (installedPackageJson !== packageJson) {
-    fail(ctx, "pi_version", "The agent's packages are out of date");
+    fail(ctx, new HostError("pi_version", "The agent's packages are out of date", { key: "agent_packages_outdated" }));
     return;
   }
   const extensionFiles = await installedPipkinExtensionFiles(ctx.env.root, pipkinExtensions);
   if (extensionFiles === null) {
-    fail(ctx, "pi_version", "The agent's bundled extensions are out of date");
+    fail(ctx, new HostError("pi_version", "The agent's bundled extensions are out of date", { key: "agent_extensions_outdated" }));
     return;
   }
   const isDirectory = await stat(cwd).then(
@@ -147,13 +156,13 @@ export async function rpc(ctx: ModeContext): Promise<void> {
     () => false,
   );
   if (!isDirectory) {
-    fail(ctx, "cwd_missing", `Folder not found: ${cwd}`);
+    fail(ctx, folderNotFound("cwd_missing", cwd));
     return;
   }
   // A restore swaps the configuration while it holds the lock, and an extension update rewrites the packages Pi loads;
   // Pi must start on one side of the change or the other.
   if (await isConfigLocked(ctx.env)) {
-    fail(ctx, "config_busy", "Pipkin is backing up, restoring or updating the configuration; try again in a moment");
+    fail(ctx, configBusy());
     return;
   }
 

@@ -26,6 +26,7 @@ import io.jeph.pipkin.host.GitChange
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import java.text.NumberFormat
 
 /**
  * Paseo's document file header: the file's name and, muted, its folder, cut off at the end where they don't fit;
@@ -79,6 +80,18 @@ internal fun DiffStat(additions: Int, deletions: Int) {
   Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4)) {
     Text(text = "+${compactCount(additions)}", color = colors.dotSuccess, fontSize = PipkinTokens.FontSize.sm)
     Text(text = "-${compactCount(deletions)}", color = colors.dotDanger, fontSize = PipkinTokens.FontSize.sm)
+  }
+}
+
+/** [value] as Paseo's compact count, `1.2k`, with the app language's digits and unit. */
+@Composable
+private fun compactCount(value: Int): String {
+  val (scaled, unit) = compactScale(value)
+  val number = NumberFormat.getNumberInstance().format(scaled)
+  return when (unit) {
+    CountUnit.One -> number
+    CountUnit.Thousand -> stringResource(R.string.git_count_thousands, number)
+    CountUnit.Million -> stringResource(R.string.git_count_millions, number)
   }
 }
 

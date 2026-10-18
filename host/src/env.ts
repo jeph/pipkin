@@ -24,14 +24,31 @@ export interface HostEnv {
   sharedStorage: string;
 }
 
-/** A failure with a machine-readable code, reported as `pipkin_result` `ok:false`. */
+/**
+ * A text the app shows the user, named by a key the app looks up among its string resources (`HostText.kt`), with the
+ * values of its placeholders. The English text always travels beside it: the app falls back to it for a key it doesn't
+ * know, and logs it. A placeholder whose value is itself a text the app can show sends that text's English under its
+ * name and the text under `<name>I18n`, as fields do.
+ */
+export interface HostText {
+  key: string;
+  args?: Record<string, string | number | HostText>;
+}
+
+/** A failure with a machine-readable code, reported as `pipkin_result` `ok:false`; [i18n] names [message] for the app. */
 export class HostError extends Error {
   constructor(
     readonly code: string,
     message: string,
+    readonly i18n?: HostText,
   ) {
     super(message);
   }
+}
+
+/** The failure each mode reports, under its own [code], for a workspace folder at [path] that isn't there. */
+export function folderNotFound(code: string, path: string): HostError {
+  return new HostError(code, `Folder not found: ${path}`, { key: "folder_not_found", args: { path } });
 }
 
 export function piPackageDir(root: string): string {

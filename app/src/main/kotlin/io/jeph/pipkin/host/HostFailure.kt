@@ -1,18 +1,26 @@
 package io.jeph.pipkin.host
 
+import androidx.annotation.StringRes
+import io.jeph.pipkin.AppStrings
+import io.jeph.pipkin.R
 import java.io.IOException
-import org.json.JSONObject
 
 /**
- * Why a Termux-side operation could not run. [message] is user-presentable. [command], when set, is a literal Termux
- * command that fixes it, which setup shows in place of the installed build's setup command.
+ * Why a Termux-side operation could not run. [message] is user-presentable, in the app's language when it is read.
+ * [command], when set, is a literal Termux command that fixes it, which setup shows in place of the installed build's
+ * setup command.
  */
 internal sealed class HostFailure(
   val kind: Kind,
-  message: String,
+  @StringRes private val messageRes: Int,
   val command: String? = null,
   cause: Throwable? = null,
-) : IOException(message, cause) {
+) : IOException(null, cause) {
+  override val message: String get() = AppStrings.get(messageRes, *messageArgs())
+
+  /** The values of [messageRes]'s placeholders. */
+  protected open fun messageArgs(): Array<Any> = emptyArray()
+
   enum class Kind {
     MissingTermux,
     UntrustedTermux,
@@ -47,81 +55,62 @@ internal sealed class HostFailure(
   /** Fixed in Termux, by setup or by opening it, rather than by retrying; a host connecting proves the fix. */
   val fixedInTermux: Boolean get() = needsSetup || needsTermuxOpen
 
-  class MissingTermux : HostFailure(Kind.MissingTermux, MISSING_TERMUX)
+  class MissingTermux : HostFailure(Kind.MissingTermux, R.string.host_failure_missing_termux)
 
   /** The installed Termux is signed by neither F-Droid nor Google Play, so Pipkin won't run anything in it. */
-  class UntrustedTermux : HostFailure(Kind.UntrustedTermux, UNTRUSTED_TERMUX)
+  class UntrustedTermux : HostFailure(Kind.UntrustedTermux, R.string.host_failure_untrusted_termux)
 
-  class Permission : HostFailure(Kind.Permission, PERMISSION)
+  class Permission : HostFailure(Kind.Permission, R.string.host_failure_permission)
 
-  class ExternalApps : HostFailure(Kind.ExternalApps, EXTERNAL_APPS)
+  class ExternalApps : HostFailure(Kind.ExternalApps, R.string.host_failure_external_apps)
 
-  class Background : HostFailure(Kind.Background, BACKGROUND)
+  class Background : HostFailure(Kind.Background, R.string.host_failure_background)
 
-  class TermuxNotInitialized : HostFailure(Kind.TermuxNotInitialized, TERMUX_NOT_INITIALIZED)
+  class TermuxNotInitialized : HostFailure(Kind.TermuxNotInitialized, R.string.host_failure_termux_not_initialized)
 
-  class NodeMissing : HostFailure(Kind.NodeMissing, NODE_MISSING)
+  class NodeMissing : HostFailure(Kind.NodeMissing, R.string.host_failure_node_missing)
 
-  class NodeTooOld : HostFailure(Kind.NodeTooOld, NODE_TOO_OLD, "yes | pkg upgrade -y")
+  class NodeTooOld : HostFailure(Kind.NodeTooOld, R.string.host_failure_node_too_old, UPGRADE_COMMAND) {
+    override fun messageArgs(): Array<Any> = arrayOf(UPGRADE_COMMAND)
+  }
 
-  class Internal : HostFailure(Kind.Internal, INTERNAL)
+  class Internal : HostFailure(Kind.Internal, R.string.host_failure_internal)
 
-  class Crashed(val exitCode: Int) : HostFailure(Kind.Crashed, "$CRASHED $exitCode before connecting.")
+  class Crashed(val exitCode: Int) : HostFailure(Kind.Crashed, R.string.host_failure_crashed) {
+    override fun messageArgs(): Array<Any> = arrayOf(exitCode)
+  }
 
-  class Timeout : HostFailure(Kind.Timeout, TIMEOUT)
+  class Timeout : HostFailure(Kind.Timeout, R.string.host_failure_timeout)
 
-  class Disconnected(cause: Throwable? = null) : HostFailure(Kind.Disconnected, DISCONNECTED, cause = cause)
+  class Disconnected(cause: Throwable? = null) :
+    HostFailure(Kind.Disconnected, R.string.host_failure_disconnected, cause = cause)
 
   /** Termux stopped its service as the host was launched; [HostLauncher] retries these. */
-  class Interrupted : HostFailure(Kind.Interrupted, INTERRUPTED)
+  class Interrupted : HostFailure(Kind.Interrupted, R.string.host_failure_interrupted)
 
   /** Termux refused the command for a reason other than `allow-external-apps`. */
-  class TermuxError : HostFailure(Kind.TermuxError, TERMUX_ERROR)
+  class TermuxError : HostFailure(Kind.TermuxError, R.string.host_failure_termux_error)
 
   /**
    * Termux was reinstalled, or swapped between its F-Droid and Play builds, after Pipkin set it up. Either wipes
    * Termux's home folder, so Pi, its sign-in and Pipkin's setup there are gone.
    */
-  class TermuxChanged : HostFailure(Kind.TermuxChanged, TERMUX_CHANGED)
+  class TermuxChanged : HostFailure(Kind.TermuxChanged, R.string.host_failure_termux_changed)
 
   /** Play build: Pipkin holds no pairing with a helper in Termux yet. */
-  class HelperNotPaired : HostFailure(Kind.HelperNotPaired, HELPER_NOT_PAIRED)
+  class HelperNotPaired : HostFailure(Kind.HelperNotPaired, R.string.host_failure_helper_not_paired)
 
   /** Play build: the helper answered but holds another pairing key, e.g. after Pipkin's data was cleared. */
-  class HelperRejected : HostFailure(Kind.HelperRejected, HELPER_REJECTED)
+  class HelperRejected : HostFailure(Kind.HelperRejected, R.string.host_failure_helper_rejected)
 
   /** Play build: nothing listens on the helper's ports, so Termux or the helper isn't running. */
-  class HelperUnreachable : HostFailure(Kind.HelperUnreachable, HELPER_UNREACHABLE)
+  class HelperUnreachable : HostFailure(Kind.HelperUnreachable, R.string.host_failure_helper_unreachable)
 
   /** Play build: every helper port is held by something other than Pipkin's helper. */
-  class HelperPortTaken : HostFailure(Kind.HelperPortTaken, HELPER_PORT_TAKEN)
+  class HelperPortTaken : HostFailure(Kind.HelperPortTaken, R.string.host_failure_helper_port_taken)
 
   private companion object {
-    const val MISSING_TERMUX = "Termux is not installed. Install it from F-Droid or Google Play."
-    const val UNTRUSTED_TERMUX = "For your security, Pipkin only runs in the official F-Droid or Google Play build " +
-      "of Termux, and the Termux on this phone is neither. Reinstall Termux from F-Droid or Google Play."
-    const val PERMISSION =
-      "Pipkin isn't allowed to run commands in Termux. In Pipkin's app info, go to Permissions → " +
-        "Additional permissions → Run commands in Termux environment → Allow, then retry."
-    const val EXTERNAL_APPS = "Termux blocked Pipkin's commands. Run the setup command in Termux, then retry."
-    const val BACKGROUND = "Android blocked starting Termux in the background. Open Pipkin and retry."
-    const val INTERRUPTED = "Termux stopped while starting Pipkin's helper. Retry."
-    const val TERMUX_ERROR = "Termux couldn't run Pipkin's helper. Retry."
-    const val TERMUX_NOT_INITIALIZED = "Open Termux once and let it finish installing."
-    const val NODE_MISSING = "Node.js is missing in Termux. Run the setup command in Termux, then retry."
-    const val NODE_TOO_OLD = "Node.js can't run or is too old. Run `yes | pkg upgrade -y` in Termux, then retry."
-    const val INTERNAL = "Pipkin's Termux helper did not receive its token. Retry."
-    const val CRASHED = "Pipkin's Termux helper exited with status"
-    const val TIMEOUT = "Termux did not respond in time. Open Termux once, then retry."
-    const val DISCONNECTED = "The connection to Termux closed unexpectedly. Retry."
-    const val TERMUX_CHANGED = "Termux was reinstalled, which removed Pi, its sign-in and Pipkin's setup in Termux. " +
-      "Run the setup command in Termux again."
-    const val HELPER_NOT_PAIRED = "Pipkin isn't set up in Termux yet. Run the setup command in Termux."
-    const val HELPER_REJECTED = "Termux's Pipkin helper doesn't recognize this Pipkin. " +
-      "Run the setup command in Termux again."
-    const val HELPER_UNREACHABLE = "Pipkin's helper isn't running in Termux. Open Termux, then switch back to Pipkin."
-    const val HELPER_PORT_TAKEN = "Another app is using the ports Pipkin's helper needs. " +
-      "Restart your phone, then retry."
+    const val UPGRADE_COMMAND = "yes | pkg upgrade -y"
 
     val SETUP_KINDS = setOf(
       Kind.MissingTermux,
@@ -135,17 +124,5 @@ internal sealed class HostFailure(
       Kind.HelperNotPaired,
       Kind.HelperRejected,
     )
-  }
-}
-
-/** The host ran the operation and refused it; [code] is the host's machine code (`pi_version`, `bad_id`, …). */
-internal class HostRejected(val code: String, val error: String) : Exception(error) {
-  companion object {
-    /** Null for an `ok:true` `pipkin_result`. */
-    fun from(result: JSONObject): HostRejected? = if (result.optBoolean("ok")) {
-      null
-    } else {
-      HostRejected(result.optString("code", "error"), result.optString("error", "The Termux helper failed."))
-    }
   }
 }

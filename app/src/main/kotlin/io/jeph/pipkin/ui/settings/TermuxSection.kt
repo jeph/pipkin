@@ -49,7 +49,7 @@ internal fun TermuxSection(graph: AppGraph, onOpenPermissions: () -> Unit) {
         current.piVersion?.let { stringResource(R.string.settings_pi_version, it) }
           ?: stringResource(R.string.settings_pi_missing)
       },
-    ).joinToString(" · ")
+    ).joinToString(stringResource(R.string.separator_dot))
   val reinstall = {
     progressLine = null
     outcome = null

@@ -451,6 +451,11 @@ describe("rpc mode", () => {
       type: "pipkin_request",
       params: { cwd: path.join(dirs.base, "nope"), sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, disabledPackages: [], pipkinExtensions: [] },
     });
-    expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "cwd_missing" });
+    expect(await run.next()).toMatchObject({
+      type: "pipkin_result",
+      ok: false,
+      code: "cwd_missing",
+      i18n: { key: "folder_not_found", args: { path: path.join(dirs.base, "nope") } },
+    });
   });
 });

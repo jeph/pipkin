@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.chat
 
+import android.text.format.DateFormat
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -42,9 +44,7 @@ import io.jeph.pipkin.ui.components.PipkinMarkdown
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import java.util.Date
 import kotlinx.coroutines.delay
 
 private val UserBubbleShape =
@@ -54,7 +54,6 @@ private val UserBubbleShape =
     bottomEnd = PipkinTokens.Radius.xxl,
     bottomStart = PipkinTokens.Radius.xxl,
   )
-private val TimeFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 private val ImageMaxEdge = 160.dp
 
 @Composable
@@ -165,10 +164,11 @@ internal fun AssistantMessage(
   }
 }
 
-/** When a message was sent, as `2:47 PM` in the device's time zone. */
+/** When a message was sent, as `2:47 PM` or `14:47` in the device's time zone, language and 12/24-hour setting. */
 @Composable
 internal fun MessageTime(timestamp: Long) {
-  val time = remember(timestamp) { TimeFormat.format(Instant.ofEpochMilli(timestamp).atZone(ZoneId.systemDefault())) }
+  val context = LocalContext.current
+  val time = remember(timestamp, context) { DateFormat.getTimeFormat(context).format(Date(timestamp)) }
   Text(text = time, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
 }
 

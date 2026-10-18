@@ -1,5 +1,7 @@
 package io.jeph.pipkin.data
 
+import io.jeph.pipkin.AppStrings
+import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.host.AuthStatus
@@ -45,11 +47,11 @@ internal class AccountRepository(
         statusState.value = hostClient.authStatus()
         null
       } catch (failure: IOException) {
-        failure.message ?: REFRESH_FAILED
+        failure.message ?: refreshFailed()
       } catch (rejected: HostRejected) {
         rejected.error
       } catch (error: JSONException) {
-        error.message ?: REFRESH_FAILED
+        error.message ?: refreshFailed()
       }
     }
   }
@@ -98,7 +100,5 @@ internal class AccountRepository(
     withContext(Dispatchers.Main.immediate) { registry.reloadIdle() }
   }
 
-  private companion object {
-    const val REFRESH_FAILED = "Could not read sign-in status."
-  }
+  private fun refreshFailed() = AppStrings.get(R.string.settings_auth_refresh_failed)
 }

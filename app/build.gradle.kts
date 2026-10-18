@@ -367,6 +367,14 @@ android {
     compose = true
   }
 
+  // Android 13 and later list Pipkin under Settings › Apps › Language with every locale it has strings for, read from
+  // the values-* folders; src/main/res/resources.properties names the locale of the unqualified values folder.
+  androidResources { generateLocaleConfig = true }
+
+  // Debug builds carry the en-XA and ar-XB pseudolocales: switched to one, any text that skips the string resources
+  // stays plain English, and layouts show how they take longer or right-to-left text.
+  buildTypes { debug { isPseudoLocalesEnabled = true } }
+
   // Production classes log through android.util.Log, whose JVM stub otherwise throws in unit tests.
   testOptions { unitTests.isReturnDefaultValues = true }
 

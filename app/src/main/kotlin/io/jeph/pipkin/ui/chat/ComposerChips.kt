@@ -49,7 +49,7 @@ internal fun ThinkingChip(thinkingLevel: String?, onClick: () -> Unit) {
       tint = colors.foregroundMuted,
     )
     Text(
-      text = thinkingLevel?.let(::levelLabel).orEmpty(),
+      text = thinkingLevel?.let { thinkingLevelLabel(it) }.orEmpty(),
       color = colors.foreground,
       fontSize = PipkinTokens.FontSize.sm,
       maxLines = 1,

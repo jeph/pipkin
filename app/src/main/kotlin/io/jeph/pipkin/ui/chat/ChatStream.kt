@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.findViewTreeCompositionContext
 import androidx.compose.ui.res.colorResource
@@ -55,6 +56,7 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.TimelineState
+import io.jeph.pipkin.agent.text
 import io.jeph.pipkin.ui.components.LoadingPill
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.MarkdownCache
@@ -354,8 +356,8 @@ private fun StreamItem(
     is TimelineItem.ExtensionNotice -> ExtensionNoticeCard(item, modifier)
     is TimelineItem.Thinking -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
     is TimelineItem.ToolCall -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
-    is TimelineItem.Error -> ErrorRow(item.message, modifier)
-    is TimelineItem.Notice -> NoticeRow(item.text, modifier)
+    is TimelineItem.Error -> ErrorRow(item.cause.text(LocalResources.current), modifier)
+    is TimelineItem.Notice -> NoticeRow(stringResource(item.kind.text), modifier)
     is TimelineItem.TurnFooter -> TurnFooterRow(item, backgroundTasks, modifier)
     is TimelineItem.ExitBanner -> ExitBannerCard(item, onRestart, modifier)
   }

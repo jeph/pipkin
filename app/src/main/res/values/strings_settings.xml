@@ -153,6 +153,8 @@
     <string name="provider_status_checking">Checking…</string>
     <string name="provider_status_connected">Connected</string>
     <string name="provider_status_failed">Couldn\'t connect</string>
+    <!-- Pipkin couldn't ask Pi which providers you're signed in to. -->
+    <string name="settings_auth_refresh_failed">Could not read sign-in status.</string>
     <plurals name="provider_models_available">
         <item quantity="one">%1$d model available</item>
         <item quantity="other">%1$d models available</item>
@@ -218,6 +220,9 @@
     <string name="model_summary_thinking">Thinking</string>
     <string name="model_summary_images">Images</string>
     <string name="model_summary_context">%1$s context</string>
+    <!-- A token count shortened to thousands or millions, such as the 272K in "272K context". %1$s: the count of thousands or millions, such as 272 or 1.05. -->
+    <string name="model_tokens_thousands">%1$sK</string>
+    <string name="model_tokens_millions">%1$sM</string>
 
     <string name="subscription_models_empty">No models selected. Add models to use this provider.</string>
     <string name="provider_save">Save</string>

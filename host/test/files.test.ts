@@ -85,7 +85,12 @@ describe("files mode", () => {
 
   it("reports listing failures in the listing", async () => {
     await writeFile(path.join(workspace, "notes.txt"), "");
-    expect(await list("missing")).toMatchObject({ path: "missing", entries: [], error: "This file or folder no longer exists." });
+    expect(await list("missing")).toMatchObject({
+      path: "missing",
+      entries: [],
+      error: "This file or folder no longer exists.",
+      errorI18n: { key: "files_gone" },
+    });
     expect(await list("notes.txt")).toMatchObject({ entries: [], error: "This isn't a folder." });
     expect(await list("../outside")).toMatchObject({ entries: [], error: "That path is outside the workspace." });
     await symlink(outside, path.join(workspace, "escape"));
@@ -94,6 +99,7 @@ describe("files mode", () => {
     expect(await request("pipkin_files_list", { root: missingRoot, path: "." })).toMatchObject({
       entries: [],
       error: `Folder not found: ${missingRoot}`,
+      errorI18n: { key: "folder_not_found", args: { path: missingRoot } },
     });
     expect(await request("pipkin_files_list", { root: "relative", path: "." })).toMatchObject({ error: "Folder not found: relative" });
   });

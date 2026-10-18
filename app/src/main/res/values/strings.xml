@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
     <string name="app_name" translatable="false">Pipkin</string>
 
     <string name="agent_notification_channel">Agent activity</string>
@@ -25,4 +25,35 @@
 
     <!-- Shown over every screen while Pipkin waits for its helper in Termux's Google Play build. -->
     <string name="termux_waking">Starting Pipkin\'s helper in Termux…</string>
+
+    <!-- Why a request to the agent failed. %1$s is the agent's command name, such as get_state, kept as is. -->
+    <string name="agent_rpc_rejected">The agent rejected <xliff:g id="command" example="set_model">%1$s</xliff:g>.</string>
+    <string name="agent_rpc_timed_out">The agent did not answer <xliff:g id="command" example="get_state">%1$s</xliff:g> in time.</string>
+    <string name="agent_not_running">The agent is not running.</string>
+    <string name="agent_install_failed">Installing the Pipkin agent failed.</string>
+
+    <!--
+        Why another chat can't open: the chats already running are all busy. Built from two sentences, a count of busy
+        chats (agent_too_many_working or agent_too_many_shown) and advice (agent_too_many_over_limit or
+        agent_too_many_stop_one), joined by agent_too_many.
+    -->
+    <string name="agent_too_many">%1$s %2$s</string>
+    <plurals name="agent_too_many_working">
+        <item quantity="one"><xliff:g id="count" example="1">%1$d</xliff:g> chat is working.</item>
+        <item quantity="other"><xliff:g id="count" example="4">%1$d</xliff:g> chats are working.</item>
+    </plurals>
+    <!-- Like agent_too_many_working, for when an idle chat shown on screen also holds its agent. -->
+    <plurals name="agent_too_many_shown">
+        <item quantity="one"><xliff:g id="count" example="1">%1$d</xliff:g> chat is working or on screen.</item>
+        <item quantity="other"><xliff:g id="count" example="4">%1$d</xliff:g> chats are working or on screen.</item>
+    </plurals>
+    <!-- After the limit of running chats in Settings was lowered below the number already running. -->
+    <plurals name="agent_too_many_over_limit">
+        <item quantity="one">That\'s more than the limit of <xliff:g id="limit" example="1">%1$d</xliff:g>, so stop some to open another.</item>
+        <item quantity="other">That\'s more than the limit of <xliff:g id="limit" example="2">%1$d</xliff:g>, so stop some to open another.</item>
+    </plurals>
+    <string name="agent_too_many_stop_one">Stop one to open another.</string>
+
+    <!-- Joins short facts in one line, such as a project and a model in a notification. Keep the spaces. -->
+    <string name="separator_dot">"\u0020·\u0020"</string>
 </resources>

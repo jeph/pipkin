@@ -43,7 +43,7 @@ internal object ChatNotification {
     process.sessionFile.value?.let { open.putExtra(EXTRA_CWD, process.cwd).putExtra(EXTRA_SESSION, it) }
     return Notification.Builder(context, channel)
       .setSmallIcon(R.drawable.ic_launcher_foreground)
-      .setSubText(listOfNotNull(project, model).joinToString(" · "))
+      .setSubText(listOfNotNull(project, model).joinToString(context.getString(R.string.separator_dot)))
       .setContentIntent(
         PendingIntent.getActivity(
           context,

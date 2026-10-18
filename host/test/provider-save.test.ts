@@ -132,6 +132,7 @@ describe("provider_save mode", () => {
       ok: false,
       code: "models_invalid",
       error: "models.json is not valid JSON. Ask the agent to fix it.",
+      i18n: { key: "models_invalid" },
     });
     expect(await readFile(modelsPath, "utf8")).toBe("{ not json");
   });

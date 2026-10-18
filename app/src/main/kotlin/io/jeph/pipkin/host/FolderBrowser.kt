@@ -11,7 +11,7 @@ import org.json.JSONObject
 internal data class FolderPlace(val kind: String, val path: String, val name: String?)
 
 /** Subfolders of [path], as Termux sees them. [error] explains an unreadable path; [parent] is null at `/`. */
-internal data class FolderListing(val path: String, val parent: String?, val dirs: List<String>, val error: String?)
+internal data class FolderListing(val path: String, val parent: String?, val dirs: List<String>, val error: HostText?)
 
 /**
  * One `host.mjs browse` process kept open while the folder browser is shown, so only opening it pays
@@ -27,7 +27,7 @@ internal class FolderBrowser(private val channel: HostChannel, val places: List<
       path = line.optString("path"),
       parent = line.opt("parent") as? String,
       dirs = line.optJSONArray("dirs").strings(),
-      error = line.opt("error") as? String,
+      error = HostText.field(line, "error"),
     )
   }
 

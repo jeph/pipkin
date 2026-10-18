@@ -25,7 +25,7 @@ import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.text.NumberFormat
-import java.util.Locale
+import java.util.Currency
 import kotlin.math.roundToInt
 import org.json.JSONObject
 
@@ -64,8 +64,14 @@ internal fun SessionInfoSheet(stats: JSONObject, name: String?, home: String?, o
   }
 }
 
-/** A session's spend in USD, to a tenth of a cent. */
-internal fun formatCost(usd: Double): String = String.format(Locale.US, "$%.3f", usd)
+/** A session's spend in USD to a tenth of a cent, written as the app's language writes amounts of US dollars. */
+internal fun formatCost(usd: Double): String = NumberFormat.getCurrencyInstance().apply {
+  currency = Currency.getInstance("USD")
+  minimumFractionDigits = COST_DIGITS
+  maximumFractionDigits = COST_DIGITS
+}.format(usd)
+
+private const val COST_DIGITS = 3
 
 /** Input counts the whole prompt, cached or not, like Pi's terminal UI. */
 @Composable

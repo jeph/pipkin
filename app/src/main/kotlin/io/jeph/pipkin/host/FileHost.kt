@@ -27,8 +27,10 @@ internal sealed interface FileContent {
   class TooLarge(override val size: Long) : FileContent
 }
 
-/** The `files` host ran the request and couldn't do it; [message] says why, for the user. */
-internal class FileError(message: String) : IOException(message)
+/** The `files` host ran the request and couldn't do it; [message] says why, for the user, in the app's language. */
+internal class FileError(private val reason: HostText) : IOException() {
+  override val message: String get() = reason.resolve()
+}
 
 /** A workspace's folders as the file explorer lists and adds to them. */
 internal interface WorkspaceFolders {
@@ -78,7 +80,7 @@ internal class FileHost(hostClient: HostClient, scope: CoroutineScope) : Workspa
 
   private suspend fun request(message: JSONObject, timeoutMillis: Long): JSONObject {
     val reply = host.request(message, timeoutMillis)
-    reply.optString("error").takeIf { it.isNotEmpty() }?.let { throw FileError(it) }
+    HostText.field(reply, "error")?.let { throw FileError(it) }
     return reply
   }
 

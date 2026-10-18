@@ -40,22 +40,41 @@ export async function providerModels(ctx: ModeContext): Promise<JsonObject> {
       throw new HostError("timeout", `No response from ${baseUrl} within 15 s`);
     }
     if (ctx.signal.aborted) throw error;
-    const cause = error instanceof Error && error.cause instanceof Error ? `: ${error.cause.message}` : "";
-    throw new HostError("network", `Could not reach ${baseUrl}${cause}`);
+    if (!(error instanceof Error && error.cause instanceof Error)) {
+      throw new HostError("network", `Could not reach ${baseUrl}`, { key: "provider_unreachable", args: { url: baseUrl } });
+    }
+    const cause = error.cause.message;
+    throw new HostError("network", `Could not reach ${baseUrl}: ${cause}`, {
+      key: "provider_unreachable_because",
+      args: { url: baseUrl, cause },
+    });
   }
   if (!response.ok) {
+    const code = httpErrorCode(response.status);
     const said = serverMessage(body);
-    throw new HostError(httpErrorCode(response.status), `HTTP ${response.status}${said === "" ? "" : `: ${said}`}`);
+    if (said === "") throw new HostError(code, `HTTP ${response.status}`, { key: "provider_http_status", args: { status: response.status } });
+    throw new HostError(code, `HTTP ${response.status}: ${said}`, {
+      key: "provider_http_status_said",
+      args: { status: response.status, message: said },
+    });
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(body);
   } catch {
-    if (HTML_BODY.test(body)) throw new HostError("bad_response", `${url} returned a web page, not JSON`);
-    throw new HostError("bad_response", `The server did not return JSON: ${body.slice(0, BODY_PREVIEW)}`);
+    if (HTML_BODY.test(body)) {
+      throw new HostError("bad_response", `${url} returned a web page, not JSON`, { key: "provider_web_page", args: { url } });
+    }
+    const preview = body.slice(0, BODY_PREVIEW);
+    throw new HostError("bad_response", `The server did not return JSON: ${preview}`, {
+      key: "provider_not_json",
+      args: { body: preview },
+    });
   }
   const data = isObject(parsed) ? parsed.data : undefined;
-  if (!Array.isArray(data)) throw new HostError("bad_response", "The server's /models response has no data list");
+  if (!Array.isArray(data)) {
+    throw new HostError("bad_response", "The server's /models response has no data list", { key: "provider_no_data_list" });
+  }
   const detected = new Map<string, ModelDef>();
   for (const entry of data) {
     if (isObject(entry) && typeof entry.id === "string" && !detected.has(entry.id)) {

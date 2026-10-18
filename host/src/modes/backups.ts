@@ -61,14 +61,23 @@ function backupPath(env: HostEnv, name: string): string {
   return join(backupsDir(env), name);
 }
 
-/** Sends a progress line at most every `PROGRESS_INTERVAL_MS`. */
-function progress(ctx: ModeContext, verb: string): (count: number) => void {
+/**
+ * Sends a progress line at most every `PROGRESS_INTERVAL_MS`: `<verb> <count> items`, which the app shows through the
+ * plural string [key] names.
+ */
+function progress(ctx: ModeContext, verb: string, key: string): (count: number) => void {
   let last = 0;
   return (count) => {
     if (Date.now() - last < PROGRESS_INTERVAL_MS) return;
     last = Date.now();
-    ctx.conn.send({ type: "pipkin_progress", line: `${verb} ${count} ${count === 1 ? "item" : "items"}` });
+    const line = `${verb} ${count} ${count === 1 ? "item" : "items"}`;
+    ctx.conn.send({ type: "pipkin_progress", line, lineI18n: { key, args: { count } } });
   };
+}
+
+/** The failure of a file whose manifest doesn't make it a Pipkin backup. */
+function notBackup(): HostError {
+  return new HostError("not_backup", "This file is not a Pipkin configuration backup", { key: "backup_not_pipkin" });
 }
 
 /** Reads the first `size` bytes of an open file, then closes it. */
@@ -155,7 +164,7 @@ async function readManifest(path: string): Promise<Manifest> {
     for await (const entry of readTar(gunzip as AsyncIterable<Buffer>)) {
       return await parseManifest(entry);
     }
-    throw new TarError("The archive is empty");
+    throw new TarError("The archive is empty", { key: "archive_empty" });
   } finally {
     file.destroy();
     gunzip.destroy();
@@ -164,22 +173,20 @@ async function readManifest(path: string): Promise<Manifest> {
 }
 
 async function parseManifest(entry: TarEntry): Promise<Manifest> {
-  if (entry.type !== "file" || entry.path !== MANIFEST || entry.size > MAX_MANIFEST) {
-    throw new HostError("not_backup", "This file is not a Pipkin configuration backup");
-  }
+  if (entry.type !== "file" || entry.path !== MANIFEST || entry.size > MAX_MANIFEST) throw notBackup();
   const chunks: Buffer[] = [];
   for await (const chunk of entry.content) chunks.push(chunk);
   let manifest: unknown;
   try {
     manifest = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
-    throw new HostError("not_backup", "This file is not a Pipkin configuration backup");
+    throw notBackup();
   }
-  if (manifest === null || typeof manifest !== "object" || !("format" in manifest) || manifest.format !== FORMAT) {
-    throw new HostError("not_backup", "This file is not a Pipkin configuration backup");
-  }
+  if (manifest === null || typeof manifest !== "object" || !("format" in manifest) || manifest.format !== FORMAT) throw notBackup();
   if (!("version" in manifest) || manifest.version !== VERSION) {
-    throw new HostError("backup_version", "This backup is from a newer Pipkin; update Pipkin to restore it");
+    throw new HostError("backup_version", "This backup is from a newer Pipkin; update Pipkin to restore it", {
+      key: "backup_from_newer_pipkin",
+    });
   }
   const createdAt = "createdAt" in manifest && typeof manifest.createdAt === "string" ? manifest.createdAt : "";
   const piVersion = "piVersion" in manifest && typeof manifest.piVersion === "string" ? manifest.piVersion : null;
@@ -195,7 +202,13 @@ async function backupInfo(env: HostEnv, name: string): Promise<JsonObject> {
     if (!Number.isNaN(Date.parse(manifest.createdAt))) info.createdAt = manifest.createdAt;
     info.piVersion = manifest.piVersion;
   } catch (error) {
-    info.error = error instanceof HostError || error instanceof TarError ? error.message : "This file can't be read as a backup";
+    if (error instanceof HostError || error instanceof TarError) {
+      info.error = error.message;
+      info.errorI18n = error.i18n;
+    } else {
+      info.error = "This file can't be read as a backup";
+      info.errorI18n = { key: "backup_unreadable" };
+    }
   }
   return info;
 }
@@ -229,7 +242,7 @@ export async function createBackup(ctx: ModeContext): Promise<JsonObject> {
       createdAt: new Date().toISOString(),
       piVersion: await installedPiVersion(ctx.env.root),
     } satisfies Manifest);
-    const counted = progress(ctx, "Backed up");
+    const counted = progress(ctx, "Backed up", "backup_progress_backed_up");
     async function* entries(): AsyncGenerator<TarEntry> {
       const bytes = Buffer.from(manifest);
       yield { type: "file", path: MANIFEST, mode: 0o644, mtime: Math.floor(Date.now() / 1000), size: bytes.length, content: Readable.from([bytes]) };
@@ -263,14 +276,23 @@ async function removePartialBackups(dir: string): Promise<void> {
 
 /** Checks one archive path under `config/` and returns it relative to the config folder. */
 function configPath(path: string): string {
-  if (!path.startsWith(`${CONFIG}/`)) throw new HostError("bad_backup", `The backup holds a file outside the configuration: ${path}`);
+  if (!path.startsWith(`${CONFIG}/`)) {
+    throw new HostError("bad_backup", `The backup holds a file outside the configuration: ${path}`, {
+      key: "backup_path_outside_config",
+      args: { path },
+    });
+  }
   const relativePath = path.slice(CONFIG.length + 1);
   const segments = relativePath.split("/");
   if (segments.some((segment) => segment === "" || segment === "." || segment === ".." || segment.includes("\0"))) {
-    throw new HostError("bad_backup", `The backup holds an unsafe path: ${path}`);
+    throw new HostError("bad_backup", `The backup holds an unsafe path: ${path}`, { key: "backup_path_unsafe", args: { path } });
   }
-  if (NOT_CONFIGURATION[segments[0] as string] === true) {
-    throw new HostError("bad_backup", `The backup holds ${segments[0]}, which a restore never replaces`);
+  const name = segments[0] as string;
+  if (NOT_CONFIGURATION[name] === true) {
+    throw new HostError("bad_backup", `The backup holds ${name}, which a restore never replaces`, {
+      key: "backup_holds_excluded",
+      args: { name },
+    });
   }
   return relativePath;
 }
@@ -289,7 +311,7 @@ async function extract(ctx: ModeContext, archive: string, staging: string): Prom
   const links: { path: string; target: string }[] = [];
   const linkPaths = new Set<string>();
   const folders: { path: string; mode: number; mtime: number }[] = [];
-  const counted = progress(ctx, "Restored");
+  const counted = progress(ctx, "Restored", "backup_progress_restored");
   let first = true;
   try {
     for await (const entry of readTar(gunzip as AsyncIterable<Buffer>)) {
@@ -301,10 +323,15 @@ async function extract(ctx: ModeContext, archive: string, staging: string): Prom
       }
       if (entry.path === CONFIG && entry.type === "directory") continue;
       const relativePath = configPath(entry.path);
-      if (seen.has(relativePath)) throw new HostError("bad_backup", `The backup holds ${relativePath} twice`);
+      if (seen.has(relativePath)) {
+        throw new HostError("bad_backup", `The backup holds ${relativePath} twice`, { key: "backup_path_twice", args: { path: relativePath } });
+      }
       for (let index = relativePath.indexOf("/"); index >= 0; index = relativePath.indexOf("/", index + 1)) {
         if (linkPaths.has(relativePath.slice(0, index))) {
-          throw new HostError("bad_backup", `The backup holds ${relativePath} beneath a symlink`);
+          throw new HostError("bad_backup", `The backup holds ${relativePath} beneath a symlink`, {
+            key: "backup_path_beneath_symlink",
+            args: { path: relativePath },
+          });
         }
       }
       seen.add(relativePath);
@@ -315,7 +342,10 @@ async function extract(ctx: ModeContext, archive: string, staging: string): Prom
       } else if (entry.type === "symlink") {
         // Anything unpacked beneath this path made it a folder; a symlink beneath it is not on disk yet.
         if ((await exists(target)) || links.some((link) => link.path.startsWith(`${relativePath}/`))) {
-          throw new HostError("bad_backup", `The backup holds files beneath the symlink ${relativePath}`);
+          throw new HostError("bad_backup", `The backup holds files beneath the symlink ${relativePath}`, {
+            key: "backup_files_beneath_symlink",
+            args: { path: relativePath },
+          });
         }
         links.push({ path: relativePath, target: entry.target });
         linkPaths.add(relativePath);
@@ -332,13 +362,21 @@ async function extract(ctx: ModeContext, archive: string, staging: string): Prom
       }
       counted(seen.size);
     }
-    if (first) throw new HostError("not_backup", "This file is not a Pipkin configuration backup");
+    if (first) throw notBackup();
     await done;
   } catch (error) {
     file.destroy();
     gunzip.destroy();
-    if (error instanceof TarError || (error as NodeJS.ErrnoException).code === "Z_DATA_ERROR" || (error as NodeJS.ErrnoException).code === "Z_BUF_ERROR") {
-      throw new HostError("bad_backup", `The backup is damaged: ${(error as Error).message}`);
+    if (error instanceof TarError) {
+      throw new HostError("bad_backup", `The backup is damaged: ${error.message}`, {
+        key: "backup_damaged",
+        args: { reason: error.message, reasonI18n: error.i18n },
+      });
+    }
+    const zlibCode = (error as NodeJS.ErrnoException).code;
+    if (zlibCode === "Z_DATA_ERROR" || zlibCode === "Z_BUF_ERROR") {
+      const reason = (error as Error).message;
+      throw new HostError("bad_backup", `The backup is damaged: ${reason}`, { key: "backup_damaged", args: { reason } });
     }
     throw error;
   }
@@ -420,7 +458,7 @@ export async function restoreBackup(ctx: ModeContext): Promise<JsonObject> {
   const archive = backupPath(ctx.env, stringParam(ctx.params, "name"));
   return withConfigLock(ctx.env, async () => {
     await settleRestores(ctx.env, ctx.signal);
-    if (!(await exists(archive))) throw new HostError("not_found", "This backup no longer exists");
+    if (!(await exists(archive))) throw new HostError("not_found", "This backup no longer exists", { key: "backup_missing" });
     const id = `${Date.now()}-${process.pid}`;
     const staging = `${ctx.env.configDir}.restore-${id}`;
     await mkdir(dirname(ctx.env.configDir), { recursive: true });

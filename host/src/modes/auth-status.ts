@@ -1,4 +1,4 @@
-import { loadPi } from "../env.js";
+import { HostError, type HostText, loadPi } from "../env.js";
 import { isObject, type JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { type ModelDef, objectsById, parseModelDef } from "../model-def.js";
@@ -14,20 +14,24 @@ export async function authStatus(ctx: ModeContext): Promise<JsonObject> {
 
   let providers: JsonObject = {};
   let modelsError = runtime.getError();
+  let modelsErrorI18n: HostText | undefined;
   try {
     ({ providers } = await readModelsJson(ctx.env.configDir));
   } catch (error) {
     modelsError = error instanceof Error ? error.message : String(error);
+    if (error instanceof HostError) modelsErrorI18n = error.i18n;
   }
 
   // `null` scope: settings.json has no enabledModels (or is invalid), so every model shows.
   let scope: ScopeRef[] | null = null;
   let settingsError: string | undefined;
+  let settingsErrorI18n: HostText | undefined;
   try {
     const { enabledModels } = openSettings(ctx, pi);
     if (enabledModels.length > 0) scope = await scopeResolver(pi, await scopeUniverse(runtime, ctx.signal))(enabledModels);
   } catch (error) {
     settingsError = error instanceof Error ? error.message : String(error);
+    if (error instanceof HostError) settingsErrorI18n = error.i18n;
   }
 
   const builtin: JsonObject[] = [];
@@ -70,7 +74,7 @@ export async function authStatus(ctx: ModeContext): Promise<JsonObject> {
     custom,
     scope: scope?.map((ref) => `${ref.provider}/${ref.id}`) ?? null,
     npmPackages: [...userNpmPackages(await readGlobalSettings(ctx.env.configDir))],
-    ...(modelsError === undefined ? {} : { modelsError }),
-    ...(settingsError === undefined ? {} : { settingsError }),
+    ...(modelsError === undefined ? {} : { modelsError, modelsErrorI18n }),
+    ...(settingsError === undefined ? {} : { settingsError, settingsErrorI18n }),
   };
 }

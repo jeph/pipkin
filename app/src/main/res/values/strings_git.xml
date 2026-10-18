@@ -3,6 +3,9 @@
     <string name="git_explorer_changes">Changes</string>
     <string name="git_no_longer_repository">No longer a git repository</string>
     <string name="git_no_longer_installed">git is no longer installed</string>
+    <!-- A diff's added or removed line count shortened to thousands or millions, shown after + or -, such as +1.2k. %1$s: the count of thousands or millions, such as 1.2. -->
+    <string name="git_count_thousands">%1$sk</string>
+    <string name="git_count_millions">%1$sm</string>
 
     <string name="git_trust_title">Trust this repository?</string>
     <string name="git_trust_text">To show its changes, Pipkin runs git in this repository with the repository\'s own configuration, which can run programs. Trust it only if you trust its files.</string>

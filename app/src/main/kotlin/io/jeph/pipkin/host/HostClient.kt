@@ -86,9 +86,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
           .put("expectedVersion", expectedPiVersion)
           .put("pipkinExtensions", JSONArray(extensions))
       }
-      val data = call("ensure", params, ENSURE_TIMEOUT_MILLIS) { _, line ->
-        if (line.optString("type") == HostProtocol.PROGRESS) onProgress(line.optString("line"))
-      }
+      val data = call("ensure", params, ENSURE_TIMEOUT_MILLIS, progress(onProgress))
       val version = data.getString("piVersion")
       helloState.update { it?.copy(piVersion = version) }
       return version
@@ -216,8 +214,14 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     call("update_extensions", JSONObject(), EXTENSIONS_UPDATE_TIMEOUT_MILLIS, progress(onProgress))
   }
 
+  /**
+   * Hands each progress line to [onProgress] in the app's language. Lines are shown only until the next arrives, so each
+   * is resolved as it comes.
+   */
   private fun progress(onProgress: (String) -> Unit): suspend (HostChannel, JSONObject) -> Unit = { _, line ->
-    if (line.optString("type") == HostProtocol.PROGRESS) onProgress(line.optString("line"))
+    if (line.optString("type") == HostProtocol.PROGRESS) {
+      onProgress(HostText.of(line.optString("line"), line.optJSONObject("lineI18n")).resolve())
+    }
   }
 
   /** Opens a folder browser session; close it to end the host. Cancelling the caller closes it too. */

@@ -195,9 +195,12 @@ private fun FolderList(state: FolderBrowserState, modifier: Modifier) {
   val colors = pipkinColors
   val listing = state.listing
   LazyColumn(modifier = modifier.fillMaxWidth()) {
-    val message = state.failure ?: listing?.error
-    if (message != null) {
-      item { Note(message, colors.destructive) }
+    val failure = state.failure
+    val listingError = listing?.error
+    if (failure != null) {
+      item { Note(failure, colors.destructive) }
+    } else if (listingError != null) {
+      item { Note(listingError.localized(), colors.destructive) }
     }
     listing?.parent?.let { parent ->
       item {
