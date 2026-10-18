@@ -172,4 +172,7 @@ Do not report suspected security vulnerabilities in public issues. Follow the
 ## License
 
 Pipkin is released under the [MIT License](LICENSE). Third-party code, fonts, and icons that Pipkin
-includes keep their own licenses, which are noted in the files they were copied into.
+includes keep their own licenses. The app lists them under **Settings → About → Open-source
+licenses**. Their texts are in [`app/src/main/assets/licenses/`](app/src/main/assets/licenses/), the
+bundled Pi extensions' folders, and the files they were copied into, and the website serves its own
+at [`/licenses.txt`](site/public/licenses.txt).

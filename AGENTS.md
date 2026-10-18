@@ -50,6 +50,14 @@ Before adding a dependency, whether a Gradle dependency in `app/build.gradle.kts
 
 When you copy or adapt code, icons, or other assets from another project, keep a header in the copied file naming the source, version, and license, as the Lucide icons in `app/src/main/res/drawable/ic_lucide_*.xml` do.
 
+The APK has to carry the license of everything third-party that it ships, because Android's resource compiler and esbuild strip the comments those headers live in. Settings › About › Open-source licenses lists every `.txt` file under the APK's `licenses/` and `syntax/licenses/` assets, so when you add or update something that ships in the app, update its license file there too:
+
+- Copied code, icons and fonts, and native libraries from Gradle dependencies: a file in `app/src/main/assets/licenses/`, starting with a line naming the source, version, license, and what Pipkin uses it for. Apache-2.0 Android libraries are listed together in `android-libraries.txt`.
+- Packages bundled into the host or a bundled extension: `host/build.ts` writes their license files and puts their notices at the top of the bundle.
+- tree-sitter and the grammars: the `syntaxSources` task in `app/build.gradle.kts` copies each source's license, plus the `notices` of code inside a source that its own license doesn't cover.
+
+The website serves its own notices in `site/public/licenses.txt`; update it when the site starts serving another project's code, fonts, or icons.
+
 ## Vendored pi-web-access
 
 The `pipkin-web-access` extension in `host/src/pi-extensions/pipkin-web-access/` is a copy of the upstream pi-web-access package with a few Pipkin changes. Before updating it to a new upstream release or editing it, read `UPSTREAM.md` in that folder: it lists every difference from upstream and the steps for folding in a release.
