@@ -18,7 +18,7 @@ A command that keeps running in a Pipkin terminal, such as a development server,
 
 ## Background tasks
 
-The agent can run a command in the background, such as a development server, a long build, or a test suite, and stop working while it runs. When the command exits, its result comes back to the chat and the agent picks up where it left off, even if you've left the app.
+The agent can run a command in the background, such as a development server, a long build, or a test suite, and stop working while it runs. When the command exits, its result comes back to the chat and the agent picks up where it left off, even if you've left the app. Background tasks are experimental.
 
 - **The tasks show on the message box** as a **Background** tab, with each task's state and command.
 - **A chat with background tasks shows as working.** The simmering pot stays on its tab and at the end of the chat, with how many tasks are running. You can still send messages, and **Stop** on the message box stops the tasks when the agent isn't replying.
@@ -28,6 +28,14 @@ The agent can run a command in the background, such as a development server, a l
 - **At most four tasks run at once in each chat.** Android stops apps that start too many processes, so each task runs as a single command.
 
 The agent is told to use background tasks for anything that should keep running. It can still start processes another way, such as with `&`, `nohup`, `tmux`, or `screen`, but Pipkin can't see those or keep the phone awake for them, so Android may stop them. To turn background tasks off, turn off **Pipkin background** in **Settings → Pipkin extensions**.
+
+### Why Pipkin has its own
+
+Pi's package list already has background-task extensions, such as [pi-background-tasks](https://github.com/Jawfish/pi-background-tasks). They work well in Pi on a computer, but not in Pipkin:
+
+- **Pipkin can't see their tasks.** To save battery and memory, Pipkin stops the agent of a chat that isn't working and lets the phone sleep once no chat is working. An agent waiting on another extension's task looks idle, so Pipkin stops it, and its tasks with it, or the phone sleeps and Android stops Termux. Pipkin background comes with the app and tells it how many tasks each chat is waiting on, so the chat keeps its agent and the phone stays awake until they end.
+- **Some run their tasks in `tmux`**, outside the agent, where Pipkin can't track or stop them. Each of those tasks also costs several processes toward Android's [32-process limit](#the-32-process-limit). Pipkin background runs each task as one process and allows four at a time in each chat.
+- **Some add several tools.** The model reads every tool's description with each request, so more tools cost more input tokens. Pipkin background is one tool with one short guideline.
 
 ## When nothing is working
 

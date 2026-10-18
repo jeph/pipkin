@@ -67,7 +67,7 @@
     <string name="backups_delete_file_text">%1$s will be deleted for good.</string>
     <string name="settings_extension_todo">Pipkin todo</string>
     <string name="settings_extension_todo_summary">A todo list the agent keeps, shown on the composer</string>
-    <string name="settings_extension_background">Pipkin background</string>
+    <string name="settings_extension_background">Pipkin background (experimental)</string>
     <string name="settings_extension_background_summary">Commands that keep running while the agent waits, such as servers and long builds</string>
     <string name="settings_extension_web_access">Pipkin web access</string>
     <string name="settings_extension_web_access_summary">Web search and page fetching</string>
