@@ -1,14 +1,17 @@
 ---
 title: Connect a model
-description: Sign in with a Claude or OpenAI subscription, add an OpenAI-compatible API, and choose models per chat.
+description: Sign in with a Claude or OpenAI subscription, add a Gemini, Z.ai or Kimi API key or an OpenAI-compatible API, and choose models per chat.
 ---
 
-The agent runs on your phone, but the AI model it talks to runs at a provider. Pipkin supports three kinds:
+The agent runs on your phone, but the AI model it talks to runs at a provider. Pipkin supports these:
 
 | Choice | What you need |
 | --- | --- |
 | **Claude** | A Claude Pro or Max subscription |
 | **OpenAI** | An OpenAI Codex subscription |
+| **Gemini** | A Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) |
+| **Z.ai** | An API key for the [GLM Coding Plan](https://z.ai/subscribe) |
+| **Kimi** | An API key from the [Kimi Code console](https://www.kimi.com/code) |
 | **OpenAI-compatible API** | A base URL and API key from any service that speaks the OpenAI API, including gateways and servers you run yourself |
 
 You can connect several and switch between them per chat. Add them during setup, or later in **Settings → Providers → Add a provider**.
@@ -27,6 +30,17 @@ The other options are useful when the browser flow doesn't work on your phone:
 - **Device code login** (OpenAI): Pipkin shows a code; open the link, enter the code, and Pipkin finishes on its own.
 
 To sign out, open the subscription in **Settings → Providers** and tap **Sign out**.
+
+## Add a Gemini, Z.ai or Kimi key
+
+1. Choose **Gemini**, **Z.ai** or **Kimi**.
+2. Paste your API key and tap **Continue**. Pipkin shows **Key saved**.
+
+Pipkin uses Pi's built-in support for these providers, so their models, context windows and reasoning levels are already filled in. Usage counts against your Gemini API billing, your GLM Coding Plan, or your Kimi Code membership. Pipkin doesn't check the key when you save it; a wrong key shows up as an error in the first chat.
+
+Google doesn't let third-party apps use a Google AI Pro or Ultra subscription, so Gemini needs an API key rather than a Google sign-in.
+
+To remove a key, open the provider in **Settings → Providers** and tap **Remove key**.
 
 ## Add an OpenAI-compatible API
 
@@ -61,7 +75,7 @@ Whatever you pick applies to the current chat and becomes the default for new ch
 
 Pipkin saves providers in Pi's own configuration files, in Termux under `~/.pipkin/pi`:
 
-- `auth.json` holds subscription sign-ins.
+- `auth.json` holds subscription sign-ins and the Gemini, Z.ai and Kimi keys.
 - `models.json` holds OpenAI-compatible providers, their models, and their API keys.
 - `settings.json` holds the default model and which models appear in the list.
 
@@ -69,7 +83,7 @@ These files contain your keys and sign-in tokens, so keep them private. A [backu
 
 ### Other providers
 
-Pipkin's screens cover the three choices above, but Pi reads `models.json` directly, so you can add any provider Pi supports by editing the file. For example, a local [Ollama](https://ollama.com) server:
+Pipkin's screens cover the choices above, but Pi reads `models.json` directly, so you can add any provider Pi supports by editing the file. For example, a local [Ollama](https://ollama.com) server:
 
 ```json
 {

@@ -46,8 +46,8 @@ your code, and every command it runs on the phone itself:
   tree-sitter syntax highlighting for more than twenty languages, look back through commits, and
   open terminals without leaving the app.
 - **Your model, your plan.** Sign in with a Claude Pro or Max subscription or an OpenAI Codex
-  subscription, or add any OpenAI-compatible API, including hosted gateways and servers you run
-  yourself. Add several and switch per chat.
+  subscription, add a Gemini, Z.ai Coding Plan or Kimi Code API key, or add any OpenAI-compatible
+  API, including hosted gateways and servers you run yourself. Add several and switch per chat.
 - **Runs in the background.** Lock your phone or switch apps; a notification tells you when the chat
   is done.
 - **Guided setup.** A step-by-step guide sets up Termux and installs Pi for you, explaining each
@@ -116,7 +116,7 @@ The permission steps can be revisited later from **Settings → Permissions**.
 
 ### Models and providers
 
-Subscriptions and providers live in **Settings**. An OpenAI-compatible provider needs a base URL,
+Subscriptions, API keys and providers live in **Settings**. An OpenAI-compatible provider needs a base URL,
 usually ending in `/v1`, and an API key. Pipkin checks the connection by listing the provider's
 models, and you can pick a default model and switch models per chat.
 
