@@ -206,12 +206,15 @@ internal class AgentProcess(
     timelineState.busy && processState == AgentProcessState.Ready
   }.stateIn(processScope, SharingStarted.Eagerly, false)
 
-  /** Running background tasks, which keep Pi alive while it waits for them, unlike a run, without showing as working. */
-  val backgroundTasks: StateFlow<Int> = backgroundTasksState.asStateFlow()
-
-  override val holdsPi: StateFlow<Boolean> = combine(busy, backgroundTasksState) { working, tasks ->
-    working || tasks > 0
-  }.stateIn(processScope, SharingStarted.Eagerly, false)
+  /**
+   * Lets go [HOLD_GRACE_MILLIS] late: a task's start and end reach the app on Pipkin's channel, apart from Pi's events,
+   * so a run settling and a task starting, or a task ending and the run it wakes, can arrive a moment apart, and
+   * neither the keep-alive nor the registry may let go of Pi in between.
+   */
+  override val holdsPi: StateFlow<Boolean> =
+    combine(busy, backgroundTasksState) { working, tasks -> working || tasks > 0 }
+      .releasedAfter(HOLD_GRACE_MILLIS)
+      .stateIn(processScope, SharingStarted.Eagerly, false)
 
   init {
     // One reader, conflated: a burst of turn ends costs one get_session_stats, and answers never land out of order.
@@ -743,6 +746,9 @@ internal class AgentProcess(
 
     /** The `pipkin-background` extension's topic on Pipkin's channel. */
     const val BACKGROUND_TOPIC = "background"
+
+    /** How long [holdsPi] stays true once nothing holds Pi; Pipkin's channel and Pi's output arrive milliseconds apart. */
+    const val HOLD_GRACE_MILLIS = 2_000L
 
     const val PI_VERSION = "pi_version"
     const val RESYNC_TIMEOUT_MILLIS = 15_000L

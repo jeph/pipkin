@@ -31,7 +31,7 @@ export const TOOL_DESCRIPTION =
 export const PROMPT_SNIPPET = "Run servers, watchers and long commands in the background; results arrive as a message";
 
 export const PROMPT_GUIDELINES: string[] = [
-  "Use `background` for anything that should keep running after a command returns: servers, watchers, long builds, timed waits. Never use `&`, `nohup`, `setsid`, `disown`, `tmux` or `screen` for that: on Android, Pipkin can't keep those alive and Android kills them. After starting a task, don't poll or sleep waiting for it; its result arrives as a message.",
+  "Use `background` for anything that should keep running after a command returns: servers, watchers, long builds, timed waits. After starting a task, don't poll or sleep waiting for it; its result arrives as a message.",
 ];
 
 export const BackgroundParams = Type.Object({
@@ -76,45 +76,6 @@ export interface ResultDetails {
     durationMs: number;
     logPath: string;
   }[];
-}
-
-/** Strips quoted text, where `&` and keywords are only characters, so the checks below see the shell's own syntax. */
-function shellSyntax(command: string): string {
-  return command.replace(/\\./g, "").replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''");
-}
-
-/** A lone `&` that backgrounds what precedes it: not `&&`, `&>`, `>&`, `<&` or `|&`. */
-const BACKGROUND_AMPERSAND = /(?<![&><|])&(?![&>])/;
-
-/**
- * [pattern] as a command: at the start, or after `;`, `&`, `|`, `(`, a backtick or a newline, past any variable
- * assignments, `exec` or `sudo`; not as an argument, as in `grep nohup`.
- */
-function asCommand(pattern: string): RegExp {
-  return new RegExp(`(?:^|[;&|(\`\\n])\\s*(?:\\w+=\\S*\\s+)*(?:(?:exec|sudo)\\s+)*${pattern}`);
-}
-
-const DETACHERS: [RegExp, string][] = [
-  [asCommand(String.raw`nohup\b`), "`nohup`"],
-  [asCommand(String.raw`setsid\b`), "`setsid`"],
-  [asCommand(String.raw`disown\b`), "`disown`"],
-  [asCommand(String.raw`tmux\s+(?:new|new-session|new-window|split-window|send-keys|run-shell)\b`), "`tmux`"],
-  [asCommand(String.raw`screen\s+-\w*d`), "`screen`"],
-];
-
-/**
- * Why [command] would leave a process running after it returns, or null when it wouldn't. A `&` counts unless the
- * command also `wait`s for or `kill`s what it started.
- */
-export function detachedReason(command: string): string | null {
-  const syntax = shellSyntax(command);
-  for (const [pattern, name] of DETACHERS) if (pattern.test(syntax)) return name;
-  if (BACKGROUND_AMPERSAND.test(syntax) && !/(?:^|[\s;&|(])(?:wait|kill)\b/.test(syntax)) return "`&`";
-  return null;
-}
-
-export function blockedBashReason(what: string): string {
-  return `Blocked: ${what} would leave a process running after this command returns, which Pipkin can't keep alive on Android. Run it with the \`background\` tool instead (action "start"); its result arrives as a message when it exits.`;
 }
 
 /** `45s`, `2m 13s`, `1h 4m`. */

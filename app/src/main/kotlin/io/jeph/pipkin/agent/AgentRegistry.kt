@@ -4,6 +4,7 @@ import io.jeph.pipkin.workspace.Pane
 import java.util.IdentityHashMap
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
 
 /** What [AgentRegistry] needs from one chat's agent process. */
@@ -27,7 +29,10 @@ internal interface ManagedProcess {
   /** Whether a run is working, which the chat shows. */
   val busy: StateFlow<Boolean>
 
-  /** Whether Pi has work to keep it alive for: [busy], or background tasks whose results it waits for. */
+  /**
+   * Whether Pi has work to keep it alive for: [busy], or background tasks whose results it waits for. It stays true a
+   * moment after both end, so the handoff from a run to a task or back never lets go of Pi.
+   */
   val holdsPi: StateFlow<Boolean>
 
   suspend fun abort()
@@ -43,6 +48,13 @@ internal interface ManagedProcess {
 
   /** Final: ends Pi and releases the process. */
   fun close()
+}
+
+/** These values, each change to false held back [millis]; a true in that time cancels it, so the false never shows. */
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun Flow<Boolean>.releasedAfter(millis: Long): Flow<Boolean> = transformLatest { held ->
+  if (!held) delay(millis)
+  emit(held)
 }
 
 /** A chat's identity in [AgentRegistry]: its session file path once known, otherwise `new:<uuid>`. */

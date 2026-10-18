@@ -2,8 +2,7 @@
  * Pipkin background: the `background` tool, which runs shell commands past the turn that started them and brings each
  * one's result back as a message that wakes the agent. Pipkin stops an idle chat's Pi and lets the phone sleep once no
  * chat works, so the extension tells the app over Pipkin's channel how many tasks still need this Pi: the app keeps the
- * chat's Pi and its wake lock while any do. It also blocks `bash` commands that would leave a process behind, since
- * nothing would keep that alive.
+ * chat's Pi and its wake lock while any do.
  *
  * Tasks belong to the Pi process, not to one load of the extension: Pi loads it again for each session and `/reload`,
  * and every load shares one registry, so the count the app sees covers all of them. A `/reload` keeps its session's
@@ -17,9 +16,7 @@ import { isObject } from "../../framing.js";
 import { type PipkinChannel, pipkinChannel } from "../pipkin-channel.js";
 import {
   BackgroundParams,
-  blockedBashReason,
   defaultLabel,
-  detachedReason,
   listText,
   logDir,
   MAX_RUNNING,
@@ -269,12 +266,6 @@ export default function pipkinBackground(pi: ExtensionAPI): void {
         else text = listText([...state.tasks.values()].filter((task) => task.sessionId === sessionId), Date.now());
         return { content: [{ type: "text", text }], details: undefined };
       },
-    });
-
-    pi.on("tool_call", (event) => {
-      if (event.toolName !== "bash" || typeof event.input.command !== "string") return undefined;
-      const reason = detachedReason(event.input.command);
-      return reason === null ? undefined : { block: true, reason: blockedBashReason(reason) };
     });
 
     pi.on("agent_start", () => {

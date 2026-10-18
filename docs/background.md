@@ -25,11 +25,11 @@ The agent can run a command in the background, such as a development server, a l
 - **Tasks end with their chat's agent.** Reloading or archiving the chat, switching it to another session, or Android stopping Termux ends them; Pipkin asks before a reload or archive does.
 - **At most four tasks run at once in each chat.** Android stops apps that start too many processes, so each task runs as a single command.
 
-The agent is told to use background tasks instead of `&`, `nohup`, `tmux`, or `screen`, which leave processes Pipkin can't see or keep awake, and Pipkin blocks commands that would. To turn background tasks off, turn off **Pipkin background** in **Settings → Pipkin extensions**.
+The agent is told to use background tasks for anything that should keep running. It can still start processes another way, such as with `&`, `nohup`, `tmux`, or `screen`, but Pipkin can't see those or keep the phone awake for them, so Android may stop them. To turn background tasks off, turn off **Pipkin background** in **Settings → Pipkin extensions**.
 
 ## When nothing is working
 
-Once every chat is idle, no background task is running, and no terminal is running a command, Pipkin waits a couple of seconds, then removes its notification and releases the wake lock, so the phone can sleep normally. Pipkin doesn't hold a wake lock while idle, so leaving it open costs no extra battery.
+Once every chat is idle, no background task is running, and no terminal is running a command, Pipkin removes its notification and releases the wake lock, so the phone can sleep normally. Pipkin doesn't hold a wake lock while idle, so leaving it open costs no extra battery.
 
 Idle chats also give back their memory. A chat that isn't working, waiting on background tasks, or on screen stops its agent after the time set in **Settings → Advanced → Stop idle chats after** (5 minutes by default). Its history stays, and the agent starts again when you open the chat.
 

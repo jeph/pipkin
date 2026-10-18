@@ -22,13 +22,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentRegistryTest {
-  private class FakeProcess(override val cwd: String, sessionPath: String?) : ManagedProcess {
+  private class FakeProcess(override val cwd: String, sessionPath: String?, holdGraceMillis: Long) : ManagedProcess {
     override val sessionFile = MutableStateFlow(sessionPath)
     override val busy = MutableStateFlow(false)
     val backgroundTasks = MutableStateFlow(0)
 
     // Unconfined, so it follows busy and backgroundTasks as soon as a test sets them, like AgentProcess's.
     override val holdsPi: StateFlow<Boolean> = combine(busy, backgroundTasks) { working, tasks -> working || tasks > 0 }
+      .releasedAfter(holdGraceMillis)
       .stateIn(CoroutineScope(Dispatchers.Unconfined), SharingStarted.Eagerly, false)
     var closed = false
     var parked = false
@@ -66,6 +67,9 @@ class AgentRegistryTest {
   private val ended = mutableListOf<FakeProcess>()
   private val maxRunning = MutableStateFlow(MAX_RUNNING)
   private val idleParkMillis = MutableStateFlow(IdleStop.Default.millis)
+
+  /** The [ManagedProcess.holdsPi] grace of the processes a test opens; none, unless the test is about it. */
+  private var holdGraceMillis = 0L
 
   @Test
   fun openReusesTheProcessOfAnOpenSession() = registryTest { registry ->
@@ -359,6 +363,28 @@ class AgentRegistryTest {
     assertEquals(2, registry.processes.value.size)
   }
 
+  // A task's result reaches the app on Pipkin's channel just before the run it wakes reaches it in Pi's events.
+  @Test
+  fun aHiddenChatOverALoweredLimitKeepsItsPiFromATaskEndingToTheRunItWakes() = registryTest { registry ->
+    holdGraceMillis = 200
+    val waiting = registry.open(CWD, "/s/waiting.jsonl")
+    List(2) { registry.open(CWD, "/s/$it.jsonl") }.forEach { it.busy.value = true }
+    waiting.backgroundTasks.value = 1
+    maxRunning.value = 2
+    settle()
+
+    waiting.backgroundTasks.value = 0
+    delay(10)
+    waiting.busy.value = true
+    settle()
+    assertFalse(waiting.parked)
+
+    waiting.busy.value = false
+    delay(400)
+    assertTrue(waiting.parked)
+    assertEquals(listOf(waiting), ended)
+  }
+
   @Test
   fun openingParksDownToALoweredLimit() = registryTest { registry ->
     idleParkMillis.value = null
@@ -575,7 +601,7 @@ class AgentRegistryTest {
     try {
       block(
         AgentRegistry(scope, maxRunning, idleParkMillis, ended::add) { cwd, path ->
-          FakeProcess(cwd, path).also(created::add)
+          FakeProcess(cwd, path, holdGraceMillis).also(created::add)
         },
       )
     } finally {

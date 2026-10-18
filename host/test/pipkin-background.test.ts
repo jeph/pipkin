@@ -5,7 +5,6 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
-  detachedReason,
   readTail,
   resultText,
   signalGroup,
@@ -14,42 +13,6 @@ import {
 } from "../src/pi-extensions/pipkin-background/tasks.js";
 
 const SHELL = { shell: "/bin/sh", args: ["-c"] };
-
-describe("detachedReason", () => {
-  it.each([
-    ["python3 -m http.server 8000 &", "`&`"],
-    ["npm run dev > out.log 2>&1 &", "`&`"],
-    ["(sleep 5; echo hi) & echo started", "`&`"],
-    ["nohup ./server > log 2>&1", "`nohup`"],
-    ["PORT=3000 nohup node server.js", "`nohup`"],
-    ["cd app\nnohup ./server", "`nohup`"],
-    ["cd app && setsid node server.js", "`setsid`"],
-    ["./run & disown", "`disown`"],
-    ["tmux new -d -s dev 'npm start'", "`tmux`"],
-    ["tmux send-keys -t dev 'make' Enter", "`tmux`"],
-    ["screen -dmS build make", "`screen`"],
-  ])("blocks %s", (command, reason) => {
-    expect(detachedReason(command)).toBe(reason);
-  });
-
-  it.each([
-    "echo a && echo b",
-    "ls 2>&1 | grep x",
-    "make &> build.log",
-    "cmd |& tee log",
-    "exec 3<&0",
-    "curl 'http://x/?a=1&b=2'",
-    `echo "nohup & tmux new"`,
-    "a & b & wait",
-    "sleep 1 & pid=$!; kill $pid",
-    "tmux ls",
-    "screen -ls",
-    "grep -r nohup docs",
-    "man setsid",
-  ])("allows %s", (command) => {
-    expect(detachedReason(command)).toBeNull();
-  });
-});
 
 describe("results", () => {
   let dir: string;

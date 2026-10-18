@@ -35,8 +35,6 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -118,32 +116,25 @@ internal class AppGraph(private val application: Application) {
   }
 
   /**
-   * One [KeepAlive] acquisition while any chat holds its Pi (it works or waits on background tasks) or any terminal runs
-   * a command, so switching apps does not stop them. The notification follows which of them keeps Pipkin awake, also
-   * while sign-in or a Pi install keeps it up. The hold outlasts them by [KEEP_ALIVE_GRACE_MILLIS]: a background task's
-   * start and end reach the app on Pipkin's channel, apart from Pi's events, so a run settling and a task starting, or a
-   * task ending and the run it starts, can arrive a moment apart.
+   * One [KeepAlive] acquisition while any chat holds its Pi (it works or waits on background tasks, with a short grace
+   * after; see [AgentProcess.holdsPi]) or any terminal runs a command, so switching apps does not stop them. The
+   * notification follows which of them keeps Pipkin awake, also while sign-in or a Pi install keeps it up.
    */
   private fun holdWhileWorking() {
     scope.launch {
       var hold: AutoCloseable? = null
       // Busy only changes the notification, which tells a working chat from one waiting on background tasks.
-      combine(registry.busy, registry.holding, terminals.busy, ::Triple).collectLatest { (_, chats, terminalsBusy) ->
-        // The service may still run for another holder; a no-op once it has stopped.
-        AgentService.refresh(application)
+      combine(registry.busy, registry.holding, terminals.busy, ::Triple).collect { (_, chats, terminalsBusy) ->
         if (chats || terminalsBusy) {
           if (hold == null) hold = keepAlive.acquire(if (chats) "chats working" else "terminal command")
-          return@collectLatest
+        } else {
+          hold?.close()
+          hold = null
         }
-        delay(KEEP_ALIVE_GRACE_MILLIS)
-        hold?.close()
-        hold = null
+        // The service may still run for another holder; a no-op once it has stopped.
+        AgentService.refresh(application)
       }
     }
-  }
-
-  private companion object {
-    const val KEEP_ALIVE_GRACE_MILLIS = 2_000L
   }
 }
 
