@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type Dirs, installRealPi, makeDirs, removeDirs, runMode } from "./harness.js";
@@ -31,6 +31,29 @@ describe("package_install", () => {
     const missing = path.join(dirs.base, "missing");
     const result = await runMode("package_install", dirs, { source: missing });
     expect(result).toMatchObject({ ok: false, code: "install_failed", error: expect.stringContaining(missing) });
+  });
+
+  it("retries an npm install that fails once, as when npm's cache lost a file", async () => {
+    // Stands in for npm: the first run fails, later runs install the package under --prefix.
+    const bin = path.join(dirs.base, "bin");
+    await mkdir(bin);
+    const npm = path.join(bin, "npm");
+    await writeFile(
+      npm,
+      `#!/bin/sh
+if [ ! -e "$FAKE_NPM_FAILED" ]; then : > "$FAKE_NPM_FAILED"; echo "npm error code ENOENT" >&2; exit 1; fi
+prev=""; for arg in "$@"; do [ "$prev" = "--prefix" ] && prefix="$arg"; prev="$arg"; done
+mkdir -p "$prefix/node_modules/fake-plugin"
+echo '{"name":"fake-plugin","version":"1.0.0"}' > "$prefix/node_modules/fake-plugin/package.json"
+`,
+    );
+    await chmod(npm, 0o755);
+    const env = { PATH: `${bin}:${process.env.PATH ?? ""}`, FAKE_NPM_FAILED: path.join(dirs.base, "failed") };
+    const progress: string[] = [];
+    expect(await runMode("package_install", dirs, { source: "npm:fake-plugin" }, env, progress)).toMatchObject({ ok: true });
+    expect(progress).toContain("npm error code ENOENT");
+    const settings: unknown = JSON.parse(await readFile(path.join(dirs.configDir, "settings.json"), "utf8"));
+    expect(settings).toMatchObject({ packages: ["npm:fake-plugin"] });
   });
 });
 
