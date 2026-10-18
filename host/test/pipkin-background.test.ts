@@ -26,6 +26,7 @@ describe("results", () => {
   });
 
   const task = (overrides: Partial<Task>): Task => ({
+    key: "k1",
     id: "bg1",
     label: "build",
     command: "make",
@@ -50,28 +51,33 @@ describe("results", () => {
     const log = path.join(dir, "bg1.log");
     const lines = Array.from({ length: 1000 }, (_, index) => `line ${index}`);
     await writeFile(log, `${lines.join("\n")}\n`);
-    const tail = readTail(log).split("\n");
+    const tail = (readTail(log) ?? "").split("\n");
     expect(tail).toHaveLength(40);
     expect(tail.at(-1)).toBe("line 999");
     expect(tail[0]).toBe("line 960");
   });
 
-  it("reads nothing from a missing log", () => {
-    expect(readTail(path.join(dir, "missing.log"))).toBe("");
+  it("tells a missing log apart from an empty one", async () => {
+    await writeFile(path.join(dir, "empty.log"), "");
+    expect(readTail(path.join(dir, "missing.log"))).toBeUndefined();
+    expect(readTail(path.join(dir, "empty.log"))).toBe("");
   });
 
-  it("says how each task ended, with its output or that it printed nothing", async () => {
+  it("says how each task ended, with its output, that it printed nothing or that its log is gone", async () => {
     await writeFile(path.join(dir, "bg1.log"), "compiled\n");
+    await writeFile(path.join(dir, "bg2.log"), "");
     const text = resultText([
       task({}),
       task({ id: "bg2", label: "server", logPath: path.join(dir, "bg2.log"), exitCode: null, signal: "SIGTERM" }),
       task({ id: "bg3", label: "bad", status: "failed", error: "spawn /bin/sh ENOENT" }),
+      task({ id: "bg4", label: "gone", logPath: path.join(dir, "bg4.log") }),
     ]);
     expect(text).toBe(
       [
         `Background task bg1 (build) exit 0 after 2m 5s.\nLast output:\n\`\`\`\ncompiled\n\`\`\`\nFull output: ${path.join(dir, "bg1.log")}`,
         `Background task bg2 (server) ended by SIGTERM after 2m 5s.\nIt printed nothing.\nFull output: ${path.join(dir, "bg2.log")}`,
         "Background task bg3 (bad) failed to start: spawn /bin/sh ENOENT.",
+        `Background task bg4 (gone) exit 0 after 2m 5s.\nIts log file ${path.join(dir, "bg4.log")} is gone.`,
       ].join("\n\n"),
     );
   });

@@ -4,7 +4,7 @@
  */
 import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync, readSync, fstatSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
@@ -17,6 +17,9 @@ export const TOPIC = "background";
 
 /** The custom message a finished task's result arrives in. */
 export const RESULT_TYPE = "pipkin-background-result";
+
+/** The custom message telling a session what became of tasks whose Pi stopped tracking them. */
+export const REPORT_TYPE = "pipkin-background-report";
 
 /** Each running task is a process Android counts toward its limit of 32 across all apps. */
 export const MAX_RUNNING = 4;
@@ -45,9 +48,12 @@ export const BackgroundParams = Type.Object({
 
 export type BackgroundParams = Static<typeof BackgroundParams>;
 
-export type TaskStatus = "running" | "exited" | "stopped" | "timed_out" | "failed";
+export const TaskStatus = StringEnum(["running", "exited", "stopped", "timed_out", "failed"] as const);
+export type TaskStatus = Static<typeof TaskStatus>;
 
 export interface Task {
+  /** Unique across Pi processes, unlike [id], which each Pi counts from 1; the task's record and log are named by it. */
+  key: string;
   id: string;
   label: string;
   command: string;
@@ -67,6 +73,7 @@ export interface Task {
 /** What a finished task's result message carries besides its text. */
 export interface ResultDetails {
   tasks: {
+    key: string;
     id: string;
     label: string;
     command: string;
@@ -88,7 +95,7 @@ export function formatDuration(ms: number): string {
 }
 
 /** How a finished task ended, in a few words. */
-export function outcome(task: Task): string {
+export function outcome(task: Pick<Task, "status" | "exitCode" | "signal" | "error">): string {
   switch (task.status) {
     case "running":
       return "running";
@@ -108,14 +115,14 @@ export function outcome(task: Task): string {
 
 /**
  * The last [TAIL_LINES] lines of [path] within its last [TAIL_BYTES] bytes, without terminal escapes or carriage-return
- * progress redraws; empty when the file is empty or gone.
+ * progress redraws; empty when the file is empty, undefined when it's gone.
  */
-export function readTail(path: string): string {
+export function readTail(path: string): string | undefined {
   let fd: number;
   try {
     fd = openSync(path, "r");
   } catch {
-    return "";
+    return undefined;
   }
   try {
     const size = fstatSync(fd).size;
@@ -134,6 +141,14 @@ export function readTail(path: string): string {
   }
 }
 
+/** What a report shows of a task's output: its last lines, or that it printed nothing, and where the rest is. */
+export function outputText(logPath: string): string {
+  const tail = readTail(logPath);
+  if (tail === undefined) return `Its log file ${logPath} is gone.`;
+  const output = tail === "" ? "It printed nothing." : `Last output:\n\`\`\`\n${tail}\n\`\`\``;
+  return `${output}\nFull output: ${logPath}`;
+}
+
 /** The text of one result message, covering every task that finished since the last one. */
 export function resultText(tasks: Task[]): string {
   return tasks
@@ -141,9 +156,7 @@ export function resultText(tasks: Task[]): string {
       const name = `Background task ${task.id} (${task.label})`;
       if (task.status === "failed") return `${name} ${outcome(task)}.`;
       const head = `${name} ${outcome(task)} after ${formatDuration((task.endedAt ?? task.startedAt) - task.startedAt)}.`;
-      const tail = readTail(task.logPath);
-      const output = tail === "" ? "It printed nothing." : `Last output:\n\`\`\`\n${tail}\n\`\`\``;
-      return `${head}\n${output}\nFull output: ${task.logPath}`;
+      return `${head}\n${outputText(task.logPath)}`;
     })
     .join("\n\n");
 }
@@ -151,6 +164,7 @@ export function resultText(tasks: Task[]): string {
 export function resultDetails(tasks: Task[]): ResultDetails {
   return {
     tasks: tasks.map((task) => ({
+      key: task.key,
       id: task.id,
       label: task.label,
       command: task.command,
@@ -227,9 +241,12 @@ export function defaultLabel(command: string): string {
   return first.length > 40 ? `${first.slice(0, 39)}…` : first;
 }
 
-/** Where tasks' output goes. Pi processes share it, so each log's name starts with its Pi's pid. */
-export function logDir(): string {
-  const dir = join(tmpdir(), "pipkin-background");
+/**
+ * Where tasks' logs and records go. Not `$TMPDIR`: Termux empties it whenever its service stops, which would take the
+ * logs of the very tasks a later Pi reports on.
+ */
+export function taskDir(): string {
+  const dir = join(homedir(), ".pipkin", "background");
   mkdirSync(dir, { recursive: true });
   return dir;
 }

@@ -7,27 +7,47 @@
  * Tasks belong to the Pi process, not to one load of the extension: Pi loads it again for each session and `/reload`,
  * and every load shares one registry, so the count the app sees covers all of them. A `/reload` keeps its session's
  * tasks; moving to another session or quitting stops them.
+ *
+ * Each task also has a record on disk (`./records.ts`), so when a Pi stops without passing on what became of its
+ * tasks, as when Android ends Termux, the next Pi on the session tells the agent what the records show.
  */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getShellConfig } from "@earendil-works/pi-coding-agent";
-import { readdirSync, rmSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { isObject } from "../../framing.js";
 import { type PipkinChannel, pipkinChannel } from "../pipkin-channel.js";
 import {
+  bootId,
+  groupRunning,
+  recordedIdentity,
+  pruneRecords,
+  readRecords,
+  removeRecord,
+  reportText,
+  type Self,
+  saveRecord,
+  type StopReason,
+  stopGroup,
+  stopOrphans,
+  type TaskRecord,
+  tracker,
+} from "./records.js";
+import {
   BackgroundParams,
   defaultLabel,
   listText,
-  logDir,
   MAX_RUNNING,
   PROMPT_GUIDELINES,
   PROMPT_SNIPPET,
+  REPORT_TYPE,
   RESULT_TYPE,
   resultDetails,
   resultText,
   signalGroup,
   startProcess,
   type Task,
+  taskDir,
   TOOL_DESCRIPTION,
   TOOL_LABEL,
   TOOL_NAME,
@@ -41,19 +61,27 @@ export const WIDGET_KEY = "background";
 /** How long a stopped task gets to exit on SIGTERM before SIGKILL. */
 const KILL_AFTER_MS = 3000;
 
-/** Logs older than this go when a Pi starts, so the folder doesn't grow for good. */
-const LOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+/** How often, and how many times, a session looks again at tasks another Pi still ran when it started. */
+const RECHECK_MS = 1000;
+const RECHECKS = 30;
 
 /**
- * Why a task was ended early. The agent's own `stop` already answered and a session being left has no one to tell, so
- * neither sends a result; the user's Stop tells the agent without waking it; a timeout is a result like any other.
+ * Why a task was ended early. The agent's own `stop` already answered and a session being left (`quit`, `switch`) has
+ * no one to tell, so neither sends a result; the user's Stop tells the agent without waking it; a timeout is a result
+ * like any other.
  */
-type EndReason = "agent" | "session" | "user" | "timeout";
+type EndReason = Exclude<StopReason, "exit">;
+
+function leftSession(reason: EndReason | undefined): boolean {
+  return reason === "quit" || reason === "switch";
+}
 
 interface RunningTask extends Task {
   pid: number | undefined;
   endReason?: EndReason;
   timer?: NodeJS.Timeout;
+  /** What's on disk about the task; undefined when it has no process. */
+  record?: TaskRecord;
 }
 
 /** A session's latest load of the extension, which its results and widget go through. */
@@ -73,6 +101,12 @@ interface Registry {
   bindings: Map<string, Binding>;
   channel: PipkinChannel;
   lastReported?: number;
+  /** This Pi as records name it. */
+  self: Self;
+  /** Settles once the task groups no Pi tracked when this one started are stopped. */
+  orphans: Promise<void>;
+  /** Records this Pi already told a session about, whose message may not be in the session yet. */
+  reported: Set<string>;
 }
 
 const SHARED = Symbol.for("pipkin.background");
@@ -80,13 +114,25 @@ const SHARED = Symbol.for("pipkin.background");
 function registry(): Registry {
   const global = globalThis as { [SHARED]?: Registry };
   if (global[SHARED]) return global[SHARED];
+  const tasks = new Map<string, RunningTask>();
+  const self: Self = {
+    pid: process.pid,
+    identity: recordedIdentity(process.pid),
+    tracks: (key) => [...tasks.values()].some((task) => task.key === key),
+  };
   const created: Registry = {
-    tasks: new Map(),
+    tasks,
     nextId: 1,
     undelivered: new Map(),
     delivering: 0,
     bindings: new Map(),
     channel: pipkinChannel(),
+    self,
+    // A failure here or in a reconcile leaves records for a later Pi: a report goes missing, nothing false is said.
+    orphans: stopOrphans(self)
+      .then(() => pruneRecords(self, Date.now()))
+      .catch(() => undefined),
+    reported: new Set(),
   };
   global[SHARED] = created;
   created.channel.on(TOPIC, (data) => {
@@ -95,23 +141,11 @@ function registry(): Registry {
   });
   // Pi exits on stdin EOF after `session_shutdown`; this catches a crash, so no task outlives its Pi.
   process.once("exit", () => {
-    for (const task of created.tasks.values()) if (task.status === "running") signalGroup(task.pid, "SIGKILL");
-  });
-  pruneLogs();
-  return created;
-}
-
-function pruneLogs(): void {
-  try {
-    const dir = logDir();
-    const cutoff = Date.now() - LOG_MAX_AGE_MS;
-    for (const name of readdirSync(dir)) {
-      const path = join(dir, name);
-      if (statSync(path).mtimeMs < cutoff) rmSync(path, { force: true });
+    for (const task of created.tasks.values()) {
+      if (task.status === "running" && signalGroup(task.pid, "SIGKILL")) recordStop(task, "exit");
     }
-  } catch {
-    // A log left behind costs a little space, nothing more.
-  }
+  });
+  return created;
 }
 
 /** Tells the app how many tasks keep this Pi needed: running ones and results on their way to the agent. */
@@ -131,9 +165,19 @@ function showWidget(state: Registry, sessionId: string): void {
   binding.ctx.ui.setWidget(WIDGET_KEY, widgetLines(tasks, binding.ctx.ui.theme) ?? undefined);
 }
 
+/** Notes in [task]'s record that Pipkin began stopping it, unless it already had. */
+function recordStop(task: RunningTask, reason: StopReason): void {
+  if (!task.record || task.record.stop) return;
+  task.record = { ...task.record, stop: { reason, at: Date.now() } };
+  saveRecord(task.record);
+}
+
 /** Ends [task]'s process group: SIGTERM, then SIGKILL if it's still there. */
 function stop(task: RunningTask, reason: EndReason): void {
-  task.endReason ??= reason;
+  if (task.endReason === undefined) {
+    task.endReason = reason;
+    recordStop(task, reason);
+  }
   if (!signalGroup(task.pid, "SIGTERM")) return;
   setTimeout(() => {
     if (task.status === "running") signalGroup(task.pid, "SIGKILL");
@@ -155,7 +199,17 @@ function finished(state: Registry, task: RunningTask, code: number | null, signa
   } else {
     task.status = task.endReason ? "stopped" : "exited";
   }
-  if (task.endReason === "session") {
+  // The agent's own stop needs no later word; any other exit is noted before its result goes out, which a Pi stopping
+  // now could leave undelivered.
+  const record = task.record;
+  if (record && task.endReason === "agent") {
+    removeRecord(task.key);
+  } else if (record) {
+    const exit = { status: task.status, exitCode: code, signal, at: task.endedAt, ...(error === undefined ? {} : { error }) };
+    task.record = { ...record, exit };
+    saveRecord(task.record);
+  }
+  if (leftSession(task.endReason)) {
     state.tasks.delete(task.id);
   } else if (task.endReason !== "agent") {
     const waiting = state.undelivered.get(task.sessionId) ?? [];
@@ -187,14 +241,104 @@ function deliver(state: Registry, sessionId: string, settled?: { aborted: boolea
 }
 
 /** Stops a session's tasks without telling the agent, which is leaving the session. */
-function leaveSession(state: Registry, sessionId: string): void {
+function leaveSession(state: Registry, sessionId: string, reason: "quit" | "switch"): void {
   for (const task of state.tasks.values()) {
     if (task.sessionId !== sessionId) continue;
-    if (task.status === "running") stop(task, "session");
+    if (task.status === "running") stop(task, reason);
     else state.tasks.delete(task.id);
   }
   state.undelivered.delete(sessionId);
   state.bindings.delete(sessionId);
+}
+
+/** The keys of the tasks whose result or report [ctx]'s session holds. */
+function deliveredKeys(ctx: ExtensionContext): Set<string> {
+  const keys = new Set<string>();
+  for (const entry of ctx.sessionManager.getEntries()) {
+    if (entry.type !== "custom_message" || (entry.customType !== RESULT_TYPE && entry.customType !== REPORT_TYPE)) continue;
+    const tasks = isObject(entry.details) && Array.isArray(entry.details.tasks) ? entry.details.tasks : [];
+    for (const task of tasks) if (isObject(task) && typeof task.key === "string") keys.add(task.key);
+  }
+  return keys;
+}
+
+/** Deletes the records of [sessionId]'s tasks whose result or report its session now holds. */
+function settleRecords(sessionId: string, ctx: ExtensionContext): void {
+  const delivered = deliveredKeys(ctx);
+  for (const record of readRecords()) {
+    if (record.sessionId === sessionId && delivered.has(record.key)) removeRecord(record.key);
+  }
+}
+
+/**
+ * Moves this Pi's numbering past every task id [ctx]'s session names, in its `background` results, task results and
+ * reports, or in its records, so a new task never takes an id the agent may still read about. Any id seen counts,
+ * since numbering past one costs nothing.
+ */
+function skipUsedIds(state: Registry, sessionId: string, ctx: ExtensionContext): void {
+  const use = (id: unknown) => {
+    const number = typeof id === "string" ? /^bg(\d+)$/.exec(id)?.[1] : undefined;
+    if (number !== undefined) state.nextId = Math.max(state.nextId, Number(number) + 1);
+  };
+  for (const entry of ctx.sessionManager.getEntries()) {
+    if (entry.type === "custom_message" && (entry.customType === RESULT_TYPE || entry.customType === REPORT_TYPE)) {
+      const tasks = isObject(entry.details) && Array.isArray(entry.details.tasks) ? entry.details.tasks : [];
+      for (const task of tasks) if (isObject(task)) use(task.id);
+    }
+    if (entry.type !== "message" || entry.message.role !== "toolResult" || entry.message.toolName !== TOOL_NAME) continue;
+    for (const block of entry.message.content) {
+      if (block.type !== "text") continue;
+      for (const match of block.text.matchAll(/\bbg\d+\b/g)) use(match[0]);
+    }
+  }
+  for (const record of readRecords()) if (record.sessionId === sessionId) use(record.id);
+}
+
+/**
+ * Tells [binding]'s session what the records show of its tasks that no Pi tracks and whose result never reached it,
+ * as one message read with the next prompt: an agent coming back to a chat shouldn't start work on its own. A group
+ * found running goes first. Tasks another running Pi tracks are looked at again until it's gone.
+ */
+async function reconcile(state: Registry, sessionId: string, binding: Binding, rechecks = RECHECKS): Promise<void> {
+  await state.orphans;
+  if (state.bindings.get(sessionId) !== binding) return;
+  const delivered = deliveredKeys(binding.ctx);
+  const reports: { record: TaskRecord; text: string }[] = [];
+  let trackedElsewhere = false;
+  for (let record of readRecords()) {
+    if (record.sessionId !== sessionId || state.reported.has(record.key)) continue;
+    if (delivered.has(record.key)) {
+      removeRecord(record.key);
+      continue;
+    }
+    const who = tracker(record, state.self);
+    trackedElsewhere ||= who === "other";
+    if (who !== "none") continue;
+    const running = record.exit ? false : groupRunning(record);
+    if (running === true) {
+      record = { ...record, orphan: { at: Date.now(), stopped: await stopGroup(record) } };
+      saveRecord(record);
+    }
+    const text = reportText(record, running, Date.now());
+    if (text === null) removeRecord(record.key);
+    else reports.push({ record, text });
+  }
+  if (state.bindings.get(sessionId) !== binding) return;
+  if (reports.length > 0) {
+    for (const { record } of reports) state.reported.add(record.key);
+    binding.pi.sendMessage(
+      {
+        customType: REPORT_TYPE,
+        content: reports.map(({ text }) => text).join("\n\n"),
+        display: true,
+        details: { tasks: reports.map(({ record }) => ({ key: record.key, id: record.id, label: record.label })) },
+      },
+      { triggerTurn: false },
+    );
+  }
+  if (trackedElsewhere && rechecks > 0) {
+    setTimeout(() => reconcile(state, sessionId, binding, rechecks - 1).catch(() => undefined), RECHECK_MS).unref();
+  }
 }
 
 function start(state: Registry, params: BackgroundParams, ctx: ExtensionContext): string {
@@ -208,20 +352,39 @@ function start(state: Registry, params: BackgroundParams, ctx: ExtensionContext)
   // Node reports a missing cwd as the shell not being found, so it's checked here.
   if (!statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) return `Error: ${cwd} is not a directory`;
   const id = `bg${state.nextId++}`;
+  const startedAt = Date.now();
+  const key = `${startedAt.toString(36)}-${process.pid}-${id}`;
   const task: RunningTask = {
+    key,
     id,
     label: params.label?.trim() || defaultLabel(command),
     command,
     cwd,
     sessionId: ctx.sessionManager.getSessionId(),
-    logPath: join(logDir(), `${process.pid}-${id}.log`),
-    startedAt: Date.now(),
+    logPath: join(taskDir(), `${key}.log`),
+    startedAt,
     status: "running",
     pid: undefined,
   };
   try {
     const started = startProcess(getShellConfig(), command, cwd, task.logPath);
     task.pid = started.pid;
+    if (started.pid !== undefined) {
+      task.record = {
+        key,
+        id,
+        label: task.label,
+        command,
+        sessionId: task.sessionId,
+        logPath: task.logPath,
+        startedAt,
+        pid: started.pid,
+        identity: recordedIdentity(started.pid),
+        owner: { pid: state.self.pid, identity: state.self.identity },
+        boot: bootId(),
+      };
+      saveRecord(task.record);
+    }
     started.ended.then(
       ({ code, signal }) => finished(state, task, code, signal),
       (error: unknown) => finished(state, task, null, null, error instanceof Error ? error.message : String(error)),
@@ -284,6 +447,7 @@ export default function pipkinBackground(pi: ExtensionAPI): void {
       for (const [id, task] of state.tasks) {
         if (task.sessionId === sessionId && task.status !== "running" && !undelivered.has(task)) state.tasks.delete(id);
       }
+      settleRecords(sessionId, ctx);
       showWidget(state, sessionId);
       return undefined;
     });
@@ -292,8 +456,9 @@ export default function pipkinBackground(pi: ExtensionAPI): void {
       const sessionId = ctx.sessionManager.getSessionId();
       // The reload's next load takes the session over at its session_start; until then, results wait.
       if (event.reason === "reload") state.bindings.delete(sessionId);
-      else if (event.reason === "quit") for (const id of new Set([...state.bindings.keys(), sessionId])) leaveSession(state, id);
-      else leaveSession(state, sessionId);
+      else if (event.reason === "quit") {
+        for (const id of new Set([...state.bindings.keys(), sessionId])) leaveSession(state, id, "quit");
+      } else leaveSession(state, sessionId, "switch");
       report(state);
     });
   };
@@ -310,8 +475,11 @@ export default function pipkinBackground(pi: ExtensionAPI): void {
     }
     if (!owned) return;
     const sessionId = ctx.sessionManager.getSessionId();
-    state.bindings.set(sessionId, { pi, ctx });
+    const binding = { pi, ctx };
+    state.bindings.set(sessionId, binding);
+    skipUsedIds(state, sessionId, ctx);
     showWidget(state, sessionId);
     deliver(state, sessionId);
+    reconcile(state, sessionId, binding).catch(() => undefined);
   });
 }
