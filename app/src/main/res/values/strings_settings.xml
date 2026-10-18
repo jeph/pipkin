@@ -115,8 +115,8 @@
     <string name="login_key_saved">Key saved</string>
     <string name="login_failed">Sign-in failed.</string>
     <string name="login_try_again">Try again</string>
-    <string name="claude_plugin_warning">Your Pro or Max plan won\'t cover Pipkin without a plugin. Anthropic bills other apps as extra usage, at API rates.</string>
-    <string name="claude_plugin_explanation">The pi-anthropic-auth plugin makes Pipkin\'s requests look like Claude Code\'s, so your plan covers them. That breaks Anthropic\'s terms and could get your account suspended, but many coding tools already do it, so it\'s likely safe.</string>
+    <string name="claude_plugin_warning">Your Pro or Max plan won\'t cover Pipkin without a plugin. Anthropic bills third-party harnesses as extra usage, at API rates.</string>
+    <string name="claude_plugin_explanation">The pi-anthropic-auth plugin makes Pipkin\'s requests look like Claude Code\'s so that you can use your plan\'s token quotas with Pipkin. Although this practice is common in other harnesses, it does technically break Anthropic\'s terms of service. The option to one-click install this plugin is listed here as a setup convenience.</string>
     <string name="claude_plugin_link">github.com/gotgenes/pi-anthropic-auth</string>
     <string name="claude_plugin_skip">Skip</string>
     <string name="claude_plugin_install">Install plugin</string>
