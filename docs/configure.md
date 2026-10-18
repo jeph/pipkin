@@ -3,53 +3,53 @@ title: Configure the agent
 description: Where Pipkin keeps Pi's configuration, how to edit it, how to give the agent standing instructions, and how backups work.
 ---
 
-The agent is [Pi](https://pi.dev), configured with files in its config folder.
+Pipkin runs [Pi](https://pi.dev), so the agent is configured the way Pi is: with files in a config folder. Pipkin gives Pi its own folder, separate from any copy of Pi you run yourself.
 
 ## Where the configuration lives
 
-Pipkin's config folder is `~/.pipkin/pi` in Termux, or `/data/data/com.termux/files/home/.pipkin/pi` in full. **Settings → Agent → Config folder** copies the path.
+Pipkin's config folder is `~/.pipkin/pi` in Termux. The full path is `/data/data/com.termux/files/home/.pipkin/pi`, and **Settings → Agent → Config folder** has a button that copies it.
 
-A standalone Pi uses `~/.pi/agent`. Pipkin and a standalone Pi don't share settings, sign-ins, or extensions.
+A plain Pi install uses `~/.pi/agent` instead. Pipkin doesn't read that folder, so settings, sign-ins, and extensions you set up for your own `pi` don't carry over, and the reverse is true too.
 
 | File or folder | What it holds |
 | --- | --- |
 | `settings.json` | Pi's settings, including the default model and installed packages |
 | `auth.json` | Subscription sign-ins and API keys |
 | `models.json` | OpenAI-compatible providers and their models (see [Connect a model](/docs/providers/)) |
-| `AGENTS.md` | Instructions for every chat |
-| `APPEND_SYSTEM.md` | Text appended to the system prompt |
-| `SYSTEM.md` | A replacement system prompt |
-| `extensions/`, `skills/`, `prompts/`, `themes/` | Your extensions, skills, prompt templates, and themes |
-| `web-search.json` | Settings for the bundled web access extension |
+| `AGENTS.md` | Instructions the agent follows in every chat |
+| `APPEND_SYSTEM.md` | Text added to the end of the system prompt |
+| `SYSTEM.md` | A replacement for Pi's system prompt |
+| `extensions/`, `skills/`, `prompts/`, `themes/` | Your own extensions, skills, prompt templates, and themes |
+| `web-search.json` | Settings for the bundled web search extension |
 | `sessions/` | Chat history |
 
-Pi's [configuration documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/configuration.md) covers every file and setting. Read `~/.pi/agent` there as `~/.pipkin/pi`.
+Pi's [configuration documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/configuration.md) describes every file and setting. Wherever it says `~/.pi/agent`, use `~/.pipkin/pi`.
 
 ## Edit the files
 
-The file viewer is read-only. To change a file:
+Pipkin's file viewer is read-only, so there are two ways to change these files:
 
-- **Ask the agent**, for example: "Add a rule to `~/.pipkin/pi/AGENTS.md` that tests run with `pytest -q`."
-- **Use a terminal**: open **Chat actions → New terminal** and use an editor such as `nano` (`pkg install nano`).
+- **Ask the agent.** In any chat, say what you want, for example: "Add a rule to `~/.pipkin/pi/AGENTS.md` that tests run with `pytest -q`."
+- **Use a terminal.** Open one with **Chat actions → New terminal** and edit with a terminal editor, such as `nano` (`pkg install nano`).
 
-To browse the folder, add `~/.pipkin/pi` as a workspace, or choose **Show hidden files** in the file explorer.
+To browse the folder, add `~/.pipkin/pi` as a workspace, or open the file explorer and choose **Show hidden files**.
 
-Reload to apply changes:
+After you change a file, reload so the agent picks it up:
 
-- **Chat actions → Reload agent**, or `/reload`, reloads the current chat. Pipkin asks first if the agent is working.
-- **Settings → Agent → Reload all agents** reloads every idle chat.
+- **Chat actions → Reload agent**, or type `/reload`, reloads the current chat. If the agent is working, Pipkin asks before stopping it.
+- **Settings → Agent → Reload all agents** reloads every chat that isn't working.
 
-A reload restarts the agent and keeps the conversation.
+A reload restarts the agent in the same folder and keeps the conversation.
 
 ## Give the agent standing instructions
 
-Instructions for every chat go in `~/.pipkin/pi/AGENTS.md`. Instructions for one project go in an `AGENTS.md` in its folder. Pi reads both, plus any `AGENTS.md` in parent folders.
+Put instructions you want in every chat in `~/.pipkin/pi/AGENTS.md`: your preferred tools, coding style, or notes about your phone. For a single project, put an `AGENTS.md` in the project's folder instead. Pi reads both, plus any `AGENTS.md` in the folders above the project.
 
-Pipkin already tells the agent it runs on Android in Termux. To add to the system prompt instead, use `APPEND_SYSTEM.md`.
+Pipkin already tells the agent it's running on Android in Termux, so you don't need to explain that. To add to the system prompt instead of the conversation's instructions, use `APPEND_SYSTEM.md`.
 
 ## Project settings
 
-A project's `.pi` folder can hold its own Pi settings, extensions, skills, and prompts. These can run code, so Pi loads them only from trusted folders. Pipkin can't show Pi's trust prompt, so list trusted folders by full path in `~/.pipkin/pi/trust.json`:
+A project can carry its own Pi settings, extensions, skills, and prompts in a `.pi` folder. Because those can run code, Pi loads them only from folders you trust. Pipkin runs Pi without its interactive trust prompt, so record the decision in `~/.pipkin/pi/trust.json`, using the folder's full path:
 
 ```json
 {
@@ -57,12 +57,12 @@ A project's `.pi` folder can hold its own Pi settings, extensions, skills, and p
 }
 ```
 
-Trust extends to subfolders. `AGENTS.md` files load without trust.
+Trusting a folder also trusts the folders inside it. `AGENTS.md` files don't need trust; they always load.
 
 ## Back up and restore
 
-In **Settings → Agent → Backups**, tap **Back up now**. A backup holds settings, sign-ins, models, extensions, skills, prompts, and themes, but not chats.
+Open **Settings → Agent → Backups** and tap **Back up now**. A backup holds Pi's configuration: settings, sign-ins, models, extensions, skills, prompts, and themes. Chats aren't part of it.
 
-Backups are saved in `~/.pipkin/backups`. The Android Files app can copy them elsewhere. Uninstalling Termux or clearing its data deletes them.
+Backups are saved in Termux at `~/.pipkin/backups`. The Android Files app can reach them under Termux, so you can copy one somewhere safe. Uninstalling Termux or clearing its data deletes them too.
 
-To restore, tap **Restore** next to a backup. It replaces the current configuration; chats are kept. Pipkin stops running chats first. Quit any `pi` you started yourself with Pipkin's config folder before restoring.
+To restore, tap **Restore** next to a backup. The backup replaces the current configuration, and anything changed since is lost. Your chats stay as they are. Pipkin stops running chats first, so a reply in progress ends. If you started `pi` yourself in a terminal with Pipkin's config folder, quit it before restoring.
