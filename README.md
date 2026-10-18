@@ -23,7 +23,6 @@ cloud server doing the work somewhere else.
 - [Development](#development)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
-- [Donations](#donations)
 - [License](#license)
 
 ## Features
@@ -210,14 +209,8 @@ problem, please [open an issue](https://github.com/jeph/pipkin/issues) with your
 Android version, and Termux build. Reports from real-world use are especially helpful while the
 project is young.
 
-Do not report suspected security vulnerabilities in public issues. Use
-[GitHub's private vulnerability reporting](https://github.com/jeph/pipkin/security/advisories/new)
-instead.
-
-## Donations
-
-If this project is useful to you and you would like to support its development, donations are
-welcome to **@Jephrey** on Venmo.
+Do not report suspected security vulnerabilities in public issues. Follow the
+[security policy](.github/SECURITY.md) to submit a private vulnerability report.
 
 ## License
 
