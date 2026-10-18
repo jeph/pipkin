@@ -1,11 +1,12 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { once } from "node:events";
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer, type Socket } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { inject } from "vitest";
+import { inject, onTestFinished } from "vitest";
 import { encodeLine, isObject, LineSplitter, type JsonObject } from "../src/framing.js";
 
 export const PI_VERSION = "1.3.0";
@@ -44,6 +45,21 @@ export async function makeDirs(): Promise<Dirs> {
 
 export async function removeDirs(dirs: Dirs): Promise<void> {
   await rm(dirs.base, { recursive: true, force: true });
+}
+
+/**
+ * Holds the config lock in `dirs` the way another live host would, until the test ends. The holder is a real process
+ * whose command line names host.mjs, since on Linux and Android the host reads that from /proc before it believes a
+ * lock; the test runner's own pid would pass for a host only where there's no /proc.
+ */
+export async function holdConfigLock(dirs: Dirs): Promise<void> {
+  const holder = spawn(process.execPath, ["-e", "setInterval(() => {}, 60_000)", "host.mjs"], { stdio: "ignore" });
+  await once(holder, "spawn");
+  onTestFinished(async () => {
+    holder.kill();
+    if (holder.exitCode === null && holder.signalCode === null) await once(holder, "exit");
+  });
+  await symlink(String(holder.pid), path.join(dirs.root, "config.lock"));
 }
 
 function piDir(dirs: Dirs): string {

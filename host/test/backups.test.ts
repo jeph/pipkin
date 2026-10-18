@@ -8,7 +8,7 @@ import { createGzip } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { isObject } from "../src/framing.js";
 import { tarStream, type TarEntry } from "../src/tar.js";
-import { type Dirs, makeDirs, removeDirs, runMode } from "./harness.js";
+import { type Dirs, holdConfigLock, makeDirs, removeDirs, runMode } from "./harness.js";
 
 /** Every entry under `dir`: file contents, symlink targets, folders, with permission bits. */
 async function snapshot(dir: string): Promise<Record<string, string>> {
@@ -262,7 +262,7 @@ describe("configuration backups", () => {
   });
 
   it("refuses to run while another host holds the config lock, and takes over one a dead host left", async () => {
-    await symlink(String(process.pid), path.join(dirs.root, "config.lock"));
+    await holdConfigLock(dirs);
     expect(await runMode("backup_create", dirs, {})).toMatchObject({ ok: false, code: "busy" });
     await rm(path.join(dirs.root, "config.lock"));
     await symlink("999999", path.join(dirs.root, "config.lock"));

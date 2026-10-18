@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -7,6 +7,7 @@ import { encodeLine } from "../src/framing.js";
 import { SYSTEM_APPEND } from "../src/prompt.js";
 import {
   type Dirs,
+  holdConfigLock,
   type HostRun,
   installFakePi,
   makeDirs,
@@ -256,7 +257,7 @@ describe("rpc mode", () => {
   });
 
   it("refuses to start Pi while a backup or restore holds the config lock", async () => {
-    await symlink(String(process.pid), path.join(dirs.root, "config.lock"));
+    await holdConfigLock(dirs);
     const { run } = await startHost("rpc", dirs);
     await run.next();
     run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
