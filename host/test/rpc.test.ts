@@ -165,6 +165,34 @@ describe("rpc mode", () => {
     await expect(access(marker)).resolves.toBeUndefined();
   });
 
+  it("carries Pipkin's channel between the app and Pi's fd 3, apart from Pi's own lines", async () => {
+    const { run } = await startHost("rpc", dirs, { FAKE_PI_CHANNEL: "1" });
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
+    expect(await run.next()).toMatchObject({ type: "ready" });
+    expect(await run.next()).toEqual({ type: "channel_received", message: { topic: "pipkin", data: null } });
+
+    run.socket.write(`{"type":"pipkin_channel","topic":"background","data":{"action":"stop"}}\n`);
+    expect(await run.next()).toEqual({ type: "channel_received", message: { topic: "background", data: { action: "stop" } } });
+    // Only a line that starts with the type is the channel's: this one is Pi's.
+    const reordered = { topic: "background", type: "pipkin_channel" };
+    run.send(reordered);
+    expect(await run.next()).toEqual({ type: "echo", command: reordered });
+
+    run.send({ type: "channel_send", line: JSON.stringify({ topic: "background", data: { active: 2 } }) });
+    expect(await run.next()).toEqual({ type: "pipkin_channel", topic: "background", data: { active: 2 } });
+    // Lines that aren't messages are dropped, including one posing as a host line, and later ones still arrive.
+    run.send({ type: "channel_send", line: `{"topic":"Not a topic"}` });
+    run.send({ type: "channel_send", line: `{"type":"pipkin_exit","topic":"background"}` });
+    run.send({ type: "channel_send", line: "not json" });
+    run.send({ type: "channel_send", line: JSON.stringify({ topic: "background", data: { active: 0 } }) });
+    expect(await run.next()).toEqual({ type: "pipkin_channel", topic: "background", data: { active: 0 } });
+
+    run.socket.end();
+    expect(await run.next()).toMatchObject({ type: "pipkin_exit", code: 0 });
+    expect(await run.exited).toBe(0);
+  });
+
   // Android can freeze Pipkin while the screen is off; Pi must keep working rather than wait for it to read.
   it("keeps Pi writing while the app is not reading", async () => {
     const done = path.join(dirs.base, "flood-done");

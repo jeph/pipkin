@@ -20,8 +20,11 @@ class PanesTest {
   private class FakeProcess(override val cwd: String, sessionPath: String?) : ManagedProcess {
     override val sessionFile = MutableStateFlow(sessionPath)
     override val busy = MutableStateFlow(false)
+    override val holdsPi = MutableStateFlow(false)
 
     override suspend fun abort() = Unit
+
+    override suspend fun stopBackgroundTasks() = Unit
 
     override fun park() = Unit
 

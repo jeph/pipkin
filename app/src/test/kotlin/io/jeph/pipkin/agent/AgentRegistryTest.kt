@@ -2,10 +2,15 @@ package io.jeph.pipkin.agent
 
 import io.jeph.pipkin.workspace.Pane
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -20,11 +25,22 @@ class AgentRegistryTest {
   private class FakeProcess(override val cwd: String, sessionPath: String?) : ManagedProcess {
     override val sessionFile = MutableStateFlow(sessionPath)
     override val busy = MutableStateFlow(false)
+    val backgroundTasks = MutableStateFlow(0)
+
+    // Unconfined, so it follows busy and backgroundTasks as soon as a test sets them, like AgentProcess's.
+    override val holdsPi: StateFlow<Boolean> = combine(busy, backgroundTasks) { working, tasks -> working || tasks > 0 }
+      .stateIn(CoroutineScope(Dispatchers.Unconfined), SharingStarted.Eagerly, false)
     var closed = false
     var parked = false
     var restarts = 0
     var aborts = 0
     var abortFails = false
+    var backgroundStops = 0
+
+    override suspend fun stopBackgroundTasks() {
+      backgroundStops += 1
+      backgroundTasks.value = 0
+    }
 
     override suspend fun abort() {
       aborts += 1
@@ -105,6 +121,43 @@ class AgentRegistryTest {
     assertTrue(split.parked)
     assertFalse(shown.parked)
     assertEquals(setOf(ChatKey("/s/shown.jsonl")), registry.processes.value.keys)
+  }
+
+  @Test
+  fun backgroundTasksKeepAHiddenChatUntilTheyEnd() = registryTest { registry ->
+    idleParkMillis.value = 50
+    val waiting = registry.open(CWD, "/s/waiting.jsonl")
+    waiting.backgroundTasks.value = 1
+    delay(300)
+
+    assertFalse(waiting.parked)
+
+    waiting.backgroundTasks.value = 0
+    delay(300)
+
+    assertTrue(waiting.parked)
+  }
+
+  @Test
+  fun aChatWithBackgroundTasksHoldsItsSlotButIsNotBusy() = registryTest { registry ->
+    val waiting = registry.open(CWD, "/s/waiting.jsonl")
+    List(3) { registry.open(CWD, "/s/$it.jsonl") }.forEach { it.busy.value = true }
+    waiting.backgroundTasks.value = 2
+    settle()
+
+    assertThrows(TooManyRunning::class.java) { registry.open(CWD, null) }
+    registry.reloadIdle()
+    assertFalse(waiting.parked || waiting.closed)
+
+    created.forEach { if (it !== waiting) it.busy.value = false }
+    settle()
+    assertFalse(registry.busy.value)
+    assertTrue(registry.holding.value)
+    // Background tasks ending isn't a run ending.
+    waiting.backgroundTasks.value = 0
+    settle()
+    assertFalse(registry.holding.value)
+    assertFalse(ended.contains(waiting))
   }
 
   @Test
@@ -467,6 +520,27 @@ class AgentRegistryTest {
     val restarted = registry.shown.value[Pane.Secondary]
     assertNotSame(stuckShown, restarted)
     assertEquals("/s/stuck-shown.jsonl", restarted?.sessionFile?.value)
+  }
+
+  @Test
+  fun abortAllStopsBackgroundTasksWithoutAbortingIdleChats() = registryTest { registry ->
+    val waiting = registry.open(CWD, "/s/waiting.jsonl")
+    val working = registry.open(CWD, "/s/working.jsonl")
+    val idle = registry.open(CWD, "/s/idle.jsonl")
+    waiting.backgroundTasks.value = 1
+    working.busy.value = true
+    working.backgroundTasks.value = 1
+    settle()
+
+    registry.abortAll()
+    settle()
+
+    assertEquals(0, waiting.aborts)
+    assertEquals(1, waiting.backgroundStops)
+    assertEquals(1, working.aborts)
+    assertEquals(1, working.backgroundStops)
+    assertEquals(0, idle.backgroundStops)
+    assertFalse(registry.holding.value)
   }
 
   @Test

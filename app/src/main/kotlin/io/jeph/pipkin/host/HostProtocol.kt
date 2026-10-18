@@ -15,6 +15,12 @@ internal object HostProtocol {
   const val RESULT = "pipkin_result"
   const val PROGRESS = "pipkin_progress"
   const val EXIT = "pipkin_exit"
+
+  /**
+   * A line on Pipkin's channel between the app and the extensions it bundles, `{"type":…,"topic":…,"data":…}`. The
+   * host routes the app's lines by their first bytes, so [type] must come first (see `host/src/channel.ts`).
+   */
+  const val CHANNEL = "pipkin_channel"
   const val AUTH_EVENT = "pipkin_auth_event"
   const val AUTH_PROMPT = "pipkin_auth_prompt"
   const val AUTH_RESPONSE = "pipkin_auth_response"

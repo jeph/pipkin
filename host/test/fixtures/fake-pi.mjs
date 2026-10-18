@@ -5,8 +5,21 @@
 // stdout backpressure, then {"type":"flood_end","count":...}, and creates `done` once the last line
 // was handed to the host. Pi's writes to a pipe block on Linux, so stdin EOF during a flood is only
 // acted on once the flood finished.
+// Pipkin's channel on fd 3: with FAKE_PI_CHANNEL set, each line read there is reported as
+// {"type":"channel_received","message":...}; {"type":"channel_send","line":...} writes `line` and a newline to it.
 import { once } from "node:events";
 import { writeFileSync } from "node:fs";
+import net from "node:net";
+
+const channel = process.env.FAKE_PI_CHANNEL ? new net.Socket({ fd: 3, readable: true, writable: true }) : null;
+let channelCarry = "";
+channel?.setEncoding("utf8");
+channel?.on("data", (chunk) => {
+  const lines = (channelCarry + chunk).split("\n");
+  channelCarry = lines.pop() ?? "";
+  for (const line of lines) process.stdout.write(`${JSON.stringify({ type: "channel_received", message: JSON.parse(line) })}\n`);
+});
+channel?.unref();
 
 const FLOOD_PAD = "x".repeat(1000);
 
@@ -36,6 +49,7 @@ process.stdin.on("data", (chunk) => {
     if (line.length === 0) continue;
     const command = JSON.parse(line);
     if (command.type === "flood") flooding = flood(command.bytes, command.done);
+    else if (command.type === "channel_send") channel.write(`${command.line}\n`);
     else process.stdout.write(`${JSON.stringify({ type: "echo", command })}\n`);
   }
 });

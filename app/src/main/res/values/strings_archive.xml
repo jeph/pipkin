@@ -11,7 +11,7 @@
     </plurals>
 
     <string name="archive_stop_title">Stop and archive?</string>
-    <string name="archive_stop_text">Pipkin is working in this chat. Archiving it stops the current run.</string>
+    <string name="archive_stop_text">Pipkin is working in this chat or running its background tasks. Archiving it stops them.</string>
     <string name="archive_stop_confirm">Stop and archive</string>
 
     <string name="archive_workspace_actions">Actions for %1$s</string>
@@ -22,10 +22,10 @@
         <item quantity="other">The workspace leaves the sidebar and its %1$d chats are archived. Adding the folder back won\'t restore them.</item>
     </plurals>
     <string name="archive_remove_text_empty">The workspace leaves the sidebar. Its folder stays in Termux.</string>
-    <string name="archive_remove_working_single">Pipkin is working in a chat there; the run stops.</string>
+    <string name="archive_remove_working_single">Pipkin is working in a chat there or running its background tasks; they stop.</string>
     <plurals name="archive_remove_working">
-        <item quantity="one">One of them is working; its run stops.</item>
-        <item quantity="other">%1$d of them are working; their runs stop.</item>
+        <item quantity="one">One of them is working or running background tasks; they stop.</item>
+        <item quantity="other">%1$d of them are working or running background tasks; they stop.</item>
     </plurals>
     <plurals name="archive_remove_terminals">
         <item quantity="one">Its terminal closes too, stopping anything running in it.</item>

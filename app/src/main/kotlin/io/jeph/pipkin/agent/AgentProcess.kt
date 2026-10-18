@@ -116,6 +116,12 @@ internal class AgentProcess(
   private val contextUsageState = MutableStateFlow<ContextUsage?>(null)
   private val contextUsageRequests = Channel<Unit>(Channel.CONFLATED)
 
+  /**
+   * How many of the `pipkin-background` extension's tasks run in this Pi, as it last said over Pipkin's channel. Not
+   * saved: the tasks end with Pi, so every new connection starts at none.
+   */
+  private val backgroundTasksState = MutableStateFlow(0)
+
   /** Pi's setTitle requests and renames so far, so a cancelled [moveSession] knows whether the title changed since. */
   @Volatile
   private var extensionTitleChanges = 0
@@ -200,6 +206,13 @@ internal class AgentProcess(
     timelineState.busy && processState == AgentProcessState.Ready
   }.stateIn(processScope, SharingStarted.Eagerly, false)
 
+  /** Running background tasks, which keep Pi alive while it waits for them, unlike a run, without showing as working. */
+  val backgroundTasks: StateFlow<Int> = backgroundTasksState.asStateFlow()
+
+  override val holdsPi: StateFlow<Boolean> = combine(busy, backgroundTasksState) { working, tasks ->
+    working || tasks > 0
+  }.stateIn(processScope, SharingStarted.Eagerly, false)
+
   init {
     // One reader, conflated: a burst of turn ends costs one get_session_stats, and answers never land out of order.
     processScope.launch {
@@ -230,6 +243,7 @@ internal class AgentProcess(
     startJob?.cancel()
     connection?.close()
     connection = null
+    backgroundTasksState.value = 0
     timeline.clearDialogs()
     stateFlow.value = AgentProcessState.Starting
   }
@@ -239,6 +253,7 @@ internal class AgentProcess(
     startJob?.cancel()
     connection?.close()
     connection = null
+    backgroundTasksState.value = 0
     job.cancel()
   }
 
@@ -265,6 +280,16 @@ internal class AgentProcess(
 
   override suspend fun abort() {
     call("abort")
+  }
+
+  /** Asks Pi's `pipkin-background` extension to stop every task it runs; each one's result still reaches the chat. */
+  override suspend fun stopBackgroundTasks() {
+    val channel = connection?.channel ?: return
+    try {
+      channel.sendLine("""{"type":"${HostProtocol.CHANNEL}","topic":"$BACKGROUND_TOPIC","data":{"action":"stop"}}""")
+    } catch (_: IOException) {
+      // Pi is gone, and its tasks with it.
+    }
   }
 
   suspend fun getMessages(): JSONArray = call("get_messages").optJSONArray("messages") ?: JSONArray()
@@ -423,6 +448,7 @@ internal class AgentProcess(
   /** One connection; returns the host's refusal, or null once [state] is Ready, Exited or Failed. */
   private suspend fun attempt(): HostRejected? {
     stateFlow.value = AgentProcessState.Starting
+    backgroundTasksState.value = 0
     val disabled = disabledExtensions.value
     if (disabled != extensionUiConfiguration) {
       takeDownExtensionUi()
@@ -512,6 +538,7 @@ internal class AgentProcess(
     Log.w(TAG, "Pi stopped: exitRecord=${exit != null} code=$code signal=$signal")
     val stderr = exit?.optString("stderr").orEmpty()
     stateFlow.value = AgentProcessState.Exited(code, signal, stderr)
+    backgroundTasksState.value = 0
     timeline.showExit(code, stderr)
   }
 
@@ -521,6 +548,9 @@ internal class AgentProcess(
 
       HostProtocol.EXIT -> current.exit = line
 
+      // A line from a connection already replaced can't tell what the current Pi runs.
+      HostProtocol.CHANNEL -> if (connection === current) onChannel(line)
+
       HostProtocol.RESULT -> HostRejected.from(line)?.let { rejection ->
         current.rejection = rejection
         current.rpc.close(rejection.error, rejection)
@@ -528,6 +558,12 @@ internal class AgentProcess(
 
       else -> onEvent(line)
     }
+  }
+
+  /** A message from one of Pipkin's bundled extensions; topics the app doesn't know are left alone. */
+  private fun onChannel(line: JSONObject) {
+    val data = line.optJSONObject("data") ?: return
+    if (line.optString("topic") == BACKGROUND_TOPIC) backgroundTasksState.value = data.optInt("active")
   }
 
   private fun onEvent(event: JSONObject) {
@@ -704,6 +740,10 @@ internal class AgentProcess(
 
   private companion object {
     const val TAG = "PipkinAgent"
+
+    /** The `pipkin-background` extension's topic on Pipkin's channel. */
+    const val BACKGROUND_TOPIC = "background"
+
     const val PI_VERSION = "pi_version"
     const val RESYNC_TIMEOUT_MILLIS = 15_000L
     const val AUTO_RECONNECT_INTERVAL_MILLIS = 60_000L

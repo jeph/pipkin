@@ -164,11 +164,11 @@ internal class ShellActions(private val graph: AppGraph) {
     }
   }
 
-  /** Whether the chat in session file [path] has a Pi run going, which archiving it would stop. */
-  fun isWorking(path: String): Boolean = processFor(path)?.busy?.value == true
+  /** Whether the chat in session file [path] has a Pi run or background tasks going, which archiving it would stop. */
+  fun isWorking(path: String): Boolean = processFor(path)?.holdsPi?.value == true
 
-  /** How many chats in the workspace [cwd] have a Pi run going. */
-  fun workingIn(cwd: String): Int = processesIn(cwd).count { it.busy.value }
+  /** How many chats in the workspace [cwd] have a Pi run or background tasks going. */
+  fun workingIn(cwd: String): Int = processesIn(cwd).count { it.holdsPi.value }
 
   /** Archives [session], stopping its run if one is going, and offers Undo. */
   fun archive(session: SessionInfo) {

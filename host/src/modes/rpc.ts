@@ -3,6 +3,14 @@ import { readFile, stat, writeFile } from "node:fs/promises";
 import type { Socket } from "node:net";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
+import {
+  AppInputRouter,
+  CHANNEL_FD,
+  ChannelReader,
+  encodeChannelMessage,
+  HELLO_TOPIC,
+  OutputMerger,
+} from "../channel.js";
 import { installedPiVersion, loadPi, piEntry } from "../env.js";
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
@@ -48,16 +56,21 @@ function note(message: string): void {
   process.stderr.write(`pipkin-host rpc ${new Date().toISOString()}: ${message}\n`);
 }
 
+/** Notes a channel line from [from] that the host dropped, which only a bug in Pipkin sends. */
+function droppedChannelLine(from: string): (reason: string) => void {
+  return (reason) => note(`dropped a channel line from ${from}: ${reason}`);
+}
+
 /**
- * Copies Pi's stdout to the socket like `pipe`, but lets up to `OUTPUT_BACKLOG_LIMIT` bytes queue in the socket
- * instead of pipe's 16 KiB, so Pi keeps working while Pipkin is not reading. Never ends the socket: the exit line
- * follows Pi's output. Once the socket is gone the output is dropped, so a Pi waiting to write gets going again and
- * sees its stdin close instead of waiting for SIGTERM.
+ * Copies Pi's stdout through [merger] to the socket like `pipe`, but lets up to `OUTPUT_BACKLOG_LIMIT` bytes queue in
+ * the socket instead of pipe's 16 KiB, so Pi keeps working while Pipkin is not reading. Never ends the socket: the exit
+ * line follows Pi's output. Once the socket is gone the output is dropped, so a Pi waiting to write gets going again
+ * and sees its stdin close instead of waiting for SIGTERM.
  */
-function forwardOutput(output: Readable, socket: Socket): void {
+function forwardOutput(output: Readable, socket: Socket, merger: OutputMerger): void {
   output.on("data", (chunk: Buffer) => {
     if (!socket.writable) return;
-    socket.write(chunk);
+    merger.output(chunk);
     if (socket.writableLength >= OUTPUT_BACKLOG_LIMIT) output.pause();
   });
   socket.on("drain", () => output.resume());
@@ -156,33 +169,58 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   }
   args.push("--append-system-prompt", SYSTEM_APPEND);
   const env = await termuxSessionEnv(ctx.env);
-  const child = spawn(process.execPath, args, { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
+  // The channel socket goes last, at CHANNEL_FD; Pi hands none of its fds past stderr to the commands it runs.
+  const child = spawn(process.execPath, args, { cwd, env, stdio: ["pipe", "pipe", "pipe", "pipe"] });
+  const channel = child.stdio[CHANNEL_FD] as Socket;
   const { socket } = ctx.conn;
   const stderr = new TailBuffer();
   child.stderr.on("data", (chunk: Buffer) => {
     stderr.push(chunk);
   });
   child.stdin.on("error", () => undefined);
+  channel.on("error", (error) => note(`channel error: ${error.message}`));
+  const merger = new OutputMerger((data) => {
+    if (socket.writable) socket.write(data);
+  });
+  const fromPi = new ChannelReader((message) => merger.channel(message), droppedChannelLine("pi"));
+  channel.on("data", (chunk: Buffer) => fromPi.push(chunk));
+  channel.write(encodeChannelMessage({ topic: HELLO_TOPIC, data: null }));
 
   let reported = false;
   const report = (code: number | null, signal: string | null): void => {
     if (reported) return;
     reported = true;
     note(`pi exited: code=${code} signal=${signal} socketWritable=${socket.writable}`);
+    merger.end();
     ctx.conn.send({ type: "pipkin_exit", code, signal, stderr: stderr.text() });
     ctx.conn.finish();
   };
-  // `close` fires only after stdout ended, so the exit line never interleaves with Pi output.
+  // `close` fires only after stdout and the channel ended, so the exit line follows everything Pi sent.
   child.on("close", report);
   child.on("error", (error) => {
     stderr.push(Buffer.from(`\n${error.message}\n`));
     report(null, null);
   });
 
+  const toPi = new AppInputRouter(
+    (data) => {
+      if (!child.stdin.write(data)) socket.pause();
+    },
+    (message) => {
+      if (!channel.destroyed) channel.write(encodeChannelMessage(message));
+    },
+    droppedChannelLine("the app"),
+  );
+  child.stdin.on("drain", () => socket.resume());
   const { leftover } = ctx.conn;
-  if (leftover.length > 0) child.stdin.write(leftover);
-  socket.pipe(child.stdin);
-  forwardOutput(child.stdout, socket);
+  if (leftover.length > 0) toPi.push(leftover);
+  socket.on("data", (chunk: Buffer) => toPi.push(chunk));
+  socket.on("end", () => {
+    toPi.end();
+    child.stdin.end();
+  });
+  socket.resume();
+  forwardOutput(child.stdout, socket, merger);
   socket.on("end", () => {
     note("Pipkin ended the connection");
   });

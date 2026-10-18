@@ -82,7 +82,7 @@ internal class BuiltinCommands(private val controller: ChatController, private v
       BuiltinCommand.Resume -> navigator.openTabs()
 
       BuiltinCommand.Reload ->
-        if (process.busy.value) navigator.openSheet(ChatSheet.ConfirmReload) else controller.reload()
+        if (process.holdsPi.value) navigator.openSheet(ChatSheet.ConfirmReload) else controller.reload()
     }
   }
 

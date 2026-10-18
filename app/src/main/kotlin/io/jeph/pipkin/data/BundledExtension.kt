@@ -22,6 +22,14 @@ internal enum class BundledExtension(
     asset = "pipkin-extensions/pipkin-todo.js",
   ),
 
+  /** Runs shell commands past the agent's turn; it tells the app over Pipkin's channel while they run. */
+  Background(
+    "pipkin-background",
+    R.string.settings_extension_background,
+    R.string.settings_extension_background_summary,
+    asset = "pipkin-extensions/pipkin-background.js",
+  ),
+
   /** pi-web-access, vendored in `host/src/pi-extensions/pipkin-web-access`. */
   WebAccess(
     "pipkin-web-access",

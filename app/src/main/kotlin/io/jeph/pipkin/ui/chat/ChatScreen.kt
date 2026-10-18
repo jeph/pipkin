@@ -325,7 +325,8 @@ private fun ChatSheets(
 ) {
   val process = controller.process
   val timeline by process.screenTimeline.collectAsStateWithLifecycle()
-  val busy by process.busy.collectAsStateWithLifecycle()
+  // Reloading or archiving ends Pi, and with it a run or background tasks.
+  val holdsPi by process.holdsPi.collectAsStateWithLifecycle()
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
   val sessionName by process.sessionName.collectAsStateWithLifecycle()
   val copy = rememberCopyText()
@@ -336,10 +337,10 @@ private fun ChatSheets(
         onNewChat = { onNewChat(process.cwd) },
         onNewTerminal = onNewTerminal,
         onRename = { onSheet(ChatSheet.Rename) },
-        onReload = { if (busy) onSheet(ChatSheet.ConfirmReload) else controller.reload() },
+        onReload = { if (holdsPi) onSheet(ChatSheet.ConfirmReload) else controller.reload() },
         onCopyPath = sessionFile?.let { path -> { copy(path) } },
         onArchive = sessionFile?.let {
-          { if (busy) onSheet(ChatSheet.ConfirmArchive) else onArchive(process) }
+          { if (holdsPi) onSheet(ChatSheet.ConfirmArchive) else onArchive(process) }
         },
       ),
       onDismiss = dismiss,

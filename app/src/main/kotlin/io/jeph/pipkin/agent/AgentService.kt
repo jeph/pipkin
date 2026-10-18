@@ -97,12 +97,15 @@ class AgentService : Service() {
     private fun intent(context: Context, action: String) = Intent(context, AgentService::class.java).setAction(action)
 
     /**
-     * Says what keeps Pipkin working: chats, with Stop, or else, while only terminals run commands, the terminal
-     * notice without Stop, which would not stop them. Sign-in and Pi installs show the chats' notice.
+     * Says what keeps Pipkin working: chats, with Stop; chats' background tasks alone, with Stop, which stops them too;
+     * or else, while only terminals run commands, the terminal notice without Stop, which would not stop them. Sign-in
+     * and Pi installs show the chats' notice.
      */
     private fun notification(context: Context): Notification {
       val graph = context.appGraph
-      val terminalsOnly = graph.terminals.busy.value && !graph.registry.busy.value
+      val chatsWorking = graph.registry.busy.value
+      val backgroundOnly = !chatsWorking && graph.registry.holding.value
+      val terminalsOnly = !chatsWorking && !backgroundOnly && graph.terminals.busy.value
       val open =
         PendingIntent.getActivity(context, 20, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
       val builder = Notification.Builder(context, CHANNEL)
@@ -116,9 +119,12 @@ class AgentService : Service() {
           .build()
       }
       val stop = PendingIntent.getService(context, 21, intent(context, ACTION_STOP), PendingIntent.FLAG_IMMUTABLE)
+      val title =
+        if (backgroundOnly) R.string.agent_notification_background_title else R.string.agent_notification_title
+      val text = if (backgroundOnly) R.string.agent_notification_background_text else R.string.agent_notification_text
       return builder
-        .setContentTitle(context.getString(R.string.agent_notification_title))
-        .setContentText(context.getString(R.string.agent_notification_text))
+        .setContentTitle(context.getString(title))
+        .setContentText(context.getString(text))
         .addAction(Notification.Action.Builder(null, context.getString(R.string.agent_notification_stop), stop).build())
         .build()
     }

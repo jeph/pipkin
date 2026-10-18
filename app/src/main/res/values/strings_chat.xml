@@ -13,7 +13,7 @@
     <string name="chat_save">Save</string>
     <string name="chat_cancel">Cancel</string>
     <string name="chat_reload_confirm_title">Stop and reload?</string>
-    <string name="chat_reload_confirm_text">Pipkin is working. Reloading stops the current run.</string>
+    <string name="chat_reload_confirm_text">Pipkin is working or running background tasks. Reloading stops them.</string>
     <string name="chat_reload_confirm">Stop and reload</string>
 
     <!-- Stream -->

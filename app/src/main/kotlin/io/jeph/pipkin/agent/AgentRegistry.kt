@@ -24,9 +24,16 @@ internal interface ManagedProcess {
   /** The session file Pi reported, or the path the process was opened with until then. */
   val sessionFile: StateFlow<String?>
 
+  /** Whether a run is working, which the chat shows. */
   val busy: StateFlow<Boolean>
 
+  /** Whether Pi has work to keep it alive for: [busy], or background tasks whose results it waits for. */
+  val holdsPi: StateFlow<Boolean>
+
   suspend fun abort()
+
+  /** Stops Pi's background tasks, if it runs any. */
+  suspend fun stopBackgroundTasks()
 
   /** Ends Pi but keeps the chat's history on screen, for [restart] to reload once Pi is back. */
   fun park()
@@ -64,13 +71,13 @@ internal class TooManyRunning(open: Int, limit: Int, shownIdle: Boolean = false)
   )
 
 /**
- * The app's open agent processes, at most [maxRunning]. A process that is neither busy nor shown in a pane is parked
- * after [idleParkMillis], never while that is null, and opening one more parks the idle process shown least recently,
- * never one a pane shows: its Pi ends, but the chat and its history are kept, so opening its session again shows the
- * history while Pi restarts. A changed idle delay counts from the change. Lowering [maxRunning] parks hidden idle
- * processes down to it at once, and the rest as runs end or more chats open. At most [MAX_PARKED] chats stay parked;
- * the least recently parked is closed for good. [onRunEnded] hears each time an open process stops being busy. Main
- * thread only.
+ * The app's open agent processes, at most [maxRunning]. A process that neither [holds its Pi][ManagedProcess.holdsPi]
+ * nor is shown in a pane is parked after [idleParkMillis], never while that is null, and opening one more parks the idle
+ * process shown least recently, never one a pane shows: its Pi ends, but the chat and its history are kept, so opening
+ * its session again shows the history while Pi restarts. A changed idle delay counts from the change. Lowering
+ * [maxRunning] parks hidden idle processes down to it at once, and the rest as they let go of their Pi or more chats
+ * open. At most [MAX_PARKED] chats stay parked; the least recently parked is closed for good. [onRunEnded] hears each
+ * time an open process stops being busy. Main thread only.
  */
 internal class AgentRegistry<P : ManagedProcess>(
   private val scope: CoroutineScope,
@@ -87,6 +94,7 @@ internal class AgentRegistry<P : ManagedProcess>(
   private val processState = MutableStateFlow<Map<ChatKey, P>>(emptyMap())
   private val shownState = MutableStateFlow<Map<Pane, P>>(emptyMap())
   private val busyState = MutableStateFlow(false)
+  private val holdingState = MutableStateFlow(false)
   private var tick = 0L
 
   /** Parked chats by session file, least recently parked first. */
@@ -104,6 +112,9 @@ internal class AgentRegistry<P : ManagedProcess>(
   /** True while any open process is working. */
   val busy: StateFlow<Boolean> = busyState.asStateFlow()
 
+  /** True while any open process [holds its Pi][ManagedProcess.holdsPi]. */
+  val holding: StateFlow<Boolean> = holdingState.asStateFlow()
+
   init {
     scope.launch { maxRunning.collect { parkPastLimit() } }
   }
@@ -112,7 +123,7 @@ internal class AgentRegistry<P : ManagedProcess>(
 
   /**
    * The open process for [sessionPath], the parked one restarted, or a new one (a new session when [sessionPath] is
-   * null). Throws [TooManyRunning] when [maxRunning] processes are open and all of them are busy or shown.
+   * null). Throws [TooManyRunning] when [maxRunning] processes are open and all of them hold their Pi or are shown.
    */
   fun open(cwd: String, sessionPath: String?): P {
     val key = sessionPath?.let { ChatKey.session(it) }
@@ -125,7 +136,7 @@ internal class AgentRegistry<P : ManagedProcess>(
     val excess = entries.size - maxRunning.value + 1
     if (excess > evictable.size) {
       if (key != null && resumed != null) parked[key] = resumed
-      throw TooManyRunning(entries.size, maxRunning.value, shownIdle = entries.keys.any { !it.busy.value })
+      throw TooManyRunning(entries.size, maxRunning.value, shownIdle = entries.keys.any { !it.holdsPi.value })
     }
     evictable.take(excess.coerceAtLeast(0)).forEach(::park)
     val process = resumed?.also { it.restart() } ?: factory(cwd, sessionPath)
@@ -167,22 +178,23 @@ internal class AgentRegistry<P : ManagedProcess>(
 
   /**
    * Applies changed Pi configuration to every idle process: shown ones are reloaded; hidden ones are parked, since
-   * they restart with the new configuration when shown. Busy processes are untouched.
+   * they restart with the new configuration when shown. Processes that hold their Pi are untouched.
    */
   fun reloadIdle() {
     for (process in processState.value.values.toList()) {
-      if (process.busy.value) continue
+      if (process.holdsPi.value) continue
       if (paneOf(process) != null) reload(process) else park(process)
     }
   }
 
   /**
-   * The notification's Stop action: aborts every working process. A process that cannot abort is
-   * ended so Stop always stops: a shown one restarts on its history, hidden ones close.
+   * The notification's Stop action: aborts every working process and stops every background task. A process that
+   * cannot abort is ended so Stop always stops: a shown one restarts on its history, hidden ones close.
    */
   fun abortAll() {
     for (process in processState.value.values) {
       if (process.busy.value) scope.launch { abortOrEnd(process) }
+      if (process.holdsPi.value) scope.launch { process.stopBackgroundTasks() }
     }
   }
 
@@ -230,9 +242,9 @@ internal class AgentRegistry<P : ManagedProcess>(
     hiddenIdleByLastShown().take((entries.size - maxRunning.value).coerceAtLeast(0)).forEach(::park)
   }
 
-  /** The processes that are neither busy nor shown, which may be parked to make room; least recently shown first. */
+  /** The processes that neither hold their Pi nor are shown, which may be parked to make room; least recently shown first. */
   private fun hiddenIdleByLastShown(): List<P> = entries.entries
-    .filter { !it.key.busy.value && paneOf(it.key) == null }
+    .filter { !it.key.holdsPi.value && paneOf(it.key) == null }
     .sortedBy { it.value.lastShown }
     .map { it.key }
 
@@ -268,29 +280,32 @@ internal class AgentRegistry<P : ManagedProcess>(
     processState.value = processState.value.filterValues { it !== process }
     if (paneOf(process) != null) shownState.value = shownState.value.filterValues { it !== process }
     updateBusy()
+    updateHolding()
     entry.watcher?.cancel()
     return true
   }
 
   private suspend fun watch(process: P) = coroutineScope {
+    // One collector, so a run's end is reported before a lowered limit parks the chat, which stops watching it.
     launch {
       var wasBusy = false
-      process.busy.collect { busy ->
+      var wasHolding = false
+      combine(process.busy, process.holdsPi, ::Pair).collect { (busy, holding) ->
         updateBusy()
-        if (wasBusy && !busy) {
-          onRunEnded(process)
-          // A limit lowered while chats were working applies as their runs end.
-          parkPastLimit()
-        }
+        updateHolding()
+        if (wasBusy && !busy) onRunEnded(process)
+        // A limit lowered while chats held their Pi applies once they let go.
+        if (wasHolding && !holding) parkPastLimit()
         wasBusy = busy
+        wasHolding = holding
       }
     }
     launch {
       process.sessionFile.collect { path -> if (path != null) rekey(process, ChatKey.session(path)) }
     }
-    // How long until the process parks: null while it works, a pane shows it, or idle chats keep their Pi.
-    combine(process.busy, shownState, idleParkMillis) { working, panes, millis ->
-      if (working || panes.values.any { it === process }) null else millis
+    // How long until the process parks: null while it holds its Pi, a pane shows it, or idle chats keep their Pi.
+    combine(process.holdsPi, shownState, idleParkMillis) { holding, panes, millis ->
+      if (holding || panes.values.any { it === process }) null else millis
     }
       .distinctUntilChanged()
       .collectLatest { millis ->
@@ -310,6 +325,10 @@ internal class AgentRegistry<P : ManagedProcess>(
 
   private fun updateBusy() {
     busyState.value = entries.keys.any { it.busy.value }
+  }
+
+  private fun updateHolding() {
+    holdingState.value = entries.keys.any { it.holdsPi.value }
   }
 
   companion object {
