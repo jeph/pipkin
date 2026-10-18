@@ -1,5 +1,6 @@
 /* JetBrains Mono 2.304 (https://github.com/JetBrains/JetBrainsMono), SIL Open Font License 1.1: see
-   assets/fonts/OFL.txt. Subset to Latin from the copy Pipkin bundles in app/src/main/res/font. */
+   assets/fonts/OFL.txt, served with the site's other notices in public/licenses.txt. Subset to Latin from the copy
+   Pipkin bundles in app/src/main/res/font. */
 /* Colors follow Pipkin's own palette in app/src/main/kotlin/io/jeph/pipkin/ui/theme/PipkinColors.kt. */
 @font-face {
   font-family: "JetBrains Mono";
