@@ -34,7 +34,7 @@ The agent is told to use background tasks for anything that should keep running.
 Pi's package list already has background-task extensions, such as [pi-background-tasks](https://github.com/Jawfish/pi-background-tasks). They work well in Pi on a computer, but not in Pipkin:
 
 - **Pipkin can't see their tasks.** To save battery and memory, Pipkin stops the agent of a chat that isn't working and lets the phone sleep once no chat is working. An agent waiting on another extension's task looks idle, so Pipkin stops it, and its tasks with it, or the phone sleeps and Android stops Termux. Pipkin background comes with the app and tells it how many tasks each chat is waiting on, so the chat keeps its agent and the phone stays awake until they end.
-- **Some run their tasks in `tmux`**, outside the agent, where Pipkin can't track or stop them. Each of those tasks also costs several processes toward Android's [32-process limit](#the-32-process-limit). Pipkin background runs each task as one process and allows four at a time in each chat.
+- **Some run their tasks in `tmux`**, outside the agent, where Pipkin can't track or stop them. A `tmux` server and its sessions also add processes toward Android's [32-process limit](#the-32-process-limit). Pipkin background runs tasks without one and allows four at a time in each chat.
 - **Some add several tools.** The model reads every tool's description with each request, so more tools cost more input tokens. Pipkin background is one tool with one short guideline.
 
 ## When nothing is working
@@ -52,13 +52,7 @@ Battery optimization can still stop Pipkin or Termux, or cut off the agent's net
 - **Run in the background** exempts Pipkin. Tap **Allow** when Android asks.
 - **Let Termux run in the background** exempts Termux. If Android can't ask directly, Pipkin opens Termux's battery settings, where you choose **Allow background usage → Unrestricted**.
 
-Some phones name the setting differently:
-
-| Phone | Setting |
-| --- | --- |
-| Samsung | **Battery → Unrestricted** |
-| Xiaomi | **Battery saver → No restrictions** |
-| OnePlus, Oppo, Realme | **Battery usage → Allow background activity** |
+Phone makers often name the setting differently, and many add battery managers of their own that can stop apps even with the exemption. If chats or tasks still stop while you're away, see [Troubleshooting](#troubleshooting) for the settings on your phone.
 
 Also turn on **Notifications** in **Settings → Permissions**. Without them, Pipkin can't tell you when a chat finishes, stops, or [asks you something](/docs/extensions/#how-extensions-look-in-pipkin) while you're away.
 
@@ -68,6 +62,7 @@ None of this makes Pipkin or Termux impossible to stop. Android can still end th
 
 - **The phone runs low on memory.** When memory gets tight, Android stops apps to free it, and it can stop Termux, with every chat and terminal in it, even while Pipkin's notification is showing. Background exemptions and the foreground service make this less likely, but nothing an app can do rules it out. Closing other heavy apps and running fewer chats at once help.
 - **Too many processes are running.** On Android 12 and later, Android stops child processes once more than 32 are running across all apps. See [The 32-process limit](#the-32-process-limit) below.
+- **Your phone maker's battery manager steps in.** Samsung, Xiaomi, Huawei, OnePlus and other makers add their own rules for stopping apps in the background. See [Troubleshooting](#troubleshooting).
 - **You exit Termux.** Tapping **Exit** in Termux's notification stops everything running in Termux, including the agent. Leave Termux running while chats are working.
 
 Commands you start yourself in the Termux app, outside Pipkin, don't count as Pipkin's work, so Pipkin's wake lock doesn't cover them. To keep one running with the screen off, run `termux-wake-lock` in Termux, or tap **Acquire wakelock** in Termux's notification, and release it with `termux-wake-unlock` when you're done.
@@ -126,3 +121,82 @@ If the agent stops while a chat is working, the reply in progress ends there. It
 - **The agent stopped.** The chat shows **Agent stopped** with a **Restart** button, which starts the agent again with the same chat. Then ask it to continue where it left off.
 
 If you were away when it happened, Pipkin sends a notification: **Agent finished**, **Agent failed**, or **Pi exited**, with the chat's name. Tap it to open the chat.
+
+## Troubleshooting
+
+If Pipkin or Termux still stops while you're away, the cause is usually a battery setting. Setup only asks Android to exempt both apps from battery optimization, and many phones add battery managers that ignore that exemption. Change the settings below for **both Pipkin and Termux**: first the ones for all phones, then the ones for your phone's brand. Menu names change between versions, so if a path doesn't match, search Settings for the setting's name.
+
+### Find out what stopped Termux
+
+Android records why each app's process ended. With [adb](#run-adb-on-the-phone-itself), run:
+
+```sh
+adb shell dumpsys activity exit-info com.termux
+```
+
+Each entry has a `timestamp` and a `description`, newest first:
+
+- **`o-kill` or `nirvana`**: ColorOS's battery manager, on OnePlus, Oppo and Realme phones. See [OnePlus, Oppo, and Realme](#oneplus-oppo-and-realme).
+- **A reason that mentions low memory**: the phone ran out of memory. Close heavy apps and run fewer chats at once.
+
+If chats stop but Termux itself keeps running, the [32-process limit](#the-32-process-limit) is the likely cause.
+
+### All phones
+
+- **Allow background usage.** In **Settings → Apps → *the app* → App battery usage**, tap **Allow background usage** and choose **Unrestricted**. Setup sets this, but some phones switch apps back to **Optimized** later, so check it again if things start stopping.
+- **Pause app activity if unused.** Turn this off on each app's info page. On Android 12 it's called **Remove permissions and free up space**. A paused app loses its permissions and can't run in the background.
+- **Battery Saver.** Battery Saver limits background activity, so keep it off in **Settings → Battery → Battery Saver** while chats or tasks run.
+- **Data Saver.** If Data Saver is on, turn on both apps in **Settings → Network & internet → Data Saver → Unrestricted data**. Otherwise the agent loses its network in the background.
+- **Child processes.** Turn off the [32-process limit](#turn-the-limit-off) if you run several chats, terminals, or servers at once.
+
+### Samsung
+
+- In **Settings → Battery → Background usage limits** (**Settings → Battery and device care → Battery → Background usage limits** on One UI 6):
+  - Turn off **Put unused apps to sleep**.
+  - Add both apps to **Never sleeping apps**, and make sure neither is in **Sleeping apps** or **Deep sleeping apps**. Samsung limits what sleeping apps can do in the background, even while their notification is showing.
+- In each app's battery settings, choose **Unrestricted**.
+- Turn off **Adaptive battery** and **Auto optimize** if your phone has them.
+- In Recents, tap the app's icon on its card and choose **Keep open**.
+
+### Google Pixel
+
+The settings for [all phones](#all-phones) are all a Pixel needs. Pixels have been reported to switch an app from **Unrestricted** back to **Optimized**, so check it again if chats start stopping.
+
+### Huawei and Honor
+
+- In **Settings → Apps & services → App launch** (**Phone Manager → App launch** on older versions), turn off **Manage automatically** for each app, then turn on **Auto-launch**, **Secondary launch**, and **Run in background**. On Honor phones, search Settings for **App launch**.
+- Search Settings for **Battery optimization**, show **All apps**, and set both apps to **Don't allow**.
+- In Recents, swipe the app's card down to lock it.
+- Keep **Power saving mode** off while chats or tasks run.
+
+Some EMUI versions stop background apps that aren't on Huawei's own list, whatever these settings say.
+
+### Xiaomi, Redmi, and POCO
+
+- In **Settings → Apps → Permissions → Background autostart**, turn on both apps. On MIUI, it's **Autostart** on each app's page.
+- On each app's page, set **Battery saver** (called **Power** on some HyperOS versions) to **No restrictions**.
+- Keep **Battery saver** and **Ultra battery saver** off while chats or tasks run.
+- In Recents, long-press the app's card and tap the padlock.
+
+### OnePlus, Oppo, and Realme
+
+These phones run ColorOS, OxygenOS, or realme UI.
+
+- In **Settings → Apps → App management → *the app* → Battery usage**, turn on **Allow background activity**, and **Allow foreground activity** if it's there. On OxygenOS 14, it's in **Settings → Battery → More settings → App battery management**. On realme UI, it's in **Settings → Battery → Power saving settings → App battery management**, where you also turn on **Allow auto launch** and turn off **Optimize battery use**.
+- In **Settings → Apps → Auto launch**, turn on both apps.
+- In **Settings → Battery → More settings**, turn off **Sleep standby optimization**.
+- In Recents, open the app card's menu and choose **Lock**. OnePlus phones have been reported to reset the battery settings of apps that aren't locked.
+- Keep the phone updated. Some Android 15 builds from late 2024 stopped Termux's commands, until updates from November 2024 fixed it.
+
+Even with all of these, ColorOS can stop Termux while its notification is showing, often a few seconds after the screen turns on. It shows as `nirvana` or `o-kill` in [Termux's exit records](#find-out-what-stopped-termux). No setting is known to turn it off.
+
+### Vivo
+
+- In **Settings → Apps → Autostart**, turn on both apps.
+- In **Settings → Battery → Background power consumption management**, allow both apps.
+- Lock both apps in Recents.
+
+### Motorola
+
+- Set both apps to **Unrestricted**, as for [all phones](#all-phones).
+- Turn off **Adaptive battery** in **Settings → Battery**.
