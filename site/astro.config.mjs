@@ -34,6 +34,7 @@ export default defineConfig({
         { label: "Connect a model", slug: "docs/providers" },
         { label: "Configure the agent", slug: "docs/configure" },
         { label: "Extensions", slug: "docs/extensions" },
+        { label: "Run in the background", slug: "docs/background" },
       ],
     }),
   ],

@@ -71,7 +71,7 @@ On a foldable or tablet, open chats, files, changes, and terminals side by side 
 
 **Android won't ask for the Termux permission again.** Grant it from Pipkin's app info: **Permissions → Additional permissions → Run commands in Termux environment → Allow**.
 
-**Chats stop when the phone is locked.** Allow background activity for both Pipkin and Termux in **Settings → Permissions**. Some phones name this setting differently, and the step shows where to find it.
+**Chats stop when the phone is locked.** Allow background activity for both Pipkin and Termux in **Settings → Permissions**. Some phones name this setting differently, and the step shows where to find it. [Run in the background](/docs/background/) explains what else can stop a chat.
 
 **Pipkin says Termux isn't running or its helper didn't start.** Tap **Open Termux** to see why. Once Termux is running, Pipkin switches back on its own. If Termux asks for the setup command, tap **Set up Termux** in Pipkin.
 

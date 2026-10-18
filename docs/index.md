@@ -21,5 +21,6 @@ The thinking happens at the AI model you connect, such as Claude or OpenAI, so y
 - **[Connect a model](/docs/providers/)**: sign in with a Claude or OpenAI subscription, add a Gemini, Z.ai or Kimi API key, or add any OpenAI-compatible API.
 - **[Configure the agent](/docs/configure/)**: find Pi's configuration in Termux and change how the agent behaves.
 - **[Extensions](/docs/extensions/)**: add Pi extensions, skills, and prompt templates, and see which ones Pipkin bundles.
+- **[Run in the background](/docs/background/)**: how Pipkin keeps chats working while you're away, and what Android can still stop.
 
 Pipkin is in early development, so screens and settings may change between versions.

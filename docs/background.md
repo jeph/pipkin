@@ -1,0 +1,61 @@
+---
+title: Run in the background
+description: How Pipkin keeps chats and terminal commands running when you leave the app or lock the screen, and what Android can still stop.
+---
+
+The agent runs in Termux, a separate app from Pipkin. Android pauses and stops apps you aren't looking at to save battery and memory, so Pipkin takes a few steps to keep work going while you're away, and lets go of them as soon as nothing is running.
+
+## While something is working
+
+Pipkin counts as working while a chat is running, while a command runs in a Pipkin terminal, and during sign-in, installing the agent, Termux setup, backups, and restores. For as long as any of these lasts, Pipkin:
+
+- **Runs as a foreground service.** Android shows Pipkin's notification, **Pipkin agent is working**, or **A terminal command is running** when only a terminal is busy. Android stops a foreground service far less readily than an app in the background.
+- **Holds a wake lock.** This keeps the phone's processor running while the screen is off, so the agent keeps working, and so does Termux. The screen still turns off and locks as usual.
+
+The notification's **Stop** button stops every working chat. The terminal notice has no Stop button, since stopping chats wouldn't stop a terminal's command. To stop the command, end it in the terminal or close the terminal.
+
+A command that keeps running in a Pipkin terminal, such as a development server, counts as work for as long as it runs. That keeps the notification and the wake lock up the whole time, so close the terminal when you're done with it.
+
+## When nothing is working
+
+Once every chat is idle and no terminal is running a command, Pipkin removes its notification and releases the wake lock, so the phone can sleep normally. Pipkin doesn't hold a wake lock while idle, so leaving it open costs no extra battery.
+
+Idle chats also give back their memory. A chat that isn't working or on screen stops its agent after the time set in **Settings → Advanced → Stop idle chats after** (5 minutes by default). Its history stays, and the agent starts again when you open the chat.
+
+Pipkin only starts Termux while Pipkin is on screen, because Android can refuse to start another app from the background. Anything that needs a new agent, such as reopening a chat whose agent stopped, waits until you come back to Pipkin.
+
+## Allow background activity
+
+Battery optimization can still stop Pipkin or Termux, or cut off the agent's network, after a while in the background. Setup asks you to exempt both apps; you can do it later from **Settings → Permissions**:
+
+- **Run in the background** exempts Pipkin. Tap **Allow** when Android asks.
+- **Let Termux run in the background** exempts Termux. If Android can't ask directly, Pipkin opens Termux's battery settings, where you choose **Allow background usage → Unrestricted**.
+
+Some phones name the setting differently:
+
+| Phone | Setting |
+| --- | --- |
+| Samsung | **Battery → Unrestricted** |
+| Xiaomi | **Battery saver → No restrictions** |
+| OnePlus, Oppo, Realme | **Battery usage → Allow background activity** |
+
+Also turn on **Notifications** in **Settings → Permissions**. Without them, Pipkin can't tell you when a chat finishes or stops while you're away.
+
+## What Android can still stop
+
+None of this makes Pipkin or Termux impossible to stop. Android can still end them in these cases:
+
+- **The phone runs low on memory.** When memory gets tight, Android stops apps to free it, and it can stop Termux, with every chat and terminal in it, even while Pipkin's notification is showing. Background exemptions and the foreground service make this less likely, but nothing an app can do rules it out. Closing other heavy apps and running fewer chats at once help.
+- **Too many processes are running.** On Android 12 and later, Android stops apps' child processes once there are more than 32 of them across all apps. Every chat runs a few processes in Termux, more while it works, and so does each terminal. **Settings → Advanced → Running chats** caps how many chats keep their agent running at once (6 by default). On Android 14 and later, you can turn this limit off in Developer options with **Disable child process restrictions**. On Android 12 and 13, it takes `adb`; [this guide](https://github.com/agnostic-apollo/Android-Docs/blob/master/en/docs/apps/processes/phantom-cached-and-empty-processes.md) explains how.
+- **You exit Termux.** Tapping **Exit** in Termux's notification stops everything running in Termux, including the agent. Leave Termux running while chats are working.
+
+Commands you start yourself in the Termux app, outside Pipkin, don't count as Pipkin's work, so Pipkin's wake lock doesn't cover them. To keep one running with the screen off, run `termux-wake-lock` in Termux, or tap **Acquire wakelock** in Termux's notification, and release it with `termux-wake-unlock` when you're done.
+
+## When a chat stops
+
+If the agent stops while a chat is working, the reply in progress ends there. Its history up to that point is saved.
+
+- **The connection dropped.** Pipkin reconnects on its own and reloads the chat's history. If it drops again within a minute, Pipkin stops trying and shows **Agent stopped** instead.
+- **The agent stopped.** The chat shows **Agent stopped** with a **Restart** button, which starts the agent again with the same chat. Then ask it to continue where it left off.
+
+If you were away when it happened, Pipkin sends a notification: **Agent finished**, **Agent failed**, or **Pi exited**, with the chat's name. Tap it to open the chat.
