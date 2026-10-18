@@ -139,7 +139,7 @@ Each entry has a `timestamp` and a `description`, newest first:
 - **`o-kill` or `nirvana`**: ColorOS's battery manager, on OnePlus, Oppo and Realme phones. See [OnePlus, Oppo, and Realme](#oneplus-oppo-and-realme).
 - **A reason that mentions low memory**: the phone ran out of memory. Close heavy apps and run fewer chats at once.
 
-If chats stop but Termux itself keeps running, the [32-process limit](#the-32-process-limit) is the likely cause.
+These records only cover Termux's own process, not the agent or the commands it runs. If a chat's agent stops while Termux keeps running, the [32-process limit](#the-32-process-limit) is one possible cause; the agent may also have crashed.
 
 ### All phones
 
