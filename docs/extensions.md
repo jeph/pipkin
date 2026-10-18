@@ -42,6 +42,12 @@ Use `remove` to uninstall or `list` to list packages, then reload the chat. With
 
 Pi's [packages documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md) covers git sources, version pinning, and partial loading. Packages run code with the agent's permissions; review them before installing.
 
+### Update installed packages
+
+**Settings → Agent → Update Pi extensions** runs Pi's `pi update --extensions` with Pipkin's config folder. After you confirm, Pi updates every package listed in `~/.pipkin/pi/settings.json` to its latest version, except npm packages pinned to a version, such as `npm:@example/pi-tools@1.2.0`. The row shows Pi's progress, and a message says when the update finished or why it failed. Pi itself stays at the version Pipkin ships, and Pipkin's bundled extensions update with the app.
+
+Chats can't start while the update runs. Afterwards, chats that aren't working reload with the new versions; a working chat picks them up the next time its agent starts.
+
 ## Write your own extension
 
 Put a TypeScript file in `~/.pipkin/pi/extensions/`, such as `hello.ts`, and reload the chat. Pi's [extensions documentation](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md) covers the API. Extension commands appear when you type `/`.
