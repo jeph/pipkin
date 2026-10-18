@@ -1,25 +1,23 @@
-# Pipkin
+<p align="center">
+  <img src="site/public/favicon.svg" alt="Pipkin logo" width="128" height="128">
+</p>
 
-[![License](https://img.shields.io/github/license/jeph/pipkin)](LICENSE)
+<h1 align="center">Pipkin</h1>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/jeph/pipkin" alt="License"></a>
+</p>
 
 **Pipkin** is a native Android app for agentic coding. Tell it what to build or fix, and it reads your
 code, runs commands, edits files, and checks its own work, all on your phone. It's built on the
 [Pi](https://pi.dev) agent harness and runs in [Termux](https://termux.dev), so there's no laptop or
 cloud server doing the work somewhere else.
 
-> [!IMPORTANT]
-> Pipkin is not affiliated with Termux, Pi, Anthropic, or OpenAI. The agent runs real commands in
-> Termux and can read and change your phone's shared storage once you grant it access, so review
-> what it does the same way you would on a computer.
-
 ## Contents
 
 - [Features](#features)
-- [How it works](#how-it-works)
 - [Requirements](#requirements)
 - [Installation](#installation)
-- [Usage](#usage)
-- [Troubleshooting](#troubleshooting)
 - [Development](#development)
 - [Contributing](#contributing)
 - [License](#license)
@@ -55,20 +53,6 @@ your code, and every command it runs on the phone itself:
 - **Backups.** Save your settings, sign-ins, models, and extensions in one tap and restore them
   later.
 
-## How it works
-
-| Part | Location | Role |
-| --- | --- | --- |
-| Android app | `app/` | The Kotlin and Jetpack Compose UI: onboarding, chats, files, git, terminals, and settings. |
-| Host | `host/` | A TypeScript program, bundled into the APK, that the app runs in Termux to drive Pi over its RPC protocol and serve files, git, and terminals. |
-| Pi runtime | `app/src/main/assets/pi/` | The pinned Pi version and runtime packages that setup installs in Termux with `npm ci`. |
-| Bundled extensions | `host/src/pi-extensions/` | The Pi extensions Pipkin ships, bundled into the APK and installed alongside Pi. |
-| Website | `site/` | The Astro marketing site. |
-
-Pipkin uses Termux only through its public interfaces: `RUN_COMMAND` intents on the F-Droid build,
-and a helper process that runs inside Termux. It only works with the signed F-Droid and Google Play
-builds of Termux.
-
 ## Requirements
 
 - Android 10 or newer on a 64-bit (arm64 or x86_64) device.
@@ -93,71 +77,6 @@ cd pipkin
 `installDebug` installs on the device or emulator that `adb` is connected to. To build an APK
 without installing it, run `./gradlew :app:assembleDebug` and find it in
 `app/build/outputs/apk/debug/`.
-
-## Usage
-
-### Setup
-
-On first launch, Pipkin walks through each step and checks it off as it completes:
-
-1. **Install Termux** from F-Droid or Google Play. Copies of Termux from other sources are refused.
-2. **Let Pipkin use Termux** by granting the `Run commands in Termux environment` permission (F-Droid
-   build).
-3. **Set up Termux** by pasting the setup command Pipkin copies for you into Termux.
-4. **Allow notifications** and **background activity** for Pipkin and Termux, so chats keep running
-   when you leave the app.
-5. **Allow storage access** for Termux, so the agent can reach your phone's shared storage.
-6. **Install the agent.** Pipkin installs its pinned Pi version in Termux. It takes a few minutes.
-7. **Connect a model** by signing in with Claude or OpenAI, or by adding an OpenAI-compatible API.
-
-The permission steps can be revisited later from **Settings → Permissions**.
-
-### Models and providers
-
-Subscriptions, API keys and providers live in **Settings**. An OpenAI-compatible provider needs a base URL,
-usually ending in `/v1`, and an API key. Pipkin checks the connection by listing the provider's
-models, and you can pick a default model and switch models per chat.
-
-### Workspaces and chats
-
-Workspaces in the sidebar are folders in Termux. Each holds its own chats, which you can rename,
-fork from an earlier message, archive, and restore from the archive. The Files, Changes, and
-Terminal views let you check the agent's work as it goes.
-
-### Extensions
-
-Pipkin loads the Pi extensions you install the usual Pi way, alongside the ones it ships. Turn the
-bundled extensions on or off under **Settings → Pipkin extensions**. Extensions that support Pi's
-RPC UI protocol show their prompts and widgets as native cards.
-
-### Backups
-
-**Settings → Backups** saves Pi's configuration, including your settings, sign-ins, models, and
-extensions, without your chats. Backups are stored in Termux under `~/.pipkin/backups`. Restoring
-one replaces the current configuration and leaves chats in place.
-
-## Troubleshooting
-
-### The setup command stops partway
-
-Android can kill large `pkg` installs during setup. Run the setup command in Termux again; it picks
-up where it left off. If it reports that packages need upgrading, run the command it names, such as
-`yes | pkg upgrade -y`, and then the setup command again.
-
-### Android won't ask for the Termux permission again
-
-If the `Run commands in Termux environment` permission was denied, grant it from Pipkin's app info:
-**Permissions → Additional permissions → Run commands in Termux environment → Allow**.
-
-### Chats stop when the phone is locked
-
-Allow background activity for both Pipkin and Termux in **Settings → Permissions**. Some phones name
-this setting differently; the step in Pipkin shows where to find it when Android can't prompt for it.
-
-### Pipkin's helper doesn't start
-
-Open Termux to see why. Once the helper is running, Pipkin switches back on its own. If Termux asks
-for the setup command, tap **Set up Termux** in Pipkin.
 
 ## Development
 
