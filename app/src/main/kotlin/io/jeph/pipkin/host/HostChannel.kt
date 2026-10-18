@@ -60,15 +60,17 @@ internal class HostChannel(
   }
 
   /** Writes one JSONL record; throws [IOException] once the connection is gone. */
-  suspend fun send(obj: JSONObject) = sendLine(obj.toString())
+  suspend fun send(obj: JSONObject) = write { obj.toString() }
 
   /** Writes [line], one JSON value without its newline, for a record whose key order matters to the host. */
-  suspend fun sendLine(line: String) {
+  suspend fun sendLine(line: String) = write { line }
+
+  private suspend fun write(encode: () -> String) {
     writeLock.withLock {
       // Encoded under the lock so messages keep their send order, and off the caller's thread, which may be the main
       // one: ensure's request carries over a megabyte of extension source.
       withContext(Dispatchers.IO) {
-        output.write("$line\n".toByteArray(Charsets.UTF_8))
+        output.write("${encode()}\n".toByteArray(Charsets.UTF_8))
         output.flush()
       }
     }
