@@ -47,7 +47,7 @@ import io.jeph.pipkin.ui.theme.ThemeMode
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
-/** Paseo-style settings: providers, agent, appearance, Termux, advanced and about cards under a back header. */
+/** Paseo-style settings: providers, agent, appearance, notifications, Termux, advanced and about cards under a header. */
 @Composable
 internal fun SettingsScreen(
   onBack: () -> Unit,
@@ -115,6 +115,7 @@ private fun SettingsContent(
       AgentSection(graph = graph, snackbar = snackbar, onOpenBackups = onOpenBackups)
       ExtensionsSection(graph = graph)
       AppearanceSection(preferences = graph.preferences)
+      NotificationsSection(preferences = graph.preferences)
       TermuxSection(graph = graph, onOpenPermissions = onOpenPermissions)
       AdvancedSection(onOpenAdvanced = onOpenAdvanced)
       AboutSection(onOpenLicenses = onOpenLicenses)
@@ -295,6 +296,25 @@ private fun AppearanceSection(preferences: Preferences) {
           tint = if (isSelected) colors.foreground else colors.foregroundMuted,
         )
       }
+    }
+  }
+}
+
+/** Whether chats that finish or need an answer off screen show in the pill; Android's own settings cover the rest. */
+@Composable
+private fun NotificationsSection(preferences: Preferences) {
+  val enabled by preferences.inAppNotifications.collectAsStateWithLifecycle()
+  SettingsSection(title = stringResource(R.string.settings_section_notifications)) {
+    SettingsRow(
+      title = stringResource(R.string.settings_in_app_notifications),
+      subtitle = stringResource(R.string.settings_in_app_notifications_summary),
+      modifier = Modifier.toggleable(
+        value = enabled,
+        role = Role.Switch,
+        onValueChange = preferences::setInAppNotifications,
+      ),
+    ) {
+      Switch(checked = enabled, onCheckedChange = null)
     }
   }
 }

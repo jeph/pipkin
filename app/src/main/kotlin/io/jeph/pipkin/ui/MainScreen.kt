@@ -145,7 +145,7 @@ private fun rememberPanePanels(): PanePanels {
  * The main screen: the workspace's panes, each with its own sidebar and explorer sliding within it. Opens a chat on
  * entry when none is shown, and shows [requestedChat] in the main pane when a notification asks for it (an archived
  * one opens as its transcript instead); one-shot shell notices show as snackbars. A window too narrow for split screen,
- * such as a folded phone's, closes it.
+ * such as a folded phone's, closes it. Tells [onSidePanelOpen] whether a sidebar or explorer covers a shown pane.
  */
 @Composable
 internal fun MainScreen(
@@ -156,6 +156,7 @@ internal fun MainScreen(
   onOpenArchive: () -> Unit,
   onOpenArchivedChat: (path: String) -> Unit,
   onOpenOnboarding: () -> Unit,
+  onSidePanelOpen: (Boolean) -> Unit,
 ) {
   val snackbar = remember { SnackbarStackState() }
   ShellNotices(actions, snackbar)
@@ -172,6 +173,9 @@ internal fun MainScreen(
   RequestedChatEffect(actions, requestedChat, onOpenArchivedChat, onShown = {
     for (pane in Pane.entries) panels.show(pane, Panel.Chat)
   })
+  val shownPanes = if (splitAvailable && secondaryShown) Pane.entries else listOf(Pane.Primary)
+  val sidePanelOpen = shownPanes.any { panels[it].targetValue != Panel.Chat }
+  LaunchedEffect(sidePanelOpen) { onSidePanelOpen(sidePanelOpen) }
 
   Box(modifier = Modifier.fillMaxSize()) {
     WorkspacePanes(

@@ -23,12 +23,25 @@ internal object ChatNotification {
   fun tag(process: AgentProcess): String = process.sessionFile.value ?: process.cwd
 
   /** "[headline]: chat title", from the chat's name or else its first message; just [headline] for a chat with neither. */
-  fun title(context: Context, process: AgentProcess, headline: String): String {
-    val chatTitle = process.sessionName.value?.takeIf { it.isNotBlank() }
-      ?: process.timeline.state.value.items.firstNotNullOfOrNull {
-        (it as? TimelineItem.User)?.text?.takeIf(String::isNotBlank)
-      }
-    return chatTitle?.let { context.getString(R.string.chat_notification_title, headline, it) } ?: headline
+  fun title(context: Context, process: AgentProcess, headline: String): String =
+    chatTitle(process)?.let { context.getString(R.string.chat_notification_title, headline, it) } ?: headline
+
+  /** The chat's name, or else its first message; null for a chat with neither. */
+  private fun chatTitle(process: AgentProcess): String? = process.sessionName.value?.takeIf { it.isNotBlank() }
+    ?: process.timeline.state.value.items.firstNotNullOfOrNull {
+      (it as? TimelineItem.User)?.text?.takeIf(String::isNotBlank)
+    }
+
+  /** [process]'s [ChatInbox] entry for [reason], now; null before Pi names its session file, which can't be opened. */
+  fun inboxEntry(process: AgentProcess, reason: InboxReason, detail: String?): InboxEntry? {
+    val sessionPath = process.sessionFile.value ?: return null
+    return InboxEntry(
+      location = ChatLocation(process.cwd, sessionPath),
+      reason = reason,
+      title = chatTitle(process),
+      detail = detail?.takeIf { it.isNotBlank() },
+      at = System.currentTimeMillis(),
+    )
   }
 
   /**

@@ -7,6 +7,7 @@
     <string name="settings_section_agent">Agent</string>
     <string name="settings_section_extensions">Pipkin extensions</string>
     <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_notifications">Notifications</string>
     <string name="settings_section_termux">Termux</string>
     <string name="settings_section_about">About</string>
 
@@ -92,6 +93,9 @@
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
     <string name="settings_theme_system">System</string>
+
+    <string name="settings_in_app_notifications">In-app notifications</string>
+    <string name="settings_in_app_notifications_summary">Show a pill when another chat finishes or needs your answer</string>
 
     <string name="settings_termux">Termux</string>
     <string name="settings_termux_not_installed">Not installed</string>

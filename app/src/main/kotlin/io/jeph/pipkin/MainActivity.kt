@@ -17,20 +17,17 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
@@ -39,12 +36,12 @@ import io.jeph.pipkin.agent.ChatLocation
 import io.jeph.pipkin.agent.ChatNotification
 import io.jeph.pipkin.host.TermuxWaker
 import io.jeph.pipkin.ui.AppNavigator
+import io.jeph.pipkin.ui.ChatInboxOverlay
 import io.jeph.pipkin.ui.Destination
 import io.jeph.pipkin.ui.MainScreen
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.archive.ArchiveScreen
 import io.jeph.pipkin.ui.archive.ArchivedChatScreen
-import io.jeph.pipkin.ui.components.HeaderBarHeight
 import io.jeph.pipkin.ui.components.LoadingPill
 import io.jeph.pipkin.ui.onboarding.OnboardingScreen
 import io.jeph.pipkin.ui.onboarding.PermissionsScreen
@@ -62,7 +59,6 @@ import io.jeph.pipkin.ui.settings.SettingsScreen
 import io.jeph.pipkin.ui.settings.SubscriptionScreen
 import io.jeph.pipkin.ui.settings.ownsDraft
 import io.jeph.pipkin.ui.theme.PipkinTheme
-import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -123,6 +119,8 @@ private fun PipkinApp(graph: AppGraph, requestedChat: MutableStateFlow<ChatLocat
     if (chat != null && Destination.Main in navigator.stack.value) navigator.popTo(Destination.Main)
   }
   BackHandler(enabled = stack.size > 1) { navigator.pop() }
+  // The inbox's pill would cover the rows of a sidebar or explorer, so it waits until they close.
+  var sidePanelOpen by remember { mutableStateOf(false) }
   Box(modifier = Modifier.fillMaxSize()) {
     AnimatedContent(
       targetState = stack,
@@ -132,25 +130,22 @@ private fun PipkinApp(graph: AppGraph, requestedChat: MutableStateFlow<ChatLocat
     ) { shown ->
       val top = shown.last()
       holder.SaveableStateProvider(AppNavigator.key(top)) {
-        Screen(shown, navigator, actions, drafts, requestedChat)
+        Screen(shown, navigator, actions, drafts, requestedChat, onSidePanelOpen = { sidePanelOpen = it })
       }
     }
-    WakingPill(Modifier.align(Alignment.TopCenter))
+    // The waking pill sits above the inbox's, so both show when both are up.
+    ChatInboxOverlay(
+      shown = stack.last() == Destination.Main && !sidePanelOpen,
+      onOpen = { requestedChat.value = it },
+    ) { WakingPill() }
   }
 }
 
 /** Pipkin opened Termux to start its helper and is waiting for it, on whichever screen asked, below its header bar. */
 @Composable
-private fun WakingPill(modifier: Modifier) {
+private fun WakingPill() {
   val waking by TermuxWaker.waking.collectAsStateWithLifecycle()
-  AnimatedVisibility(
-    visible = waking,
-    modifier = modifier
-      .windowInsetsPadding(WindowInsets.safeDrawing)
-      .padding(top = PipkinTokens.Spacing.s8 + HeaderBarHeight + PipkinTokens.Spacing.s8),
-    enter = fadeIn(),
-    exit = fadeOut(),
-  ) {
+  AnimatedVisibility(visible = waking, enter = fadeIn(), exit = fadeOut()) {
     LoadingPill(stringResource(R.string.termux_waking))
   }
 }
@@ -163,6 +158,7 @@ private fun Screen(
   actions: ShellActions,
   drafts: ProviderDrafts,
   requestedChat: MutableStateFlow<ChatLocation?>,
+  onSidePanelOpen: (Boolean) -> Unit,
 ) {
   when (val top = shown.last()) {
     Destination.Main -> MainScreen(
@@ -173,6 +169,7 @@ private fun Screen(
       onOpenArchive = { navigator.push(Destination.Archive) },
       onOpenArchivedChat = { navigator.push(Destination.ArchivedChat(it)) },
       onOpenOnboarding = { navigator.push(Destination.Onboarding) },
+      onSidePanelOpen = onSidePanelOpen,
     )
 
     Destination.Archive, is Destination.ArchivedChat -> ArchivePage(top, navigator, actions, requestedChat)

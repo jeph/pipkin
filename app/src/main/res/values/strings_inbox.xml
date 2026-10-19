@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The pill under the header bar for chats that finished or need the user while off screen. Each of these
+         follows the chat's title in the pill, as in "Fix flaky tests finished". -->
+    <string name="inbox_finished">finished</string>
+    <string name="inbox_failed">failed</string>
+    <string name="inbox_exited">stopped</string>
+    <string name="inbox_waiting">needs you</string>
+
+    <!-- The pill when several chats are in it; the number of chats. -->
+    <plurals name="inbox_chats">
+        <item quantity="one">%1$d chat</item>
+        <item quantity="other">%1$d chats</item>
+    </plurals>
+    <!-- After the number of chats in the pill: how many of them wait on the user's answer. -->
+    <plurals name="inbox_waiting_count">
+        <item quantity="one">%1$d needs you</item>
+        <item quantity="other">%1$d need you</item>
+    </plurals>
+
+    <!-- The list the pill opens -->
+    <string name="inbox_tray_title">Other chats</string>
+    <string name="inbox_clear_all">Clear all</string>
+    <!-- When a chat in the list finished or asked less than a minute ago. -->
+    <string name="inbox_now">now</string>
+
+    <!-- What tapping the pill does, read out by screen readers. -->
+    <string name="inbox_open_chat">Open chat</string>
+    <string name="inbox_show_chats">Show chats</string>
+    <string name="inbox_hide_chats">Hide chats</string>
+</resources>

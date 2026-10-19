@@ -10,6 +10,8 @@ import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.AgentService
+import io.jeph.pipkin.agent.AppVisibility
+import io.jeph.pipkin.agent.ChatInbox
 import io.jeph.pipkin.agent.DialogNotifications
 import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.agent.TurnNotifications
@@ -34,8 +36,12 @@ import io.jeph.pipkin.workspace.WorkspaceLayout
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -51,7 +57,14 @@ internal class AppGraph(private val application: Application) {
   val preferences = Preferences(application)
   val sessionRepository = SessionRepository(hostClient, NoticeStore(File(application.filesDir, "notices")), scope)
   val sessionArchive = SessionArchive(sessionRepository, preferences, scope)
-  private val turnNotifications = TurnNotifications(application) { hostClient.lastHello.value?.home }
+  private val visibility = AppVisibility(application)
+
+  /** The chats the user sees: those the panes show while Pipkin is on screen and nothing covers them. */
+  val chatsOnScreen = MutableStateFlow<Set<AgentProcess>>(emptySet())
+  val chatInbox = ChatInbox()
+  private val turnNotifications = TurnNotifications(application, visibility, chatInbox) {
+    hostClient.lastHello.value?.home
+  }
   val registry: AgentRegistry<AgentProcess> =
     AgentRegistry(
       scope,
@@ -61,7 +74,6 @@ internal class AppGraph(private val application: Application) {
     ) { cwd, sessionPath ->
       AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository, preferences.disabledExtensions)
     }
-  val dialogNotifications = DialogNotifications(application, registry, scope) { hostClient.lastHello.value?.home }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
   val configBackups = ConfigBackups(hostClient, registry, keepAlive, accountRepository, sessionRepository, scope)
   val piExtensionUpdate = PiExtensionUpdate(hostClient, registry, keepAlive, sessionRepository, scope)
@@ -81,6 +93,11 @@ internal class AppGraph(private val application: Application) {
   init {
     holdWhileWorking()
     restartChatsOnceTermuxWorks()
+    feedChatInbox()
+    val dialogNotifications = DialogNotifications(application, registry, chatsOnScreen, visibility, chatInbox) {
+      hostClient.lastHello.value?.home
+    }
+    scope.launch { dialogNotifications.watch() }
     ProcessLifecycleOwner.get().lifecycle.addObserver(
       object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
@@ -91,6 +108,27 @@ internal class AppGraph(private val application: Application) {
         }
       },
     )
+  }
+
+  /**
+   * Keeps [chatInbox] following the setting, the archived chats, and the session files of the chats on screen, which
+   * Pi can name late.
+   */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun feedChatInbox() {
+    scope.launch { preferences.inAppNotifications.collect { chatInbox.enabled = it } }
+    scope.launch { preferences.archivedSessions.collect { chatInbox.setArchived(it.keys) } }
+    scope.launch {
+      chatsOnScreen
+        .flatMapLatest { chats ->
+          if (chats.isEmpty()) {
+            flowOf(emptySet())
+          } else {
+            combine(chats.map { it.sessionFile }) { files -> files.filterNotNullTo(HashSet()) }
+          }
+        }
+        .collect(chatInbox::setOnScreen)
+    }
   }
 
   /**

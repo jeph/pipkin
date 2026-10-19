@@ -35,15 +35,15 @@ internal fun WorkspacePane(
 }
 
 /**
- * Tells the dialog notifications which [chats] the user sees: those shown in a pane with no side panel over them,
- * while Pipkin is on screen and no other screen covers the panes.
+ * Tells the dialog notifications and the chat inbox which [chats] the user sees: those shown in a pane with no side
+ * panel over them, while Pipkin is on screen and no other screen covers the panes.
  */
 @Composable
 internal fun ChatsOnScreen(chats: Set<AgentProcess>) {
-  val notifications = LocalContext.current.appGraph.dialogNotifications
+  val chatsOnScreen = LocalContext.current.appGraph.chatsOnScreen
   LifecycleStartEffect(chats) {
-    notifications.setChatsOnScreen(chats)
-    onStopOrDispose { notifications.setChatsOnScreen(emptySet()) }
+    chatsOnScreen.value = chats
+    onStopOrDispose { chatsOnScreen.value = emptySet() }
   }
 }
 

@@ -46,6 +46,7 @@ internal class Preferences(context: Context) {
     MutableStateFlow(IdleStop.entries.firstOrNull { it.name == name } ?: IdleStop.Default)
   }
   private val disabledExtensionsState = MutableStateFlow(readStringSet(DISABLED_EXTENSIONS))
+  private val inAppNotificationsState = MutableStateFlow(prefs.getBoolean(IN_APP_NOTIFICATIONS, true))
 
   /** Onboarding finished. */
   val setupComplete: StateFlow<Boolean> = setupCompleteState.asStateFlow()
@@ -96,6 +97,9 @@ internal class Preferences(context: Context) {
 
   /** How many chats may have Pi running at once, within [AgentRegistry.RUNNING_LIMITS]. */
   val maxRunningChats: StateFlow<Int> = maxRunningChatsState.asStateFlow()
+
+  /** Whether chats that finish or wait on a dialog off screen show in the pill under the header bar. */
+  val inAppNotifications: StateFlow<Boolean> = inAppNotificationsState.asStateFlow()
 
   /** How long a chat that is neither working nor shown keeps its Pi. */
   val idleStop: StateFlow<IdleStop> = idleStopState.asStateFlow()
@@ -217,6 +221,11 @@ internal class Preferences(context: Context) {
     maxRunningChatsState.value = allowed
   }
 
+  fun setInAppNotifications(enabled: Boolean) {
+    prefs.edit { putBoolean(IN_APP_NOTIFICATIONS, enabled) }
+    inAppNotificationsState.value = enabled
+  }
+
   fun setIdleStop(stop: IdleStop) {
     prefs.edit { putString(IDLE_STOP, stop.name) }
     idleStopState.value = stop
@@ -297,5 +306,6 @@ internal class Preferences(context: Context) {
     const val IDLE_STOP = "idleStop"
     const val LAYOUT = "layout"
     const val DISABLED_EXTENSIONS = "disabledExtensions"
+    const val IN_APP_NOTIFICATIONS = "inAppNotifications"
   }
 }

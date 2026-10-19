@@ -6,9 +6,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import io.jeph.pipkin.R
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -17,23 +17,29 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * Tells the user a chat waits on them in a dialog they can't see, as a heads-up notification naming the chat and the
- * dialog's question: one comes up in a chat that isn't on screen, because Pipkin is in the background, another screen
- * covers the panes, or the panes show other chats, terminals, files or commits. Tapping it opens the chat. It goes
- * away once the chat is on screen or no dialog waits there any more. Main thread only.
+ * Tells the user a chat waits on them in a dialog they can't see: one comes up in a chat that isn't on screen, because
+ * Pipkin is in the background, another screen covers the panes, or the panes show other chats, terminals, files or
+ * commits. It goes in the [inbox] always, and becomes a heads-up notification naming the chat and the dialog's question
+ * while Pipkin is in the background, including once Pipkin leaves the screen with the dialog still waiting. Tapping the
+ * notification opens the chat. Both go away once the chat is on screen or no dialog waits there any more. Works while
+ * [watch] runs. Main thread only.
  */
 internal class DialogNotifications(
   application: Application,
   registry: AgentRegistry<AgentProcess>,
-  scope: CoroutineScope,
+  private val chatsOnScreen: StateFlow<Set<AgentProcess>>,
+  private val visibility: AppVisibility,
+  private val inbox: ChatInbox,
   private val home: () -> String?,
 ) {
   private val context: Context = application
   private val manager = context.getSystemService(NotificationManager::class.java)
-  private val chatsOnScreen = MutableStateFlow<Set<AgentProcess>>(emptySet())
 
   /** By chat, the tag its notification was posted under, since a new chat's session file can arrive after. */
   private val postedTags = HashMap<AgentProcess, String>()
+
+  /** By chat, the dialog told only in the inbox while Pipkin was on screen, to notify once Pipkin leaves it. */
+  private val toldInApp = HashMap<AgentProcess, ExtensionUiRequest>()
   private val alerts = DialogAlerts(post = ::post, cancel = ::cancel)
 
   /** Every open chat's front dialog, null for one that waits on none. */
@@ -57,19 +63,29 @@ internal class DialogNotifications(
         NotificationManager.IMPORTANCE_HIGH,
       ),
     )
-    scope.launch {
+  }
+
+  /** Follows the chats' dialogs, the chats on screen and Pipkin leaving the screen, until cancelled. */
+  suspend fun watch(): Unit = coroutineScope {
+    launch {
       chatDialogs.combine(chatsOnScreen, ::Pair).collect { (dialogs, onScreen) -> alerts.update(dialogs, onScreen) }
+    }
+    launch {
+      visibility.onScreen.collect { onScreen ->
+        if (onScreen) return@collect
+        toldInApp.forEach { (process, dialog) -> notify(process, dialog) }
+        toldInApp.clear()
+      }
     }
   }
 
-  /** Sets the chats the user sees: those the panes show while Pipkin is on screen and nothing covers them. */
-  fun setChatsOnScreen(chats: Set<AgentProcess>) {
-    chatsOnScreen.value = chats
+  private fun post(process: AgentProcess, dialog: ExtensionUiRequest) {
+    ChatNotification.inboxEntry(process, InboxReason.Waiting, question(dialog))?.let(inbox::add)
+    if (visibility.onScreen.value) toldInApp[process] = dialog else notify(process, dialog)
   }
 
-  private fun post(process: AgentProcess, dialog: ExtensionUiRequest) {
-    val question = listOfNotNull(dialog.title, dialog.message).filter { it.isNotBlank() }.joinToString("\n")
-      .ifEmpty { context.getString(R.string.dialog_notification_text) }
+  private fun notify(process: AgentProcess, dialog: ExtensionUiRequest) {
+    val question = question(dialog).ifEmpty { context.getString(R.string.dialog_notification_text) }
     val headline = context.getString(R.string.dialog_notification_waiting)
     val notification = ChatNotification.builder(context, CHANNEL, process, home().orEmpty())
       .setContentTitle(ChatNotification.title(context, process, headline))
@@ -81,7 +97,13 @@ internal class DialogNotifications(
     manager.notify(tag, NOTIFICATION_ID, notification)
   }
 
+  /** The dialog's title and message, each on its own line; empty for a dialog with neither. */
+  private fun question(dialog: ExtensionUiRequest): String =
+    listOfNotNull(dialog.title, dialog.message).filter { it.isNotBlank() }.joinToString("\n")
+
   private fun cancel(process: AgentProcess) {
+    toldInApp.remove(process)
+    process.sessionFile.value?.let(inbox::dialogGone)
     postedTags.remove(process)?.let { manager.cancel(it, NOTIFICATION_ID) }
   }
 
