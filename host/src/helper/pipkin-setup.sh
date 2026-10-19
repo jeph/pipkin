@@ -13,7 +13,9 @@ fail() {
 # 1. Environment.
 [ -n "${PREFIX:-}" ] && [ -n "${HOME:-}" ] || fail "Run this inside Termux."
 [ -n "${PIPKIN_URL:-}" ] && [ -n "${PIPKIN_TOKEN:-}" ] || fail "Copy the setup command in Pipkin and paste it here."
-dir="$HOME/.pipkin/helper"
+# pipkin for the release, pipkin-dev for the debug build, which keeps its own helper beside the release's.
+name='@PIPKIN_NAME@'
+dir="$HOME/.$name/helper"
 package='@PIPKIN_PACKAGE@'
 
 # Termux sessions run the shell that ~/.termux/shell links to (chsh sets it), or bash without a usable one; this picks
@@ -63,7 +65,7 @@ if ! node_ok; then
   node_ok || fail "Node.js couldn't be installed. Check your internet connection and paste the command again."
 fi
 
-# 3. The helper's files, the boot script, the shell hooks and pipkin-start.
+# 3. The helper's files and ports, the boot script, the shell hooks and <name>-start.
 { mkdir -p "$dir" && chmod 700 "$dir"; } || fail "Couldn't create $dir."
 fetch() { # $1 = name, $2 = sha256, $3 = mode
   local tmp="$dir/$1.$$.tmp"
@@ -81,11 +83,13 @@ fetch() { # $1 = name, $2 = sha256, $3 = mode
 fetch helper.mjs '@HELPER_SHA256@' 600
 fetch run.sh '@RUN_SHA256@' 700
 fetch start.sh '@START_SHA256@' 700
+# Each build's helper has its own ports, so neither build reaches the other's helper.
+printf '%s\n' '@HELPER_PORTS@' | write_file "$dir/ports" || fail "Couldn't write $dir/ports."
 
-boot="$HOME/.termux/boot/pipkin-helper"
+boot="$HOME/.termux/boot/$name-helper"
 mkdir -p "${boot%/*}" || fail "Couldn't create ~/.termux/boot."
 # shellcheck disable=SC2016 # $HOME expands when the boot script runs.
-printf '#!%s/bin/sh\nexec "$HOME/.pipkin/helper/run.sh"\n' "$PREFIX" | write_file "$boot" ||
+printf '#!%s/bin/sh\nexec "$HOME/.%s/helper/run.sh"\n' "$PREFIX" "$name" | write_file "$boot" ||
   fail "Couldn't write the boot script."
 chmod 700 "$boot" || fail "Couldn't write the boot script."
 
@@ -107,14 +111,23 @@ put_block() {
 
 # The session Pipkin opens to start the helper runs these hooks; start.sh does the rest. A shell gets its hook when
 # it's installed, so switching to it later with chsh keeps working; bash is always installed. A session that stays
-# open starts with status 0, so prompts that show a failed status don't flag it.
+# open starts with status 0, so prompts that show a failed status don't flag it. Both builds write the same hook,
+# which starts the release's helper and Pipkin Dev's, whichever are set up: a session either build opens runs all of
+# them, so the hook must not close it before the helper that build waits for has started.
 # shellcheck disable=SC2016 # $HOME expands when the shell runs the hook.
 sh_hook='# >>> pipkin >>>
-if [ -x "$HOME/.pipkin/helper/start.sh" ]; then
-  "$HOME/.pipkin/helper/start.sh" --shell
-  # 3: this session only started the helper, and closing it keeps Termux under its limit of 8 sessions.
-  if [ $? = 3 ]; then exit 0; fi
-fi
+pipkin_close=
+for pipkin_start in "$HOME/.pipkin/helper/start.sh" "$HOME/.pipkin-dev/helper/start.sh"; do
+  if [ -x "$pipkin_start" ]; then
+    "$pipkin_start" --shell
+    # 3: this session started the helper.
+    if [ $? = 3 ]; then pipkin_close=1; fi
+  fi
+done
+unset pipkin_start
+# A session that only started helpers closes, which keeps Termux under its limit of 8 sessions.
+if [ -n "$pipkin_close" ]; then exit 0; fi
+unset pipkin_close
 # <<< pipkin <<<'
 put_block "$HOME/.bashrc" "$sh_hook" || fail "Couldn't update ~/.bashrc."
 if [ -x "$PREFIX/bin/zsh" ] || [ "$login_shell" = zsh ]; then
@@ -127,18 +140,27 @@ if [ -x "$PREFIX/bin/fish" ] || [ "$login_shell" = fish ]; then
   mkdir -p "${fish_hook%/*}" || fail "Couldn't create ${fish_hook%/*}."
   write_file "$fish_hook" <<'EOF' || fail "Couldn't write $fish_hook."
 # Written by Pipkin's Termux setup, which replaces this file each time it runs.
-if status is-interactive; and test -x "$HOME/.pipkin/helper/start.sh"
-    "$HOME/.pipkin/helper/start.sh" --shell
-    # 3: this session only started the helper, and closing it keeps Termux under its limit of 8 sessions.
-    if test $status = 3
+if status is-interactive
+    set -l pipkin_close false
+    for pipkin_start in "$HOME/.pipkin/helper/start.sh" "$HOME/.pipkin-dev/helper/start.sh"
+        if test -x $pipkin_start
+            $pipkin_start --shell
+            # 3: this session started the helper.
+            if test $status = 3
+                set pipkin_close true
+            end
+        end
+    end
+    # A session that only started helpers closes, which keeps Termux under its limit of 8 sessions.
+    if test $pipkin_close = true
         exec true
     end
 end
 EOF
 fi
 
-if [ "$(readlink "$PREFIX/bin/pipkin-start" 2>/dev/null)" != "$dir/start.sh" ]; then
-  ln -sfn "$dir/start.sh" "$PREFIX/bin/pipkin-start" || fail "Couldn't create pipkin-start."
+if [ "$(readlink "$PREFIX/bin/$name-start" 2>/dev/null)" != "$dir/start.sh" ]; then
+  ln -sfn "$dir/start.sh" "$PREFIX/bin/$name-start" || fail "Couldn't create $name-start."
 fi
 
 # 4. Pairing.

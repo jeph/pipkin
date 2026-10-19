@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.Build
 import android.os.PersistableBundle
+import io.jeph.pipkin.MainActivity
 import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.host.HostLauncher
 import io.jeph.pipkin.host.PlaySetup
@@ -16,37 +17,37 @@ import io.jeph.pipkin.host.PlaySetup
  */
 internal object TermuxSetup {
   /**
-   * F-Droid: Node.js 22.19+, allow-external-apps, then back to Pipkin. `dpkg --configure -a` finishes an upgrade an
-   * earlier paste left half done. Packages are upgraded before Node.js is installed: a fresh F-Droid bootstrap ships an
-   * older openssl that the current nodejs package cannot link against ("CANNOT LINK EXECUTABLE node"), and a Node.js
-   * that can't start fails the version check the same way. `yes` answers dpkg's conffile prompts. A failed install
-   * stops before "done", so Pipkin isn't reopened as if setup had worked. Storage access is its own setup step.
+   * F-Droid: Node.js 22.19+, allow-external-apps, then back to Pipkin, the build with [packageName]: the debug build has
+   * its own package beside the release. `dpkg --configure -a` finishes an upgrade an earlier paste left half done.
+   * Packages are upgraded before Node.js is installed: a fresh F-Droid bootstrap ships an older openssl that the
+   * current nodejs package cannot link against ("CANNOT LINK EXECUTABLE node"), and a Node.js that can't start fails
+   * the version check the same way. `yes` answers dpkg's conffile prompts. A failed install stops before "done", so
+   * Pipkin isn't reopened as if setup had worked. Storage access is its own setup step.
    */
-  val FDROID_COMMAND = inBash(
+  fun fdroidCommand(packageName: String): String = inBash(
     "{ node -e \"const [a,b]=process.versions.node.split(/[.]/).map(Number);" +
       "process.exit(a>22||(a===22&&b>=19)?0:1)\" " +
       "2>/dev/null || { dpkg --configure -a; yes | pkg upgrade -y && pkg install -y nodejs; }; } && " +
       "mkdir -p ~/.termux && { grep -qx allow-external-apps=true ~/.termux/termux.properties 2>/dev/null " +
       "|| echo allow-external-apps=true >> ~/.termux/termux.properties; } && termux-reload-settings " +
-      "&& echo \"Pipkin setup done\" && am start -n io.jeph.pipkin/.MainActivity >/dev/null " +
+      "&& echo \"Pipkin setup done\" && am start -n $packageName/${MainActivity::class.java.name} >/dev/null " +
       "|| echo \"Pipkin setup did not finish. Check your internet connection, then paste the command again.\"",
   )
 
   /**
-   * F-Droid: Termux's own storage prompt, shown in front by the session [requestFDroidStorage] opens. The broadcast in
-   * `termux-setup-storage` only reaches a Termux on screen, so it waits a moment for Termux to open. Its question about
-   * rebuilding an existing `~/storage` stays the user's to answer: Termux empties that folder, files included. Pipkin
-   * comes back once access is granted, after a minute, or at once on a "no"; the line it prints is what a user who
-   * declined the prompt sees meanwhile. The wait checks shared storage itself, as the host does.
+   * F-Droid: opens Termux on a session that shows Termux's own storage prompt; F-Droid's build only, as it needs
+   * RUN_COMMAND. The broadcast in `termux-setup-storage` only reaches a Termux on screen, so it waits a moment for
+   * Termux to open. Its question about rebuilding an existing `~/storage` stays the user's to answer: Termux empties
+   * that folder, files included. Pipkin comes back once access is granted, after a minute, or at once on a "no"; the
+   * line it prints is what a user who declined the prompt sees meanwhile. The wait checks shared storage itself, as
+   * the host does.
    */
-  private const val FDROID_STORAGE_COMMAND = "echo \"Pipkin: waiting for storage access. Switch back to Pipkin " +
-    "any time.\"; sleep 1; termux-setup-storage && " +
-    "for i in $(seq 60); do [ -w \"${'$'}{EXTERNAL_STORAGE:-/sdcard}\" ] && break; sleep 1; done; " +
-    "am start -n io.jeph.pipkin/.MainActivity >/dev/null"
-
-  /** Opens Termux on a session that shows its storage prompt; F-Droid's build only, as it needs RUN_COMMAND. */
   fun requestFDroidStorage(context: Context) {
-    HostLauncher.runInTerminal(context, "storage", FDROID_STORAGE_COMMAND)
+    val command = "echo \"Pipkin: waiting for storage access. Switch back to Pipkin any time.\"; sleep 1; " +
+      "termux-setup-storage && " +
+      "for i in $(seq 60); do [ -w \"${'$'}{EXTERNAL_STORAGE:-/sdcard}\" ] && break; sleep 1; done; " +
+      "am start -n ${context.packageName}/${MainActivity::class.java.name} >/dev/null"
+    HostLauncher.runInTerminal(context, "storage", command)
     TermuxInstall.openTermux(context)
   }
 
@@ -61,8 +62,10 @@ internal object TermuxSetup {
    * The setup command for the installed build. The Play build's carries a fresh single-use pairing token, so ask for
    * it only when it's about to be copied; [keepAlive] keeps Pipkin serving its installer while the user is in Termux.
    */
-  fun command(context: Context, keepAlive: KeepAlive): String =
-    if (TermuxInstall.status(context).isPlay) PlaySetup.newCommand(context, keepAlive) else FDROID_COMMAND
+  fun command(context: Context, keepAlive: KeepAlive): String = when {
+    TermuxInstall.status(context).isPlay -> PlaySetup.newCommand(context, keepAlive)
+    else -> fdroidCommand(context.packageName)
+  }
 
   /** Puts [command] on the clipboard and opens Termux so the user can paste it. */
   fun copyAndOpen(context: Context, command: String) {

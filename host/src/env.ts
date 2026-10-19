@@ -13,9 +13,9 @@ export type PiSdk = typeof PiModule;
 /** Values the Termux bootstrap exports before exec'ing node. */
 export interface HostEnv {
   token: string;
-  /** `$HOME/.local/share/pipkin`: Pipkin-managed state, including the pinned Pi install. */
+  /** `$HOME/.local/share/pipkin` (`pipkin-dev` for the debug build): Pipkin-managed state, including the pinned Pi install. */
   root: string;
-  /** `PI_CODING_AGENT_DIR`, `$HOME/.pipkin/pi`: Pi's config, sessions and user-installed packages. */
+  /** `PI_CODING_AGENT_DIR`, `$HOME/.pipkin/pi` (`.pipkin-dev` for the debug build): Pi's config, sessions and user-installed packages. */
   configDir: string;
   home: string;
   /** Termux's `$PREFIX`, the root of its packages. */
@@ -120,7 +120,7 @@ export function withoutHostVariables(environment: NodeJS.ProcessEnv): NodeJS.Pro
   return rest;
 }
 
-/** `~/.pipkin/backups`: configuration backups, next to the config folder and on the same filesystem. */
+/** `~/.pipkin/backups` (`~/.pipkin-dev/backups` for the debug build): configuration backups, next to the config folder and on the same filesystem. */
 export function backupsDir(env: HostEnv): string {
   return join(dirname(env.configDir), "backups");
 }

@@ -386,7 +386,16 @@ android {
 
   // Debug builds carry the en-XA and ar-XB pseudolocales: switched to one, any text that skips the string resources
   // stays plain English, and layouts show how they take longer or right-to-left text.
-  buildTypes { debug { isPseudoLocalesEnabled = true } }
+  //
+  // Debug builds are Pipkin Dev, installable beside the release: their own package here, and in src/debug their own
+  // name and folders in Termux and helper ports (TermuxBuild, with the release's in src/release), so both can share one
+  // Termux without touching each other's state.
+  buildTypes {
+    debug {
+      isPseudoLocalesEnabled = true
+      applicationIdSuffix = ".debug"
+    }
+  }
 
   // Production classes log through android.util.Log, whose JVM stub otherwise throws in unit tests.
   testOptions { unitTests.isReturnDefaultValues = true }

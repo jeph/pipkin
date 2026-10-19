@@ -40,7 +40,8 @@ export const EXIT_RESTART = 75;
 export const EXIT_PORTS_TAKEN = 76;
 export const EXIT_NO_KEY = 78;
 
-const DEFAULT_PORTS = [47310, 47311, 47312, 47313, 47314];
+/** The release's ports, for a helper whose installer wrote no `ports` file: one set up before builds had their own. */
+const RELEASE_PORTS = [47310, 47311, 47312, 47313, 47314];
 const HANDSHAKE_TIMEOUT_MS = 5000;
 const WRAPPER_CHECK_MS = 1000;
 const STDERR_TAIL = 4096;
@@ -48,10 +49,15 @@ const LOG_KEEP = 64 * 1024;
 const TERMUX_PREFIX = "/data/data/com.termux/files/usr";
 const PACKAGE_NAME = /^[A-Za-z0-9_]+(\.[A-Za-z0-9_]+)+$/;
 
-/** `PIPKIN_HELPER_PORTS` (comma-separated) overrides the port list. Test-only: Pipkin always tries the defaults. */
-function ports(): number[] {
-  const override = process.env.PIPKIN_HELPER_PORTS;
-  return override ? override.split(",").map((port) => Number.parseInt(port, 10)) : DEFAULT_PORTS;
+/** The ports in [files]' `ports`: 47310–47314 for the release, 47320–47324 for the debug build. */
+function ports(files: HelperFiles): number[] {
+  let text: string;
+  try {
+    text = readFileSync(files.ports, "utf8");
+  } catch {
+    return RELEASE_PORTS;
+  }
+  return text.trim().split(",").map((port) => Number.parseInt(port, 10));
 }
 
 export async function runDaemon(files = new HelperFiles()): Promise<number> {
@@ -76,7 +82,7 @@ export async function runDaemon(files = new HelperFiles()): Promise<number> {
     .update(readFileSync(fileURLToPath(import.meta.url)))
     .digest("hex");
   const daemon = new Daemon(files, key, version, log);
-  const port = await daemon.listen(ports());
+  const port = await daemon.listen(ports(files));
   if (port === undefined) {
     log("all ports taken");
     writeFileAtomic(files.status, "ports-taken\n");

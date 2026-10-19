@@ -1,0 +1,12 @@
+package io.jeph.pipkin.host
+
+/**
+ * The release's names in Termux, apart from Pipkin Dev's (src/debug) so both builds can share one Termux: Pi's config
+ * and the helper under `~/.pipkin`, the host under `~/.local/share/pipkin`, `pipkin-start`.
+ */
+internal object TermuxBuild {
+  const val NAME = "pipkin"
+
+  /** The first of the five loopback ports the Play-Termux helper may listen on. */
+  const val HELPER_FIRST_PORT = 47310
+}

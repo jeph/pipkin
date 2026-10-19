@@ -18,7 +18,21 @@ Test changes on an Android emulator. Several agents work at once, so each worktr
 
 Before testing, create an emulator for the worktree, named after its branch, with the Pixel 9 hardware profile and a system image under `~/Library/Android/sdk/system-images`, for example `echo no | avdmanager create avd -n pipkin-<branch> -d pixel_9 -k "system-images;android-36;google_apis_playstore;arm64-v8a"` (the `echo no` answers its custom hardware profile prompt). Without `-d`, the emulator gets a 320×640 screen that Pipkin's UI and `adb` taps don't fit. Boot it on a free even port with `emulator -avd pipkin-<branch> -port <port> -memory 4096`, and pass `-s emulator-<port>` to every `adb` command so it can't reach another agent's emulator or the phone. When you remove the worktree, shut the emulator down with `adb -s emulator-<port> emu kill` and delete it with `avdmanager delete avd -n pipkin-<branch>`.
 
-To chat with a model on the emulator, run `scripts/emulator-llm.sh emulator-<port>` once Pipkin's setup has installed the agent. It signs Pipkin in to the shared codex-lb provider, with the API key stored in the Mac's Keychain under `pipkin-codex-lb`, and makes GPT-6-Astra the default model. Never print the key or copy it anywhere else.
+To chat with a model on the emulator, run `scripts/emulator-llm.sh emulator-<port>` once Pipkin Dev's setup has installed the agent, or add `--release` to sign in the release build instead. It signs Pipkin in to the shared codex-lb provider, with the API key stored in the Mac's Keychain under `pipkin-codex-lb`, and makes GPT-6-Astra the default model. It always goes through Pipkin Dev, the debuggable build, so Pipkin Dev has to be installed and set up even for `--release`. Never print the key or copy it anywhere else.
+
+## Release and debug builds
+
+The debug build is Pipkin Dev, a separate app that installs beside the release, so the user can test it on a phone that runs the release. The package suffix is set in `app/build.gradle.kts`. Both builds share one Termux, and each keeps all of its state there under its own names, from `TermuxBuild` in `app/src/debug/kotlin` and `app/src/release/kotlin` (the helper's ports through `HelperProtocol.PORTS`):
+
+| | Release | Debug (Pipkin Dev) |
+|---|---|---|
+| Package | `io.jeph.pipkin` | `io.jeph.pipkin.debug` |
+| Host and pinned Pi (`PIPKIN_ROOT`) | `~/.local/share/pipkin` | `~/.local/share/pipkin-dev` |
+| Pi's config and sessions (`PI_CODING_AGENT_DIR`) | `~/.pipkin/pi` | `~/.pipkin-dev/pi` |
+| Backups, background tasks | `~/.pipkin/backups`, `~/.pipkin/background` | `~/.pipkin-dev/backups`, `~/.pipkin-dev/background` |
+| Play-Termux helper, its ports, boot script and command | `~/.pipkin/helper`, 47310–47314, `~/.termux/boot/pipkin-helper`, `pipkin-start` | `~/.pipkin-dev/helper`, 47320–47324, `~/.termux/boot/pipkin-dev-helper`, `pipkin-dev-start` |
+
+Keep it that way when you add state in Termux: derive the path from `TermuxBuild.NAME`, from Pi's config folder (`PI_CODING_AGENT_DIR`, Pi's `getAgentDir()`, or the host's `env.configDir`), from `PIPKIN_ROOT`, or from the helper's own folder, never from a fixed `~/.pipkin`. Anything the app launches by component, such as `am start`, takes the build's package name from `context.packageName`; the activity class stays `io.jeph.pipkin.MainActivity` in both. The one shared piece is the shell hook in `~/.bashrc`, `~/.zshrc` and fish's `conf.d/pipkin.fish`, which both builds' setups write the same way: it starts every installed helper, so a session either build opens serves both. The user-facing docs describe the release's paths; when you test or debug on an emulator, Pipkin Dev's are the ones in use, for example `adb -s emulator-<port> shell run-as io.jeph.pipkin.debug`.
 
 The user's phone is sometimes reachable over `adb`, but it's their own phone, not a test device. Ask the user before you install a build on it, run commands on it, or test on it, and do only what they agreed to. Never change settings on the phone, whether in Android, Termux, Pipkin, or any other app, without asking first.
 
@@ -36,7 +50,7 @@ Pipkin is set up for translation, so every text the app itself shows comes from 
 
 The Termux host writes its messages in English, and each one the app may show also carries an `i18n` object, `{ key, args }`, beside the English: `i18n` on a failure, `<field>I18n` beside a text field such as `error` or `line`. `app/src/main/kotlin/io/jeph/pipkin/host/HostText.kt` maps each key to a resource in `strings_host.xml` and falls back to the English for a key it doesn't know. When the host gets a new message, add its key, the mapping, and the resource together.
 
-Debug builds include pseudo-locales. Set Pipkin's language to English (XA) to find text that skips resources, which stays plain English while everything else turns accented, or to Arabic (XB) to check right-to-left layouts, for example with `adb -s emulator-<port> shell cmd locale set-app-locales io.jeph.pipkin --locales en-XA`.
+Debug builds include pseudo-locales. Set Pipkin's language to English (XA) to find text that skips resources, which stays plain English while everything else turns accented, or to Arabic (XB) to check right-to-left layouts, for example with `adb -s emulator-<port> shell cmd locale set-app-locales io.jeph.pipkin.debug --locales en-XA`.
 
 ## Commits
 

@@ -3,7 +3,14 @@
 # --shell: called by the login shell's hook that pipkin-setup.sh writes (~/.bashrc, ~/.zshrc, fish's conf.d); warns
 # when the helper has a problem, and exits 3 when the calling terminal session should close (see below).
 set -u
-dir="$HOME/.pipkin/helper"
+# The folder this script is in, through the pipkin-start or pipkin-dev-start link: ~/.pipkin/helper for the release,
+# ~/.pipkin-dev/helper for the debug build.
+dir=$(dirname "$(readlink -f "$0")")
+# Which app set this helper up, for messages: both builds' hooks may print in the same terminal session.
+case $dir in
+  */.pipkin-dev/helper) pipkin="Pipkin Dev" ;;
+  *) pipkin=Pipkin ;;
+esac
 shell=false
 [ "${1:-}" = --shell ] && shell=true
 
@@ -35,10 +42,10 @@ alive "$dir/helper.pid" helper.mjs && alive "$dir/run.pid" run.sh && exit 0
 # Says what the helper's last run reported going wrong, if anything.
 problem() {
   case $(cat "$dir/status" 2>/dev/null) in
-    node-missing) echo "Pipkin: Node.js is missing. Paste Pipkin's setup command again." ;;
-    node-crashed*) echo "Pipkin: The helper keeps stopping. Paste Pipkin's setup command again." ;;
-    no-key) echo "Pipkin: The helper isn't paired. Paste Pipkin's setup command again." ;;
-    ports-taken) echo "Pipkin: Another app is using the helper's ports. Restart your phone." ;;
+    node-missing) echo "$pipkin: Node.js is missing. Paste $pipkin's setup command again." ;;
+    node-crashed*) echo "$pipkin: The helper keeps stopping. Paste $pipkin's setup command again." ;;
+    no-key) echo "$pipkin: The helper isn't paired. Paste $pipkin's setup command again." ;;
+    ports-taken) echo "$pipkin: Another app is using the helper's ports. Restart your phone." ;;
   esac
 }
 
@@ -73,8 +80,8 @@ if $shell; then
   disown
   exit 0
 fi
-echo "Starting Pipkin's helper…"
+echo "Starting $pipkin's helper…"
 start || {
-  echo "Pipkin: Couldn't start the helper." >&2
+  echo "$pipkin: Couldn't start the helper." >&2
   exit 1
 }

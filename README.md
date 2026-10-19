@@ -106,9 +106,10 @@ cd pipkin
 without installing it, run `./gradlew :app:assembleDebug` and find it in
 `app/build/outputs/apk/debug/`.
 
-A build from source is signed with your own debug key, not the release key, so Android won't install
-it over a downloaded release or the other way around. Uninstall one before installing the other;
-uninstalling removes Pipkin's own settings, but your files and chats in Termux stay.
+A build from source is Pipkin Dev, a separate app that installs beside a downloaded release rather
+than over it. Both can use the same Termux: Pipkin Dev keeps its own state there, in `~/.pipkin-dev`
+and `~/.local/share/pipkin-dev` instead of the release's `~/.pipkin` and `~/.local/share/pipkin`, so
+it needs its own setup and sign-ins, and the two don't see each other's chats.
 
 ## Usage
 

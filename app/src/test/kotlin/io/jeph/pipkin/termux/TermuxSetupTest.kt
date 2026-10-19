@@ -7,7 +7,7 @@ import org.junit.Test
 class TermuxSetupTest {
   @Test
   fun fdroidCommandRunsInAnyShell() {
-    assertRunsInAnyShell(TermuxSetup.FDROID_COMMAND)
+    assertRunsInAnyShell(TermuxSetup.fdroidCommand("io.jeph.pipkin.debug"))
   }
 }
 

@@ -1,29 +1,33 @@
-/** The helper's files under `$HOME/.pipkin/helper/`, shared with `run.sh`, `start.sh` and the installer. */
+/**
+ * The helper's files, in the folder `helper.mjs` runs from: `$HOME/.pipkin/helper/` for the release and
+ * `$HOME/.pipkin-dev/helper/` for the debug build. Shared with `run.sh`, `start.sh` and the installer.
+ */
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export class HelperFiles {
-  readonly dir: string;
   readonly helper: string;
   readonly key: string;
   readonly pid: string;
   readonly port: string;
+  /** The ports this build's helper may listen on, comma-separated, written by the installer. */
+  readonly ports: string;
   readonly status: string;
   readonly log: string;
   /** One `<random>.err` file per launched child, its stderr, read for the `exit` reply and then deleted. */
   readonly launches: string;
 
-  constructor(home: string = process.env.HOME ?? os.homedir()) {
-    this.dir = path.join(home, ".pipkin", "helper");
-    this.helper = path.join(this.dir, "helper.mjs");
-    this.key = path.join(this.dir, "key");
-    this.pid = path.join(this.dir, "helper.pid");
-    this.port = path.join(this.dir, "helper.port");
-    this.status = path.join(this.dir, "status");
-    this.log = path.join(this.dir, "helper.log");
-    this.launches = path.join(this.dir, "launches");
+  constructor(readonly dir: string = path.dirname(fileURLToPath(import.meta.url))) {
+    this.helper = path.join(dir, "helper.mjs");
+    this.key = path.join(dir, "key");
+    this.pid = path.join(dir, "helper.pid");
+    this.port = path.join(dir, "helper.port");
+    this.ports = path.join(dir, "ports");
+    this.status = path.join(dir, "status");
+    this.log = path.join(dir, "helper.log");
+    this.launches = path.join(dir, "launches");
   }
 
   ensureDir(): void {

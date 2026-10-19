@@ -24,6 +24,8 @@ cd pipkin
 
 The repository's README lists the full toolchain. Signed releases you can install directly are planned.
 
+A build from source is named **Pipkin Dev** and installs beside a release. It keeps its files in Termux under `~/.pipkin-dev` instead of `~/.pipkin`, so wherever these docs say `~/.pipkin`, Pipkin Dev uses `~/.pipkin-dev`.
+
 ## Walk through setup
 
 Open Pipkin and tap **Get started**. Each step shows **Done** once it's complete, and you can go back to any of them later from **Settings → Permissions**.

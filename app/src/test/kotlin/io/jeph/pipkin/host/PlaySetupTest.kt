@@ -21,10 +21,19 @@ class PlaySetupTest {
   }
 
   @Test
-  fun installerIsRenderedWithTheFilesHashesAndPackage() {
+  fun installerIsRenderedWithTheFilesHashesPackageAndThisBuildsTermuxNames() {
     val session = open()
     val installer = String(PlaySetup.respond("/pipkin/${session.sid}/setup.sh", NOW).body)
-    assertEquals("h=${sha256("helper")} r=${sha256("run")} s=${sha256("start")} p=io.jeph.pipkin.debug\n", installer)
+    // Pipkin Dev shares Termux with the release, so the two builds' helpers need ports of their own.
+    val ports = when (TermuxBuild.NAME) {
+      "pipkin-dev" -> "47320,47321,47322,47323,47324"
+      else -> "47310,47311,47312,47313,47314"
+    }
+    assertEquals(
+      "h=${sha256("helper")} r=${sha256("run")} s=${sha256("start")} p=io.jeph.pipkin.debug " +
+        "n=${TermuxBuild.NAME} ports=$ports\n",
+      installer,
+    )
     assertEquals(sha256(installer), session.installerSha256)
   }
 
@@ -112,7 +121,8 @@ class PlaySetupTest {
       HelperAssets.HELPER to "helper",
       HelperAssets.RUN to "run",
       HelperAssets.START to "start",
-      HelperAssets.INSTALLER to "h=@HELPER_SHA256@ r=@RUN_SHA256@ s=@START_SHA256@ p=@PIPKIN_PACKAGE@\n",
+      HelperAssets.INSTALLER to
+        "h=@HELPER_SHA256@ r=@RUN_SHA256@ s=@START_SHA256@ p=@PIPKIN_PACKAGE@ n=@PIPKIN_NAME@ ports=@HELPER_PORTS@\n",
     )
     val session = SetupSession.create(
       read = { files.getValue(it).toByteArray() },

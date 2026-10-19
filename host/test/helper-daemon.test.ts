@@ -26,6 +26,8 @@ interface Env {
   home: string;
   dir: string;
   amLog: string;
+  /** The two ports in the helper's `ports` file. */
+  ports: number[];
   env: NodeJS.ProcessEnv;
 }
 
@@ -45,16 +47,18 @@ beforeEach(async () => {
   await writeFile(path.join(prefix, "bin", "am"), `#!/bin/sh\necho "$*" >> '${amLog}'\n`, { mode: 0o755 });
   await copyFile(bundle, path.join(dir, "helper.mjs"));
   await writeFile(path.join(dir, "key"), `${KEY.toString("hex")}\n`, { mode: 0o600 });
+  const ports = await freePorts(2);
+  await writeFile(path.join(dir, "ports"), `${ports.join(",")}\n`);
   env = {
     root,
     home,
     dir,
     amLog,
+    ports,
     env: {
       PATH: `${path.join(prefix, "bin")}:${process.env.PATH ?? ""}`,
       PREFIX: prefix,
       HOME: home,
-      PIPKIN_HELPER_PORTS: (await freePorts(2)).join(","),
     },
   };
 });
@@ -323,8 +327,8 @@ describe("helper daemon", () => {
     expect(await readOptional(file("helper.port"))).toBe(`${port}\n`);
   });
 
-  it("falls back to the next port and reports when all are taken", async () => {
-    const [first, second] = (env.env.PIPKIN_HELPER_PORTS ?? "").split(",").map(Number);
+  it("listens on its ports file's first free port and reports when all are taken", async () => {
+    const [first, second] = env.ports;
     await listen(createServer(), Number(first));
     const { child, port } = await startDaemon();
     expect(port).toBe(second);

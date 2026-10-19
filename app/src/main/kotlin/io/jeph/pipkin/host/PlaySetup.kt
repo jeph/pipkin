@@ -173,6 +173,8 @@ internal class SetupSession(
         .replace("@RUN_SHA256@", HelperAssets.sha256Hex(run))
         .replace("@START_SHA256@", HelperAssets.sha256Hex(start))
         .replace("@PIPKIN_PACKAGE@", packageName)
+        .replace("@PIPKIN_NAME@", TermuxBuild.NAME)
+        .replace("@HELPER_PORTS@", HelperProtocol.PORTS.joinToString(","))
       return SetupSession(
         sid = ByteArray(ID_BYTES).also(random::nextBytes).toHexString(),
         token = ByteArray(TOKEN_BYTES).also(random::nextBytes),

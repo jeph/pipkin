@@ -197,8 +197,8 @@ internal object HostLauncher {
     command -v node >/dev/null 2>&1 || exit 72
     node -e 'const [a,b]=process.versions.node.split(".").map(Number);process.exit(a>22||(a===22&&b>=19)?0:1)' || exit 73
     command -v npm >/dev/null 2>&1 || exit 74
-    export PIPKIN_ROOT="$HOME/.local/share/pipkin"
-    export PI_CODING_AGENT_DIR="$HOME/.pipkin/pi"
+    export PIPKIN_ROOT="$HOME/.local/share/$$${TermuxBuild.NAME}"
+    export PI_CODING_AGENT_DIR="$HOME/.$$${TermuxBuild.NAME}/pi"
     mkdir -p "$PIPKIN_ROOT" "$PI_CODING_AGENT_DIR"
     mode=$1
     port=$2

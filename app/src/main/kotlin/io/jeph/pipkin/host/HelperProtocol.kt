@@ -23,8 +23,11 @@ import org.json.JSONObject
  * neither read, inject, reorder nor replay them. Pure JVM; the sockets come from the caller.
  */
 internal object HelperProtocol {
-  /** The helper listens on the first free one, so Pipkin tries them in this order. */
-  val PORTS = listOf(47310, 47311, 47312, 47313, 47314)
+  /**
+   * The helper listens on the first free one, so Pipkin tries them in this order. The release's are 47310–47314 and
+   * the debug build's 47320–47324: each build then knocks only on its own helper, whose key it holds.
+   */
+  val PORTS = List(5) { TermuxBuild.HELPER_FIRST_PORT + it }
   const val KEY_BYTES = 32
 
   /** The helper replies to the opening at once; anything slower is not Pipkin's helper. */

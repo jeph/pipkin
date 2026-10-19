@@ -28,6 +28,7 @@ import io.jeph.pipkin.data.ConfigBackups
 import io.jeph.pipkin.host.BackupInfo
 import io.jeph.pipkin.host.Backups
 import io.jeph.pipkin.host.HostRejected
+import io.jeph.pipkin.host.TermuxBuild
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.SimmeringPot
@@ -210,7 +211,7 @@ private fun SavedSection(
     }
   }
   val dir = (list as? BackupList.Loaded)?.backups?.dir
-  SettingsCaption(text = stringResource(R.string.backups_caption, dir ?: stringResource(R.string.backups_folder)))
+  SettingsCaption(text = stringResource(R.string.backups_caption, dir ?: "~/.${TermuxBuild.NAME}/backups"))
 }
 
 /** One backup: when it was made, its size and Pi version, or why it can't be read; restorable only when readable. */

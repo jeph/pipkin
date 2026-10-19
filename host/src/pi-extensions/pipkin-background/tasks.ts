@@ -4,9 +4,9 @@
  */
 import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync, readSync, fstatSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { StringEnum } from "@earendil-works/pi-ai";
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
 
 export const TOOL_NAME = "background";
@@ -242,11 +242,13 @@ export function defaultLabel(command: string): string {
 }
 
 /**
- * Where tasks' logs and records go. Not `$TMPDIR`: Termux empties it whenever its service stops, which would take the
- * logs of the very tasks a later Pi reports on.
+ * Where tasks' logs and records go: `background` beside Pi's config folder, `~/.pipkin/background` for the release and
+ * `~/.pipkin-dev/background` for the debug build, so neither build's Pi reports on or cleans up the other's tasks. Not
+ * `$TMPDIR`: Termux empties it whenever its service stops, which would take the logs of the very tasks a later Pi
+ * reports on.
  */
 export function taskDir(): string {
-  const dir = join(homedir(), ".pipkin", "background");
+  const dir = join(dirname(getAgentDir()), "background");
   mkdirSync(dir, { recursive: true });
   return dir;
 }
