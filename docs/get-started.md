@@ -14,7 +14,11 @@ Setup takes a few minutes, and Pipkin does most of it for you. It checks off eac
 
 ## Install Pipkin
 
-Prebuilt releases aren't published yet, so for now Pipkin is built from source. With the Android SDK set up and your phone connected over `adb`, run:
+[Download the latest APK](https://github.com/jeph/pipkin/releases/latest) from the releases page on your phone and open it to install. Android asks you to allow installs from your browser or file manager the first time. Later releases install over it as updates and keep your chats and settings.
+
+### Build from source
+
+With the Android SDK set up and your phone connected over `adb`, run:
 
 ```sh
 git clone https://github.com/jeph/pipkin.git
@@ -22,7 +26,7 @@ cd pipkin
 ./gradlew :app:installDebug
 ```
 
-The repository's README lists the full toolchain. Signed releases you can install directly are planned.
+The repository's README lists the full toolchain.
 
 A build from source is named **Pipkin Dev** and installs beside a release. It keeps its files in Termux under `~/.pipkin-dev` instead of `~/.pipkin`, so wherever these docs say `~/.pipkin`, Pipkin Dev uses `~/.pipkin-dev`.
 
