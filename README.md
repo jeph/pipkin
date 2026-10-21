@@ -174,8 +174,18 @@ Do not report suspected security vulnerabilities in public issues. Follow the
 
 ## Acknowledgements
 
-Pipkin's interface takes inspiration from [Paseo](https://paseo.sh), an app for running coding
-agents from your phone and desktop.
+Pipkin's interface takes inspiration from [Paseo](https://paseo.sh), an open-source app for running
+coding agents from your desktop and phone, and its folder search, file-type icon table, and
+file-icon colours are adapted from Paseo's code.
+
+Pipkin is built on [Pi](https://pi.dev) and [Termux](https://termux.dev), with Jetpack Compose,
+[libghostty-android](https://github.com/SagerNet/libghostty-android) and
+[Ghostty](https://github.com/ghostty-org/ghostty) for the terminal,
+[tree-sitter](https://github.com/tree-sitter/tree-sitter) for syntax highlighting,
+[Lucide](https://lucide.dev) and [Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme)
+for icons, and [pi-web-access](https://github.com/nicobailon/pi-web-access) for web search. The
+[acknowledgements page](https://pipkin.jeph.io/docs/acknowledgements/) lists every open-source
+project Pipkin uses.
 
 ## License
 

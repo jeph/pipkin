@@ -35,6 +35,7 @@ export default defineConfig({
         { label: "Configure the agent", slug: "docs/configure" },
         { label: "Extensions", slug: "docs/extensions" },
         { label: "Run in the background", slug: "docs/background" },
+        { label: "Acknowledgements", slug: "docs/acknowledgements" },
       ],
     }),
   ],
