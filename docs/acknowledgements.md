@@ -9,7 +9,7 @@ The license texts for everything Pipkin ships are in the app under **Settings â†
 
 ## Inspiration
 
-- **[Paseo](https://paseo.sh)**, an open-source app for running coding agents from your desktop and phone, inspired much of Pipkin's interface. Pipkin's folder search, file-type icon table, and file-icon colours are adapted from [Paseo's code](https://github.com/getpaseo/paseo).
+- **[Paseo](https://paseo.sh)**, an open-source app for running coding agents from your desktop and phone. Pipkin's interface is modelled on Paseo's, and some of its code is adapted from [Paseo's](https://github.com/getpaseo/paseo): the folder search, the file-type icon table and icon colours, the layout and type scale, and the syntax highlighting colours.
 
 ## The agent
 
