@@ -33,6 +33,7 @@ cloud server doing the work somewhere else.
 - [Usage](#usage)
 - [Development](#development)
 - [Contributing](#contributing)
+- [Acknowledgements](#acknowledgements)
 - [License](#license)
 
 ## Features
@@ -170,6 +171,11 @@ project is young.
 
 Do not report suspected security vulnerabilities in public issues. Follow the
 [security policy](.github/SECURITY.md) to submit a private vulnerability report.
+
+## Acknowledgements
+
+Pipkin's interface takes inspiration from [Paseo](https://paseo.sh), an app for running coding
+agents from your phone and desktop.
 
 ## License
 

@@ -5,7 +5,7 @@ import Nav from "../components/Nav.astro";
 import PhoneDemo from "../components/PhoneDemo.astro";
 import Screenshot from "../components/Screenshot.astro";
 import Base from "../layouts/Base.astro";
-import { GITHUB_URL, PI_URL, TERMUX_URL } from "../site";
+import { GITHUB_URL, PASEO_URL, PI_URL, TERMUX_URL } from "../site";
 
 import extensionSelect from "../assets/screens/extension-select.png";
 import fileView from "../assets/screens/file-view.png";
@@ -329,7 +329,9 @@ Setting up git ...</span>
         <a href={TERMUX_URL} rel="noopener">Termux</a>
         <a href="/licenses.txt">Licenses</a>
       </nav>
-      <p class="footer-note">An agent native to your phone. © 2026 Pipkin</p>
+      <p class="footer-note">
+        An agent native to your phone. UI inspired by <a href={PASEO_URL} rel="noopener">Paseo</a>. © 2026 Pipkin
+      </p>
     </div>
   </footer>
 </Base>
