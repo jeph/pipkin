@@ -302,7 +302,7 @@ private fun HeaderPill(text: String, color: Color, background: Color) {
     fontSize = 11.5.sp,
     fontWeight = FontWeight.Bold,
     maxLines = 1,
-    style = TextStyle(fontFeatureSettings = PipkinFonts.TABULAR),
+    style = LocalTextStyle.current.copy(fontFeatureSettings = PipkinFonts.TABULAR),
   )
 }
 

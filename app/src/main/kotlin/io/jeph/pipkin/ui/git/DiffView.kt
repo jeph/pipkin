@@ -41,6 +41,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -106,7 +107,7 @@ internal fun DiffView(
   }
 }
 
-/** The code font: 12sp JetBrains Mono on 18sp lines, ligatures off. */
+/** The code font: 12sp JetBrains Mono on 18sp lines, ligatures off, and left to right in any language. */
 @Composable
 private fun codeStyle(): TextStyle {
   val colors = pipkinColors
@@ -117,6 +118,7 @@ private fun codeStyle(): TextStyle {
       fontSize = PipkinTokens.FontSize.code,
       lineHeight = PipkinTokens.LineHeight.code,
       fontFeatureSettings = PipkinFonts.FEATURES,
+      textDirection = TextDirection.Ltr,
     )
   }
 }

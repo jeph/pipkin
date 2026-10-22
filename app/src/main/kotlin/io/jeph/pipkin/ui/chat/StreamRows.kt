@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -209,7 +210,7 @@ private fun FooterText(text: String) {
     text = text,
     color = pipkinColors.foregroundMuted,
     fontSize = PipkinTokens.FontSize.sm,
-    style = TextStyle(fontFeatureSettings = PipkinFonts.TABULAR),
+    style = LocalTextStyle.current.copy(fontFeatureSettings = PipkinFonts.TABULAR),
   )
 }
 

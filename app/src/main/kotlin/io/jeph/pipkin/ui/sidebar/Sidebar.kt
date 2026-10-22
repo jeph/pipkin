@@ -115,10 +115,12 @@ internal fun Sidebar(
       workspaces = workspaces,
       home = home,
       removal = removal,
-      onOpen = { cwd -> showThen(cwd) { actions.openWorkspace(pane, cwd) } },
-      onNewChatIn = { cwd -> showThen(cwd) { actions.newChat(pane, cwd) } },
-      onActions = { menuFor = it },
-      onAddWorkspace = { pickerOpen = true },
+      callbacks = WorkspaceListCallbacks(
+        onOpen = { cwd -> showThen(cwd) { actions.openWorkspace(pane, cwd) } },
+        onNewChatIn = { cwd -> showThen(cwd) { actions.newChat(pane, cwd) } },
+        onActions = { menuFor = it },
+        onAddWorkspace = { pickerOpen = true },
+      ),
       modifier = Modifier.weight(1f),
     )
     SidebarFooter(
@@ -298,16 +300,21 @@ private fun SidebarHeader(onClose: () -> Unit) {
   }
 }
 
+/** What the workspace list's rows do. */
+private class WorkspaceListCallbacks(
+  val onOpen: (cwd: String) -> Unit,
+  val onNewChatIn: (cwd: String) -> Unit,
+  val onActions: (Workspace) -> Unit,
+  val onAddWorkspace: () -> Unit,
+)
+
 @Composable
 private fun WorkspaceList(
   pane: Pane,
   workspaces: List<Workspace>,
   home: String,
   removal: WorkspaceRemoval,
-  onOpen: (cwd: String) -> Unit,
-  onNewChatIn: (cwd: String) -> Unit,
-  onActions: (Workspace) -> Unit,
-  onAddWorkspace: () -> Unit,
+  callbacks: WorkspaceListCallbacks,
   modifier: Modifier = Modifier,
 ) {
   val registry = LocalContext.current.appGraph.registry
@@ -325,7 +332,7 @@ private fun WorkspaceList(
         fontSize = PipkinTokens.FontSize.lg,
         textAlign = TextAlign.Center,
       )
-      AddWorkspaceRow(onClick = onAddWorkspace)
+      AddWorkspaceRow(onClick = callbacks.onAddWorkspace)
     }
     return
   }
@@ -353,13 +360,15 @@ private fun WorkspaceList(
           cwd = cwd,
           shown = items[pane]?.let { sameFolder(it.cwd, cwd) } == true,
           working = anyWorking(remember(processes, cwd) { processes.values.filter { sameFolder(it.cwd, cwd) } }),
-          onOpen = { onOpen(cwd) },
-          onNewChat = { onNewChatIn(cwd) },
-          onActions = { onActions(workspace) },
+          onOpen = { callbacks.onOpen(cwd) },
+          onNewChat = { callbacks.onNewChatIn(cwd) },
+          onActions = { callbacks.onActions(workspace) },
         )
       }
     }
-    item(key = ADD_WORKSPACE_KEY) { AddWorkspaceRow(onClick = onAddWorkspace, modifier = Modifier.animateItem()) }
+    item(key = ADD_WORKSPACE_KEY) {
+      AddWorkspaceRow(onClick = callbacks.onAddWorkspace, modifier = Modifier.animateItem())
+    }
   }
 }
 

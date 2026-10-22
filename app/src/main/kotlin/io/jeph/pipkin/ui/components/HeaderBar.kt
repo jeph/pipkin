@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -169,7 +170,7 @@ private fun CountBadge(badge: TitleBadge) {
       color = colors.accent,
       fontSize = 11.sp,
       fontWeight = FontWeight.Bold,
-      style = TextStyle(fontFeatureSettings = PipkinFonts.TABULAR),
+      style = LocalTextStyle.current.copy(fontFeatureSettings = PipkinFonts.TABULAR),
       maxLines = 1,
     )
   }

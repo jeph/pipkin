@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
@@ -241,6 +242,8 @@ private fun SourceView(lines: List<AnnotatedString>, modifier: Modifier) {
             fontFamily = PipkinFonts.mono,
             fontSize = PipkinTokens.FontSize.code,
             lineHeight = PipkinTokens.LineHeight.code,
+            // Code reads left to right in any language, so its punctuation stays where it was written.
+            style = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr),
           )
         }
       }
