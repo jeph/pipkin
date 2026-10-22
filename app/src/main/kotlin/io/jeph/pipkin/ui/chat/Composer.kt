@@ -42,6 +42,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldDecorator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -327,7 +328,9 @@ private fun BoxScope.RemoveBadge(onRemove: () -> Unit) {
 @Composable
 private fun ComposerField(controller: ChatController, acceptsImages: Boolean, onRan: () -> Unit, modifier: Modifier) {
   val colors = pipkinColors
-  val style = TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.content)
+  val style = LocalTextStyle.current.merge(
+    TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.content),
+  )
   val currentOnRan by rememberUpdatedState(onRan)
   val enterPicks = remember(controller) { controller.slash.enterPicks { currentOnRan() } }
   BasicTextField(

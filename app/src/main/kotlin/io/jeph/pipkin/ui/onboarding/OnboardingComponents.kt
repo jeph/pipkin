@@ -31,7 +31,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,6 +40,7 @@ import io.jeph.pipkin.termux.TermuxSetup
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -250,7 +250,7 @@ internal fun CommandBox(command: String, modifier: Modifier = Modifier) {
       text = command,
       modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s4),
       color = colors.foreground,
-      fontFamily = FontFamily.Monospace,
+      fontFamily = PipkinFonts.mono,
       fontSize = PipkinTokens.FontSize.code,
       lineHeight = PipkinTokens.LineHeight.code,
     )
@@ -272,7 +272,7 @@ internal fun ProgressLines(lines: List<String>, modifier: Modifier = Modifier) {
       Text(
         text = line,
         color = pipkinColors.foregroundMuted,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = PipkinFonts.mono,
         fontSize = PipkinTokens.FontSize.code,
         lineHeight = PipkinTokens.LineHeight.code,
         maxLines = 1,

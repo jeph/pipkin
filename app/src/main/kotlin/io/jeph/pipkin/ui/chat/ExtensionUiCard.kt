@@ -347,7 +347,7 @@ private fun TextCard(
   val state = rememberTextFieldState(request.prefill.orEmpty())
   val focusRequester = remember { FocusRequester() }
   LaunchedEffect(Unit) { focusRequester.requestFocus() }
-  val style = TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base)
+  val style = LocalTextStyle.current.merge(TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base))
   val shape = RoundedCornerShape(PipkinTokens.Radius.xl)
   CardLayout(
     header = header,

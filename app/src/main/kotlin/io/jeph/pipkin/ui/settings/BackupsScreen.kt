@@ -17,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
@@ -33,6 +32,7 @@ import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStackState
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.io.IOException
@@ -264,7 +264,7 @@ private fun ProgressLine(line: String, modifier: Modifier = Modifier) {
     text = line,
     modifier = modifier.fillMaxWidth(),
     color = pipkinColors.foregroundMuted,
-    fontFamily = FontFamily.Monospace,
+    fontFamily = PipkinFonts.mono,
     fontSize = PipkinTokens.FontSize.code,
     lineHeight = PipkinTokens.LineHeight.code,
     maxLines = 1,

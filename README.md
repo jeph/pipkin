@@ -174,10 +174,10 @@ Do not report suspected security vulnerabilities in public issues. Follow the
 
 ## Acknowledgements
 
-Pipkin's interface is modelled on [Paseo](https://paseo.sh), an open-source app for running coding
-agents from your desktop and phone, and some of its code is adapted from
-[Paseo's](https://github.com/getpaseo/paseo): the folder search, the file-type icon table and icon
-colours, the layout and type scale, and the syntax highlighting colours.
+Pipkin's interface started out modelled on [Paseo](https://paseo.sh), an open-source app for running
+coding agents from your desktop and phone, and some of its code is adapted from
+[Paseo's](https://github.com/getpaseo/paseo): the folder search, and the file-type icon table and icon
+colours.
 
 Pipkin is built on [Pi](https://pi.dev) and [Termux](https://termux.dev), with Jetpack Compose,
 [libghostty-android](https://github.com/SagerNet/libghostty-android) and

@@ -56,6 +56,7 @@ import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SwipeAway
+import io.jeph.pipkin.ui.files.sidebarHighlight
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.rememberPaneItems
@@ -373,8 +374,7 @@ private fun WorkspaceRow(
   onActions: () -> Unit,
 ) {
   val colors = pipkinColors
-  // The light sidebar is surface2 itself, so its highlight steps up one surface.
-  val highlight = if (colors.isDark) colors.surface2 else colors.surface3
+  val highlight = sidebarHighlight()
   Row(
     modifier = Modifier
       .fillMaxWidth()

@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -201,7 +202,9 @@ private fun NewFolderRow(onCommit: (String) -> Unit, onCancel: () -> Unit) {
           focused = state.isFocused
         },
       singleLine = true,
-      textStyle = TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base),
+      textStyle = LocalTextStyle.current.merge(
+        TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base),
+      ),
       cursorBrush = SolidColor(colors.accent),
       keyboardOptions = KeyboardOptions(
         capitalization = KeyboardCapitalization.None,
@@ -306,9 +309,9 @@ private fun CenterNote(modifier: Modifier, content: @Composable () -> Unit) {
   }
 }
 
-/** The sidebar's highlight: the light sidebar is surface2 itself, so its highlight steps up one surface. */
+/** The side panels' highlight for a selected row: one surface step above the panel's surface0. */
 @Composable
-internal fun sidebarHighlight(): Color = pipkinColors.let { if (it.isDark) it.surface2 else it.surface3 }
+internal fun sidebarHighlight(): Color = pipkinColors.surface2
 
 /** Paseo's tree names sit at 76% strength, so the file icons' colours lead. */
 private const val NAME_ALPHA = 0.76f

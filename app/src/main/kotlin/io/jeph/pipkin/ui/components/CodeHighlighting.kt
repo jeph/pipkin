@@ -18,6 +18,9 @@ import io.jeph.pipkin.syntax.Grammar
 import io.jeph.pipkin.syntax.LoadedGrammar
 import io.jeph.pipkin.syntax.SyntaxSession
 import io.jeph.pipkin.syntax.loadGrammar
+import io.jeph.pipkin.ui.theme.DarkPipkinColors
+import io.jeph.pipkin.ui.theme.LightPipkinColors
+import io.jeph.pipkin.ui.theme.PipkinColors
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.conflate
@@ -230,28 +233,18 @@ private val TOKENS = mapOf(
   "none" to Token.Plain,
 )
 
-/**
- * Paseo's syntax palette (GitHub's Primer), by token; Paseo commit b26b923, Apache License 2.0
- * (`assets/licenses/paseo.txt`).
- */
-private val DarkPalette = mapOf(
+/** The syntax palette, by token, from the theme's own roles so code reads as part of the app. */
+private fun palette(colors: PipkinColors, comment: Color) = mapOf(
   Token.Plain to Color.Unspecified,
-  Token.Keyword to Color(0xFFFF7B72),
-  Token.String to Color(0xFFA5D6FF),
-  Token.Constant to Color(0xFF79C0FF),
-  Token.Comment to Color(0xFF8B949E),
-  Token.Function to Color(0xFFD2A8FF),
-  Token.Type to Color(0xFFFFA657),
-  Token.Tag to Color(0xFF7EE787),
+  Token.Keyword to colors.accent,
+  Token.String to colors.dotSuccess,
+  Token.Constant to colors.info,
+  Token.Comment to comment,
+  Token.Function to colors.dotWarning,
+  Token.Type to colors.extension,
+  Token.Tag to colors.dotDanger,
 )
 
-private val LightPalette = mapOf(
-  Token.Plain to Color.Unspecified,
-  Token.Keyword to Color(0xFFCF222E),
-  Token.String to Color(0xFF0A3069),
-  Token.Constant to Color(0xFF0550AE),
-  Token.Comment to Color(0xFF6E7781),
-  Token.Function to Color(0xFF8250DF),
-  Token.Type to Color(0xFF953800),
-  Token.Tag to Color(0xFF116329),
-)
+// Comments sit between the muted and faint text colours: quieter than code, still readable at 4.5:1.
+private val DarkPalette = palette(DarkPipkinColors, comment = Color(0xFF7D85A6))
+private val LightPalette = palette(LightPipkinColors, comment = Color(0xFF5F6687))

@@ -9,9 +9,9 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.Dispatchers
@@ -49,7 +49,7 @@ internal fun LicenseScreen(path: String, onBack: () -> Unit) {
         Text(
           text = it,
           color = pipkinColors.foreground,
-          fontFamily = FontFamily.Monospace,
+          fontFamily = PipkinFonts.mono,
           fontSize = PipkinTokens.FontSize.code,
           lineHeight = PipkinTokens.LineHeight.code,
         )

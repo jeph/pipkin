@@ -33,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -47,6 +46,7 @@ import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.settings.copyToClipboard
 import io.jeph.pipkin.ui.settings.subscriptions
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.delay
@@ -199,7 +199,7 @@ private fun DeviceCodeBlock(step: DeviceCodeStep, onOpen: (String) -> Unit) {
       Text(
         text = step.userCode,
         color = colors.foreground,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = PipkinFonts.mono,
         fontSize = PipkinTokens.FontSize.xxl,
       )
       IconButton28(

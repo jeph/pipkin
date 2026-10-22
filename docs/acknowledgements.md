@@ -9,7 +9,7 @@ The license texts for everything Pipkin ships are in the app under **Settings â†
 
 ## Inspiration
 
-- **[Paseo](https://paseo.sh)**, an open-source app for running coding agents from your desktop and phone. Pipkin's interface is modelled on Paseo's, and some of its code is adapted from [Paseo's](https://github.com/getpaseo/paseo): the folder search, the file-type icon table and icon colours, the layout and type scale, and the syntax highlighting colours.
+- **[Paseo](https://paseo.sh)**, an open-source app for running coding agents from your desktop and phone. Pipkin's interface started out modelled on Paseo's, and some of its code is adapted from [Paseo's](https://github.com/getpaseo/paseo): the folder search, and the file-type icon table and icon colours.
 
 ## The agent
 
@@ -23,7 +23,7 @@ The license texts for everything Pipkin ships are in the app under **Settings â†
 - **[libghostty-android](https://github.com/SagerNet/libghostty-android)** is the terminal. It's built on **[Ghostty](https://github.com/ghostty-org/ghostty)**, with the [Zig](https://codeberg.org/ziglang/zig) standard library, [uucode](https://github.com/jacobsandlund/uucode), [Wuffs](https://github.com/google/wuffs), and the [Unicode Character Database](https://www.unicode.org).
 - **[tree-sitter](https://github.com/tree-sitter/tree-sitter)** highlights code, with grammars from the tree-sitter project and its community for Bash, C, C#, C++, CSS, Dart, Dockerfile, Go, INI, Java, JavaScript, JSON, Kotlin, Lua, Make, Perl, PHP, Python, Ruby, Rust, Swift, TOML, TypeScript, XML, and YAML.
 - **[Lucide](https://lucide.dev)** provides the interface icons, **[Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme)** the file-type icons, and **[Lobe Icons](https://github.com/lobehub/lobe-icons)** the provider logos.
-- **[JetBrains Mono](https://github.com/JetBrains/JetBrainsMono)** is the code font.
+- **[Manrope](https://github.com/googlefonts/manrope)** is the interface font, and **[JetBrains Mono](https://github.com/JetBrains/JetBrainsMono)** the code font.
 
 ## The bundled extensions and host
 

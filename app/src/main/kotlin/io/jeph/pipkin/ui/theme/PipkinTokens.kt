@@ -3,10 +3,7 @@ package io.jeph.pipkin.ui.theme
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/**
- * Layout and type scale copied from Paseo's `packages/app/src/styles/theme.ts` (https://github.com/getpaseo/paseo,
- * commit b26b923; Copyright (c) 2025-present Mohamed Boudra, Apache License 2.0, see `assets/licenses/paseo.txt`).
- */
+/** Pipkin's spacing, type and shape scale. */
 object PipkinTokens {
   object Spacing {
     val s2 = 2.dp
@@ -32,17 +29,17 @@ object PipkinTokens {
   }
 
   object LineHeight {
-    val markdown = 21.sp
+    val markdown = 22.sp
     val code = 18.sp
   }
 
   object Radius {
-    val sm = 2.dp
-    val base = 4.dp
-    val md = 6.dp
-    val lg = 8.dp
-    val xl = 12.dp
-    val xxl = 16.dp
+    val sm = 4.dp
+    val base = 7.dp
+    val md = 12.dp
+    val lg = 14.dp
+    val xl = 18.dp
+    val xxl = 22.dp
   }
 
   object IconSize {

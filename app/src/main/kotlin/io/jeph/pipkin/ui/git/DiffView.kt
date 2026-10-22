@@ -31,7 +31,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
@@ -44,6 +43,7 @@ import io.jeph.pipkin.ui.components.fileLanguage
 import io.jeph.pipkin.ui.components.highlightCode
 import io.jeph.pipkin.ui.components.splitLines
 import io.jeph.pipkin.ui.theme.PipkinColors
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.Dispatchers
@@ -96,16 +96,17 @@ internal fun DiffView(
   }
 }
 
-/** The code font: Paseo's 12sp monospace on 18sp lines. */
+/** The code font: 12sp JetBrains Mono on 18sp lines, ligatures off. */
 @Composable
 private fun codeStyle(): TextStyle {
   val colors = pipkinColors
   return remember(colors) {
     TextStyle(
       color = colors.foreground,
-      fontFamily = FontFamily.Monospace,
+      fontFamily = PipkinFonts.mono,
       fontSize = PipkinTokens.FontSize.code,
       lineHeight = PipkinTokens.LineHeight.code,
+      fontFeatureSettings = PipkinFonts.FEATURES,
     )
   }
 }

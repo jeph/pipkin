@@ -429,7 +429,10 @@ private fun BulkActions(
         onClick = onDelete,
         modifier = Modifier.weight(1f),
         enabled = enabled,
-        colors = ButtonDefaults.buttonColors(containerColor = colors.destructive, contentColor = Color.White),
+        colors = ButtonDefaults.buttonColors(
+          containerColor = colors.destructive,
+          contentColor = colors.destructiveForeground,
+        ),
       ) {
         Text(stringResource(R.string.archive_delete_count, deleteCount))
       }

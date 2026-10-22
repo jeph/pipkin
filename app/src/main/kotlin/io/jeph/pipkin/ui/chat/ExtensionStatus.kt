@@ -221,13 +221,17 @@ private class SgrState(private val colors: PipkinColors) {
       else -> 1
     }
 
-  /** Palette slots 0-15 by the role Pi's default theme gives them; 16-255 as xterm defines them. */
+  /**
+   * Palette slots 0-15 by the role Pi's default theme gives them; 16-255 as xterm defines them. Pi's themes make
+   * magenta their accent, so it takes Pipkin's; cyan keeps a hue of its own.
+   */
   private fun paletteColor(index: Int): Color? = when (index) {
     in 0..15 -> when (index % 8) {
       1 -> colors.destructive
       2 -> colors.dotSuccess
       3 -> colors.dotWarning
-      4, 5, 6 -> colors.accent
+      4, 5 -> colors.accent
+      6 -> colors.info
       7 -> colors.foreground
       else -> colors.foregroundMuted
     }

@@ -1,8 +1,10 @@
 package io.jeph.pipkin
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -75,12 +77,22 @@ class MainActivity : ComponentActivity() {
     setContent {
       val theme by graph.preferences.theme.collectAsStateWithLifecycle()
       PipkinTheme(theme) {
+        // The app's theme can differ from the system's, so the bars' icons follow the app's.
+        val dark = pipkinColors.isDark
+        LaunchedEffect(dark) { enableEdgeToEdge(statusBarStyle(dark), navigationBarStyle(dark)) }
         Surface(modifier = Modifier.fillMaxSize(), color = pipkinColors.surface0) {
           PipkinApp(graph, requestedChat)
         }
       }
     }
   }
+
+  private fun statusBarStyle(dark: Boolean) =
+    if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+
+  // Drawn behind three-button navigation only; gesture navigation stays transparent. androidx.activity's defaults.
+  private fun navigationBarStyle(dark: Boolean) =
+    if (dark) SystemBarStyle.dark(DARK_NAV_SCRIM) else SystemBarStyle.light(LIGHT_NAV_SCRIM, DARK_NAV_SCRIM)
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
@@ -97,6 +109,9 @@ class MainActivity : ComponentActivity() {
     TermuxWaker.pipkinCovered(this)
   }
 }
+
+private const val LIGHT_NAV_SCRIM = 0xE6FFFFFF.toInt()
+private const val DARK_NAV_SCRIM = 0x801B1B1B.toInt()
 
 /**
  * Shows the top of the navigator's stack; onboarding is the root until setup completes. Pushed

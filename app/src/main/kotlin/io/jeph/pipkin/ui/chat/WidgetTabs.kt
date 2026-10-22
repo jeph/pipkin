@@ -64,7 +64,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,6 +72,7 @@ import io.jeph.pipkin.agent.ExtensionWidget
 import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -353,7 +353,7 @@ private fun WidgetPanel(item: KeyedWidget, belowEditor: Boolean, tight: Boolean,
           .fadeScrolledEdges(scroll, vertical = true)
           .verticalScroll(scroll),
         color = colors.foreground,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = PipkinFonts.mono,
         fontSize = PipkinTokens.FontSize.code,
         lineHeight = PipkinTokens.LineHeight.code,
       )
@@ -415,7 +415,7 @@ internal fun WidgetSheet(item: KeyedWidget, tabs: WidgetTabs, onDismiss: () -> U
           .verticalScroll(rememberScrollState())
           .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s24),
         color = colors.foreground,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = PipkinFonts.mono,
         fontSize = PipkinTokens.FontSize.code,
         lineHeight = PipkinTokens.LineHeight.code,
       )

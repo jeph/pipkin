@@ -31,13 +31,13 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.GitCommit
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.relativeTime
@@ -176,7 +176,7 @@ private fun CommitRow(commit: GitCommit, isFirst: Boolean, isLast: Boolean, onOp
         text = commit.shortSha,
         modifier = Modifier.width(70.dp),
         color = colors.foregroundMuted,
-        fontFamily = FontFamily.Monospace,
+        fontFamily = PipkinFonts.mono,
         fontSize = PipkinTokens.FontSize.sm,
         maxLines = 1,
       )

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -39,7 +40,9 @@ fun SearchField(
       horizontal = PipkinTokens.Spacing.s16,
       vertical = PipkinTokens.Spacing.s4,
     ),
-    textStyle = TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base),
+    textStyle = LocalTextStyle.current.merge(
+      TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base),
+    ),
     cursorBrush = SolidColor(colors.accent),
     keyboardOptions = keyboardOptions,
     singleLine = true,

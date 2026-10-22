@@ -15,9 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -56,7 +56,7 @@ internal fun CodeText(text: AnnotatedString, color: Color = pipkinColors.foregro
   Text(
     text = text,
     color = color,
-    fontFamily = FontFamily.Monospace,
+    fontFamily = PipkinFonts.mono,
     fontSize = PipkinTokens.FontSize.code,
     lineHeight = PipkinTokens.LineHeight.code,
     softWrap = false,

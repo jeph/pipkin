@@ -49,12 +49,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -159,14 +159,14 @@ private fun PasteDemoTerminal(modifier: Modifier) {
     verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(text = PROMPT, color = colors.foregroundMuted, fontFamily = FontFamily.Monospace, fontSize = mono)
+      Text(text = PROMPT, color = colors.foregroundMuted, fontFamily = PipkinFonts.mono, fontSize = mono)
       Box(contentAlignment = Alignment.CenterStart) {
         PressTarget(time)
         Text(
           text = COMMAND,
           modifier = Modifier.graphicsLayer { alpha = fade(time.value, PASTE_AT, PASTE_AT + STEP_MILLIS) },
           color = colors.foreground,
-          fontFamily = FontFamily.Monospace,
+          fontFamily = PipkinFonts.mono,
           fontSize = mono,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
@@ -177,7 +177,7 @@ private fun PasteDemoTerminal(modifier: Modifier) {
       text = stringResource(R.string.onboarding_demo_installing),
       modifier = Modifier.graphicsLayer { alpha = fade(time.value, RUN_AT, RUN_AT + STEP_MILLIS) },
       color = colors.foregroundMuted,
-      fontFamily = FontFamily.Monospace,
+      fontFamily = PipkinFonts.mono,
       fontSize = mono,
     )
     DoneLine(time)
@@ -202,7 +202,7 @@ private fun DoneLine(time: State<Float>) {
     Text(
       text = stringResource(R.string.onboarding_demo_done),
       color = colors.foreground,
-      fontFamily = FontFamily.Monospace,
+      fontFamily = PipkinFonts.mono,
       fontSize = PipkinTokens.FontSize.code,
     )
   }

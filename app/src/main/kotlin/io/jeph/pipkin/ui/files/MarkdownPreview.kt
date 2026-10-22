@@ -29,11 +29,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.ui.components.PipkinMarkdown
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -95,7 +95,7 @@ private fun FrontMatterTable(rows: List<Pair<String, String>>) {
               text = key,
               modifier = Modifier.width(keyWidth).padding(CELL_PADDING_HORIZONTAL, CELL_PADDING_VERTICAL),
               color = colors.foregroundMuted,
-              fontFamily = FontFamily.Monospace,
+              fontFamily = PipkinFonts.mono,
               fontSize = PipkinTokens.FontSize.base,
               lineHeight = TABLE_LINE_HEIGHT,
             )

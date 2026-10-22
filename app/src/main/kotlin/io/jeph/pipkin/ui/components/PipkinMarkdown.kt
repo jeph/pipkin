@@ -16,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
@@ -36,6 +35,7 @@ import com.mikepenz.markdown.model.markdownAnnotator
 import com.mikepenz.markdown.model.markdownDimens
 import com.mikepenz.markdown.model.markdownPadding
 import com.mikepenz.markdown.utils.resolveImageAlt
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.flow.conflate
@@ -50,8 +50,10 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier, cache: Markd
   val colors = pipkinColors
   val body = TextStyle(
     color = colors.foreground,
+    fontFamily = PipkinFonts.ui,
     fontSize = PipkinTokens.FontSize.content,
     lineHeight = PipkinTokens.LineHeight.markdown,
+    fontFeatureSettings = PipkinFonts.FEATURES,
   )
   // CodeText is Pipkin's one code style, so the library's code typography is ignored here.
   val codeBlock: @Composable (String, String?, TextStyle) -> Unit = { text, language, _ ->
@@ -135,9 +137,10 @@ private fun typography(body: TextStyle): MarkdownTypography {
   val colors = pipkinColors
   val code = TextStyle(
     color = colors.foreground,
-    fontFamily = FontFamily.Monospace,
+    fontFamily = PipkinFonts.mono,
     fontSize = PipkinTokens.FontSize.code,
     lineHeight = PipkinTokens.LineHeight.code,
+    fontFeatureSettings = PipkinFonts.FEATURES,
   )
   return markdownTypography(
     h1 = body.copy(fontSize = PipkinTokens.FontSize.xxl, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),

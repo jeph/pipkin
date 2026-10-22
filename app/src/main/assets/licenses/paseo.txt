@@ -1,4 +1,4 @@
-Paseo, commit b26b9234c0f088ed97abbaa981f002da7817498e (https://github.com/getpaseo/paseo), Apache License 2.0. Pipkin's folder search, file-type icon table and file-icon colours, layout and type scale, and syntax highlighting colours are adapted from Paseo.
+Paseo, commit b26b9234c0f088ed97abbaa981f002da7817498e (https://github.com/getpaseo/paseo), Apache License 2.0. Pipkin's folder search, and its file-type icon table and file-icon colours, are adapted from Paseo.
 
 Copyright (c) 2025-present Mohamed Boudra
 

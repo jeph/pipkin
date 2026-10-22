@@ -24,7 +24,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -36,6 +35,7 @@ import io.jeph.pipkin.ui.components.CodeBox
 import io.jeph.pipkin.ui.components.CodeText
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
@@ -66,7 +66,7 @@ internal fun StatusBanner(
           text = it,
           modifier = Modifier.fillMaxWidth(),
           color = pipkinColors.foregroundMuted,
-          fontFamily = FontFamily.Monospace,
+          fontFamily = PipkinFonts.mono,
           fontSize = PipkinTokens.FontSize.code,
           lineHeight = PipkinTokens.LineHeight.code,
           maxLines = 1,

@@ -44,7 +44,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,6 +64,7 @@ import io.jeph.pipkin.ui.components.splitLines
 import io.jeph.pipkin.ui.settings.SegmentedControl
 import io.jeph.pipkin.ui.settings.copyToClipboard
 import io.jeph.pipkin.ui.sidebar.tildePath
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.CloseSplitButton
@@ -240,7 +240,7 @@ private fun SourceView(lines: List<AnnotatedString>, modifier: Modifier) {
             text = (index + 1).toString(),
             modifier = Modifier.width(GUTTER_WIDTH).padding(end = PipkinTokens.Spacing.s12),
             color = colors.foregroundMuted,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = PipkinFonts.mono,
             fontSize = PipkinTokens.FontSize.code,
             lineHeight = PipkinTokens.LineHeight.code,
             textAlign = TextAlign.End,
@@ -249,7 +249,7 @@ private fun SourceView(lines: List<AnnotatedString>, modifier: Modifier) {
             text = line,
             modifier = Modifier.weight(1f).padding(end = PipkinTokens.Spacing.s12),
             color = colors.foreground,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = PipkinFonts.mono,
             fontSize = PipkinTokens.FontSize.code,
             lineHeight = PipkinTokens.LineHeight.code,
           )
