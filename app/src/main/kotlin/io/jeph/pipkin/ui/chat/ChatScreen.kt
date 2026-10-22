@@ -186,7 +186,7 @@ private fun ChatContent(
   }
 }
 
-/** The stream, with the snackbars and the slash menu over its bottom. */
+/** The stream, with the snackbars over its bottom (or its top while a dialog or steering waits) and the slash menu. */
 @Composable
 private fun StreamArea(
   controller: ChatController,
@@ -211,7 +211,12 @@ private fun StreamArea(
       onRestart = process::restart,
       backgroundTasks = backgroundTasks,
     )
-    SnackbarStack(snackbar, Modifier.align(Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16))
+    // A dialog card or the steering box fills the space over the composer, so snackbars move up under the header.
+    val raised = timeline.pendingUi != null || timeline.queue.isNotEmpty()
+    SnackbarStack(
+      snackbar,
+      Modifier.align(if (raised) Alignment.TopCenter else Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16),
+    )
     SlashMenuHost(controller, ready = processState == AgentProcessState.Ready, Modifier.align(Alignment.BottomCenter))
   }
 }
