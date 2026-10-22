@@ -56,7 +56,7 @@ Pipkin organizes chats by **workspace**: a folder the agent works in, usually a 
 
 A few things to know while it works:
 
-- **Pick a model** with the model chip under the message box, and how hard it should think with the **Reasoning effort** chip. Your choice applies to the chat and becomes the default for new chats.
+- **Pick a model** with the model chip under the message box. The same sheet sets how hard it should think, under **Reasoning effort**. Your choice applies to the chat and becomes the default for new chats.
 - **Steer it.** Type a message while the agent is busy and it waits in the **Steering** box until the agent is ready for it. Tap **Send now** to interrupt, or **Edit** to change it.
 - **Stop it** at any time with **Stop**.
 - **Attach images** with the **+** button when the model can see them.

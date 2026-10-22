@@ -67,7 +67,7 @@ To remove a provider, open it and tap **Remove provider**. Pipkin forgets the pr
 
 ## Choose a model for a chat
 
-Under the message box, the model chip shows the current model. Tap it to search and switch. The **Reasoning effort** chip next to it sets how much the model thinks before answering; it only offers the levels the current model supports. You can also type `/model` or `/thinking`.
+Under the message box, the model chip shows the current model. Tap it to search and switch. Under the models, **Reasoning effort** sets how much the model thinks before answering; it only offers the levels the current model supports, and the chip next to the model chip shows the one picked. Tapping that chip, or typing `/model` or `/thinking`, opens the same sheet, and `/thinking high` sets a level directly.
 
 Whatever you pick applies to the current chat and becomes the default for new chats. To control which models show up in the list, open a provider in **Settings → Providers** and add or remove its models.
 
