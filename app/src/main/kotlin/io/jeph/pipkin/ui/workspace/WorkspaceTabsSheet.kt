@@ -11,8 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -26,6 +29,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
@@ -272,8 +280,9 @@ private class TabListCallbacks(
 )
 
 /**
- * The tab menu's rows: the workspace's open tabs, then the saved chats, then [footer] when given. What the pane shows
- * is highlighted; opening the chat the other pane shows swaps the panes.
+ * The tab menu's rows: what the pane shows first, then the workspace's other open tabs, then its other saved chats,
+ * then [footer] when given. What the pane shows is highlighted; opening the chat the other pane shows swaps the panes.
+ * An edge with more rows past it fades into the sheet, so a list cut short reads as one that scrolls.
  */
 @Composable
 private fun TabList(
@@ -288,29 +297,37 @@ private fun TabList(
   val processes by graph.registry.processes.collectAsStateWithLifecycle()
   val keptTitles by graph.sessionRepository.extensionTitles.bySessionFile.collectAsStateWithLifecycle()
   val keptStatuses by graph.sessionRepository.extensionStatuses.bySessionFile.collectAsStateWithLifecycle()
-  LazyColumn(modifier = modifier) {
-    tabRows(tabs, closing, callbacks)
-    items(tabs.chats, key = { it.path }) { session ->
-      val elsewhere = session.path == tabs.shown.elsewhereChat
-      SwipeAway(
-        leaving = session.path in archiving.leaving,
-        onSwiped = { archiving.archive(session) },
-        onLeft = { archiving.onLeft(session) },
-        containerColor = pipkinColors.surface1,
-        modifier = Modifier.animateItem(),
-      ) {
-        val process = processes[ChatKey.session(session.path)]
-        ChatTabRow(
-          title = chatTitle(session, process, keptTitles[session.path]),
-          modified = session.modified,
-          statuses = chatStatuses(process, keptStatuses[session.path]),
-          process = process,
-          current = session.path == tabs.shown.chat,
-          onOpen = { if (elsewhere) callbacks.onSwapPanes() else callbacks.onOpenChat(session) },
-          onActions = { callbacks.onActions(TabMenu.Chat(session)) },
-        )
-      }
+  val listState = rememberLazyListState()
+  // The list keeps its first visible row in place, so a shown tab that changes while the sheet is open, as when the
+  // shown terminal closes, would land just above the view; going back to the top keeps it in sight.
+  val shownKey = tabs.shownChat?.path ?: tabs.shown.tab?.key
+  LaunchedEffect(shownKey) { listState.requestScrollToItem(0) }
+  val fadeTo = pipkinColors.surface1
+  val chatRow: @Composable LazyItemScope.(SessionInfo) -> Unit = { session ->
+    val elsewhere = session.path == tabs.shown.elsewhereChat
+    SwipeAway(
+      leaving = session.path in archiving.leaving,
+      onSwiped = { archiving.archive(session) },
+      onLeft = { archiving.onLeft(session) },
+      containerColor = pipkinColors.surface1,
+      modifier = Modifier.animateItem(),
+    ) {
+      val process = processes[ChatKey.session(session.path)]
+      ChatTabRow(
+        title = chatTitle(session, process, keptTitles[session.path]),
+        modified = session.modified,
+        statuses = chatStatuses(process, keptStatuses[session.path]),
+        process = process,
+        current = session.path == tabs.shown.chat,
+        onOpen = { if (elsewhere) callbacks.onSwapPanes() else callbacks.onOpenChat(session) },
+        onActions = { callbacks.onActions(TabMenu.Chat(session)) },
+      )
     }
+  }
+  LazyColumn(modifier = modifier.scrollFades(listState, fadeTo), state = listState) {
+    tabs.shownChat?.let { shown -> item(key = shown.path) { chatRow(shown) } }
+    tabRows(tabs, closing, callbacks)
+    items(tabs.otherChats, key = { it.path }) { chatRow(it) }
     footer?.let { item(key = FOOTER_KEY) { it() } }
   }
 }
@@ -419,3 +436,26 @@ private val PINNED_ACTIONS_MIN_HEIGHT = 600.dp
 
 /** The list key of the tiles when they scroll at the end of the tabs. */
 private const val FOOTER_KEY = "pipkin:tab-actions"
+
+/**
+ * Fades the top of a list into [color] once it's scrolled and the bottom while rows lie below. Painted in the
+ * sheet's colour over the rows rather than as a transparency mask, which would draw the whole list offscreen; [state]
+ * is read while drawing, so scrolling redraws the fades without recomposing the list.
+ */
+private fun Modifier.scrollFades(state: LazyListState, color: Color): Modifier = drawWithContent {
+  drawContent()
+  val fade = SCROLL_FADE.toPx().coerceAtMost(size.height / 2)
+  if (state.canScrollBackward) {
+    drawRect(Brush.verticalGradient(listOf(color, Color.Transparent), endY = fade), size = Size(size.width, fade))
+  }
+  if (state.canScrollForward) {
+    val top = size.height - fade
+    drawRect(
+      Brush.verticalGradient(listOf(Color.Transparent, color), startY = top, endY = size.height),
+      topLeft = Offset(0f, top),
+      size = Size(size.width, fade),
+    )
+  }
+}
+
+private val SCROLL_FADE = 40.dp

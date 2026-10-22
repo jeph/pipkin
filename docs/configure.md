@@ -30,13 +30,13 @@ Pi's [configuration documentation](https://github.com/earendil-works/pi/blob/mai
 Pipkin's file viewer is read-only, so there are two ways to change these files:
 
 - **Ask the agent.** In any chat, say what you want, for example: "Add a rule to `~/.pipkin/pi/AGENTS.md` that tests run with `pytest -q`."
-- **Use a terminal.** Tap the chat's title, choose **New terminal**, and edit with a terminal editor, such as `nano` (`pkg install nano`).
+- **Use a terminal.** Tap the tabs button at the top of the chat, choose **New terminal**, and edit with a terminal editor, such as `nano` (`pkg install nano`).
 
 To browse the folder, add `~/.pipkin/pi` as a workspace, or open the file explorer and choose **Show hidden files**.
 
 After you change a file, reload so the agent picks it up:
 
-- Tap the chat's title and choose **Reload agent**, or type `/reload`, to reload the current chat. If the agent is working, Pipkin asks before stopping it.
+- Tap the tabs button at the top of the chat and choose **Reload agent**, or type `/reload`, to reload the current chat. If the agent is working, Pipkin asks before stopping it.
 - **Settings → Agent → Reload all agents** reloads every chat that isn't working.
 
 A reload restarts the agent in the same folder and keeps the conversation.

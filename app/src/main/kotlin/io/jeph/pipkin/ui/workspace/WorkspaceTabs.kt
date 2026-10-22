@@ -18,10 +18,18 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * The tab menu's tabs for a workspace: its open tabs, by [menuGroup] and then oldest first; its saved chats, newest
- * first, which leaves out a new chat until Pi saved its first message; and what the panes show.
+ * first, which leaves out a new chat until Pi saved its first message; and what the panes show. What this side's pane
+ * shows comes first, so the menu opens on it: the shown tab heads [tabs], and the shown chat, which the menu lists
+ * before the tabs, is [shownChat] and heads [chats].
  */
 internal class WorkspaceTabs(val tabs: List<WorkspaceTab>, val chats: List<SessionInfo>, val shown: PanesShow) {
   val count: Int get() = tabs.size + chats.size
+
+  /** The saved chat this side's pane shows, if it's one of [chats]. */
+  val shownChat: SessionInfo? = chats.firstOrNull()?.takeIf { it.path == shown.chat }
+
+  /** [chats] without [shownChat]. */
+  val otherChats: List<SessionInfo> = if (shownChat == null) chats else chats.drop(1)
 }
 
 /**
@@ -53,15 +61,27 @@ internal fun rememberWorkspaceTabs(pane: Pane, cwd: String): WorkspaceTabs {
   val herePath by sessionFileOf(here).collectAsStateWithLifecycle()
   val elsewherePath by sessionFileOf(elsewhere).collectAsStateWithLifecycle()
   return remember(sessions, open, here, elsewhere, herePath, elsewherePath, cwd) {
+    val shownTab = (here as? PaneItem.Tab)?.tab
     WorkspaceTabs(
-      tabs = open.filter { sameFolder(it.cwd, cwd) }.sortedBy { it.menuGroup },
-      chats = sessions.filter { sameFolder(it.cwd, cwd) },
+      tabs = open.filter { sameFolder(it.cwd, cwd) }.sortedBy { it.menuGroup }.withFirst { it == shownTab },
+      chats = sessions.filter { sameFolder(it.cwd, cwd) }.withFirst { it.path == herePath },
       shown = PanesShow(
         chat = herePath,
-        tab = (here as? PaneItem.Tab)?.tab,
+        tab = shownTab,
         elsewhereChat = elsewherePath,
       ),
     )
+  }
+}
+
+/** This list with its first element that [isFirst] moved to the front, keeping the others' order. */
+private fun <T> List<T>.withFirst(isFirst: (T) -> Boolean): List<T> {
+  val index = indexOfFirst(isFirst)
+  if (index <= 0) return this
+  return buildList(size) {
+    add(this@withFirst[index])
+    addAll(this@withFirst.subList(0, index))
+    addAll(this@withFirst.subList(index + 1, this@withFirst.size))
   }
 }
 

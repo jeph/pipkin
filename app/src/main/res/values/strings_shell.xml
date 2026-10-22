@@ -11,6 +11,9 @@
         <item quantity="one">%1$d tab in this workspace</item>
         <item quantity="other">%1$d tabs in this workspace</item>
     </plurals>
+    <!-- Inside the header's tabs button when the workspace has more tabs than fit: %1$s is the most it shows, 99,
+         already formatted. -->
+    <string name="shell_tabs_more">%1$s+</string>
     <!-- The line under a workspace's name in the sidebar: what its chats are doing, then how many tabs it has. -->
     <string name="shell_workspace_waiting">Waiting for you</string>
     <string name="shell_workspace_working">Working</string>

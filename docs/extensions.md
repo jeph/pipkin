@@ -29,7 +29,7 @@ Pi packages bundle extensions, skills, prompts, and themes from npm or git. Inst
 }
 ```
 
-Then reload the chat: tap its title and choose **Reload agent**, or type `/reload`. Pi installs missing packages when the agent starts.
+Then reload the chat: tap the tabs button at the top of the chat and choose **Reload agent**, or type `/reload`. Pi installs missing packages when the agent starts.
 
 **Run Pi's install command** in a terminal tab. Pipkin's Pi isn't on the terminal's `PATH`, so give its path and config folder:
 

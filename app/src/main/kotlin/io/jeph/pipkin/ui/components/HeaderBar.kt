@@ -72,13 +72,9 @@ private val HEADER_ICON_SIZE = 18.dp
 /** The height of [HeaderBar] below the status bar, which overlays such as Termux's waking pill stay under. */
 val HeaderBarHeight = 52.dp
 
-/** A short [text], such as a count, at the end of a [HeaderBar]'s title, read out as [description]. */
-class TitleBadge(val text: String, val description: String)
-
 /**
- * The header of a screen: [leading] and [trailing] buttons around a bold [title] with its [badge], over the [folder]
- * it's in, or over the [status] while there is one, which pans when it doesn't fit. With [onTitleClick] the title is a
- * button and ends in a chevron.
+ * The header of a screen: [leading] and [trailing] buttons around a bold [title] over the [folder] it's in, or over
+ * the [status] while there is one, which pans when it doesn't fit.
  */
 @Composable
 fun HeaderBar(
@@ -86,8 +82,6 @@ fun HeaderBar(
   modifier: Modifier = Modifier,
   folder: String? = null,
   status: AnnotatedString? = null,
-  badge: TitleBadge? = null,
-  onTitleClick: (() -> Unit)? = null,
   leading: @Composable RowScope.() -> Unit = {},
   trailing: @Composable RowScope.() -> Unit = {},
 ) {
@@ -103,16 +97,16 @@ fun HeaderBar(
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
     leading()
-    val titleButton =
-      if (onTitleClick == null) {
-        Modifier
-      } else {
-        Modifier
-          .clip(RoundedCornerShape(PipkinTokens.Radius.md))
-          .clickable(role = Role.Button, onClick = onTitleClick)
-      }
-    Column(modifier = Modifier.weight(1f).then(titleButton).padding(horizontal = PipkinTokens.Spacing.s4)) {
-      HeaderTitle(title, badge, chevron = onTitleClick != null)
+    Column(modifier = Modifier.weight(1f).padding(horizontal = PipkinTokens.Spacing.s4)) {
+      Text(
+        text = title,
+        color = pipkinColors.foreground,
+        fontSize = PipkinTokens.FontSize.title,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = TITLE_TRACKING,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
       if (status != null) {
         PanningText(status)
       } else if (folder != null) {
@@ -120,59 +114,6 @@ fun HeaderBar(
       }
     }
     trailing()
-  }
-}
-
-@Composable
-private fun HeaderTitle(title: String, badge: TitleBadge?, chevron: Boolean) {
-  val colors = pipkinColors
-  Row(
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
-  ) {
-    Text(
-      text = title,
-      modifier = Modifier.weight(1f, fill = false),
-      color = colors.foreground,
-      fontSize = PipkinTokens.FontSize.title,
-      fontWeight = FontWeight.ExtraBold,
-      letterSpacing = TITLE_TRACKING,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-    )
-    if (badge != null) CountBadge(badge)
-    if (chevron) {
-      LucideIcon(
-        icon = R.drawable.ic_lucide_chevron_down,
-        contentDescription = null,
-        size = PipkinTokens.IconSize.xs,
-        tint = colors.foregroundExtraMuted,
-      )
-    }
-  }
-}
-
-@Composable
-private fun CountBadge(badge: TitleBadge) {
-  val colors = pipkinColors
-  Box(
-    modifier = Modifier
-      .heightIn(min = BADGE_SIZE)
-      .widthIn(min = BADGE_SIZE)
-      .clip(CircleShape)
-      .background(colors.accentSoft)
-      .padding(horizontal = 5.dp)
-      .clearAndSetSemantics { contentDescription = badge.description },
-    contentAlignment = Alignment.Center,
-  ) {
-    Text(
-      text = badge.text,
-      color = colors.accent,
-      fontSize = 11.sp,
-      fontWeight = FontWeight.Bold,
-      style = LocalTextStyle.current.copy(fontFeatureSettings = PipkinFonts.TABULAR),
-      maxLines = 1,
-    )
   }
 }
 
@@ -201,5 +142,4 @@ private fun HeaderFolder(folder: String) {
   }
 }
 
-private val BADGE_SIZE = 18.dp
 private val TITLE_TRACKING = (-0.025).em
