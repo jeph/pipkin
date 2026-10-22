@@ -2,6 +2,8 @@ package io.jeph.pipkin.ui.components
 
 import android.view.View
 import android.view.ViewTreeObserver
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -24,10 +26,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.core.view.SoftwareKeyboardControllerCompat
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -74,8 +83,16 @@ fun PipkinSheet(
       )
     },
   ) {
+    val holdSheet = remember { HoldSheetAfterListScroll() }
     Column(
       modifier = Modifier
+        .nestedScroll(holdSheet)
+        .pointerInput(holdSheet) {
+          awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+            holdSheet.listScrolled = false
+          }
+        }
         .then(sizing)
         .navigationBarsPadding()
         .padding(bottom = PipkinTokens.Spacing.s16),
@@ -85,6 +102,24 @@ fun PipkinSheet(
 }
 
 private val SHEET_SHAPE = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
+
+/**
+ * Keeps a touch that scrolled a list in the sheet from also moving the sheet. Material hands a list's leftover scroll
+ * and fling to the sheet, so a swipe or fling that reaches the top of a list would carry on and close the sheet. Once
+ * a list has scrolled during a touch, the rest of that touch and its fling stay with the list; a touch that starts
+ * with the list at its top still drags the sheet. [listScrolled] is reset when a finger goes down.
+ */
+private class HoldSheetAfterListScroll : NestedScrollConnection {
+  var listScrolled = false
+
+  override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+    if (consumed.y != 0f) listScrolled = true
+    return if (listScrolled) Offset(0f, available.y) else Offset.Zero
+  }
+
+  override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity =
+    if (listScrolled) Velocity(0f, available.y) else Velocity.Zero
+}
 
 /**
  * Closes the keyboard for a sheet and returns whether it's down, so the sheet can open. A sheet that opens
