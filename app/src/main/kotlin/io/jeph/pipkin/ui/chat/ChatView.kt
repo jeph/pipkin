@@ -4,6 +4,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateSetOf
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.TimelineItem
@@ -42,11 +43,14 @@ internal class ChatScroll {
 /**
  * What the chat screen keeps of one chat while another one shows or the activity is recreated, as on rotation or
  * folding: its [scroll] position, its replies' parsed [markdown], so switching back draws the chat as it was from the
- * first frame, its [widgetTabs], and the composer's unsent [draft].
+ * first frame, the step folds it has [expanded], its [widgetTabs], and the composer's unsent [draft].
  */
 internal class ChatView {
   val scroll = ChatScroll()
   val markdown = MarkdownCache()
+
+  /** The keys of the [io.jeph.pipkin.agent.TimelineItem.Steps] whose steps the stream lists. */
+  val expanded = mutableStateSetOf<String>()
   val widgetTabs = WidgetTabs()
   val draft = TextFieldState()
 }

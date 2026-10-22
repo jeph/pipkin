@@ -225,6 +225,7 @@ class ChatTimeline(
   private inner class SeededRun(private val startedAt: Long?, private val openedByExtension: Boolean = false) {
     private var replyKey: String? = null
     private var endedAt: Long? = null
+    private var stopped = false
     private var answered = false
 
     /**
@@ -244,6 +245,7 @@ class ChatTimeline(
       val final = message.optString("stopReason") != "toolUse"
       replyKey = key.takeIf { final }
       endedAt = message.piTimestamp?.let { start -> message.durationMs?.let { start + it } }?.takeIf { final }
+      stopped = final && message.isAborted
     }
 
     /** Adds the run's footer once its final reply came, and returns the run still open, or null once it closed. */
@@ -252,7 +254,9 @@ class ChatTimeline(
       val start = startedAt
       val end = endedAt
       // Keyed by the reply, so reseeding the same history gives the footer the same key.
-      if (start != null && end != null) items += TurnFooter("$key.footer", start, (end - start).coerceAtLeast(0))
+      if (start != null && end != null) {
+        items += TurnFooter("$key.footer", start, (end - start).coerceAtLeast(0), stopped)
+      }
       return null
     }
   }
@@ -334,7 +338,7 @@ class ChatTimeline(
     when (event.optString("type")) {
       "agent_start" -> startRun()
 
-      "agent_settled" -> finishRun()
+      "agent_settled" -> finishRun(stopped = event.optBoolean("aborted"))
 
       // Pi takes the steers for the next turn right after `turn_end` and delivers them before its reply starts.
       "turn_end" -> queueInFlight = true
@@ -379,12 +383,12 @@ class ChatTimeline(
     if (footer == null) footer = TurnFooter("t${itemSeq++}", clock(), null)
   }
 
-  private fun finishRun() {
+  private fun finishRun(stopped: Boolean = false) {
     busy = false
     live = null
     streamingArgs.clear()
     items.replaceAll(::settle)
-    footer?.let { items += it.copy(durationMillis = clock() - it.startedAt) }
+    footer?.let { items += it.copy(durationMillis = clock() - it.startedAt, stopped = stopped) }
     footer = null
     runEnded = true
     clearRetryNotice()
@@ -714,7 +718,18 @@ private fun messageItems(message: JSONObject, prefix: String, settled: Boolean, 
     "bashExecution" -> {
       val exitCode = if (message.isNull("exitCode")) 0 else message.optInt("exitCode")
       val args = JSONObject().put("command", message.optString("command"))
-      listOf(ToolCall(prefix, prefix, "bash", args, message.optString("output"), exitCode != 0, ToolStatus.Done))
+      listOf(
+        ToolCall(
+          prefix,
+          prefix,
+          "bash",
+          args,
+          message.optString("output"),
+          exitCode != 0,
+          ToolStatus.Done,
+          byUser = true,
+        ),
+      )
     }
 
     else -> emptyList()
@@ -772,7 +787,8 @@ private fun assistantItems(message: JSONObject, prefix: String, settled: Boolean
         }
       }
     }
-    if (message.optString("stopReason") == "error") {
+    // Stop ends a run with an error whose message only says it was aborted; the run's footer tells of the stop instead.
+    if (message.optString("stopReason") == "error" && !message.isAborted) {
       add(TimelineItem.Error("$prefix.error", ErrorCause.Request(message.optStringOrNull("errorMessage"))))
     }
   }
@@ -803,3 +819,17 @@ private val JSONObject.piTimestamp: Long? get() = optLong("timestamp").takeIf { 
 
 /** How long Pi took to send a reply, which it measures from the reply's `timestamp`; null when it didn't. */
 private val JSONObject.durationMs: Long? get() = if (has("durationMs")) optLong("durationMs") else null
+
+/**
+ * Whether this assistant message ended a run the user stopped: Pi marks it `aborted`, or, when the request it was
+ * about to make got the abort, an `error` with the abort's own message, whose wording depends on where it came from.
+ */
+private val JSONObject.isAborted: Boolean
+  get() = when (optString("stopReason")) {
+    "aborted" -> true
+    "error" -> optString("errorMessage").trim().matches(ABORT_MESSAGE)
+    else -> false
+  }
+
+/** The messages of Node's, undici's and Pi's own abort errors. */
+private val ABORT_MESSAGE = Regex("""(?i)(this|the) operation was aborted\.?|request was aborted\.?""")

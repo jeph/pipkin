@@ -163,11 +163,12 @@ internal class AgentProcess(
 
   /**
    * [ChatTimeline.state] for the screen, at most once per [STREAM_UPDATE_MILLIS] and always ending on the latest
-   * state. A change after a quiet spell shows at once; while Pi streams, the deltas in between are combined.
+   * state. A change after a quiet spell shows at once; while Pi streams, the deltas in between are combined. Each
+   * state's [TimelineState.stream] is built here, off the main thread.
    */
   val screenTimeline: StateFlow<TimelineState> = timeline.state
     .transform { state ->
-      emit(state)
+      emit(state.withStream())
       delay(STREAM_UPDATE_MILLIS)
     }.stateIn(processScope + Dispatchers.Default, SharingStarted.Eagerly, timeline.state.value)
 

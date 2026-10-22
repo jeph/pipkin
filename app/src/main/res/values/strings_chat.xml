@@ -76,6 +76,23 @@
     <string name="chat_no_output">No output</string>
     <string name="chat_running">Running…</string>
 
+    <!-- A run of the agent's steps folded into one line: its state, then counts. -->
+    <string name="chat_steps_working">Simmering</string>
+    <string name="chat_steps_done">Cooked</string>
+    <string name="chat_steps_stopped">Stopped</string>
+    <plurals name="chat_steps_count">
+        <!-- %1$s is the number of steps, already formatted. -->
+        <item quantity="one">%1$s step</item>
+        <item quantity="other">%1$s steps</item>
+    </plurals>
+    <plurals name="chat_steps_failed">
+        <!-- %1$s is the number of steps that failed, already formatted. -->
+        <item quantity="one">%1$s failed</item>
+        <item quantity="other">%1$s failed</item>
+    </plurals>
+    <string name="chat_steps_expand">Show steps</string>
+    <string name="chat_steps_collapse">Hide steps</string>
+
     <!-- Composer -->
     <string name="chat_placeholder">Message Pipkin…</string>
     <string name="chat_attach">Attach</string>

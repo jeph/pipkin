@@ -22,7 +22,16 @@ data class TimelineState(
    * or the run ends. `clear_queue` still returns them meanwhile, yet Pi delivers them anyway.
    */
   val queueInFlight: Boolean = false,
-)
+) {
+  /**
+   * [items] as the stream shows them, with each run of two or more steps folded into [TimelineItem.Steps]. Built once,
+   * on first read; read it off the main thread first, as the screen's timeline does, since it walks every item.
+   */
+  val stream: StepStream by lazy { StepStream.of(items) }
+
+  /** This state with its [stream] built, for a screen to read without walking the items itself. */
+  fun withStream(): TimelineState = apply { stream }
+}
 
 /**
  * The shortest time between two screen updates of streamed content. Every update re-parses and lays out the
@@ -52,7 +61,8 @@ sealed interface TimelineItem {
 
   /**
    * While [argsStreaming], [args] is only parsed until the argument the chat row shows (`path`, or `command` for
-   * `bash`) is final; [ChatTimeline.streamingArguments] has the raw text that has arrived so far.
+   * `bash`) is final; [ChatTimeline.streamingArguments] has the raw text that has arrived so far. A call [byUser] is
+   * a `!command` the user ran, not a step of the agent's.
    */
   data class ToolCall(
     override val key: String,
@@ -63,6 +73,7 @@ sealed interface TimelineItem {
     val isError: Boolean,
     val status: ToolStatus,
     val argsStreaming: Boolean = false,
+    val byUser: Boolean = false,
   ) : TimelineItem
 
   data class Error(override val key: String, val cause: ErrorCause) : TimelineItem
@@ -92,10 +103,31 @@ sealed interface TimelineItem {
 
   data class Notice(override val key: String, val kind: NoticeKind) : TimelineItem
 
-  /** Closes a run that started at [startedAt]; [durationMillis] is null while Pi is still working. */
-  data class TurnFooter(override val key: String, val startedAt: Long, val durationMillis: Long?) : TimelineItem
+  /**
+   * Closes a run that started at [startedAt]; [durationMillis] is null while Pi is still working. A run the user
+   * [stopped] ended with Stop.
+   */
+  data class TurnFooter(
+    override val key: String,
+    val startedAt: Long,
+    val durationMillis: Long?,
+    val stopped: Boolean = false,
+  ) : TimelineItem
 
   data class ExitBanner(override val key: String, val code: Int?, val stderr: String) : TimelineItem
+
+  /**
+   * Two or more [steps] in a row, which the stream folds into one line: thinking blocks and the agent's tool calls.
+   * Keyed by its first step, so the key holds as steps arrive. [current] is the step the folded line shows while the
+   * run [outcome] says is still going; [failed] counts the tool calls that failed.
+   */
+  data class Steps(
+    override val key: String,
+    val steps: List<TimelineItem>,
+    val outcome: StepsOutcome,
+    val failed: Int,
+    val current: TimelineItem,
+  ) : TimelineItem
 }
 
 /** What a [TimelineItem.Notice] says about Pi's own work on the chat. */

@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcessState
+import io.jeph.pipkin.agent.StepStream
+import io.jeph.pipkin.agent.StreamRows
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.TimelineState
 import io.jeph.pipkin.agent.text
@@ -105,13 +107,15 @@ internal fun ChatStream(
   backgroundTasks: Int,
   modifier: Modifier = Modifier,
 ) {
+  val scroll = view.scroll
   val scope = rememberCoroutineScope()
   val starting = processState is AgentProcessState.Starting || processState is AgentProcessState.Installing
   val loadingOverHistory = starting && timeline.items.isNotEmpty()
   val banner = processState.takeIf { !loadingOverHistory && (starting || it is AgentProcessState.Failed) }
-  val count = timeline.items.size + if (banner != null) 1 else 0
-  val scroll = view.scroll
-  val listState = remember { restoredListState(scroll, timeline.items, banner != null) }
+  val stream = timeline.stream
+  val rows by remember(stream) { derivedStateOf { stream.expand(view.expanded) } }
+  val count = rows.items.size + if (banner != null) 1 else 0
+  val listState = remember { restoredListState(scroll, stream, rows.items, banner != null) }
   val items by rememberUpdatedState(timeline.items)
   DisposableEffect(listState) {
     onDispose {
@@ -129,10 +133,10 @@ internal fun ChatStream(
   Box(modifier = modifier.fillMaxSize()) {
     StreamList(
       listState,
-      timeline.items,
+      rows,
       banner,
       follow,
-      view.markdown,
+      view,
       backgroundTasks,
       onRestart,
       onOpenOnboarding,
@@ -162,16 +166,27 @@ internal fun ChatStream(
 }
 
 /**
- * A list at the item [scroll] last had at its top, when the chat isn't following its end and that item is still in
- * [items]; otherwise at its start, which a following stream pins to the end before the first frame shows.
+ * A list at the row [scroll] last had at its top, or at the fold now holding that step, when the chat isn't following
+ * its end and the row is still in [rows]; otherwise at its start, which a following stream pins to the end before the
+ * first frame shows.
  */
-private fun restoredListState(scroll: ChatScroll, items: List<TimelineItem>, bannerShown: Boolean): LazyListState {
+private fun restoredListState(
+  scroll: ChatScroll,
+  stream: StepStream,
+  rows: List<TimelineItem>,
+  bannerShown: Boolean,
+): LazyListState {
   val top = scroll.top?.takeUnless { scroll.follow.value } ?: return LazyListState()
-  val index = when (top.key) {
-    BANNER_KEY -> 0
-    else -> items.indexOfFirst { it.key == top.key }.takeIf { it >= 0 }?.plus(if (bannerShown) 1 else 0)
+  if (top.key == BANNER_KEY) return LazyListState(0, top.offset)
+  val key = top.key as? String ?: return LazyListState()
+  val row = rows.indexOfFirst { it.key == key }.takeIf { it >= 0 }
+  // A step folded since: the fold's line stands where the step did.
+  val index = row ?: stream.foldHolding(key)?.let { fold -> rows.indexOfFirst { it.key == fold } }?.takeIf { it >= 0 }
+  return if (index == null) {
+    LazyListState()
+  } else {
+    LazyListState(index + if (bannerShown) 1 else 0, if (row == null) 0 else top.offset)
   }
-  return if (index == null) LazyListState() else LazyListState(index, top.offset)
 }
 
 /** The item at the top of the viewport and how far it is scrolled past; null before the list has measured. */
@@ -202,15 +217,17 @@ private fun AutoFollow(listState: LazyListState, follow: MutableState<Boolean>) 
 @Composable
 private fun StreamList(
   listState: LazyListState,
-  items: List<TimelineItem>,
+  rows: StreamRows,
   banner: AgentProcessState?,
   follow: State<Boolean>,
-  markdownCache: MarkdownCache,
+  view: ChatView,
   backgroundTasks: Int,
   onRestart: () -> Unit,
   onOpenOnboarding: () -> Unit,
   onOpenTool: (key: String) -> Unit,
 ) {
+  val items = rows.items
+  val markdownCache = view.markdown
   val recomposer = LocalView.current.findViewTreeCompositionContext() as Recomposer
   val anchor = remember(listState, follow, recomposer) { BottomAnchor(listState, follow, recomposer) }
   val gate = remember(listState) { FirstDrawGate(listState) }
@@ -223,6 +240,7 @@ private fun StreamList(
   val firstItemIndex = if (banner != null) 1 else 0
   val itemCount = items.size + firstItemIndex
   val lastFooterKey = remember(items) { items.lastOrNull { it is TimelineItem.TurnFooter }?.key }
+  val railColor = pipkinColors.border
   LazyColumn(
     state = listState,
     modifier = Modifier
@@ -250,13 +268,19 @@ private fun StreamList(
       }
     }
     itemsIndexed(items, key = { _, item -> item.key }, contentType = { _, item -> item::class }) { index, item ->
+      val rail = if (rows.isListedStep(item.key)) {
+        Modifier.foldRail(last = rows.isLastListedStep(item.key), color = railColor)
+      } else {
+        Modifier
+      }
       StreamItem(
         item = item,
         markdownCache = markdownCache,
         backgroundTasks = if (item.key == lastFooterKey) backgroundTasks else 0,
+        expanded = view.expanded,
         onOpenTool = onOpenTool,
         onRestart = onRestart,
-        modifier = Modifier.contentWidth().padding(top = gapBefore(items.getOrNull(index - 1), item)),
+        modifier = Modifier.contentWidth().padding(top = gapBefore(items.getOrNull(index - 1), item)).then(rail),
       )
     }
   }
@@ -342,27 +366,51 @@ private class BottomAnchor(
   }
 }
 
-/** [backgroundTasks] is what a [TimelineItem.TurnFooter] shows the chat still waits on. */
+/**
+ * [backgroundTasks] is what a [TimelineItem.TurnFooter] shows the chat still waits on; [expanded] holds the keys of
+ * the folds whose steps are listed, which tapping a fold's line toggles.
+ */
 @Composable
 private fun StreamItem(
   item: TimelineItem,
   markdownCache: MarkdownCache,
   backgroundTasks: Int,
+  expanded: MutableSet<String>,
   onOpenTool: (key: String) -> Unit,
   onRestart: () -> Unit,
   modifier: Modifier,
 ) {
   when (item) {
     is TimelineItem.User -> UserMessage(item, modifier)
+
     is TimelineItem.AssistantText -> AssistantMessage(item, markdownCache, modifier)
+
     is TimelineItem.ExtensionMessage -> ExtensionMessage(item, markdownCache, modifier)
+
     is TimelineItem.ExtensionNotice -> ExtensionNoticeCard(item, modifier)
+
     is TimelineItem.Thinking -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
+
     is TimelineItem.ToolCall -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
+
     is TimelineItem.Error -> ErrorRow(item.cause.text(LocalResources.current), modifier)
+
     is TimelineItem.Notice -> NoticeRow(item.kind, modifier)
+
     is TimelineItem.TurnFooter -> TurnFooterRow(item, backgroundTasks, modifier)
+
     is TimelineItem.ExitBanner -> ExitBannerCard(item, onRestart, modifier)
+
+    is TimelineItem.Steps -> {
+      val shown = item.key in expanded
+      StepFoldRow(
+        fold = item,
+        expanded = shown,
+        onToggle = { if (shown) expanded -= item.key else expanded += item.key },
+        onOpenTool = onOpenTool,
+        modifier = modifier,
+      )
+    }
   }
 }
 
@@ -432,6 +480,7 @@ private fun gapBefore(previous: TimelineItem?, item: TimelineItem): Dp = when {
   else -> PipkinTokens.Spacing.s4
 }
 
-private val TimelineItem.isStep: Boolean get() = this is TimelineItem.ToolCall || this is TimelineItem.Thinking
+private val TimelineItem.isStep: Boolean
+  get() = this is TimelineItem.ToolCall || this is TimelineItem.Thinking || this is TimelineItem.Steps
 
 private fun Modifier.contentWidth(): Modifier = widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth()
