@@ -130,6 +130,11 @@
     <!-- Slash commands; descriptions follow Pi's own where Pipkin does the same thing -->
     <string name="chat_commands_loading">Loading commands…</string>
     <string name="chat_commands_empty">No commands found</string>
+    <!-- Where a slash-menu command comes from, at the end of its row. Shown in capitals. -->
+    <string name="chat_command_source_builtin">Built-in</string>
+    <string name="chat_command_source_extension">Extension</string>
+    <string name="chat_command_source_prompt">Prompt</string>
+    <string name="chat_command_source_skill">Skill</string>
     <string name="command_settings">Open settings</string>
     <string name="command_model">Select model</string>
     <string name="command_thinking">Set thinking level</string>

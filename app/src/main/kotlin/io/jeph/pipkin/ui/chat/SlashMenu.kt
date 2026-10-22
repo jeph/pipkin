@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -36,8 +37,11 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.RpcError
@@ -97,7 +101,11 @@ internal class SlashMenu(private val controller: ChatController) {
     loading = true
     try {
       piCommands = controller.process.commands().map { command ->
-        SlashCommand(command.optString("name"), command.optString("description").ifBlank { null })
+        SlashCommand(
+          command.optString("name"),
+          command.optString("description").ifBlank { null },
+          CommandSource.of(command.optString("source")),
+        )
       }
     } catch (_: RpcError) {
       // Pi is still starting or gone; the built-ins still work and the menu asks again once Pi is ready.
@@ -215,6 +223,18 @@ private fun CommandRow(command: SlashCommand, highlighted: Boolean, onClick: () 
         fontSize = 12.sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
+      )
+    } else {
+      Spacer(Modifier.weight(1f))
+    }
+    command.source?.let { source ->
+      Text(
+        text = stringResource(source.label).toUpperCase(LocaleList.current),
+        color = colors.foregroundExtraMuted,
+        fontSize = 10.5.sp,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = 0.05.em,
+        maxLines = 1,
       )
     }
   }

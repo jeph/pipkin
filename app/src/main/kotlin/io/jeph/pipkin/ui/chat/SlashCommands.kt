@@ -33,8 +33,35 @@ internal enum class BuiltinCommand(val command: String, @StringRes val descripti
   }
 }
 
-/** One row of the slash menu: a Pipkin [builtin], or a Pi command (extension, prompt template or skill). */
-internal data class SlashCommand(val name: String, val description: String?, val builtin: BuiltinCommand? = null)
+/** Where a slash command comes from, which its menu row names. */
+internal enum class CommandSource(@StringRes val label: Int) {
+  Builtin(R.string.chat_command_source_builtin),
+  Extension(R.string.chat_command_source_extension),
+  Prompt(R.string.chat_command_source_prompt),
+  Skill(R.string.chat_command_source_skill),
+  ;
+
+  companion object {
+    /** The source `get_commands` gives a Pi command, or null for one Pipkin doesn't know. */
+    fun of(source: String): CommandSource? = when (source) {
+      "extension" -> Extension
+      "prompt" -> Prompt
+      "skill" -> Skill
+      else -> null
+    }
+  }
+}
+
+/**
+ * One row of the slash menu: a Pipkin [builtin], or a Pi command (extension, prompt template or skill). [source] is
+ * null for a Pi command whose source Pipkin doesn't know.
+ */
+internal data class SlashCommand(
+  val name: String,
+  val description: String?,
+  val source: CommandSource?,
+  val builtin: BuiltinCommand? = null,
+)
 
 /** A sent `/name argument` that names a [BuiltinCommand]. */
 internal data class BuiltinInvocation(val command: BuiltinCommand, val argument: String)
@@ -58,7 +85,7 @@ internal fun slashQuery(text: CharSequence, selection: TextRange): String? {
  * among Pi's the first is the one Pi runs, since it tries extension commands before templates.
  */
 internal fun menuCommands(pi: List<SlashCommand>): List<SlashCommand> =
-  (BuiltinCommand.entries.map { SlashCommand(it.command, null, it) } + pi).distinctBy { it.name }
+  (BuiltinCommand.entries.map { SlashCommand(it.command, null, CommandSource.Builtin, it) } + pi).distinctBy { it.name }
 
 /**
  * [commands] matching [query], best first: exact name, name prefix, a word start inside the name (after

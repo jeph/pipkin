@@ -13,7 +13,7 @@ class SlashCommandsTest {
 
   private fun names(commands: List<SlashCommand>) = commands.map { it.name }
 
-  private fun commands(vararg names: String) = names.map { SlashCommand(it, null) }
+  private fun commands(vararg names: String) = names.map { SlashCommand(it, null, CommandSource.Extension) }
 
   @Test
   fun `query is the name typed after a leading slash up to the cursor`() {
@@ -56,16 +56,30 @@ class SlashCommandsTest {
   @Test
   fun `menu lists each name once, preferring built-ins and then Pi's first command`() {
     val pi = listOf(
-      SlashCommand("hello", "extension"),
-      SlashCommand("compact", "template"),
-      SlashCommand("hello", "template"),
-      SlashCommand("skill:hello", "skill"),
+      SlashCommand("hello", "extension", CommandSource.Extension),
+      SlashCommand("compact", "template", CommandSource.Prompt),
+      SlashCommand("hello", "template", CommandSource.Prompt),
+      SlashCommand("skill:hello", "skill", CommandSource.Skill),
     )
     val menu = menuCommands(pi)
 
     assertEquals(BuiltinCommand.entries.map { it.command } + listOf("hello", "skill:hello"), names(menu))
-    assertEquals(BuiltinCommand.Compact, menu.single { it.name == "compact" }.builtin)
+    val compact = menu.single { it.name == "compact" }
+    assertEquals(BuiltinCommand.Compact, compact.builtin)
+    assertEquals(CommandSource.Builtin, compact.source)
     assertEquals("extension", menu.single { it.name == "hello" }.description)
+    assertEquals(CommandSource.Extension, menu.single { it.name == "hello" }.source)
+  }
+
+  @Test
+  fun `a command's source is read from Pi's name for it, and an unknown or missing one is null`() {
+    assertEquals(CommandSource.Extension, CommandSource.of("extension"))
+    assertEquals(CommandSource.Prompt, CommandSource.of("prompt"))
+    assertEquals(CommandSource.Skill, CommandSource.of("skill"))
+    assertNull(CommandSource.of("mcp"))
+    assertNull(CommandSource.of(""))
+    // Pipkin's own commands never come from Pi.
+    assertNull(CommandSource.of("builtin"))
   }
 
   @Test
