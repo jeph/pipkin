@@ -64,6 +64,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,18 +77,22 @@ import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-private val TAB_HEIGHT = 28.dp
-private val TAB_CORNER = 10.dp
+private val TAB_HEIGHT = 26.dp
 private val TAB_LABEL_MAX_WIDTH = 150.dp
 
 /** How tall a widget's lines grow inside the composer before they scroll; the sheet shows them all. */
 private val PANEL_MAX_HEIGHT = 180.dp
 
 /** The same while the keyboard is up or a dialog waits: four lines, so the field and the dialog keep their room. */
-private val PANEL_TIGHT_MAX_HEIGHT = 72.dp
+private val PANEL_TIGHT_MAX_HEIGHT = 68.dp
 
-/** Lowers the panel's lines so the first one centres on the 28 dp expand button beside it: (28 - 18) / 2. */
-private val PANEL_TEXT_TOP = 5.dp
+private val PANEL_SHAPE = RoundedCornerShape(14.dp)
+private val PANEL_FONT_SIZE = 11.sp
+private val PANEL_LINE_HEIGHT = 17.sp
+private val EXPAND_SIZE = 26.dp
+
+/** Lowers the panel's lines so the first one centres on the expand button beside it: (26 - 17) / 2. */
+private val PANEL_TEXT_TOP = 4.5.dp
 
 /** How far a tab strip or a panel fades at an edge it scrolls past. */
 private val SCROLL_FADE = 24.dp
@@ -174,12 +179,13 @@ internal fun WidgetTabStrip(edge: WidgetEdge, tabs: WidgetTabs, belowEditor: Boo
     LazyRow(
       modifier = Modifier
         .fillMaxWidth()
+        .padding(vertical = PipkinTokens.Spacing.s6)
         .height(TAB_HEIGHT)
         .clipToBounds()
         .fadeScrolledEdges(state, vertical = false),
       state = state,
-      contentPadding = PaddingValues(horizontal = PipkinTokens.Spacing.s16),
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
+      contentPadding = PaddingValues(horizontal = PipkinTokens.Spacing.s2),
+      horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
       items(shown, key = { it.key }) { item ->
         val rise = remember { Animatable(if (risen.add(item.key)) 1f else 0f) }
@@ -200,9 +206,8 @@ internal fun WidgetTabStrip(edge: WidgetEdge, tabs: WidgetTabs, belowEditor: Boo
 }
 
 /**
- * One tab: an icon for its edge, the label, and a chevron while it's open or a dot when the widget changed since the
- * user last saw it. An open tab takes the composer's color and covers the border where it meets the composer, so the
- * two read as one.
+ * One tab: a pill with an icon for its edge, the label, and a chevron while it's open or a yellow dot when the widget
+ * changed since the user last saw it. An open tab is tinted cobalt.
  */
 @Composable
 private fun WidgetTab(
@@ -214,50 +219,35 @@ private fun WidgetTab(
   modifier: Modifier,
 ) {
   val colors = pipkinColors
-  val shape = if (belowEditor) {
-    RoundedCornerShape(bottomStart = TAB_CORNER, bottomEnd = TAB_CORNER)
-  } else {
-    RoundedCornerShape(topStart = TAB_CORNER, topEnd = TAB_CORNER)
-  }
-  val fill = if (open) colors.surface1 else colors.surface0
+  val content = if (open) colors.accent else colors.foregroundMuted
   val description = if (changed) stringResource(R.string.chat_widget_changed, label) else label
   val action = stringResource(if (open) R.string.chat_widget_close else R.string.chat_widget_open)
   Row(
     modifier = modifier
       .height(TAB_HEIGHT)
-      .clip(shape)
-      .drawWithContent {
-        drawContent()
-        if (!open) return@drawWithContent
-        val line = 1.dp.toPx()
-        drawRect(
-          color = fill,
-          topLeft = Offset(line, if (belowEditor) 0f else size.height - line),
-          size = Size(size.width - 2 * line, line),
-        )
-      }
-      .background(fill)
-      .border(1.dp, colors.borderAccent, shape)
+      .clip(CircleShape)
+      .background(if (open) colors.accentSoft else colors.surface2)
       .clickable(onClickLabel = action, role = Role.Tab, onClick = onClick)
       .semantics {
         contentDescription = description
         selected = open
       }
-      .padding(horizontal = PipkinTokens.Spacing.s8 + PipkinTokens.Spacing.s2),
+      .padding(horizontal = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
   ) {
     LucideIcon(
       icon = if (belowEditor) R.drawable.ic_lucide_panel_bottom else R.drawable.ic_lucide_panel_top,
       contentDescription = null,
-      size = PipkinTokens.IconSize.sm,
-      tint = if (open) colors.accent else colors.foregroundMuted,
+      size = PipkinTokens.IconSize.xs,
+      tint = content,
     )
     Text(
       text = label,
       modifier = Modifier.widthIn(max = TAB_LABEL_MAX_WIDTH),
-      color = if (open) colors.foreground else colors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.sm,
+      color = content,
+      fontSize = 11.5.sp,
+      fontWeight = FontWeight.SemiBold,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )
@@ -266,10 +256,10 @@ private fun WidgetTab(
         icon = if (belowEditor) R.drawable.ic_lucide_chevron_up else R.drawable.ic_lucide_chevron_down,
         contentDescription = null,
         size = PipkinTokens.IconSize.xs,
-        tint = colors.foregroundMuted,
+        tint = content,
       )
 
-      changed -> Box(modifier = Modifier.size(6.dp).background(colors.accent, CircleShape))
+      changed -> Box(modifier = Modifier.size(7.dp).background(colors.dotWarning, CircleShape))
     }
   }
 }
@@ -337,41 +327,37 @@ private fun WidgetPanel(item: KeyedWidget, belowEditor: Boolean, tight: Boolean,
   val colors = pipkinColors
   val text = remember(item.widget.lines, colors) { extensionWidgetText(item.widget.lines, colors) }
   val scroll = rememberScrollState()
-  Column(modifier = Modifier.fillMaxWidth()) {
-    if (belowEditor) HorizontalDivider(Modifier.padding(top = PipkinTokens.Spacing.s8), 1.dp, colors.border)
-    // Weighted, so the dividers stay when the composer gives the panel less than its lines.
-    Row(
-      modifier = Modifier.weight(1f, fill = false).fillMaxWidth(),
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
-    ) {
-      Text(
-        text = text,
-        modifier = Modifier
-          .weight(1f)
-          .padding(top = PANEL_TEXT_TOP)
-          .heightIn(max = if (tight) PANEL_TIGHT_MAX_HEIGHT else PANEL_MAX_HEIGHT)
-          .fadeScrolledEdges(scroll, vertical = true)
-          .verticalScroll(scroll),
-        color = colors.foreground,
-        fontFamily = PipkinFonts.mono,
-        fontSize = PipkinTokens.FontSize.code,
-        lineHeight = PipkinTokens.LineHeight.code,
-      )
-      RoundIconButton(
-        icon = R.drawable.ic_lucide_maximize_2,
-        contentDescription = stringResource(R.string.chat_widget_expand),
-        onClick = onExpand,
-        tint = colors.foregroundMuted,
-        iconSize = PipkinTokens.IconSize.sm,
-      )
-    }
-    if (!belowEditor) {
-      HorizontalDivider(
-        Modifier.padding(top = PipkinTokens.Spacing.s8, bottom = PipkinTokens.Spacing.s4),
-        1.dp,
-        colors.border,
-      )
-    }
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(top = if (belowEditor) PipkinTokens.Spacing.s8 else PipkinTokens.Spacing.s2)
+      .clip(PANEL_SHAPE)
+      .background(colors.surface0)
+      .padding(start = 11.dp, top = PipkinTokens.Spacing.s4, end = PipkinTokens.Spacing.s4),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+  ) {
+    Text(
+      text = text,
+      modifier = Modifier
+        .weight(1f)
+        .padding(top = PANEL_TEXT_TOP)
+        .heightIn(max = if (tight) PANEL_TIGHT_MAX_HEIGHT else PANEL_MAX_HEIGHT)
+        .fadeScrolledEdges(scroll, vertical = true)
+        .verticalScroll(scroll)
+        .padding(bottom = PipkinTokens.Spacing.s8),
+      color = colors.foreground,
+      fontFamily = PipkinFonts.mono,
+      fontSize = PANEL_FONT_SIZE,
+      lineHeight = PANEL_LINE_HEIGHT,
+    )
+    RoundIconButton(
+      icon = R.drawable.ic_lucide_maximize_2,
+      contentDescription = stringResource(R.string.chat_widget_expand),
+      onClick = onExpand,
+      modifier = Modifier.size(EXPAND_SIZE),
+      tint = colors.foregroundMuted,
+      iconSize = PipkinTokens.IconSize.sm,
+    )
   }
 }
 

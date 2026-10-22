@@ -54,10 +54,14 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.ChatLocation
@@ -132,13 +136,12 @@ internal fun ChatInboxOverlay(shown: Boolean, onOpen: (ChatLocation) -> Unit, ab
   }
 }
 
+/** An inverse pill, so it stands out over any chat: one chat's badge, title and what happened, or several as dots. */
 @Composable
 private fun InboxPill(entries: List<InboxEntry>, expanded: Boolean, onTap: () -> Unit, onClear: () -> Unit) {
   if (entries.isEmpty()) return
   val colors = pipkinColors
-  val shape = CircleShape
   val single = entries.singleOrNull()
-  val waiting = entries.count { it.reason == InboxReason.Waiting }
   val clearLabel = stringResource(R.string.inbox_clear_all)
   val tapLabel = stringResource(
     when {
@@ -165,17 +168,16 @@ private fun InboxPill(entries: List<InboxEntry>, expanded: Boolean, onTap: () ->
     Row(
       modifier = Modifier
         .widthIn(max = PILL_MAX_WIDTH)
-        .shadow(PILL_ELEVATION, shape)
-        .clip(shape)
-        .background(colors.surface2)
-        .border(1.dp, if (waiting > 0) colors.accent.copy(alpha = WAITING_BORDER_ALPHA) else colors.borderAccent, shape)
+        .shadow(PILL_ELEVATION, CircleShape)
+        .clip(CircleShape)
+        .background(colors.foreground)
         .clickable(onClickLabel = tapLabel, onClick = onTap)
-        .padding(start = PipkinTokens.Spacing.s8, end = PipkinTokens.Spacing.s12)
+        .padding(start = 7.dp, end = PipkinTokens.Spacing.s12)
         .heightIn(min = PILL_HEIGHT),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
     ) {
-      if (single != null) SinglePillContent(single) else MergedPillContent(entries, waiting)
+      if (single != null) SinglePillContent(single) else MergedPillContent(entries)
     }
   }
 }
@@ -183,26 +185,28 @@ private fun InboxPill(entries: List<InboxEntry>, expanded: Boolean, onTap: () ->
 @Composable
 private fun RowScope.SinglePillContent(entry: InboxEntry) {
   val colors = pipkinColors
-  ReasonIcon(entry.reason, PipkinTokens.IconSize.md)
+  ReasonBadge(entry.reason, PILL_BADGE_SIZE)
   Text(
     text = entry.title ?: stringResource(R.string.chat_new_chat),
     modifier = Modifier.weight(1f, fill = false),
-    color = colors.foreground,
-    fontSize = PipkinTokens.FontSize.meta,
+    color = colors.surface0,
+    fontSize = PILL_TEXT_SIZE,
+    fontWeight = FontWeight.SemiBold,
     maxLines = 1,
     overflow = TextOverflow.Ellipsis,
   )
   Text(
     text = stringResource(entry.reason.label),
-    color = colors.foregroundMuted,
-    fontSize = PipkinTokens.FontSize.meta,
+    color = colors.surface0.copy(alpha = PILL_DIM_ALPHA),
+    fontSize = PILL_TEXT_SIZE,
+    fontWeight = FontWeight.Medium,
     maxLines = 1,
     softWrap = false,
   )
 }
 
 @Composable
-private fun RowScope.MergedPillContent(entries: List<InboxEntry>, waiting: Int) {
+private fun RowScope.MergedPillContent(entries: List<InboxEntry>) {
   val colors = pipkinColors
   Row(horizontalArrangement = Arrangement.spacedBy(-DOT_OVERLAP)) {
     for (entry in entries.take(MAX_DOTS)) {
@@ -210,7 +214,7 @@ private fun RowScope.MergedPillContent(entries: List<InboxEntry>, waiting: Int) 
         modifier = Modifier
           .size(DOT_SIZE)
           .clip(CircleShape)
-          .background(colors.surface2)
+          .background(colors.foreground)
           .padding(DOT_RING)
           .clip(CircleShape)
           .background(entry.reason.color()),
@@ -218,16 +222,23 @@ private fun RowScope.MergedPillContent(entries: List<InboxEntry>, waiting: Int) 
     }
   }
   val count = entries.size
-  val summary = pluralStringResource(R.plurals.inbox_chats, count, count) + if (waiting > 0) {
+  val waiting = entries.count { it.reason == InboxReason.Waiting }
+  val chats = pluralStringResource(R.plurals.inbox_chats, count, count)
+  val waitingText = if (waiting > 0) {
     stringResource(R.string.separator_dot) + pluralStringResource(R.plurals.inbox_waiting_count, waiting, waiting)
   } else {
     ""
   }
+  val dim = SpanStyle(color = colors.surface0.copy(alpha = PILL_DIM_ALPHA), fontWeight = FontWeight.Medium)
   Text(
-    text = summary,
+    text = buildAnnotatedString {
+      append(chats)
+      withStyle(dim) { append(waitingText) }
+    },
     modifier = Modifier.weight(1f, fill = false),
-    color = colors.foreground,
-    fontSize = PipkinTokens.FontSize.meta,
+    color = colors.surface0,
+    fontSize = PILL_TEXT_SIZE,
+    fontWeight = FontWeight.SemiBold,
     maxLines = 1,
     overflow = TextOverflow.Ellipsis,
   )
@@ -237,43 +248,50 @@ private fun RowScope.MergedPillContent(entries: List<InboxEntry>, waiting: Int) 
 @Composable
 private fun InboxTray(entries: List<InboxEntry>, onOpen: (InboxEntry) -> Unit, onClearAll: () -> Unit) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.xxl)
   val now = rememberMinuteClock()
   Column(
     modifier = Modifier
       .widthIn(max = TRAY_MAX_WIDTH)
       .fillMaxWidth()
-      .shadow(TRAY_ELEVATION, shape)
-      .clip(shape)
+      .shadow(TRAY_ELEVATION, TRAY_SHAPE)
+      .clip(TRAY_SHAPE)
       .background(colors.surface1)
-      .border(1.dp, colors.borderAccent, shape)
-      .padding(PipkinTokens.Spacing.s6),
+      .padding(
+        start = PipkinTokens.Spacing.s8,
+        top = 10.dp,
+        end = PipkinTokens.Spacing.s8,
+        bottom = PipkinTokens.Spacing.s8,
+      ),
   ) {
     Row(
-      modifier = Modifier.fillMaxWidth().padding(start = PipkinTokens.Spacing.s8),
+      modifier = Modifier.fillMaxWidth().padding(start = 10.dp, bottom = PipkinTokens.Spacing.s4),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Text(
         text = stringResource(R.string.inbox_tray_title),
         modifier = Modifier.weight(1f),
-        color = colors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.meta,
+        color = colors.foreground,
+        fontSize = PipkinTokens.FontSize.lg,
+        fontWeight = FontWeight.ExtraBold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
       Text(
         text = stringResource(R.string.inbox_clear_all),
         modifier = Modifier
-          .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
+          .clip(CircleShape)
           .clickable(onClick = onClearAll)
-          .padding(horizontal = PipkinTokens.Spacing.s8, vertical = PipkinTokens.Spacing.s8),
+          .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
         color = colors.accent,
-        fontSize = PipkinTokens.FontSize.meta,
-        fontWeight = FontWeight.Medium,
+        fontSize = 12.5.sp,
+        fontWeight = FontWeight.Bold,
         maxLines = 1,
       )
     }
-    Column(modifier = Modifier.heightIn(max = TRAY_LIST_MAX_HEIGHT).verticalScroll(rememberScrollState())) {
+    Column(
+      modifier = Modifier.heightIn(max = TRAY_LIST_MAX_HEIGHT).verticalScroll(rememberScrollState()),
+      verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s2),
+    ) {
       for (entry in entries) {
         key(entry.location.sessionPath) { InboxRow(entry, now, onOpen) }
       }
@@ -289,30 +307,21 @@ private fun InboxRow(entry: InboxEntry, now: Long, onOpen: (InboxEntry) -> Unit)
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .clip(RoundedCornerShape(PipkinTokens.Radius.xl))
+      .clip(ROW_SHAPE)
       .clickable(onClickLabel = stringResource(R.string.inbox_open_chat)) { onOpen(entry) }
-      .padding(horizontal = PipkinTokens.Spacing.s8, vertical = PipkinTokens.Spacing.s8),
+      .padding(PipkinTokens.Spacing.s8),
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
-    ReasonIcon(entry.reason, PipkinTokens.IconSize.lg)
+    ReasonBadge(entry.reason, ROW_BADGE_SIZE)
     Column(modifier = Modifier.weight(1f)) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-          text = entry.title ?: stringResource(R.string.chat_new_chat),
-          modifier = Modifier.weight(1f),
-          color = colors.foreground,
-          fontSize = PipkinTokens.FontSize.base,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        Text(
-          text = timeAgo(entry.at, now),
-          modifier = Modifier.padding(start = PipkinTokens.Spacing.s8),
-          color = colors.foregroundExtraMuted,
-          fontSize = PipkinTokens.FontSize.sm,
-          maxLines = 1,
-        )
-      }
+      Text(
+        text = entry.title ?: stringResource(R.string.chat_new_chat),
+        color = colors.foreground,
+        fontSize = 13.5.sp,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
       Text(
         text = listOfNotNull(stringResource(entry.reason.label), detail)
           .joinToString(stringResource(R.string.separator_dot)),
@@ -322,28 +331,42 @@ private fun InboxRow(entry: InboxEntry, now: Long, onOpen: (InboxEntry) -> Unit)
         overflow = TextOverflow.Ellipsis,
       )
     }
+    Text(
+      text = timeAgo(entry.at, now),
+      modifier = Modifier.padding(top = PipkinTokens.Spacing.s2),
+      color = colors.foregroundExtraMuted,
+      fontSize = PipkinTokens.FontSize.sm,
+      maxLines = 1,
+    )
   }
 }
 
+/** What happened to a chat, as a mark on a disc in its colour. */
 @Composable
-private fun ReasonIcon(reason: InboxReason, size: Dp) {
-  LucideIcon(
-    icon = when (reason) {
-      InboxReason.Finished -> R.drawable.ic_lucide_circle_check
-      InboxReason.Failed, InboxReason.Exited -> R.drawable.ic_lucide_circle_x
-      InboxReason.Waiting -> R.drawable.ic_lucide_message_circle_question
-    },
-    contentDescription = null,
-    size = size,
-    tint = reason.color(),
-  )
+private fun ReasonBadge(reason: InboxReason, size: Dp) {
+  Box(
+    modifier = Modifier.size(size).clip(CircleShape).background(reason.color()),
+    contentAlignment = Alignment.Center,
+  ) {
+    LucideIcon(
+      icon = when (reason) {
+        InboxReason.Finished -> R.drawable.ic_lucide_check
+        InboxReason.Failed, InboxReason.Exited -> R.drawable.ic_lucide_x
+        InboxReason.Waiting -> R.drawable.ic_lucide_message_circle_question
+      },
+      contentDescription = null,
+      size = size * BADGE_ICON_SCALE,
+      tint = pipkinColors.surface0,
+    )
+  }
 }
 
 @Composable
 private fun InboxReason.color(): Color = when (this) {
   InboxReason.Finished -> pipkinColors.dotSuccess
-  InboxReason.Failed, InboxReason.Exited -> pipkinColors.dotDanger
-  InboxReason.Waiting -> pipkinColors.accent
+  InboxReason.Failed -> pipkinColors.dotDanger
+  InboxReason.Exited -> pipkinColors.foregroundExtraMuted
+  InboxReason.Waiting -> pipkinColors.dotWarning
 }
 
 private val InboxReason.label: Int
@@ -376,14 +399,20 @@ private fun timeAgo(at: Long, now: Long): String = if (now - at < DateUtils.MINU
 
 /** Wide enough for a short title and what happened; a longer title is cut short rather than cover the chat. */
 private val PILL_MAX_WIDTH = 260.dp
-private val PILL_HEIGHT = 32.dp
+private val PILL_HEIGHT = 34.dp
 private val PILL_ELEVATION = 6.dp
+private val PILL_BADGE_SIZE = 22.dp
+private val PILL_TEXT_SIZE = 12.5.sp
+private const val PILL_DIM_ALPHA = 0.65f
+private val TRAY_SHAPE = RoundedCornerShape(26.dp)
 private val TRAY_MAX_WIDTH = 400.dp
 private val TRAY_LIST_MAX_HEIGHT = 320.dp
 private val TRAY_ELEVATION = 12.dp
-private val DOT_SIZE = 10.dp
-private val DOT_RING = 1.5.dp
-private val DOT_OVERLAP = 3.dp
+private val ROW_SHAPE = RoundedCornerShape(18.dp)
+private val ROW_BADGE_SIZE = 28.dp
+private const val BADGE_ICON_SCALE = 0.6f
+private val DOT_SIZE = 19.dp
+private val DOT_RING = 2.5.dp
+private val DOT_OVERLAP = 7.dp
 private const val MAX_DOTS = 3
 private const val SCRIM_ALPHA = 0.4f
-private const val WAITING_BORDER_ALPHA = 0.5f

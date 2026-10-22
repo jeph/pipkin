@@ -10,6 +10,8 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -26,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -38,11 +41,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
@@ -55,8 +60,8 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlin.math.roundToInt
 
 /**
- * Paseo's context window meter: a ring that fills as the context does, next to the send button.
- * A tap opens a tooltip with the percentage, the token counts and the session cost; the chat closes it
+ * The context window meter: a ring that fills as the context does, next to the send button.
+ * A tap opens a popover with the percentage, a bar, the token counts and the session cost; the chat closes it
  * on any press (see [closeContextDetailsOnPress]), and so does back.
  */
 @Composable
@@ -75,7 +80,7 @@ internal fun ContextMeter(usage: ContextUsage?, open: Boolean, onOpenChange: (Bo
   Box(
     modifier =
       Modifier
-        .size(28.dp)
+        .size(30.dp)
         .clip(CircleShape)
         .pointerInput(Unit) {
           awaitEachGesture {
@@ -113,13 +118,13 @@ internal fun Modifier.closeContextDetailsOnPress(controller: ChatController): Mo
   }
 }
 
-/** A 16dp ring; the arc runs clockwise from twelve and turns amber at 70% and red past 90%. */
+/** A 23dp ring; the arc runs clockwise from twelve and turns amber at 70% and red past 90%. */
 @Composable
 private fun ContextRing(percent: Double?) {
   val colors = pipkinColors
   val progress = percent?.let { ringColor(it, colors) }
-  Canvas(modifier = Modifier.size(PipkinTokens.IconSize.md)) {
-    val stroke = 2.dp.toPx()
+  Canvas(modifier = Modifier.size(RING_SIZE)) {
+    val stroke = RING_STROKE.toPx()
     val inset = stroke / 2
     val arcSize = Size(size.width - stroke, size.height - stroke)
     drawCircle(colors.surface3, radius = arcSize.minDimension / 2, style = Stroke(stroke))
@@ -144,27 +149,25 @@ private fun ringColor(percent: Double, colors: PipkinColors): Color = when {
   else -> colors.foregroundMuted
 }
 
-/** The tooltip body: Paseo's `ContextWindowDetails` with its title, as in the native tooltip. */
+/** The popover: its title, the share of the window used over a bar in the ring's colour, then the details. */
 @Composable
 private fun ContextDetails(usage: ContextUsage?, percent: Int?) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.xl)
-  // Paseo's popover colour: a raised surface in dark mode, the page surface in light mode.
-  val container = if (colors.isDark) colors.surface2 else colors.surface0
+  val shape = RoundedCornerShape(22.dp)
   Column(
     modifier =
       Modifier
         .shadow(8.dp, shape, ambientColor = SHADOW, spotColor = SHADOW)
-        .background(container, shape)
-        .border(1.dp, colors.borderAccent, shape)
-        .padding(horizontal = PipkinTokens.Spacing.s8, vertical = PipkinTokens.Spacing.s4)
-        .widthIn(min = 200.dp),
-    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
+        .background(colors.surface2, shape)
+        .padding(horizontal = PipkinTokens.Spacing.s16, vertical = 14.dp)
+        .widthIn(min = 220.dp, max = 280.dp),
+    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
   ) {
     Text(
       stringResource(R.string.context_window_title),
       color = colors.foreground,
-      fontSize = PipkinTokens.FontSize.base,
+      fontSize = 13.5.sp,
+      fontWeight = FontWeight.ExtraBold,
     )
     val tokens = usage?.tokens
     val window = usage?.contextWindow
@@ -172,9 +175,10 @@ private fun ContextDetails(usage: ContextUsage?, percent: Int?) {
       Text(
         text = stringResource(R.string.context_window_used, percent),
         color = colors.foreground,
-        fontSize = PipkinTokens.FontSize.base,
-        lineHeight = PipkinTokens.FontSize.base * 1.4f,
+        fontSize = DETAIL_SIZE,
+        lineHeight = DETAIL_LINE_HEIGHT,
       )
+      UsageBar(usage.percent ?: 0.0, ringColor(usage.percent ?: 0.0, colors))
       Detail(stringResource(R.string.context_window_tokens, formatTokens(tokens), formatTokens(window)))
     } else {
       Detail(stringResource(R.string.context_window_no_data))
@@ -185,15 +189,36 @@ private fun ContextDetails(usage: ContextUsage?, percent: Int?) {
   }
 }
 
+/** An 8dp bar filled to [percent] in [fill]. */
+@Composable
+private fun UsageBar(percent: Double, fill: Color) {
+  val track = pipkinColors.surface3
+  Canvas(modifier = Modifier.fillMaxWidth().padding(vertical = PipkinTokens.Spacing.s4).height(BAR_HEIGHT)) {
+    val radius = CornerRadius(size.height / 2)
+    drawRoundRect(track, cornerRadius = radius)
+    val width = size.width * (percent.coerceIn(0.0, 100.0) / 100.0).toFloat()
+    if (width <= 0f) return@Canvas
+    // Mirrored in right-to-left layouts, so the bar fills from the start like the text reads.
+    val left = if (layoutDirection == LayoutDirection.Rtl) size.width - width else 0f
+    drawRoundRect(fill, topLeft = Offset(left, 0f), size = Size(width, size.height), cornerRadius = radius)
+  }
+}
+
 @Composable
 private fun Detail(text: String) {
   Text(
     text = text,
     color = pipkinColors.foregroundMuted,
-    fontSize = PipkinTokens.FontSize.sm,
-    lineHeight = PipkinTokens.FontSize.sm * 1.4f,
+    fontSize = DETAIL_SIZE,
+    lineHeight = DETAIL_LINE_HEIGHT,
   )
 }
+
+private val RING_SIZE = 23.dp
+private val RING_STROKE = 2.6.dp
+private val BAR_HEIGHT = 8.dp
+private val DETAIL_SIZE = 13.sp
+private val DETAIL_LINE_HEIGHT = 19.5.sp
 
 /** Centred above the anchor and kept [gap] from it, shifted to stay on screen; below when there's no room above. */
 private class AboveAnchor(private val gap: Int) : PopupPositionProvider {

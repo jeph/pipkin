@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.mikepenz.markdown.annotator.AnnotatorSettings
 import com.mikepenz.markdown.annotator.annotatorSettings
 import com.mikepenz.markdown.compose.elements.MarkdownTableBasicText
@@ -38,7 +39,7 @@ import org.intellij.markdown.flavours.gfm.GFMElementTypes
 import org.intellij.markdown.flavours.gfm.GFMTokenTypes
 
 /**
- * A markdown table drawn as Paseo draws one: a bordered grid with the header on surface2. Unlike the renderer's own
+ * A markdown table on a raised card: a muted bold header and a line under each row. Unlike the renderer's own
  * table, whose columns share the width equally and cut each cell to one line, each column here is sized to what it
  * holds (see [columnWidths]) and cells wrap. The table scrolls sideways only when its columns can't fit at their
  * narrowest readable width.
@@ -48,9 +49,9 @@ internal fun MarkdownTable(content: String, node: ASTNode, style: TextStyle) {
   val table = remember(content, node) { parseTable(content, node) }
   if (table.columns == 0) return
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.md)
+  val shape = RoundedCornerShape(16.dp)
   val annotator = annotatorSettings()
-  val headerStyle = style.copy(fontWeight = FontWeight.SemiBold)
+  val headerStyle = style.copy(color = colors.foregroundMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
   val rows = listOf(table.header) + table.body
   BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
     val available = constraints.maxWidth
@@ -59,7 +60,6 @@ internal fun MarkdownTable(content: String, node: ASTNode, style: TextStyle) {
     }
     Layout(
       contents = listOf(
-        { Box(Modifier.background(colors.surface2)) },
         {
           rows.forEachIndexed { rowIndex, cells ->
             cells.forEachIndexed { columnIndex, cell ->
@@ -68,12 +68,12 @@ internal fun MarkdownTable(content: String, node: ASTNode, style: TextStyle) {
             }
           }
         },
-        { repeat(rows.size - 1 + table.columns - 1) { Box(Modifier.background(colors.border)) } },
+        { repeat(rows.size - 1) { Box(Modifier.background(colors.surface2)) } },
       ),
       modifier = Modifier
         .horizontalScroll(rememberScrollState())
         .clip(shape)
-        .border(GRID_LINE, colors.border, shape)
+        .background(colors.surface1)
         .semantics { collectionInfo = CollectionInfo(rows.size, table.columns) },
       measurePolicy = measurePolicy,
     )
@@ -112,11 +112,11 @@ private fun TableCell(
 }
 
 /**
- * Lays out the header's background, then the cells row by row in columns sized by [columnWidths] for [available], each
- * row as tall as its tallest cell, then the grid's lines between rows and between columns.
+ * Lays out the cells row by row in columns sized by [columnWidths] for [available], each row as tall as its tallest
+ * cell, then the lines between rows.
  */
 private fun gridMeasurePolicy(rows: Int, columns: Int, available: Int) =
-  MultiContentMeasurePolicy { (headerBackground, cells, lines), _ ->
+  MultiContentMeasurePolicy { (cells, lines), _ ->
     val minimums = IntArray(columns)
     val naturals = IntArray(columns)
     cells.forEachIndexed { index, cell ->
@@ -132,14 +132,10 @@ private fun gridMeasurePolicy(rows: Int, columns: Int, available: Int) =
     val width = lefts.last()
     val height = tops.last()
     val line = GRID_LINE.roundToPx()
-    val header = headerBackground.single().measure(Constraints.fixed(width, heights[0]))
     val rowLines = (1 until rows).map { lines[it - 1].measure(Constraints.fixed(width, line)) }
-    val columnLines = (1 until columns).map { lines[rows - 2 + it].measure(Constraints.fixed(line, height)) }
     layout(width, height) {
-      header.place(0, 0)
       placed.forEachIndexed { index, cell -> cell.place(lefts[index % columns], tops[index / columns]) }
       rowLines.forEachIndexed { index, rowLine -> rowLine.place(0, tops[index + 1]) }
-      columnLines.forEachIndexed { index, columnLine -> columnLine.place(lefts[index + 1], 0) }
     }
   }
 

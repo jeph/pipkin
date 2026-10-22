@@ -35,11 +35,14 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.RpcError
 import io.jeph.pipkin.agent.commands
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
@@ -146,22 +149,20 @@ internal class SlashMenu(private val controller: ChatController) {
 }
 
 /**
- * The menu above the composer: a bordered card up to 220dp tall whose rows stack upwards from the
- * best match, which is highlighted. [onRan] follows a picked built-in that ran.
+ * The menu above the composer: a raised card up to 220dp tall whose rows stack upwards from the best match, which is
+ * tinted cobalt. [onRan] follows a picked built-in that ran.
  */
 @Composable
 internal fun SlashCommandMenu(menu: SlashMenu, query: String, onRan: () -> Unit, modifier: Modifier = Modifier) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.lg)
   val options = menu.options(query)
   val highlighted = menu.highlighted(query, options.size)
   Box(
     modifier =
       modifier
-        .shadow(8.dp, shape, ambientColor = SHADOW, spotColor = SHADOW)
-        .clip(shape)
+        .shadow(8.dp, MENU_SHAPE, ambientColor = SHADOW, spotColor = SHADOW)
+        .clip(MENU_SHAPE)
         .background(colors.surface1)
-        .border(1.dp, colors.borderAccent, shape)
         .heightIn(max = 220.dp),
   ) {
     if (options.isEmpty()) {
@@ -180,7 +181,7 @@ internal fun SlashCommandMenu(menu: SlashMenu, query: String, onRan: () -> Unit,
     LazyColumn(
       state = listState,
       reverseLayout = true,
-      contentPadding = PaddingValues(vertical = PipkinTokens.Spacing.s4),
+      contentPadding = PaddingValues(PipkinTokens.Spacing.s6),
     ) {
       itemsIndexed(options, key = { _, option -> option.name }) { index, option ->
         CommandRow(option, highlighted = index == highlighted, onClick = { if (menu.select(option)) onRan() })
@@ -193,11 +194,16 @@ internal fun SlashCommandMenu(menu: SlashMenu, query: String, onRan: () -> Unit,
 private fun CommandRow(command: SlashCommand, highlighted: Boolean, onClick: () -> Unit) {
   val colors = pipkinColors
   val description = command.builtin?.let { stringResource(it.description) } ?: command.description
-  MenuRow(onClick = onClick, modifier = if (highlighted) Modifier.background(colors.surface2) else Modifier) {
+  MenuRow(
+    onClick = onClick,
+    modifier = if (highlighted) Modifier.background(colors.accentSoft, ROW_SHAPE) else Modifier,
+  ) {
     Text(
       text = "/${command.name}",
-      color = colors.foreground,
-      fontSize = PipkinTokens.FontSize.base,
+      color = if (highlighted) colors.accent else colors.foreground,
+      fontFamily = PipkinFonts.mono,
+      fontSize = 12.5.sp,
+      fontWeight = FontWeight.SemiBold,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )
@@ -206,7 +212,7 @@ private fun CommandRow(command: SlashCommand, highlighted: Boolean, onClick: () 
         text = description,
         modifier = Modifier.weight(1f),
         color = colors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.sm,
+        fontSize = 12.sp,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
@@ -220,13 +226,17 @@ private fun MenuRow(onClick: (() -> Unit)?, modifier: Modifier = Modifier, conte
     modifier = modifier
       .fillMaxWidth()
       .heightIn(min = 36.dp)
+      .clip(ROW_SHAPE)
       .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-      .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
+      .padding(horizontal = 9.dp, vertical = 7.dp),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
     content = content,
   )
 }
 
-/** Paseo's `shadow.md`: black at 20%. */
+private val MENU_SHAPE = RoundedCornerShape(20.dp)
+private val ROW_SHAPE = RoundedCornerShape(16.dp)
+
+/** Black at 20%, for a card floating over the chat. */
 private val SHADOW = Color.Black.copy(alpha = 0.2f)

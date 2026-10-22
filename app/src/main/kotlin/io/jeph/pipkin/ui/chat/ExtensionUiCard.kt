@@ -4,6 +4,8 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -52,15 +55,21 @@ import androidx.compose.ui.layout.MultiContentMeasurePolicy
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.ExtensionUiRequest
 import io.jeph.pipkin.agent.UiAnswer
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.PillButton
+import io.jeph.pipkin.ui.components.PillTone
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.delay
@@ -80,16 +89,19 @@ internal fun ExtensionUiCard(
   modifier: Modifier = Modifier,
 ) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.lg)
-  Box(modifier = modifier.fillMaxWidth().padding(horizontal = PipkinTokens.Spacing.s16), Alignment.TopCenter) {
+  Box(modifier = modifier.fillMaxWidth().padding(horizontal = 10.dp), Alignment.TopCenter) {
     key(request.id) {
       val cardModifier = Modifier
         .widthIn(max = PipkinTokens.contentMaxWidth)
         .fillMaxWidth()
-        .clip(shape)
+        .clip(CARD_SHAPE)
         .background(colors.surface1)
-        .border(1.dp, colors.border, shape)
-        .padding(PipkinTokens.Spacing.s12)
+        .padding(
+          start = PipkinTokens.Spacing.s12,
+          top = PipkinTokens.Spacing.s12,
+          end = PipkinTokens.Spacing.s12,
+          bottom = 10.dp,
+        )
       val header: @Composable () -> Unit = { CardHeader(request, number, count) }
       when (request.method) {
         "select" -> ChoiceCard(
@@ -229,21 +241,27 @@ private fun CardHeader(request: ExtensionUiRequest, number: Int, count: Int) {
   )
   Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
     Column(
-      modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
-      verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+      modifier = Modifier.weight(
+        1f,
+      ).verticalScroll(rememberScrollState()).padding(horizontal = PipkinTokens.Spacing.s4),
+      verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
     ) {
-      Text(text = title, color = colors.foreground, fontSize = PipkinTokens.FontSize.base)
-      request.message?.let { Text(text = it, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.base) }
+      Text(
+        text = title,
+        color = colors.foreground,
+        fontSize = 15.5.sp,
+        fontWeight = FontWeight.ExtraBold,
+        lineHeight = 20.sp,
+        letterSpacing = (-0.015).em,
+      )
+      request.message?.let { Text(text = it, color = colors.foregroundMuted, fontSize = 13.5.sp, lineHeight = 20.sp) }
     }
     request.expiresAt?.let { SecondsLeft(it) }
     if (count > 1) {
-      Text(
+      HeaderPill(
         text = stringResource(R.string.chat_dialog_counter, number, count),
-        modifier = Modifier
-          .border(1.dp, colors.border, RoundedCornerShape(PipkinTokens.Radius.md))
-          .padding(horizontal = PipkinTokens.Spacing.s6, vertical = 1.dp),
         color = colors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.sm,
+        background = colors.surface2,
       )
     }
   }
@@ -261,11 +279,30 @@ private fun SecondsLeft(expiresAt: Long) {
     }
   }
   val seconds = ((expiresAt - now + MILLIS_PER_SECOND - 1) / MILLIS_PER_SECOND).coerceAtLeast(0)
-  Text(
+  val colors = pipkinColors
+  HeaderPill(
     text = stringResource(R.string.chat_dialog_seconds_left, seconds),
-    modifier = Modifier.padding(top = 1.dp),
-    color = pipkinColors.dotWarning,
-    fontSize = PipkinTokens.FontSize.sm,
+    color = colors.dotWarning,
+    background = colors.warningSoft,
+  )
+}
+
+/** A small bold pill beside the card's title, such as the counter or the seconds left. */
+@Composable
+private fun HeaderPill(text: String, color: Color, background: Color) {
+  Text(
+    text = text,
+    modifier = Modifier
+      .heightIn(min = 22.dp)
+      .clip(CircleShape)
+      .background(background)
+      .wrapContentHeight(Alignment.CenterVertically)
+      .padding(horizontal = 9.dp),
+    color = color,
+    fontSize = 11.5.sp,
+    fontWeight = FontWeight.Bold,
+    maxLines = 1,
+    style = TextStyle(fontFeatureSettings = PipkinFonts.TABULAR),
   )
 }
 
@@ -298,35 +335,30 @@ private fun ChoiceCard(
   )
 }
 
-/** Paseo's radio row: the picked one is highlighted, with an accent dot in its circle. */
+/** A radio row: the picked one is tinted cobalt, with a cobalt dot in its circle. */
 @Composable
 private fun ChoiceRow(label: String, picked: Boolean, onPick: () -> Unit) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.md)
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .clip(shape)
-      .background(if (picked) colors.surface2 else Color.Transparent)
+      .clip(ROW_SHAPE)
+      .background(if (picked) colors.accentSoft else Color.Transparent)
       .selectable(selected = picked, role = Role.RadioButton, onClick = onPick)
       .heightIn(min = 40.dp)
-      .padding(horizontal = 10.dp, vertical = 7.dp),
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+      .padding(horizontal = 10.dp, vertical = PipkinTokens.Spacing.s8),
+    horizontalArrangement = Arrangement.spacedBy(10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Box(
       modifier = Modifier
-        .size(16.dp)
-        .border(1.dp, if (picked) colors.accent else colors.foregroundExtraMuted, CircleShape),
+        .size(18.dp)
+        .border(2.dp, if (picked) colors.accent else colors.foregroundExtraMuted, CircleShape),
       contentAlignment = Alignment.Center,
     ) {
-      if (picked) Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(colors.accent))
+      if (picked) Box(modifier = Modifier.size(9.dp).clip(CircleShape).background(colors.accent))
     }
-    Text(
-      text = label,
-      color = if (picked) colors.foreground else colors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.base,
-    )
+    Text(text = label, color = if (picked) colors.foreground else colors.foregroundMuted, fontSize = 14.sp)
   }
 }
 
@@ -347,8 +379,9 @@ private fun TextCard(
   val state = rememberTextFieldState(request.prefill.orEmpty())
   val focusRequester = remember { FocusRequester() }
   LaunchedEffect(Unit) { focusRequester.requestFocus() }
+  val interaction = remember { MutableInteractionSource() }
+  val focused by interaction.collectIsFocusedAsState()
   val style = LocalTextStyle.current.merge(TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base))
-  val shape = RoundedCornerShape(PipkinTokens.Radius.xl)
   CardLayout(
     header = header,
     answers = {
@@ -357,11 +390,12 @@ private fun TextCard(
         modifier = Modifier
           .fillMaxWidth()
           .then(if (multiline) Modifier.heightIn(min = 120.dp) else Modifier)
-          .clip(shape)
-          .background(colors.surface2)
-          .border(1.dp, colors.borderAccent, shape)
+          .clip(FIELD_SHAPE)
+          .background(colors.surface0)
+          .border(if (focused) 2.dp else 1.dp, if (focused) colors.accent else colors.border, FIELD_SHAPE)
           .padding(PipkinTokens.Spacing.s12)
           .focusRequester(focusRequester),
+        interactionSource = interaction,
         textStyle = style,
         lineLimits = if (multiline) TextFieldLineLimits.MultiLine() else TextFieldLineLimits.SingleLine,
         // An `input` often asks for a name or a path, which a capital first letter would change.
@@ -392,53 +426,33 @@ private fun TextCard(
   )
 }
 
-/** Dismiss, when [onDismiss] is given, above the accent Submit, both full width as in Paseo's question card. */
+/** Dismiss, when [onDismiss] is given, then Submit, side by side as pills. */
 @Composable
 private fun SubmitButtons(canSubmit: Boolean, onSubmit: () -> Unit, onDismiss: (() -> Unit)?) {
-  Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
-    onDismiss?.let { CardButton(stringResource(R.string.chat_dismiss), R.drawable.ic_lucide_x, onClick = it) }
-    CardButton(
-      stringResource(R.string.chat_submit),
-      R.drawable.ic_lucide_check,
-      filled = true,
-      enabled = canSubmit,
+  Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
+    onDismiss?.let {
+      PillButton(
+        label = stringResource(R.string.chat_dismiss),
+        onClick = it,
+        modifier = Modifier.weight(1f),
+        tone = PillTone.Tonal,
+      )
+    }
+    PillButton(
+      label = stringResource(R.string.chat_submit),
       onClick = onSubmit,
+      modifier = Modifier.weight(1f),
+      enabled = canSubmit,
+      icon = R.drawable.ic_lucide_check,
     )
   }
 }
 
-/** Paseo's full-width action button: muted text on the card, or accent-filled when [filled]. */
-@Composable
-private fun CardButton(
-  label: String,
-  @DrawableRes icon: Int,
-  filled: Boolean = false,
-  enabled: Boolean = true,
-  onClick: () -> Unit,
-) {
-  val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.md)
-  val content = if (filled) colors.accentForeground else colors.foregroundMuted
-  Row(
-    modifier = Modifier
-      .fillMaxWidth()
-      .alpha(if (enabled) 1f else DISABLED_ALPHA)
-      .clip(shape)
-      .background(if (filled) colors.accent else colors.surface1)
-      .border(1.dp, if (filled) colors.accent else colors.surface3, shape)
-      .clickable(enabled = enabled, onClick = onClick)
-      .heightIn(min = 40.dp)
-      .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8, Alignment.CenterHorizontally),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    LucideIcon(icon, contentDescription = null, size = PipkinTokens.IconSize.sm, tint = content)
-    Text(text = label, color = content, fontSize = PipkinTokens.FontSize.base)
-  }
-}
-
 private const val MILLIS_PER_SECOND = 1000L
-private const val DISABLED_ALPHA = 0.5f
+
+private val CARD_SHAPE = RoundedCornerShape(22.dp)
+private val ROW_SHAPE = RoundedCornerShape(12.dp)
+private val FIELD_SHAPE = RoundedCornerShape(14.dp)
 
 /** The space between the header, the answers and the buttons. */
 private val CARD_GAP = 10.dp

@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -50,6 +49,8 @@ import androidx.compose.ui.platform.findViewTreeCompositionContext
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
@@ -60,6 +61,8 @@ import io.jeph.pipkin.agent.text
 import io.jeph.pipkin.ui.components.LoadingPill
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.MarkdownCache
+import io.jeph.pipkin.ui.components.PillButton
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.delay
@@ -357,7 +360,7 @@ private fun StreamItem(
     is TimelineItem.Thinking -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
     is TimelineItem.ToolCall -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
     is TimelineItem.Error -> ErrorRow(item.cause.text(LocalResources.current), modifier)
-    is TimelineItem.Notice -> NoticeRow(stringResource(item.kind.text), modifier)
+    is TimelineItem.Notice -> NoticeRow(item.kind, modifier)
     is TimelineItem.TurnFooter -> TurnFooterRow(item, backgroundTasks, modifier)
     is TimelineItem.ExitBanner -> ExitBannerCard(item, onRestart, modifier)
   }
@@ -371,8 +374,8 @@ private fun EmptyState(noModel: Boolean, onOpenProviders: () -> Unit, modifier: 
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
-    // The launcher icon as on the home screen: its multi-colour mark on the cream background. A
-    // launcher shows the middle 72dp of the 108dp foreground, so draw it 1.5x larger and clip.
+    // The launcher icon as on the home screen: its mark on the icon's background. A launcher shows the middle 72dp of
+    // the 108dp foreground, so draw it 1.5x larger and clip.
     Box(
       modifier = Modifier
         .size(EMPTY_STATE_ICON_SIZE)
@@ -388,26 +391,27 @@ private fun EmptyState(noModel: Boolean, onOpenProviders: () -> Unit, modifier: 
     }
     Text(
       text = stringResource(if (noModel) R.string.chat_no_model else R.string.chat_empty),
-      color = pipkinColors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.base,
+      color = pipkinColors.foreground,
+      fontSize = PipkinTokens.FontSize.title,
+      fontWeight = FontWeight.ExtraBold,
+      textAlign = TextAlign.Center,
     )
-    if (noModel) Button(onClick = onOpenProviders) { Text(text = stringResource(R.string.chat_sign_in)) }
+    if (noModel) PillButton(label = stringResource(R.string.chat_sign_in), onClick = onOpenProviders)
   }
 }
 
+/** A 40dp disc on surface2, the size of the composer's send button, with a chevron down. */
 @Composable
 private fun ScrollToBottomButton(visible: Boolean, onClick: () -> Unit, modifier: Modifier) {
   AnimatedVisibility(visible = visible, modifier = modifier, enter = fadeIn(), exit = fadeOut()) {
-    Box(
-      modifier = Modifier.size(48.dp).clip(CircleShape).background(pipkinColors.surface2).clickable(onClick = onClick),
-      contentAlignment = Alignment.Center,
-    ) {
-      LucideIcon(
-        icon = R.drawable.ic_lucide_chevron_down,
-        contentDescription = stringResource(R.string.chat_scroll_to_bottom),
-        size = 24.dp,
-      )
-    }
+    RoundIconButton(
+      icon = R.drawable.ic_lucide_chevron_down,
+      contentDescription = stringResource(R.string.chat_scroll_to_bottom),
+      onClick = onClick,
+      modifier = Modifier.size(40.dp),
+      background = pipkinColors.surface2,
+      iconSize = 20.dp,
+    )
   }
 }
 
@@ -419,12 +423,15 @@ private fun LazyListState.distanceFromBottom(): Int {
   return (last.offset + last.size - (info.viewportEndOffset - info.afterContentPadding)).coerceAtLeast(0)
 }
 
-/** Paseo's rhythm: 4dp inside a run of user messages or tool rows, 16dp around user-message groups. */
+/** 12dp above a user message and 8dp after one, none between steps, so a run of them reads as a list, else 4dp. */
 private fun gapBefore(previous: TimelineItem?, item: TimelineItem): Dp = when {
-  previous == null -> PipkinTokens.Spacing.s16
-  previous is TimelineItem.User && item is TimelineItem.User -> PipkinTokens.Spacing.s4
-  previous is TimelineItem.User || item is TimelineItem.User -> PipkinTokens.Spacing.s16
+  previous == null -> PipkinTokens.Spacing.s8
+  item is TimelineItem.User -> PipkinTokens.Spacing.s12
+  previous is TimelineItem.User -> PipkinTokens.Spacing.s8
+  previous.isStep && item.isStep -> 0.dp
   else -> PipkinTokens.Spacing.s4
 }
+
+private val TimelineItem.isStep: Boolean get() = this is TimelineItem.ToolCall || this is TimelineItem.Thinking
 
 private fun Modifier.contentWidth(): Modifier = widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth()

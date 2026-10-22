@@ -8,13 +8,14 @@ import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.ToolStatus
 import org.json.JSONObject
 
-/** How a thinking block or tool call is labelled in its compact row and its detail sheet. */
+/** How a thinking block or tool call is labelled in its compact row and its detail sheet; [code] summaries are monospace. */
 internal data class ToolPresentation(
   @DrawableRes val icon: Int,
   val title: String,
   val summary: String?,
   val running: Boolean,
   val isError: Boolean,
+  val code: Boolean = true,
 )
 
 @Composable
@@ -67,6 +68,7 @@ internal fun toolPresentation(item: TimelineItem.Thinking): ToolPresentation = T
   item.text.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.trim('*', ' '),
   item.streaming,
   isError = false,
+  code = false,
 )
 
 /** Android's `optString` turns JSON null and non-strings into text; this only accepts real strings. */

@@ -42,7 +42,7 @@ import kotlinx.coroutines.flow.conflate
 import org.intellij.markdown.MarkdownElementTypes
 
 /**
- * Assistant markdown styled to Paseo's message tokens: 15/21sp body, bordered horizontally scrolling code. With a
+ * Assistant markdown: 15/22sp body, and code on raised cards that scroll sideways, headed by their language. With a
  * [cache], markdown it has parsed before shows from the first frame, and each parse of it is kept there.
  */
 @Composable
@@ -57,7 +57,10 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier, cache: Markd
   )
   // CodeText is Pipkin's one code style, so the library's code typography is ignored here.
   val codeBlock: @Composable (String, String?, TextStyle) -> Unit = { text, language, _ ->
-    CodeBox(modifier = Modifier.padding(vertical = PipkinTokens.Spacing.s6)) { CodeText(text, language) }
+    CodeBox(
+      modifier = Modifier.padding(vertical = PipkinTokens.Spacing.s6),
+      label = language?.takeIf { it.isNotBlank() },
+    ) { CodeText(text, language) }
   }
   val state = rememberParsedMarkdown(markdown, cache)
   SelectionContainer(modifier = modifier) {
@@ -73,7 +76,7 @@ fun PipkinMarkdown(markdown: String, modifier: Modifier = Modifier, cache: Markd
         ),
       typography = typography(body),
       padding = markdownPadding(block = PipkinTokens.Spacing.s6, codeBlock = PaddingValues(0.dp)),
-      dimens = markdownDimens(codeBackgroundCornerSize = PipkinTokens.Radius.md),
+      dimens = markdownDimens(codeBackgroundCornerSize = PipkinTokens.Radius.base),
       components =
         markdownComponents(
           codeFence = { MarkdownCodeFence(it.content, it.node, style = it.typography.code, block = codeBlock) },

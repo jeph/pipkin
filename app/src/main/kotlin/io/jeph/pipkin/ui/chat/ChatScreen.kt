@@ -229,7 +229,7 @@ private fun PendingDialogCard(controller: ChatController, timeline: TimelineStat
   )
 }
 
-/** The slash menu while the draft starts with `/`, 12dp above the composer and as wide as it. */
+/** The slash menu while the draft starts with `/`, 6dp above the composer and 10dp in from the edges, like its tray. */
 @Composable
 private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: Modifier) {
   val query = controller.slash.query
@@ -246,7 +246,7 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
       focus.clearFocus()
     },
     modifier = modifier
-      .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s12)
+      .padding(start = 10.dp, end = 10.dp, bottom = PipkinTokens.Spacing.s6)
       .widthIn(max = PipkinTokens.contentMaxWidth)
       .fillMaxWidth(),
   )

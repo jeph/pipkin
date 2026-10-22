@@ -62,7 +62,7 @@ fun LucideIcon(
   )
 }
 
-/** A 28dp circular icon button. */
+/** A circular icon button, 28dp unless [modifier] sets a size, which comes first and so wins. */
 @Composable
 fun RoundIconButton(
   @DrawableRes icon: Int,

@@ -36,6 +36,8 @@
     <string name="chat_image">Attached image</string>
     <string name="chat_copy_reply">Copy reply</string>
     <string name="chat_copy_message">Copy message</string>
+    <!-- Labels the user's own messages in the chat, before the time each was sent. Shown in capitals. -->
+    <string name="chat_you">You</string>
     <string name="chat_copy_details">Copy</string>
     <string name="chat_extension_message">Extension message</string>
     <string name="chat_notice_info">Info</string>

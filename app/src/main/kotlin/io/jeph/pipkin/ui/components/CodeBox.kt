@@ -1,7 +1,6 @@
 package io.jeph.pipkin.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -15,33 +14,57 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** Paseo's code surface: surface2, 1dp border, monospace, scrolls sideways instead of wrapping. */
+/**
+ * A code card on [background], monospace, that scrolls sideways instead of wrapping, with its [label], such as the
+ * language, over the code.
+ */
 @Composable
 internal fun CodeBox(
   modifier: Modifier = Modifier,
-  radius: Dp = PipkinTokens.Radius.md,
+  label: String? = null,
+  background: Color = pipkinColors.surface1,
+  radius: Dp = 16.dp,
   padding: Dp = PipkinTokens.Spacing.s12,
   content: @Composable ColumnScope.() -> Unit,
 ) {
-  val colors = pipkinColors
-  val shape = RoundedCornerShape(radius)
-  Column(
-    modifier =
-      modifier
+  Column(modifier = modifier.fillMaxWidth().clip(RoundedCornerShape(radius)).background(background)) {
+    if (label != null) {
+      Text(
+        text = label,
+        modifier = Modifier.padding(start = padding, top = PipkinTokens.Spacing.s8, end = padding),
+        color = pipkinColors.foregroundMuted,
+        fontSize = 11.5.sp,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+      )
+    }
+    Column(
+      modifier = Modifier
         .fillMaxWidth()
-        .clip(shape)
-        .background(colors.surface2)
-        .border(1.dp, colors.border, shape)
         .horizontalScroll(rememberScrollState())
-        .padding(padding),
-    content = content,
-  )
+        .padding(
+          start = padding,
+          top = if (label !=
+            null
+          ) {
+            PipkinTokens.Spacing.s4
+          } else {
+            padding
+          },
+          end = padding,
+          bottom = padding,
+        ),
+      content = content,
+    )
+  }
 }
 
 /** [text] in the code font, coloured for [language] (a fence name or file extension) when Highlights knows it. */

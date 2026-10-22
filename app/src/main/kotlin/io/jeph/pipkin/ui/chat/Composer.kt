@@ -87,12 +87,24 @@ private enum class PrimaryAction { Send, Stop, Idle, Sending }
 
 private const val MAX_PICKED_IMAGES = 6
 
+private val TRAY_SHAPE = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+
+/** The toolbar's attach button and chips. */
+private val TOOL_SIZE = 30.dp
+
+/** The send and stop button. */
+private val PRIMARY_SIZE = 40.dp
+
+/** The icon on the attach, send and stop buttons. */
+private val ICON_SIZE = 18.dp
+
 /**
- * Paseo's composer: attachment tray, growing text field and a toolbar with attach, model chip, the
- * context meter, [trailingControls] (reserved for voice input) and the primary send/stop button. Send stays
- * greyed out while Pi starts. The model and thinking chips open their pickers through [onSheet]. Extension widgets
- * hang from its edges as tabs, and a tab opens its widget's panel in the composer, which keeps to a few lines and
- * scrolls when [tight].
+ * The composer: a tray docked to the bottom of the chat, under the keyboard's top edge when it's up, holding the
+ * attachment row, a growing text field and a toolbar with attach, the model and thinking chips, the context meter,
+ * [trailingControls] (reserved for voice input) and the primary send/stop button. Send stays greyed out while Pi
+ * starts. The model and thinking chips open their pickers through [onSheet]. Extension widgets show as tabs at the
+ * tray's top or bottom edge, and a tab opens its widget's panel in the tray, which keeps to a few lines and scrolls
+ * when [tight].
  */
 @Composable
 internal fun Composer(
@@ -112,7 +124,7 @@ internal fun Composer(
     keyboard?.hide()
     focus.clearFocus()
   }
-  val shape = RoundedCornerShape(PipkinTokens.Radius.xxl)
+  val shape = TRAY_SHAPE
   val tabs = controller.view.widgetTabs
   val widgets by controller.process.extensionWidgets.collectAsStateWithLifecycle()
   LaunchedEffect(widgets) { tabs.track(widgets) }
@@ -123,24 +135,17 @@ internal fun Composer(
     modifier =
       modifier
         .fillMaxWidth()
+        .clip(shape)
+        .background(colors.surface1)
         .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
-        .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s16),
+        .padding(start = 10.dp, end = 10.dp, bottom = PipkinTokens.Spacing.s4),
     contentAlignment = Alignment.TopCenter,
   ) {
     Column(modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth()) {
-      // Over the composer's border by its width, so an open tab covers the border where the two meet.
-      WidgetTabStrip(above, tabs, belowEditor = false, Modifier.zIndex(1f).offset(y = 1.dp))
+      WidgetTabStrip(above, tabs, belowEditor = false)
       // Not clipped: the attachment remove buttons overhang their thumbnails. Weighted, so the tab strips keep their
       // height when the composer has to shrink.
-      Column(
-        modifier =
-          Modifier
-            .weight(1f, fill = false)
-            .fillMaxWidth()
-            .background(colors.surface1, shape)
-            .border(1.dp, colors.borderAccent, shape)
-            .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
-      ) {
+      Column(modifier = Modifier.weight(1f, fill = false).fillMaxWidth()) {
         // An open panel is weighted like the field, so it shrinks to the room left once the toolbar is measured. A
         // closed one isn't: a column doesn't pass on a weighted child's unused share, so it would cap the draft.
         val panelWeight = Modifier.weight(1f, fill = false)
@@ -150,7 +155,7 @@ internal fun Composer(
         }
         // Weighted, so the tray and toolbar are measured first and long drafts scroll instead of pushing them off.
         ComposerField(controller, acceptsImages(model), onRan = hideKeyboard, Modifier.weight(1f, fill = false))
-        Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s12))
+        Spacer(modifier = Modifier.height(PipkinTokens.Spacing.s8))
         ComposerToolbar(
           controller = controller,
           model = model,
@@ -163,7 +168,7 @@ internal fun Composer(
         )
         WidgetPanelSlot(below.shown, tabs, true, tight, openWidget, if (below.shown != null) panelWeight else Modifier)
       }
-      WidgetTabStrip(below, tabs, belowEditor = true, Modifier.zIndex(1f).offset(y = (-1).dp))
+      WidgetTabStrip(below, tabs, belowEditor = true)
     }
   }
 }
@@ -182,14 +187,14 @@ private fun ComposerToolbar(
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
   ) {
     // The left group takes what the trailing buttons leave, and inside it the model chip is
     // measured last, so on a narrow screen the model name is cut before send is pushed off.
     Row(
       modifier = Modifier.weight(1f),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
     ) {
       AttachButton(controller, model)
       ModelChip(model, onOpenModelSheet, Modifier.weight(1f, fill = false))
@@ -226,11 +231,11 @@ private fun AttachmentTray(attachments: List<Attachment>, onRemove: (Attachment)
     modifier =
       Modifier
         .fillMaxWidth()
-        .padding(bottom = PipkinTokens.Spacing.s8)
+        .padding(bottom = PipkinTokens.Spacing.s4)
         .horizontalScroll(rememberScrollState())
         // Inside the scroll, which clips: room for the remove badges that overhang each chip by 8dp.
-        .padding(start = PipkinTokens.Spacing.s8, top = PipkinTokens.Spacing.s8),
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+        .padding(start = PipkinTokens.Spacing.s8, top = PipkinTokens.Spacing.s12),
+    horizontalArrangement = Arrangement.spacedBy(10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     attachments.forEach { attachment ->
@@ -244,34 +249,32 @@ private fun AttachmentTray(attachments: List<Attachment>, onRemove: (Attachment)
 
 @Composable
 private fun AttachmentThumbnail(attachment: Attachment.Image, onRemove: () -> Unit) {
-  val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.md)
-  Box(modifier = Modifier.size(48.dp)) {
+  val shape = RoundedCornerShape(13.dp)
+  Box(modifier = Modifier.size(46.dp)) {
     Image(
       bitmap = attachment.thumbnail,
       contentDescription = stringResource(R.string.chat_image),
-      modifier = Modifier.matchParentSize().clip(shape).border(1.dp, colors.borderAccent, shape),
+      modifier = Modifier.matchParentSize().clip(shape),
       contentScale = ContentScale.Crop,
     )
     RemoveBadge(onRemove)
   }
 }
 
-/** A 48dp tray chip for a picked file: icon, name and size, with the same remove badge as images. */
+/** A 46dp tray chip for a picked file: icon, name and size, with the same remove badge as images. */
 @Composable
 private fun FileChip(file: Attachment.File, onRemove: () -> Unit) {
   val colors = pipkinColors
   val context = LocalContext.current
-  val shape = RoundedCornerShape(PipkinTokens.Radius.md)
+  val shape = RoundedCornerShape(13.dp)
   Box {
     Row(
       modifier =
         Modifier
-          .height(48.dp)
+          .height(46.dp)
           .widthIn(max = 200.dp)
           .background(colors.surface2, shape)
-          .border(1.dp, colors.borderAccent, shape)
-          .padding(horizontal = PipkinTokens.Spacing.s8),
+          .padding(horizontal = 10.dp),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
     ) {
@@ -304,10 +307,10 @@ private fun BoxScope.RemoveBadge(onRemove: () -> Unit) {
       Modifier
         .align(Alignment.TopStart)
         .offset(x = (-8).dp, y = (-8).dp)
-        .size(24.dp)
+        .size(22.dp)
         .clip(CircleShape)
-        .background(colors.surface2)
-        .border(1.dp, colors.border, CircleShape)
+        .background(colors.surface3)
+        .border(2.dp, colors.surface1, CircleShape)
         .clickable(onClick = onRemove),
     contentAlignment = Alignment.Center,
   ) {
@@ -337,6 +340,7 @@ private fun ComposerField(controller: ChatController, acceptsImages: Boolean, on
     state = controller.draft,
     modifier = modifier
       .fillMaxWidth()
+      .padding(start = PipkinTokens.Spacing.s6, top = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s6)
       .atMostHalfTall()
       .heightIn(min = 30.dp)
       .onFocusChanged { controller.composerFocused = it.isFocused }
@@ -398,6 +402,10 @@ private fun AttachButton(controller: ChatController, model: JSONObject?) {
     icon = R.drawable.ic_lucide_plus,
     contentDescription = stringResource(R.string.chat_attach),
     onClick = { sheetOpen = true },
+    background = pipkinColors.surface2,
+    tint = pipkinColors.foregroundMuted,
+    iconSize = ICON_SIZE,
+    modifier = Modifier.size(TOOL_SIZE),
   )
   if (!sheetOpen) return
   val acceptsImages = acceptsImages(model)
@@ -423,13 +431,13 @@ private fun AttachButton(controller: ChatController, model: JSONObject?) {
   }
 }
 
+/** Send on a cobalt disc, greyed out while it can't send, or Stop on an inverse one; a pot simmers while a command runs. */
 @Composable
 private fun PrimaryButton(action: PrimaryAction, onSend: () -> Unit, onStop: () -> Unit) {
   val colors = pipkinColors
-  val send = stringResource(R.string.chat_send)
   when (action) {
     PrimaryAction.Sending -> Box(
-      modifier = Modifier.size(28.dp).clip(CircleShape).background(colors.accent),
+      modifier = Modifier.size(PRIMARY_SIZE).clip(CircleShape).background(colors.accent),
       contentAlignment = Alignment.Center,
     ) {
       SimmeringPot(tint = colors.accentForeground)
@@ -437,19 +445,23 @@ private fun PrimaryButton(action: PrimaryAction, onSend: () -> Unit, onStop: () 
 
     PrimaryAction.Send, PrimaryAction.Idle -> RoundIconButton(
       icon = R.drawable.ic_lucide_arrow_up,
-      contentDescription = send,
+      contentDescription = stringResource(R.string.chat_send),
       onClick = onSend,
       enabled = action == PrimaryAction.Send,
       background = colors.accent,
       tint = colors.accentForeground,
+      iconSize = ICON_SIZE,
+      modifier = Modifier.size(PRIMARY_SIZE),
     )
 
     PrimaryAction.Stop -> RoundIconButton(
       icon = R.drawable.ic_lucide_square,
       contentDescription = stringResource(R.string.chat_stop),
       onClick = onStop,
-      background = colors.accent,
-      tint = colors.accentForeground,
+      background = colors.foreground,
+      tint = colors.surface0,
+      iconSize = ICON_SIZE,
+      modifier = Modifier.size(PRIMARY_SIZE),
     )
   }
 }

@@ -1,24 +1,34 @@
 package io.jeph.pipkin.ui.chat
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.TimelineState
 import io.jeph.pipkin.ui.components.LucideIcon
@@ -27,6 +37,13 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 
 /** Long enough to read several queued messages, short enough to leave the stream most of the screen. */
 private const val STEERING_MAX_LINES = 6
+
+private const val DISABLED_ALPHA = 0.5f
+
+private val BOX_SHAPE = RoundedCornerShape(20.dp)
+private val BUTTON_HEIGHT = 30.dp
+private val LINE_SIZE = 13.5.sp
+private val LINE_HEIGHT = 19.5.sp
 
 /** The messages Pi queued, between the dialog card and the composer, while there are any. */
 @Composable
@@ -44,11 +61,11 @@ internal fun PendingSteeringBox(controller: ChatController, timeline: TimelineSt
 }
 
 /**
- * The messages Pi has queued but not taken yet, one per line as typed, so the user sees what is about to steer the
- * run; attachments show only as a count. Edit takes them back into the composer; Send now stops the run and sends
- * them at once, each as its own message. Both are off while Pi may be taking the queue for its next turn, since it
- * then delivers the messages regardless. A [compact] box leaves room for the keyboard or a dialog: one line with the
- * first message and how many lines follow it.
+ * The messages Pi has queued but not taken yet, one per line as typed, under a cobalt "Steering" label, so the user
+ * sees what is about to steer the run; attachments show only as a count. Edit takes them back into the composer; Send
+ * now stops the run and sends them at once, each as its own message. Both are off while Pi may be taking the queue
+ * for its next turn, since it then delivers the messages regardless. A [compact] box leaves room for the keyboard or a
+ * dialog: one line with the first message and how many lines follow it.
  */
 @Composable
 internal fun SteeringBox(
@@ -61,18 +78,19 @@ internal fun SteeringBox(
   modifier: Modifier = Modifier,
 ) {
   val colors = pipkinColors
-  Box(modifier = modifier.fillMaxWidth().padding(horizontal = PipkinTokens.Spacing.s16), Alignment.TopCenter) {
+  Box(modifier = modifier.fillMaxWidth().padding(horizontal = 10.dp), Alignment.TopCenter) {
     Column(
       modifier =
         Modifier
           .widthIn(max = PipkinTokens.contentMaxWidth)
           .fillMaxWidth()
-          .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
-          .background(colors.surface2)
+          .clip(BOX_SHAPE)
+          .background(colors.surface1)
           .padding(
             start = PipkinTokens.Spacing.s12,
-            end = PipkinTokens.Spacing.s4,
-            bottom = if (compact) 0.dp else PipkinTokens.Spacing.s12,
+            top = PipkinTokens.Spacing.s4,
+            end = PipkinTokens.Spacing.s6,
+            bottom = if (compact) PipkinTokens.Spacing.s4 else 10.dp,
           ),
     ) {
       Row(verticalAlignment = Alignment.CenterVertically) {
@@ -80,24 +98,25 @@ internal fun SteeringBox(
           SteeringLine(summary, Modifier.weight(1f))
         } else {
           Text(
-            text = stringResource(R.string.chat_steering),
+            text = stringResource(R.string.chat_steering).toUpperCase(LocaleList.current),
             modifier = Modifier.weight(1f),
-            color = colors.foregroundMuted,
-            fontSize = PipkinTokens.FontSize.sm,
+            color = colors.accent,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.06.em,
           )
         }
-        TextButton(onClick = onEdit, enabled = editEnabled) { Text(text = stringResource(R.string.chat_steering_edit)) }
-        TextButton(onClick = onSendNow, enabled = sendNowEnabled) {
-          Text(text = stringResource(R.string.chat_steering_send_now))
-        }
+        SteerButton(stringResource(R.string.chat_steering_edit), editEnabled, filled = false, onEdit)
+        SteerButton(stringResource(R.string.chat_steering_send_now), sendNowEnabled, filled = true, onSendNow)
       }
       if (compact) return@Column
       if (summary.text.isNotEmpty()) {
         Text(
           text = summary.text,
-          modifier = Modifier.padding(end = PipkinTokens.Spacing.s8),
+          modifier = Modifier.padding(top = PipkinTokens.Spacing.s2, end = PipkinTokens.Spacing.s6),
           color = colors.foreground,
-          fontSize = PipkinTokens.FontSize.base,
+          fontSize = LINE_SIZE,
+          lineHeight = LINE_HEIGHT,
           maxLines = STEERING_MAX_LINES,
           overflow = TextOverflow.Ellipsis,
         )
@@ -105,6 +124,27 @@ internal fun SteeringBox(
       if (summary.attachments > 0) SteeringAttachments(summary.attachments)
     }
   }
+}
+
+/** A steering action: cobalt text, on a cobalt-tinted pill when [filled]. */
+@Composable
+private fun SteerButton(label: String, enabled: Boolean, filled: Boolean, onClick: () -> Unit) {
+  val colors = pipkinColors
+  Text(
+    text = label,
+    modifier = Modifier
+      .padding(start = PipkinTokens.Spacing.s4)
+      .alpha(if (enabled) 1f else DISABLED_ALPHA)
+      .heightIn(min = BUTTON_HEIGHT)
+      .clip(CircleShape)
+      .background(if (filled) colors.accentSoft else Color.Transparent)
+      .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+      .padding(horizontal = if (filled) PipkinTokens.Spacing.s12 else 10.dp, vertical = 7.dp),
+    color = colors.accent,
+    fontSize = 12.5.sp,
+    fontWeight = FontWeight.Bold,
+    maxLines = 1,
+  )
 }
 
 /** The compact steering box's text: the first queued line, or the attachment count when there is no text, and "+N". */
@@ -123,7 +163,7 @@ private fun SteeringLine(summary: SteeringSummary, modifier: Modifier) {
       text = first,
       modifier = Modifier.weight(1f, fill = false),
       color = colors.foreground,
-      fontSize = PipkinTokens.FontSize.base,
+      fontSize = LINE_SIZE,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )
@@ -132,6 +172,7 @@ private fun SteeringLine(summary: SteeringSummary, modifier: Modifier) {
         text = stringResource(R.string.chat_steering_more, lines.size - 1),
         color = colors.foregroundMuted,
         fontSize = PipkinTokens.FontSize.sm,
+        fontWeight = FontWeight.SemiBold,
       )
     }
   }
@@ -143,18 +184,18 @@ private fun SteeringAttachments(count: Int) {
   Row(
     modifier = Modifier.padding(top = PipkinTokens.Spacing.s4),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
   ) {
     LucideIcon(
       R.drawable.ic_lucide_paperclip,
       contentDescription = null,
-      size = PipkinTokens.IconSize.sm,
+      size = PipkinTokens.IconSize.xs,
       tint = colors.foregroundMuted,
     )
     Text(
       text = pluralStringResource(R.plurals.chat_steering_attachments, count, count),
       color = colors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.sm,
+      fontSize = LINE_SIZE,
     )
   }
 }

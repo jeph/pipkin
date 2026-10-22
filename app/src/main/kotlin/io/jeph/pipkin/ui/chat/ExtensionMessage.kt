@@ -3,7 +3,6 @@ package io.jeph.pipkin.ui.chat
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,10 +33,14 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.NoticeLevel
@@ -57,12 +60,14 @@ private const val FOLDED_LINES = 6
 /** How many lines past [FOLDED_LINES] content may run before it folds; paragraph spacing makes real lines taller. */
 private const val FOLD_SLACK_LINES = 3
 
-/** The notice's line height, which also sets its icon's 20dp row. */
+/** The notice's line height. */
 private val NOTICE_LINE_HEIGHT = 20.sp
 
+private val CardShape = RoundedCornerShape(16.dp)
+
 /**
- * A message an extension posted, as Pi's terminal shows it: the extension's message type over its content, set apart
- * from the conversation. Long text folds behind Show more; images always show whole.
+ * A message an extension posted, as Pi's terminal shows it: the extension's message type in plum over its content, on
+ * a raised card. Long text folds behind Show more; images always show whole.
  */
 @Composable
 internal fun ExtensionMessage(
@@ -71,31 +76,29 @@ internal fun ExtensionMessage(
   modifier: Modifier = Modifier,
 ) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.xl)
   Column(
     modifier = modifier
       .fillMaxWidth()
-      .padding(top = PipkinTokens.Spacing.s8)
-      .background(colors.surface1, shape)
-      .border(1.dp, colors.borderAccent, shape)
-      .padding(PipkinTokens.Spacing.s12),
-    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+      .padding(top = PipkinTokens.Spacing.s4)
+      .background(colors.surface1, CardShape)
+      .padding(start = PipkinTokens.Spacing.s12, top = 10.dp, end = PipkinTokens.Spacing.s12, bottom = 10.dp),
+    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
   ) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
+      horizontalArrangement = Arrangement.spacedBy(7.dp),
     ) {
       LucideIcon(
         icon = R.drawable.ic_lucide_plug,
         contentDescription = stringResource(R.string.chat_extension_message),
         size = PipkinTokens.IconSize.sm,
-        tint = colors.foregroundMuted,
+        tint = colors.extension,
       )
       Text(
         text = item.customType,
-        color = colors.foregroundMuted,
-        fontFamily = PipkinFonts.mono,
+        color = colors.extension,
         fontSize = PipkinTokens.FontSize.sm,
+        fontWeight = FontWeight.Bold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
@@ -117,8 +120,8 @@ internal fun ExtensionMessage(
 }
 
 /**
- * A notice an extension showed with `ctx.ui.notify`: a card washed in its level's colour. Long notices fold like
- * extension messages, and the text can be selected.
+ * A notice an extension showed with `ctx.ui.notify`: a card washed in its level's colour, its level word over the
+ * text, so the colour isn't the only signal. Long notices fold like extension messages, and the text can be selected.
  */
 @Composable
 internal fun ExtensionNoticeCard(item: TimelineItem.ExtensionNotice, modifier: Modifier = Modifier) {
@@ -136,29 +139,30 @@ internal fun ExtensionNoticeCard(item: TimelineItem.ExtensionNotice, modifier: M
     NoticeLevel.Error ->
       NoticeLook(R.drawable.ic_lucide_circle_x, R.string.chat_notice_error, colors.destructive, colors.dangerSoft)
   }
-  val shape = RoundedCornerShape(PipkinTokens.Radius.md)
   // Opaque, so a folded notice's fade ends in the card's own colour.
   val background = look.wash.compositeOver(colors.surface0)
   Row(
     modifier = modifier
       .fillMaxWidth()
-      .background(background, shape)
+      .background(background, CardShape)
       .padding(horizontal = PipkinTokens.Spacing.s12, vertical = 10.dp),
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    horizontalArrangement = Arrangement.spacedBy(11.dp),
   ) {
-    LucideIcon(
-      icon = look.icon,
-      contentDescription = stringResource(look.description),
-      modifier = Modifier.padding(top = PipkinTokens.Spacing.s2),
-      tint = look.tint,
-    )
-    Column(modifier = Modifier.weight(1f)) {
+    LucideIcon(icon = look.icon, contentDescription = null, modifier = Modifier.padding(top = 1.dp), tint = look.tint)
+    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+      Text(
+        text = stringResource(look.level).toUpperCase(LocaleList.current),
+        color = look.tint,
+        fontSize = 10.5.sp,
+        fontWeight = FontWeight.ExtraBold,
+        letterSpacing = 0.06.em,
+      )
       FoldedContent(item.key, NOTICE_LINE_HEIGHT, fadeTo = background) {
         SelectionContainer {
           Text(
             text = item.appNotice?.let { stringResource(it.text) } ?: item.message,
             color = colors.foreground,
-            fontSize = PipkinTokens.FontSize.base,
+            fontSize = 13.5.sp,
             lineHeight = NOTICE_LINE_HEIGHT,
           )
         }
@@ -167,12 +171,7 @@ internal fun ExtensionNoticeCard(item: TimelineItem.ExtensionNotice, modifier: M
   }
 }
 
-private data class NoticeLook(
-  @DrawableRes val icon: Int,
-  @StringRes val description: Int,
-  val tint: Color,
-  val wash: Color,
-)
+private data class NoticeLook(@DrawableRes val icon: Int, @StringRes val level: Int, val tint: Color, val wash: Color)
 
 /**
  * [content] cut to [FOLDED_LINES] lines of [lineHeight] over a fade into [fadeTo], with a toggle to show all of it.
@@ -224,6 +223,7 @@ private fun FoldedContent(
         modifier = Modifier.clickable { expanded = !expanded }.padding(top = PipkinTokens.Spacing.s8),
         color = colors.accent,
         fontSize = PipkinTokens.FontSize.meta,
+        fontWeight = FontWeight.Bold,
       )
     }
   }

@@ -1,0 +1,236 @@
+package io.jeph.pipkin.ui.chat
+
+import android.text.format.DateFormat
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.toUpperCase
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import io.jeph.pipkin.R
+import io.jeph.pipkin.agent.ImagePart
+import io.jeph.pipkin.agent.NoticeKind
+import io.jeph.pipkin.agent.TimelineItem
+import io.jeph.pipkin.agent.text
+import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.MarkdownCache
+import io.jeph.pipkin.ui.components.PipkinMarkdown
+import io.jeph.pipkin.ui.components.RoundIconButton
+import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.theme.PipkinFonts
+import io.jeph.pipkin.ui.theme.PipkinTokens
+import io.jeph.pipkin.ui.theme.pipkinColors
+import java.util.Date
+import kotlinx.coroutines.delay
+
+/**
+ * A tool call's or thinking block's one-line row: a status dot, the bold title and a muted summary, in monospace for a
+ * tool's arguments. The dot is green when done, red when failed, and a cobalt ring while it runs.
+ */
+@Composable
+internal fun ToolRow(presentation: ToolPresentation, onClick: () -> Unit, modifier: Modifier = Modifier) {
+  val colors = pipkinColors
+  Row(
+    modifier =
+      modifier
+        .fillMaxWidth()
+        .heightIn(min = 30.dp)
+        .clip(RoundedCornerShape(PipkinTokens.Radius.md))
+        .clickable(onClick = onClick)
+        .padding(horizontal = PipkinTokens.Spacing.s4),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+  ) {
+    StepDot(running = presentation.running, failed = presentation.isError)
+    Text(
+      text = presentation.title,
+      color = colors.foreground,
+      fontSize = 12.5.sp,
+      fontWeight = FontWeight.SemiBold,
+      maxLines = 1,
+    )
+    Text(
+      text = presentation.summary.orEmpty(),
+      modifier = Modifier.weight(1f),
+      color = if (presentation.isError) colors.destructive else colors.foregroundMuted,
+      fontSize = if (presentation.code) 11.5.sp else 12.5.sp,
+      fontFamily = if (presentation.code) PipkinFonts.mono else null,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+    )
+  }
+}
+
+/** A step's status: a filled dot, green or red once it settled, or a cobalt ring while it runs. */
+@Composable
+internal fun StepDot(running: Boolean, failed: Boolean, modifier: Modifier = Modifier) {
+  val colors = pipkinColors
+  Box(modifier = modifier.size(STEP_DOT_BOX), contentAlignment = Alignment.Center) {
+    when {
+      running -> Box(Modifier.size(10.dp).border(2.dp, colors.accent, CircleShape))
+
+      else -> Box(
+        Modifier
+          .size(8.dp)
+          .clip(CircleShape)
+          .background(if (failed) colors.destructive else colors.dotSuccess),
+      )
+    }
+  }
+}
+
+/** The width a [StepDot] takes, so rows and the group's line line up. */
+internal val STEP_DOT_BOX = 12.dp
+
+@Composable
+internal fun ErrorRow(message: String, modifier: Modifier = Modifier) {
+  val colors = pipkinColors
+  Row(
+    modifier = modifier.fillMaxWidth().padding(vertical = PipkinTokens.Spacing.s6),
+    horizontalArrangement = Arrangement.spacedBy(10.dp),
+  ) {
+    LucideIcon(
+      icon = R.drawable.ic_lucide_circle_alert,
+      contentDescription = null,
+      modifier = Modifier.padding(top = 2.dp),
+      tint = colors.destructive,
+    )
+    SelectionContainer(modifier = Modifier.weight(1f)) {
+      Text(text = message, color = colors.destructive, fontSize = 13.5.sp, lineHeight = 19.5.sp)
+    }
+  }
+}
+
+/** A centred pill noting Pi's own work on the chat, such as retrying or compacting. */
+@Composable
+internal fun NoticeRow(kind: NoticeKind, modifier: Modifier = Modifier) {
+  val colors = pipkinColors
+  Box(
+    modifier = modifier.fillMaxWidth().padding(vertical = PipkinTokens.Spacing.s4),
+    contentAlignment = Alignment.Center,
+  ) {
+    Row(
+      modifier = Modifier
+        .heightIn(min = 27.dp)
+        .clip(CircleShape)
+        .background(colors.surface1)
+        .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s4),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+      LucideIcon(
+        icon = kind.icon,
+        contentDescription = null,
+        size = PipkinTokens.IconSize.sm,
+        tint = colors.foregroundMuted,
+      )
+      Text(
+        text = stringResource(kind.text),
+        color = colors.foregroundMuted,
+        fontSize = PipkinTokens.FontSize.sm,
+        fontWeight = FontWeight.SemiBold,
+        textAlign = TextAlign.Center,
+      )
+    }
+  }
+}
+
+@get:DrawableRes
+private val NoticeKind.icon: Int
+  get() = when (this) {
+    NoticeKind.Retrying -> R.drawable.ic_lucide_refresh_cw
+    NoticeKind.Compacting -> R.drawable.ic_lucide_archive
+    NoticeKind.Compacted -> R.drawable.ic_lucide_check
+  }
+
+/**
+ * Live `m:ss` while the run works, then how long it took. While the chat waits on [backgroundTasks], the simmering
+ * pot stays, saying how many.
+ */
+@Composable
+internal fun TurnFooterRow(item: TimelineItem.TurnFooter, backgroundTasks: Int, modifier: Modifier = Modifier) {
+  Row(
+    modifier = modifier.fillMaxWidth().heightIn(min = 28.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+  ) {
+    val duration = item.durationMillis
+    if (duration != null) {
+      FooterText(durationText(duration))
+      if (backgroundTasks > 0) SimmeringPot(size = PipkinTokens.IconSize.sm)
+    } else {
+      SimmeringPot(size = PipkinTokens.IconSize.sm)
+      RunningElapsed(item.startedAt)
+    }
+    if (backgroundTasks == 0) return@Row
+    FooterText(pluralStringResource(R.plurals.chat_background_tasks_running, backgroundTasks, backgroundTasks))
+  }
+}
+
+@Composable
+private fun FooterText(text: String) {
+  Text(
+    text = text,
+    color = pipkinColors.foregroundMuted,
+    fontSize = PipkinTokens.FontSize.sm,
+    style = TextStyle(fontFeatureSettings = PipkinFonts.TABULAR),
+  )
+}
+
+@Composable
+private fun RunningElapsed(startedAt: Long) {
+  val now by produceState(System.currentTimeMillis(), startedAt) {
+    while (true) {
+      value = System.currentTimeMillis()
+      delay(1_000L - (value - startedAt).mod(1_000L))
+    }
+  }
+  val seconds = ((now - startedAt) / 1_000L).coerceAtLeast(0)
+  FooterText("${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}")
+}
+
+@Composable
+private fun durationText(millis: Long): String {
+  val seconds = (millis / 1_000L).toInt()
+  return if (seconds >= 60) {
+    stringResource(R.string.chat_duration_minutes, seconds / 60, seconds % 60)
+  } else {
+    stringResource(R.string.chat_duration_seconds, seconds)
+  }
+}
