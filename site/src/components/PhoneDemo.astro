@@ -139,10 +139,14 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     </div>
 
     <div class="composer">
-      <div class="widget-tab" data-part="widget">
-        <Icon name="panel_top" size={12} />
-        Todos
-        <span class="dot"></span>
+      <div class="widget-strip" data-part="widget">
+        <div>
+          <div class="widget-tab">
+            <Icon name="panel_top" size={12} />
+            Todos
+            <span class="dot"></span>
+          </div>
+        </div>
       </div>
       <div class="field">
         <span class="typed" data-part="typed"></span><span class="caret"></span>
@@ -626,24 +630,40 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     position: relative;
     display: flex;
     flex-direction: column;
-    padding: calc(10 * var(--dp)) calc(12 * var(--dp)) 0;
+    padding: 0 calc(10 * var(--dp));
     border-radius: calc(22 * var(--dp)) calc(22 * var(--dp)) 0 0;
     background: var(--surface-1);
+  }
+
+  /* The tab strip unfolds above the field once a widget shows, growing the composer as the app does. */
+  .widget-strip {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.4s var(--ease-out);
+  }
+
+  /* The spacing lives on the tab, inside the clipped wrapper, so the folded strip takes no space at all. */
+  .widget-strip > div {
+    min-height: 0;
+    overflow: hidden;
   }
 
   .widget-tab {
     display: flex;
     align-items: center;
     gap: calc(6 * var(--dp));
-    align-self: flex-start;
-    margin-bottom: calc(6 * var(--dp));
-    padding: calc(4 * var(--dp)) calc(12 * var(--dp));
+    width: fit-content;
+    height: calc(26 * var(--dp));
+    margin: calc(6 * var(--dp)) calc(2 * var(--dp));
+    padding: 0 calc(10 * var(--dp));
     border-radius: 999px;
     background: var(--surface-2);
     color: var(--muted);
     font-size: calc(12.5 * var(--dp));
     font-weight: 600;
-    transition: opacity 0.4s ease;
+    transition:
+      opacity 0.4s ease,
+      transform 0.4s var(--ease-out);
   }
 
   .widget-tab :global(svg) {
@@ -661,13 +681,13 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   .field {
     position: relative;
     min-height: calc(22 * var(--dp));
-    padding: calc(6 * var(--dp)) calc(4 * var(--dp));
+    padding: calc(12 * var(--dp)) calc(6 * var(--dp)) calc(4 * var(--dp));
     font-size: calc(15 * var(--dp));
   }
 
   .placeholder {
     position: absolute;
-    inset: calc(6 * var(--dp)) calc(4 * var(--dp));
+    inset: calc(12 * var(--dp)) calc(6 * var(--dp)) calc(4 * var(--dp));
     color: var(--muted);
     pointer-events: none;
   }
@@ -851,8 +871,13 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     transform: translateY(calc(-12 * var(--dp))) scale(0.96);
   }
 
-  .playing .widget-tab:not(.on) {
+  .playing .widget-strip:not(.on) {
+    grid-template-rows: 0fr;
+  }
+
+  .playing .widget-strip:not(.on) .widget-tab {
     opacity: 0;
+    transform: translateY(100%);
   }
 
   .playing.typing .caret {
