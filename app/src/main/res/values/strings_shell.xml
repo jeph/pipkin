@@ -13,7 +13,7 @@
     </plurals>
     <!-- The line under a workspace's name in the sidebar: what its chats are doing, then how many tabs it has. -->
     <string name="shell_workspace_waiting">Waiting for you</string>
-    <string name="shell_workspace_working">Simmering</string>
+    <string name="shell_workspace_working">Working</string>
     <plurals name="shell_workspace_tabs">
         <item quantity="one">%1$d tab</item>
         <item quantity="other">%1$d tabs</item>

@@ -84,8 +84,8 @@
     <string name="chat_figure_stopped">stopped</string>
 
     <!-- A run of the agent's steps folded into one line: its state, then counts. -->
-    <string name="chat_steps_working">Simmering</string>
-    <string name="chat_steps_done">Cooked</string>
+    <string name="chat_steps_working">Working</string>
+    <string name="chat_steps_done">Done</string>
     <string name="chat_steps_stopped">Stopped</string>
     <plurals name="chat_steps_count">
         <!-- %1$s is the number of steps, already formatted. -->

@@ -114,7 +114,7 @@ internal fun WorkspaceRow(
 }
 
 /**
- * The line under a workspace's name: Waiting for you or Simmering after a dot while its chats need the user or work,
+ * The line under a workspace's name: Waiting for you or Working after a dot while its chats need the user or work,
  * else its [folder], then its tab count. Each part is its own text, so a right-to-left folder name can't pull the
  * count into it; a path keeps its end when cut short, and the count always shows whole.
  */

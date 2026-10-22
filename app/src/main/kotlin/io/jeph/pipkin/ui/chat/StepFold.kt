@@ -2,13 +2,11 @@ package io.jeph.pipkin.ui.chat
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -36,9 +34,9 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import java.text.NumberFormat
 
 /**
- * A run of steps folded into one line: Simmering while the run works, Cooked once it's done or Stopped, with how many
- * steps and how many failed. Tapping it lists the steps under it, or folds them again. Folded while the run works, the
- * step running now shows under the line, so the chat doesn't grow with every step.
+ * A run of steps folded into one line: Working while the run works, Done once it's done or Stopped, with how many steps
+ * and how many failed. Tapping it lists the steps under it, or folds them again. Folded while the run works, the step
+ * running now shows under the line, so the chat doesn't grow with every step.
  */
 @Composable
 internal fun StepFoldRow(
@@ -125,33 +123,27 @@ private fun FoldSummary(fold: TimelineItem.Steps, modifier: Modifier) {
 
 /**
  * A check once the run is done, or an alert in red when some of its steps [failed]; a square once it was stopped, or
- * a simmering pot while it works.
+ * a simmering pot while it works. As big as a step's icon, so it centres over the steps' icons.
  */
 @Composable
 private fun OutcomeIcon(outcome: StepsOutcome, failed: Boolean) {
   val colors = pipkinColors
-  // As wide as a step's dot, so the icon centres over the steps' dots.
-  Box(modifier = Modifier.size(STEP_DOT_BOX), contentAlignment = Alignment.Center) {
-    val iconModifier = Modifier.requiredSize(OUTCOME_ICON_SIZE)
-    when (outcome) {
-      StepsOutcome.Working -> SimmeringPot(modifier = iconModifier, size = OUTCOME_ICON_SIZE, tint = colors.accent)
+  when (outcome) {
+    StepsOutcome.Working -> SimmeringPot(size = STEP_ICON_SIZE, tint = colors.accent)
 
-      StepsOutcome.Done -> LucideIcon(
-        icon = if (failed) R.drawable.ic_lucide_circle_alert else R.drawable.ic_lucide_check,
-        contentDescription = null,
-        modifier = iconModifier,
-        size = OUTCOME_ICON_SIZE,
-        tint = if (failed) colors.destructive else colors.dotSuccess,
-      )
+    StepsOutcome.Done -> LucideIcon(
+      icon = if (failed) R.drawable.ic_lucide_circle_alert else R.drawable.ic_lucide_check,
+      contentDescription = null,
+      size = STEP_ICON_SIZE,
+      tint = if (failed) colors.destructive else colors.dotSuccess,
+    )
 
-      StepsOutcome.Stopped -> LucideIcon(
-        icon = R.drawable.ic_lucide_square,
-        contentDescription = null,
-        modifier = iconModifier,
-        size = OUTCOME_ICON_SIZE,
-        tint = colors.foregroundMuted,
-      )
-    }
+    StepsOutcome.Stopped -> LucideIcon(
+      icon = R.drawable.ic_lucide_square,
+      contentDescription = null,
+      size = STEP_ICON_SIZE,
+      tint = colors.foregroundMuted,
+    )
   }
 }
 
@@ -164,11 +156,11 @@ private fun stepPresentation(step: TimelineItem): ToolPresentation = when (step)
 }
 
 /**
- * Draws the rail that joins an expanded fold's steps through their dots, from the fold's line down, ending at the
- * [last] step's dot.
+ * Draws the rail that joins an expanded fold's steps through their icons, from the fold's line down, ending at the
+ * [last] step's icon.
  */
 internal fun Modifier.foldRail(last: Boolean, color: Color): Modifier = drawBehind {
-  val inset = PipkinTokens.Spacing.s4.toPx() + STEP_DOT_BOX.toPx() / 2
+  val inset = PipkinTokens.Spacing.s4.toPx() + STEP_ICON_SIZE.toPx() / 2
   val x = if (layoutDirection == LayoutDirection.Rtl) size.width - inset else inset
   val gap = RAIL_GAP.toPx()
   val middle = size.height / 2
@@ -177,8 +169,7 @@ internal fun Modifier.foldRail(last: Boolean, color: Color): Modifier = drawBehi
   if (!last) drawLine(color, Offset(x, middle + gap), Offset(x, size.height), stroke)
 }
 
-private val OUTCOME_ICON_SIZE = 14.dp
 private val RAIL_WIDTH = 1.5.dp
 
-/** How far the rail stops short of a dot's centre, just outside the running ring. */
-private val RAIL_GAP = 7.dp
+/** How far the rail stops short of an icon's centre, leaving a little space around the icon. */
+private val RAIL_GAP = 10.dp

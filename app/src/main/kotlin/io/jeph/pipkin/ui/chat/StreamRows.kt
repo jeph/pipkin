@@ -4,7 +4,6 @@ import android.text.format.DateFormat
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,8 +67,8 @@ import java.util.Date
 import kotlinx.coroutines.delay
 
 /**
- * A tool call's or thinking block's one-line row: a status dot, the bold title and a muted summary, in monospace for a
- * tool's arguments. The dot is green when done, red when failed, and a cobalt ring while it runs.
+ * A tool call's or thinking block's one-line row: the tool's icon, the bold title and a muted summary, in monospace for
+ * a tool's arguments. The icon is cobalt while the step runs, red once it failed, and muted once it's done.
  */
 @Composable
 internal fun ToolRow(presentation: ToolPresentation, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -85,7 +84,7 @@ internal fun ToolRow(presentation: ToolPresentation, onClick: () -> Unit, modifi
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
-    StepDot(running = presentation.running, failed = presentation.isError)
+    StepIcon(presentation.icon, running = presentation.running, failed = presentation.isError)
     Text(
       text = presentation.title,
       color = colors.foreground,
@@ -141,26 +140,24 @@ private fun FigureText(figure: StepFigure) {
 
 private fun colored(text: String, color: Color) = AnnotatedString(text, SpanStyle(color = color))
 
-/** A step's status: a filled dot, green or red once it settled, or a cobalt ring while it runs. */
+/** A step's tool icon, coloured by its status. */
 @Composable
-internal fun StepDot(running: Boolean, failed: Boolean, modifier: Modifier = Modifier) {
+private fun StepIcon(@DrawableRes icon: Int, running: Boolean, failed: Boolean) {
   val colors = pipkinColors
-  Box(modifier = modifier.size(STEP_DOT_BOX), contentAlignment = Alignment.Center) {
-    when {
-      running -> Box(Modifier.size(10.dp).border(2.dp, colors.accent, CircleShape))
-
-      else -> Box(
-        Modifier
-          .size(8.dp)
-          .clip(CircleShape)
-          .background(if (failed) colors.destructive else colors.dotSuccess),
-      )
-    }
-  }
+  LucideIcon(
+    icon = icon,
+    contentDescription = null,
+    size = STEP_ICON_SIZE,
+    tint = when {
+      running -> colors.accent
+      failed -> colors.destructive
+      else -> colors.foregroundMuted
+    },
+  )
 }
 
-/** The width a [StepDot] takes, so rows and the group's line line up. */
-internal val STEP_DOT_BOX = 12.dp
+/** The size of a step's icon and of a fold's, so rows and the fold's line and rail line up. */
+internal val STEP_ICON_SIZE = 14.dp
 
 @Composable
 internal fun ErrorRow(message: String, modifier: Modifier = Modifier) {

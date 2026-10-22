@@ -119,7 +119,7 @@ class StepStreamTest {
   }
 
   @Test
-  fun aSavedStoppedRunReadsStoppedAndTheNextRunCooked() {
+  fun aSavedStoppedRunReadsStoppedAndTheNextRunDone() {
     val timeline = ChatTimeline { 1_000 }
     timeline.seed(
       JSONArray(
