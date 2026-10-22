@@ -16,9 +16,10 @@ interface Step {
   removed?: number;
 }
 
-// While the run works, the fold shows only the step running now, one after another.
+// The fold is open, as if tapped, so every step shows on a rail under it as the app lists them.
 const steps: Step[] = [
   { icon: "brain", name: "Thinking", detail: "Planning the change" },
+  { icon: "terminal", name: "Shell", detail: "rg -l theme src" },
   { icon: "file_text", name: "Read", detail: "src/settings.tsx" },
   { icon: "file_pen", name: "Edit", detail: "src/theme.ts", added: 24, removed: 3 },
   { icon: "file_pen", name: "Edit", detail: "src/settings.tsx", added: 11, removed: 2 },
@@ -90,28 +91,34 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
         <div>
           <div class="fold">
             <span class="fold-icon">
-              <span class="while-working"><Logo size={16} simmer /></span>
-              <span class="once-done"><Icon name="check" size={16} /></span>
+              <span class="while-working"><Logo size={14} simmer /></span>
+              <span class="once-done"><Icon name="check" size={14} /></span>
             </span>
             <span class="fold-summary">
               <span class="fold-state"><span class="while-working">Working</span><span class="once-done">Done</span></span
               >{" · "}<span data-part="count">{steps.length} steps</span>
             </span>
-            <Icon name="chevron_down" size={14} />
+            <Icon name="chevron_up" size={14} />
           </div>
-          <div class="current">
-            {
-              steps.map((step) => (
-                <div class="tool" data-part="tool">
-                  <Icon name={step.icon} size={16} />
-                  <span class="tool-name">{step.name}</span>
-                  <span class:list={["tool-detail", { summary: step.name === "Thinking" }]}>{step.detail}</span>
-                  {step.added !== undefined && <span class="added">+{step.added}</span>}
-                  {step.removed !== undefined && <span class="removed">−{step.removed}</span>}
+          {
+            steps.map((step) => (
+              <div class="tool" data-part="tool">
+                <div>
+                  <div class="tool-row">
+                    <Icon name={step.icon} size={14} />
+                    <span class="tool-name">{step.name}</span>
+                    <span class:list={["tool-detail", { summary: step.name === "Thinking" }]}>{step.detail}</span>
+                    {(step.added !== undefined || step.removed !== undefined) && (
+                      <span class="figure">
+                        {step.added !== undefined && <span class="added">+{step.added}</span>}
+                        {step.removed !== undefined && <span class="removed">−{step.removed}</span>}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              ))
-            }
-          </div>
+              </div>
+            ))
+          }
         </div>
       </div>
 
@@ -425,7 +432,7 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     font-size: calc(14.5 * var(--dp));
   }
 
-  /* A run of steps folded into one line: Working with the step running now under it, then Done. */
+  /* A run of steps under one line that says Working, then Done. It's open, so its steps list under it. */
   .fold {
     display: flex;
     align-items: center;
@@ -445,8 +452,8 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 
   .fold-icon {
     display: grid;
-    width: calc(16 * var(--dp));
-    height: calc(16 * var(--dp));
+    width: calc(14 * var(--dp));
+    height: calc(14 * var(--dp));
   }
 
   .fold-icon :global(svg) {
@@ -478,51 +485,94 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     display: inline-flex;
   }
 
-  .current {
+  /* Each step grows in under the last, as the app adds rows to an open fold. */
+  .tool {
     display: grid;
+    grid-template-rows: 1fr;
+    transition:
+      grid-template-rows 0.35s var(--ease-out),
+      opacity 0.3s ease;
   }
 
-  .tool {
-    grid-area: 1 / 1;
+  .tool > div {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .tool-row {
+    position: relative;
     display: flex;
     align-items: center;
-    gap: calc(10 * var(--dp));
-    min-height: calc(32 * var(--dp));
+    gap: calc(8 * var(--dp));
+    min-height: calc(30 * var(--dp));
     padding: 0 calc(4 * var(--dp));
     color: var(--muted);
     white-space: nowrap;
-    transition: opacity 0.25s ease;
   }
 
-  .tool > :global(svg) {
-    width: calc(16 * var(--dp));
-    height: calc(16 * var(--dp));
+  .tool-row > :global(svg) {
+    width: calc(14 * var(--dp));
+    height: calc(14 * var(--dp));
+    transition: color 0.25s ease;
+  }
+
+  /* The rail that joins the steps through their icons, from the fold's line down to the newest step's icon. It stops
+     short of each icon, as the app's foldRail does. */
+  .tool-row::before,
+  .tool-row::after {
+    content: "";
+    position: absolute;
+    left: calc(10.25 * var(--dp));
+    width: calc(1.5 * var(--dp));
+    background: var(--border);
+  }
+
+  .tool-row::before {
+    top: 0;
+    height: calc(50% - 10 * var(--dp));
+  }
+
+  .tool-row::after {
+    top: calc(50% + 10 * var(--dp));
+    bottom: 0;
+    display: none;
+  }
+
+  .phone:not(.playing) .tool:not(:last-child) .tool-row::after,
+  .playing .tool:has(+ .tool.on) .tool-row::after {
+    display: block;
+  }
+
+  /* The step running now, its icon in the accent as the app tints it. */
+  .playing.working .tool.running .tool-row > :global(svg) {
+    color: var(--accent);
   }
 
   .tool-name {
     color: var(--fg);
-    font-size: calc(13.5 * var(--dp));
-    font-weight: 700;
+    font-size: calc(12.5 * var(--dp));
+    font-weight: 600;
   }
 
   .tool-detail {
     flex: 1;
     overflow: hidden;
     font-family: var(--mono);
-    font-size: calc(12 * var(--dp));
+    font-size: calc(11.5 * var(--dp));
     text-overflow: ellipsis;
   }
 
   /* A thinking step's summary is prose; tools' paths and commands are code. */
   .tool-detail.summary {
     font-family: inherit;
-    font-size: calc(13 * var(--dp));
+    font-size: calc(12.5 * var(--dp));
   }
 
-  .added,
-  .removed {
+  .figure {
+    display: flex;
+    gap: 0.6ch;
     font-family: var(--mono);
-    font-size: calc(12 * var(--dp));
+    font-size: calc(11.5 * var(--dp));
   }
 
   .added {
@@ -779,9 +829,8 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     font-size: calc(13 * var(--dp));
   }
 
-  /* The static, finished chat is the default: the fold says Done and lists no running step. Once the script takes
-     over it adds .playing and drives the parts. */
-  .tool,
+  /* The static, finished chat is the default: the fold says Done and lists every step. Once the script takes over it
+     adds .playing and drives the parts. */
   .phone:not(.playing) .empty,
   .phone:not(.playing) .title-new {
     opacity: 0;
@@ -791,7 +840,8 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     opacity: 1;
   }
 
-  .playing .step:not(.on) {
+  .playing .step:not(.on),
+  .playing .tool:not(.on) {
     grid-template-rows: 0fr;
     opacity: 0;
   }
@@ -841,15 +891,6 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 
   .playing:not(.sent) .run {
     opacity: 0;
-  }
-
-  .playing .tool.on {
-    opacity: 1;
-  }
-
-  /* The step running now shows only while the steps work; the reply after them closes the fold. */
-  .phone:not(.working) .current {
-    display: none;
   }
 
   /* A reply's copy button and time show once it's written. */

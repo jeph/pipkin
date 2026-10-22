@@ -70,7 +70,7 @@ export function playDemo(phone: HTMLElement): void {
     empty.classList.remove("off");
     widget.classList.remove("on");
     notification.classList.remove("on");
-    for (const step of [sent, fold, replyStep, ...tools]) step.classList.remove("on");
+    for (const step of [sent, fold, replyStep, ...tools]) step.classList.remove("on", "running");
     typed.textContent = "";
     reply.replaceChildren();
     timer.textContent = "";
@@ -102,15 +102,16 @@ export function playDemo(phone: HTMLElement): void {
     phone.classList.add("working");
     fold.classList.add("on");
     for (const [index, tool] of tools.entries()) {
-      tools[index - 1]?.classList.remove("on");
-      tool.classList.add("on");
+      tools[index - 1]?.classList.remove("running");
+      tool.classList.add("on", "running");
       setCount(index + 1);
       if (index === 1) widget.classList.add("on");
-      await sleep(index === 0 ? 1500 : 1150);
+      await sleep(index === 0 ? 1500 : 1000);
       setContext(4 + index * 1.4);
     }
+    tools.at(-1)!.classList.remove("running");
 
-    // A reply after the steps closes their fold; the run works on until the reply is written.
+    // A reply after the steps ends the fold; the run works on until the reply is written.
     phone.classList.remove("working");
     replyStep.classList.add("on");
     for (const word of replyWords) {
