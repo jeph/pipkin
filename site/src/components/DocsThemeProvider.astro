@@ -1,0 +1,9 @@
+---
+// Replaces Starlight's ThemeProvider, which knows only light and dark, so the guide shares the landing page's themes
+// and the choice saved there. Starlight renders it in the page's head; the menu is ThemeSelect.astro.
+import themeInit from "../scripts/theme-init.js?raw";
+---
+
+<meta name="theme-color" content="#1c1d20" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)" />
+<script is:inline set:html={themeInit} />

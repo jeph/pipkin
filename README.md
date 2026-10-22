@@ -20,9 +20,18 @@ code, runs commands, edits files, and checks its own work, all on your phone. It
 cloud server doing the work somewhere else.
 
 <p align="center">
-  <img src="site/src/assets/screens/photos.png" alt="A finished chat in which Pipkin found and moved duplicate photos" height="320">
-  <img src="site/src/assets/screens/git-changes.png" alt="The Changes view showing an uncommitted diff" height="320">
-  <img src="site/src/assets/screens/file-view.png" alt="A Python file open with syntax highlighting" height="320">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/src/assets/screens/stone/photos.png">
+    <img src="site/src/assets/screens/porcelain/photos.png" alt="A finished chat in which Pipkin found and moved duplicate photos" height="320">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/src/assets/screens/stone/git-changes.png">
+    <img src="site/src/assets/screens/porcelain/git-changes.png" alt="The Changes view showing an uncommitted diff" height="320">
+  </picture>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="site/src/assets/screens/stone/file-view.png">
+    <img src="site/src/assets/screens/porcelain/file-view.png" alt="A Python file open with syntax highlighting" height="320">
+  </picture>
 </p>
 
 ## Contents

@@ -2,16 +2,18 @@
 import Icon from "./Icon.astro";
 ---
 
-<!-- An icon button over a native select, so phones get the system's own picker. Hidden without JavaScript. -->
+<!-- An icon button over a native select, so phones get the system's own picker. Hidden without JavaScript. The themes
+     are the app's, in the order of its Settings › Theme. -->
 <label class="theme-select" title="Theme">
   <span class="visually-hidden">Theme</span>
-  <span class="theme-icon auto"><Icon name="laptop" size={18} /></span>
-  <span class="theme-icon light"><Icon name="sun" size={18} /></span>
-  <span class="theme-icon dark"><Icon name="moon" size={18} /></span>
+  <Icon name="palette" size={18} />
   <select>
-    <option value="dark">Dark</option>
-    <option value="light">Light</option>
-    <option value="auto" selected>Auto</option>
+    <option value="system" selected>System</option>
+    <option value="porcelain">Porcelain</option>
+    <option value="clay">Clay</option>
+    <option value="cobalt">Cobalt</option>
+    <option value="stone">Stone</option>
+    <option value="obsidian">Obsidian</option>
   </select>
 </label>
 
@@ -27,6 +29,7 @@ import Icon from "./Icon.astro";
   .theme-select {
     position: relative;
     display: none;
+    flex: none;
     place-items: center;
     width: 36px;
     height: 36px;
@@ -58,19 +61,6 @@ import Icon from "./Icon.astro";
     opacity: 0;
     cursor: pointer;
     font-size: 16px;
-  }
-
-  /* Shows the icon for the current choice, which Base.astro keeps in data-theme-choice. */
-  .theme-icon {
-    display: none;
-    grid-area: 1 / 1;
-  }
-
-  :global(:root:not([data-theme-choice])) .theme-icon.auto,
-  :global(:root[data-theme-choice="auto"]) .theme-icon.auto,
-  :global(:root[data-theme-choice="light"]) .theme-icon.light,
-  :global(:root[data-theme-choice="dark"]) .theme-icon.dark {
-    display: grid;
   }
 
   .visually-hidden {

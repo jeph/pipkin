@@ -1,0 +1,132 @@
+/* Pipkin's fonts and themes, shared by the landing page (global.css) and the guide (docs.css). The colors are those of
+   app/src/main/kotlin/io/jeph/pipkin/ui/theme/PipkinColors.kt.
+
+   With no theme picked, the page follows the system like the app's System theme: Porcelain in light mode, Stone in
+   dark mode, through light-dark(). A picked theme sets data-palette on the root (see scripts/theme-init.js): Porcelain
+   and Stone only pin the color scheme, and the other themes replace every color. */
+
+/* Manrope 4.505 (https://github.com/googlefonts/manrope), SIL Open Font License 1.1: see assets/fonts/OFL.txt, served
+   with the site's other notices in public/licenses.txt. Subset to Latin from the variable copy Pipkin bundles in
+   app/src/main/res/font. */
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("../assets/fonts/manrope.woff2") format("woff2");
+}
+
+/* JetBrains Mono 2.304 (https://github.com/JetBrains/JetBrainsMono), SIL Open Font License 1.1, subset to Latin from
+   the copy Pipkin bundles in app/src/main/res/font. */
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("../assets/fonts/jetbrains-mono-bold.woff2") format("woff2");
+}
+
+:root {
+  color-scheme: light dark;
+
+  --sans: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Porcelain, then Stone. */
+  --page: light-dark(#f6f7fb, #1c1d20);
+  --surface-1: light-dark(#ebeef7, #25262a);
+  --surface-2: light-dark(#dfe3f0, #2f3035);
+  --surface-3: light-dark(#ccd2e6, #3c3d43);
+  --border: light-dark(#d9deed, #2c2d32);
+  --border-strong: light-dark(#ccd2e6, #3c3d43);
+  --fg: light-dark(#111633, #ededf0);
+  --muted: light-dark(#565d7a, #a9aab3);
+  --faint: light-dark(#959bb5, #74757e);
+  --accent: light-dark(#2f4bd8, #b79cff);
+  --accent-fg: light-dark(#ffffff, #1a0e3d);
+  --accent-soft: light-dark(#2f4bd817, #b79cff29);
+  --success: light-dark(#157a4a, #5ed39a);
+  --danger: light-dark(#c42b3c, #ff6e80);
+  --warning: light-dark(#875700, #f5cd52);
+  --info: light-dark(#0b6b78, #5ccfe0);
+  --extension: light-dark(#8a3fc4, #ff8fcf);
+}
+
+:root[data-palette="porcelain"] {
+  color-scheme: light;
+}
+
+:root[data-palette="stone"] {
+  color-scheme: dark;
+}
+
+:root[data-palette="clay"] {
+  color-scheme: light;
+  --page: #fbf5ec;
+  --surface-1: #f3eadd;
+  --surface-2: #eadfce;
+  --surface-3: #ddcfbb;
+  --border: #e6d9c6;
+  --border-strong: #ddcfbb;
+  --fg: #2b1f18;
+  --muted: #6e5d53;
+  --faint: #a6968a;
+  --accent: #a64426;
+  --accent-fg: #fff8f1;
+  --accent-soft: #a644261a;
+  --success: #2a644d;
+  --danger: #b0203c;
+  --warning: #7a6000;
+  --info: #25676a;
+  --extension: #7a4789;
+}
+
+:root[data-palette="cobalt"] {
+  color-scheme: dark;
+  --page: #0c0f1a;
+  --surface-1: #141828;
+  --surface-2: #1c2236;
+  --surface-3: #2a3150;
+  --border: #222944;
+  --border-strong: #2a3150;
+  --fg: #e8ebf7;
+  --muted: #9ca3bf;
+  --faint: #636a88;
+  --accent: #7c9cff;
+  --accent-fg: #0a1240;
+  --accent-soft: #7c9cff24;
+  --success: #5fd49a;
+  --danger: #ff6b7a;
+  --warning: #ffc94d;
+  --info: #5ed3e6;
+  --extension: #d49cff;
+}
+
+:root[data-palette="obsidian"] {
+  color-scheme: dark;
+  --page: #0b0b0c;
+  --surface-1: #141416;
+  --surface-2: #1d1d20;
+  --surface-3: #29292d;
+  --border: #212124;
+  --border-strong: #29292d;
+  --fg: #ececef;
+  --muted: #a3a3ab;
+  --faint: #686870;
+  --accent: #ff8a3d;
+  --accent-fg: #1f0c00;
+  --accent-soft: #ff8a3d24;
+  --success: #62d196;
+  --danger: #ff5c70;
+  --warning: #f7d04a;
+  --info: #5ccbdb;
+  --extension: #c9a0ff;
+}

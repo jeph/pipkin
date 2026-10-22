@@ -115,11 +115,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 
-== JetBrains Mono (https://github.com/JetBrains/JetBrainsMono), SIL Open Font License 1.1 ==
+== JetBrains Mono (https://github.com/JetBrains/JetBrainsMono) and Manrope (https://github.com/googlefonts/manrope), SIL Open Font License 1.1 ==
 
-The site serves a Latin subset of the font.
+The site serves Latin subsets of both fonts.
 
 Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+Copyright 2018 The Manrope Project Authors (https://github.com/googlefonts/manrope)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

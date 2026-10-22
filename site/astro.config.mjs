@@ -24,7 +24,12 @@ export default defineConfig({
         { tag: "meta", attrs: { property: "og:image", content: new URL("/og.png", site).href } },
         { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" } },
       ],
-      customCss: ["./src/styles/docs.css"],
+      // The guide uses the landing page's fonts, themes and theme menu.
+      customCss: ["./src/styles/theme.css", "./src/styles/docs.css"],
+      components: {
+        ThemeProvider: "./src/components/DocsThemeProvider.astro",
+        ThemeSelect: "./src/components/ThemeSelect.astro",
+      },
       markdown: { processedDirs: ["../docs/"] },
       // Starlight's 404 page would answer for the whole site, landing page included, so Vercel's default stays.
       disable404Route: true,

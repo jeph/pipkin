@@ -1,67 +1,10 @@
-/* JetBrains Mono 2.304 (https://github.com/JetBrains/JetBrainsMono), SIL Open Font License 1.1: see
-   assets/fonts/OFL.txt, served with the site's other notices in public/licenses.txt. Subset to Latin from the copy
-   Pipkin bundles in app/src/main/res/font. */
-/* Colors follow Pipkin's own palette in app/src/main/kotlin/io/jeph/pipkin/ui/theme/PipkinColors.kt. */
-@font-face {
-  font-family: "JetBrains Mono";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("../assets/fonts/jetbrains-mono-regular.woff2") format("woff2");
-}
-
-@font-face {
-  font-family: "JetBrains Mono";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("../assets/fonts/jetbrains-mono-bold.woff2") format("woff2");
-}
-
+/* The landing page's base styles. Fonts and colors come from theme.css, which Base.astro loads first. */
 :root {
-  color-scheme: dark light;
-
-  --page: light-dark(#fbf7f1, #141716);
-  --surface-1: light-dark(#fafafa, #1e2120);
-  --surface-2: light-dark(#f4f4f5, #272a29);
-  --border: light-dark(#e7e1d8, #252b2a);
-  --border-strong: light-dark(#ddd5ca, #2f3534);
-  --fg: light-dark(#1a1a1e, #fafafa);
-  --muted: light-dark(#5f5f68, #a1a5a4);
-  --accent: light-dark(#bd5132, #dd774e);
-  /* White on the dark theme's lighter accent is below WCAG AA, so dark text sits on it there. */
-  --accent-fg: light-dark(#ffffff, #141716);
-  --accent-soft: light-dark(#f7e4da, #2c201b);
-  --success: light-dark(#299f51, #35c264);
-  --cream: #fff0d9;
-  --steam: #315e48;
-
-  /* The phone mock always shows Pipkin's dark theme, whatever the page theme. */
-  --app-bg: #181b1a;
-  --app-surface-1: #1e2120;
-  --app-surface-3: #434645;
-  --app-border: #252b2a;
-  --app-fg: #fafafa;
-  --app-muted: #a1a5a4;
-  --app-accent: #dd774e;
-
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
-
   --radius: 12px;
   --radius-lg: 20px;
   --content: 1120px;
   --gutter: clamp(20px, 5vw, 40px);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* A theme picked in the nav's theme menu overrides the system's; Base.astro sets data-theme. */
-:root[data-theme="dark"] {
-  color-scheme: dark;
-}
-
-:root[data-theme="light"] {
-  color-scheme: light;
 }
 
 *,
@@ -98,10 +41,9 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-family: var(--mono);
-  font-weight: 700;
-  line-height: 1.15;
-  letter-spacing: -0.03em;
+  font-weight: 800;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
   text-wrap: balance;
 }
 
@@ -148,9 +90,9 @@ kbd {
   align-items: center;
   gap: 8px;
   color: var(--accent);
-  font-family: var(--mono);
   font-size: 13px;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -162,7 +104,7 @@ kbd {
   min-height: 46px;
   padding: 0 20px;
   border: 1px solid transparent;
-  border-radius: var(--radius);
+  border-radius: 999px;
   font-family: var(--sans);
   font-size: 16px;
   font-weight: 600;

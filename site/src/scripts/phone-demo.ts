@@ -3,7 +3,8 @@
 
 const TIMER_SECONDS_PER_TICK = 1;
 const TIMER_TICK_MS = 190;
-const FINAL_SECONDS = 72;
+/** The run's length once it's done, as the app words it; the markup shows it too. */
+const FINAL_DURATION = "1m 12s";
 
 export function playDemo(phone: HTMLElement): void {
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -16,11 +17,16 @@ export function playDemo(phone: HTMLElement): void {
   const widget = part("widget");
   const timer = part("timer");
   const notification = part("notify");
+  const fold = part("fold");
+  const count = part("count");
   const replyStep = part("reply");
   const reply = replyStep.querySelector<HTMLElement>("[data-reply]")!;
   const tools = [...phone.querySelectorAll<HTMLElement>('[data-part="tool"]')];
-  const prompt = sent.textContent!.trim();
+  const prompt = sent.querySelector(".prompt-text")!.textContent!.trim();
   const replyWords = parseReply(reply.dataset.reply!);
+  const setCount = (steps: number) => {
+    count.textContent = `${steps} ${steps === 1 ? "step" : "steps"}`;
+  };
 
   let onScreen = false;
   // While the phone is off screen or the tab is hidden, every sleeper waits on the same gate.
@@ -51,7 +57,7 @@ export function playDemo(phone: HTMLElement): void {
   let ticking = false;
   const tick = async () => {
     while (ticking) {
-      timer.textContent = formatElapsed(seconds);
+      timer.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
       await sleep(TIMER_TICK_MS);
       seconds += TIMER_SECONDS_PER_TICK;
     }
@@ -64,7 +70,7 @@ export function playDemo(phone: HTMLElement): void {
     empty.classList.remove("off");
     widget.classList.remove("on");
     notification.classList.remove("on");
-    for (const step of [sent, replyStep, ...tools]) step.classList.remove("on", "busy");
+    for (const step of [sent, fold, replyStep, ...tools]) step.classList.remove("on");
     typed.textContent = "";
     reply.replaceChildren();
     timer.textContent = "";
@@ -93,15 +99,19 @@ export function playDemo(phone: HTMLElement): void {
     void tick();
     await sleep(700);
 
+    phone.classList.add("working");
+    fold.classList.add("on");
     for (const [index, tool] of tools.entries()) {
-      tool.classList.add("on", "busy");
+      tools[index - 1]?.classList.remove("on");
+      tool.classList.add("on");
+      setCount(index + 1);
       if (index === 1) widget.classList.add("on");
-      await sleep(index === 0 || tool.dataset.failed !== undefined ? 1500 : 1050);
-      tool.classList.remove("busy");
-      setContext(4 + index * 1.2);
-      await sleep(180);
+      await sleep(index === 0 ? 1500 : 1150);
+      setContext(4 + index * 1.4);
     }
 
+    // A reply after the steps closes their fold; the run works on until the reply is written.
+    phone.classList.remove("working");
     replyStep.classList.add("on");
     for (const word of replyWords) {
       reply.append(word);
@@ -110,7 +120,8 @@ export function playDemo(phone: HTMLElement): void {
 
     ticking = false;
     phone.classList.remove("busy");
-    timer.textContent = formatElapsed(FINAL_SECONDS);
+    timer.textContent = FINAL_DURATION;
+
     await sleep(900);
     notification.classList.add("on");
     await sleep(3200);
@@ -158,9 +169,4 @@ function parseReply(source: string): Node[] {
     }
   }
   return nodes;
-}
-
-function formatElapsed(total: number): string {
-  if (total < 60) return `0:${String(total).padStart(2, "0")}`;
-  return `${Math.floor(total / 60)}m ${total % 60}s`;
 }

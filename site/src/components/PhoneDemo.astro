@@ -1,28 +1,28 @@
 ---
-// A hand-built replay of a Pipkin chat, drawn with the app's own layout, palette and icons so it stays sharp at any
-// size and weighs a few kilobytes instead of a video. Without JavaScript, or with reduced motion, it shows the
-// finished chat.
+// A hand-built replay of a Pipkin chat, drawn with the app's own layout, labels, icons and the page's theme, so it
+// stays sharp at any size and weighs a few kilobytes instead of a video. Without JavaScript, or with reduced motion,
+// it shows the finished chat.
 import Icon, { type IconName } from "./Icon.astro";
 import Logo from "./Logo.astro";
 
 const prompt = "Add a dark mode toggle to my notes app and make sure the tests still pass";
 
-interface Tool {
+interface Step {
   icon: IconName;
   name: string;
   detail: string;
-  failed?: boolean;
+  /** Lines added, shown at the end of the row as the app does. */
+  added?: number;
+  removed?: number;
 }
 
-// Each tool row runs for its own beat; a failing test run makes the agent go back and fix it.
-const tools: Tool[] = [
+// While the run works, the fold shows only the step running now, one after another.
+const steps: Step[] = [
   { icon: "brain", name: "Thinking", detail: "Planning the change" },
   { icon: "file_text", name: "Read", detail: "src/settings.tsx" },
-  { icon: "file_pen", name: "Edit", detail: "src/theme.ts" },
-  { icon: "file_pen", name: "Edit", detail: "src/settings.tsx" },
-  { icon: "terminal", name: "Shell", detail: "npm test", failed: true },
-  { icon: "brain", name: "Thinking", detail: "A snapshot still expects light colors" },
-  { icon: "file_pen", name: "Edit", detail: "src/settings.test.tsx" },
+  { icon: "file_pen", name: "Edit", detail: "src/theme.ts", added: 24, removed: 3 },
+  { icon: "file_pen", name: "Edit", detail: "src/settings.tsx", added: 11, removed: 2 },
+  { icon: "file_pen", name: "Write", detail: "src/settings.test.tsx", added: 18 },
   { icon: "terminal", name: "Shell", detail: "npm test" },
 ];
 
@@ -35,7 +35,7 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   class="phone"
   data-demo
   role="img"
-  aria-label="Pipkin on an Android phone: the agent reads code, edits files, runs the tests, fixes a failure, and reports back."
+  aria-label="Pipkin on an Android phone: the agent reads the code, edits files, writes a test, runs the tests, and reports back."
 >
   <div class="screen" aria-hidden="true">
     <div class="status">
@@ -57,51 +57,71 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     </div>
 
     <header class="appbar">
-      <Icon name="menu" size={18} />
+      <span class="appbar-mark"><Logo size={20} /></span>
       <div class="appbar-title">
         <span class="title-new">New chat</span>
         <span class="title-chat">Add a dark mode toggle</span>
-        <span class="appbar-folder">~/notes-app</span>
+        <span class="appbar-folder"><Icon name="folder" size={12} /> ~/notes-app</span>
       </div>
-      <span class="tab-count">1</span>
-      <Icon name="ellipsis" size={18} />
-      <Icon name="panel_right" size={18} />
+      <span class="round"><span class="tab-count">1</span></span>
+      <span class="round"><Icon name="panel_right" size={18} /></span>
     </header>
 
     <div class="timeline">
       <div class="empty" data-part="empty">
-        <span class="empty-mark"><Logo size={34} simmer /></span>
+        <span class="empty-mark"><Logo size={40} simmer /></span>
         <span>Message Pipkin to start</span>
       </div>
 
       <div class="step" data-part="sent">
         <div>
-          <div class="bubble">{prompt}</div>
+          <div class="prompt">
+            <div class="prompt-head">
+              <span class="you">You</span>
+              <span class="prompt-time">· 9:41 AM</span>
+              <Icon name="copy" size={13} />
+            </div>
+            <p class="prompt-text">{prompt}</p>
+          </div>
         </div>
       </div>
 
-      {
-        tools.map((tool) => (
-          <div class="step tool-step" data-part="tool" data-failed={tool.failed ? "" : undefined}>
-            <div>
-              <div class="tool">
-                <span class="tool-icon">
-                  <Icon name={tool.icon} size={14} />
-                  <span class="tool-busy">
-                    <Logo size={14} simmer />
-                  </span>
-                </span>
-                <span class="tool-name">{tool.name}</span>
-                <span class="tool-detail">{tool.detail}</span>
-              </div>
-            </div>
+      <div class="step" data-part="fold">
+        <div>
+          <div class="fold">
+            <span class="fold-icon">
+              <span class="while-working"><Logo size={16} simmer /></span>
+              <span class="once-done"><Icon name="check" size={16} /></span>
+            </span>
+            <span class="fold-summary">
+              <span class="fold-state"><span class="while-working">Working</span><span class="once-done">Done</span></span
+              >{" · "}<span data-part="count">{steps.length} steps</span>
+            </span>
+            <Icon name="chevron_down" size={14} />
           </div>
-        ))
-      }
+          <div class="current">
+            {
+              steps.map((step) => (
+                <div class="tool" data-part="tool">
+                  <Icon name={step.icon} size={16} />
+                  <span class="tool-name">{step.name}</span>
+                  <span class:list={["tool-detail", { summary: step.name === "Thinking" }]}>{step.detail}</span>
+                  {step.added !== undefined && <span class="added">+{step.added}</span>}
+                  {step.removed !== undefined && <span class="removed">−{step.removed}</span>}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </div>
 
       <div class="step" data-part="reply">
         <div>
           <p class="reply" data-reply={reply} set:html={replyHtml} />
+          <div class="reply-meta">
+            <Icon name="copy" size={13} />
+            <span>9:42 AM</span>
+          </div>
         </div>
       </div>
 
@@ -111,19 +131,18 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
       </div>
     </div>
 
-    <div class="widget-tab" data-part="widget">
-      <Icon name="square" size={12} />
-      Todos
-      <span class="dot"></span>
-    </div>
-
     <div class="composer">
+      <div class="widget-tab" data-part="widget">
+        <Icon name="panel_top" size={12} />
+        Todos
+        <span class="dot"></span>
+      </div>
       <div class="field">
         <span class="typed" data-part="typed"></span><span class="caret"></span>
         <span class="placeholder">Message Pipkin…</span>
       </div>
       <div class="controls">
-        <Icon name="plus" size={16} />
+        <span class="chip round-chip"><Icon name="plus" size={16} /></span>
         <span class="chip">Claude Sonnet</span>
         <span class="chip"><Icon name="brain" size={13} /> Medium</span>
         <span class="spacer"></span>
@@ -143,11 +162,11 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
         </svg>
         <span class="send">
           <Icon name="arrow_up" size={15} class="send-arrow" />
-          <span class="stop"></span>
+          <Icon name="square" size={13} class="send-stop" />
         </span>
       </div>
+      <div class="gesture"></div>
     </div>
-    <div class="gesture"></div>
   </div>
 </div>
 <script is:inline>
@@ -189,14 +208,18 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     height: 100%;
     overflow: hidden;
     border-radius: 38px;
-    background: var(--app-bg);
-    color: var(--app-fg);
-    font-family: Roboto, var(--sans);
+    background: var(--page);
+    color: var(--fg);
+    font-family: var(--sans);
     font-size: calc(14.5 * var(--dp));
     line-height: 1.45;
     text-align: start;
     -webkit-user-select: none;
     user-select: none;
+  }
+
+  .screen :global(svg) {
+    flex: none;
   }
 
   .status {
@@ -205,7 +228,7 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     align-items: center;
     padding: calc(14 * var(--dp)) calc(26 * var(--dp)) calc(4 * var(--dp));
     font-size: calc(13 * var(--dp));
-    font-weight: 500;
+    font-weight: 600;
   }
 
   .status-icons {
@@ -219,18 +242,40 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     height: calc(11 * var(--dp));
   }
 
+  /* Header: the pot on a tile, the chat's title over its folder, then the tabs and panel buttons. */
   .appbar {
     display: flex;
     align-items: center;
-    gap: calc(16 * var(--dp));
-    padding: calc(10 * var(--dp)) calc(18 * var(--dp));
-    border-bottom: 1px solid var(--app-border);
+    gap: calc(10 * var(--dp));
+    padding: calc(10 * var(--dp)) calc(12 * var(--dp)) calc(8 * var(--dp));
   }
 
-  .appbar svg {
+  .appbar-mark,
+  .round {
+    display: grid;
     flex: none;
-    width: calc(20 * var(--dp));
-    height: calc(20 * var(--dp));
+    place-items: center;
+    width: calc(36 * var(--dp));
+    height: calc(36 * var(--dp));
+    background: var(--surface-1);
+  }
+
+  .appbar-mark {
+    border-radius: calc(12 * var(--dp));
+  }
+
+  .appbar-mark :global(svg) {
+    width: calc(22 * var(--dp));
+    height: calc(22 * var(--dp));
+  }
+
+  .round {
+    border-radius: 50%;
+  }
+
+  .round :global(svg) {
+    width: calc(18 * var(--dp));
+    height: calc(18 * var(--dp));
   }
 
   .appbar-title {
@@ -245,7 +290,9 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   .title-chat {
     grid-area: 1 / 1;
     overflow: hidden;
-    font-size: calc(15 * var(--dp));
+    font-size: calc(17 * var(--dp));
+    font-weight: 800;
+    letter-spacing: -0.01em;
     white-space: nowrap;
     text-overflow: ellipsis;
     transition: opacity 0.35s ease;
@@ -256,19 +303,27 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   }
 
   .appbar-folder {
-    color: var(--app-muted);
+    display: flex;
+    align-items: center;
+    gap: calc(5 * var(--dp));
+    color: var(--muted);
     font-size: calc(12 * var(--dp));
+  }
+
+  .appbar-folder :global(svg) {
+    width: calc(12 * var(--dp));
+    height: calc(12 * var(--dp));
   }
 
   .tab-count {
     display: grid;
-    flex: none;
     place-items: center;
-    width: calc(17 * var(--dp));
-    height: calc(17 * var(--dp));
+    width: calc(16 * var(--dp));
+    height: calc(16 * var(--dp));
     border: 1.5px solid currentColor;
-    border-radius: calc(3 * var(--dp));
+    border-radius: calc(4 * var(--dp));
     font-size: calc(10 * var(--dp));
+    font-weight: 700;
     line-height: 1;
   }
 
@@ -279,7 +334,7 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     flex-direction: column;
     justify-content: flex-end;
     min-height: 0;
-    padding: 0 calc(16 * var(--dp)) calc(6 * var(--dp));
+    padding: 0 calc(14 * var(--dp)) calc(8 * var(--dp));
     overflow: hidden;
     mask-image: linear-gradient(to bottom, transparent, black calc(28 * var(--dp)));
   }
@@ -292,19 +347,21 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     align-items: center;
     justify-content: center;
     gap: calc(12 * var(--dp));
-    color: var(--app-muted);
+    color: var(--muted);
+    font-weight: 600;
     transition:
       opacity 0.35s ease,
       transform 0.5s var(--ease-out);
   }
 
+  /* The launcher's pot in the theme's accent on a wash of it, as the app's empty chat draws it. */
   .empty-mark {
     display: grid;
     place-items: center;
     width: calc(76 * var(--dp));
     height: calc(76 * var(--dp));
     border-radius: 50%;
-    background: var(--cream);
+    background: var(--accent-soft);
   }
 
   .empty-mark :global(svg) {
@@ -327,72 +384,156 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     overflow: hidden;
   }
 
-  .step > div > * {
-    margin-top: calc(8 * var(--dp));
+  .step > div > :first-child {
+    margin-top: calc(10 * var(--dp));
   }
 
-  .bubble {
-    margin-left: calc(28 * var(--dp));
-    margin-bottom: calc(10 * var(--dp));
-    padding: calc(12 * var(--dp)) calc(16 * var(--dp));
-    border-radius: calc(16 * var(--dp));
-    background: #454847;
-    font-size: calc(15 * var(--dp));
+  .prompt {
+    padding: calc(6 * var(--dp)) calc(14 * var(--dp)) calc(12 * var(--dp));
+    border-radius: calc(18 * var(--dp));
+    background: var(--surface-1);
   }
 
-  .tool {
+  .prompt-head {
     display: flex;
     align-items: center;
-    gap: calc(10 * var(--dp));
-    height: calc(38 * var(--dp));
-    padding: 0 calc(12 * var(--dp));
-    border-radius: calc(8 * var(--dp));
-    background: var(--app-surface-1);
-    white-space: nowrap;
-  }
-
-  .tool-icon {
-    position: relative;
-    display: grid;
-    flex: none;
-    place-items: center;
-    width: calc(16 * var(--dp));
-    height: calc(16 * var(--dp));
-    color: var(--app-muted);
-  }
-
-  .tool-icon :global(svg) {
-    grid-area: 1 / 1;
-    width: 100%;
-    height: 100%;
-    transition: opacity 0.25s ease;
-  }
-
-  .tool-busy {
-    grid-area: 1 / 1;
-    display: grid;
-    opacity: 0;
-    transition: opacity 0.25s ease;
-  }
-
-  .tool-name {
+    gap: calc(4 * var(--dp));
+    min-height: calc(26 * var(--dp));
+    color: var(--muted);
+    font-size: calc(10.5 * var(--dp));
     font-weight: 500;
   }
 
-  .tool-detail {
-    overflow: hidden;
-    color: var(--app-muted);
+  .you {
+    color: var(--accent);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .prompt-time {
+    flex: 1;
+  }
+
+  .prompt-head :global(svg),
+  .reply-meta :global(svg) {
+    width: calc(13 * var(--dp));
+    height: calc(13 * var(--dp));
+  }
+
+  .prompt-text {
+    font-size: calc(14.5 * var(--dp));
+  }
+
+  /* A run of steps folded into one line: Working with the step running now under it, then Done. */
+  .fold {
+    display: flex;
+    align-items: center;
+    gap: calc(8 * var(--dp));
+    min-height: calc(30 * var(--dp));
+    padding: 0 calc(4 * var(--dp));
+    font-size: calc(12.5 * var(--dp));
+    white-space: nowrap;
+  }
+
+  .fold > :global(svg) {
+    width: calc(14 * var(--dp));
+    height: calc(14 * var(--dp));
+    margin-left: auto;
+    color: var(--muted);
+  }
+
+  .fold-icon {
+    display: grid;
+    width: calc(16 * var(--dp));
+    height: calc(16 * var(--dp));
+  }
+
+  .fold-icon :global(svg) {
+    width: 100%;
+    height: 100%;
+  }
+
+  .fold-icon .once-done {
+    color: var(--success);
+  }
+
+  .fold-summary {
+    color: var(--muted);
+  }
+
+  .fold-state {
+    color: var(--fg);
+    font-weight: 600;
+  }
+
+  /* The fold's icon and state say Working while the steps run, then Done. */
+  .while-working,
+  .working .once-done {
+    display: none;
+  }
+
+  .working .while-working,
+  .once-done {
+    display: inline-flex;
+  }
+
+  .current {
+    display: grid;
+  }
+
+  .tool {
+    grid-area: 1 / 1;
+    display: flex;
+    align-items: center;
+    gap: calc(10 * var(--dp));
+    min-height: calc(32 * var(--dp));
+    padding: 0 calc(4 * var(--dp));
+    color: var(--muted);
+    white-space: nowrap;
+    transition: opacity 0.25s ease;
+  }
+
+  .tool > :global(svg) {
+    width: calc(16 * var(--dp));
+    height: calc(16 * var(--dp));
+  }
+
+  .tool-name {
+    color: var(--fg);
     font-size: calc(13.5 * var(--dp));
+    font-weight: 700;
+  }
+
+  .tool-detail {
+    flex: 1;
+    overflow: hidden;
+    font-family: var(--mono);
+    font-size: calc(12 * var(--dp));
     text-overflow: ellipsis;
   }
 
-  .tool-step[data-failed] .tool-name,
-  .tool-step[data-failed] .tool-icon {
-    color: #f7796d;
+  /* A thinking step's summary is prose; tools' paths and commands are code. */
+  .tool-detail.summary {
+    font-family: inherit;
+    font-size: calc(13 * var(--dp));
+  }
+
+  .added,
+  .removed {
+    font-family: var(--mono);
+    font-size: calc(12 * var(--dp));
+  }
+
+  .added {
+    color: var(--success);
+  }
+
+  .removed {
+    color: var(--danger);
   }
 
   .reply {
-    padding: calc(6 * var(--dp)) 0 calc(4 * var(--dp));
     font-size: calc(15 * var(--dp));
     line-height: 1.5;
   }
@@ -401,13 +542,23 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     font-weight: 700;
   }
 
+  .reply-meta {
+    display: flex;
+    align-items: center;
+    gap: calc(10 * var(--dp));
+    padding: calc(6 * var(--dp)) calc(4 * var(--dp)) 0;
+    color: var(--muted);
+    font-size: calc(12.5 * var(--dp));
+  }
+
   .run {
     display: flex;
     align-items: center;
     gap: calc(8 * var(--dp));
-    padding-top: calc(10 * var(--dp));
-    color: var(--app-muted);
-    font-size: calc(13 * var(--dp));
+    min-height: calc(28 * var(--dp));
+    padding: calc(4 * var(--dp)) calc(4 * var(--dp)) 0;
+    color: var(--muted);
+    font-size: calc(12 * var(--dp));
     font-variant-numeric: tabular-nums;
   }
 
@@ -415,19 +566,33 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     display: none;
   }
 
+  .run-mark :global(svg) {
+    width: calc(14 * var(--dp));
+    height: calc(14 * var(--dp));
+  }
+
+  /* Composer: a raised sheet with the widget tabs, the field and its controls. */
+  .composer {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: calc(10 * var(--dp)) calc(12 * var(--dp)) 0;
+    border-radius: calc(22 * var(--dp)) calc(22 * var(--dp)) 0 0;
+    background: var(--surface-1);
+  }
+
   .widget-tab {
     display: flex;
     align-items: center;
     gap: calc(6 * var(--dp));
     align-self: flex-start;
-    margin: 0 0 -1px calc(34 * var(--dp));
-    padding: calc(5 * var(--dp)) calc(12 * var(--dp));
-    border: 1px solid var(--app-surface-3);
-    border-bottom: 0;
-    border-radius: calc(12 * var(--dp)) calc(12 * var(--dp)) 0 0;
-    background: var(--app-bg);
-    color: var(--app-muted);
+    margin-bottom: calc(6 * var(--dp));
+    padding: calc(4 * var(--dp)) calc(12 * var(--dp));
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--muted);
     font-size: calc(12.5 * var(--dp));
+    font-weight: 600;
     transition: opacity 0.4s ease;
   }
 
@@ -437,31 +602,23 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   }
 
   .dot {
-    width: calc(5 * var(--dp));
-    height: calc(5 * var(--dp));
+    width: calc(6 * var(--dp));
+    height: calc(6 * var(--dp));
     border-radius: 50%;
-    background: var(--app-accent);
-  }
-
-  .composer {
-    position: relative;
-    margin: 0 calc(12 * var(--dp));
-    padding: calc(12 * var(--dp)) calc(14 * var(--dp)) calc(10 * var(--dp));
-    border: 1px solid var(--app-surface-3);
-    border-radius: calc(20 * var(--dp));
-    background: var(--app-bg);
+    background: var(--warning);
   }
 
   .field {
     position: relative;
     min-height: calc(22 * var(--dp));
+    padding: calc(6 * var(--dp)) calc(4 * var(--dp));
     font-size: calc(15 * var(--dp));
   }
 
   .placeholder {
     position: absolute;
-    inset: 0;
-    color: var(--app-muted);
+    inset: calc(6 * var(--dp)) calc(4 * var(--dp));
+    color: var(--muted);
     pointer-events: none;
   }
 
@@ -475,26 +632,26 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     height: 1.1em;
     margin-left: 1px;
     vertical-align: text-bottom;
-    background: var(--app-accent);
+    background: var(--accent);
   }
 
   .controls {
     display: flex;
     align-items: center;
-    gap: calc(16 * var(--dp));
-    margin-top: calc(14 * var(--dp));
-    font-size: calc(13.5 * var(--dp));
-  }
-
-  .controls > :global(svg) {
-    width: calc(18 * var(--dp));
-    height: calc(18 * var(--dp));
+    gap: calc(8 * var(--dp));
+    margin-top: calc(8 * var(--dp));
+    font-size: calc(13 * var(--dp));
+    font-weight: 600;
   }
 
   .chip {
     display: inline-flex;
     align-items: center;
     gap: calc(5 * var(--dp));
+    height: calc(32 * var(--dp));
+    padding: 0 calc(12 * var(--dp));
+    border-radius: 999px;
+    background: var(--surface-2);
     white-space: nowrap;
   }
 
@@ -503,14 +660,25 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     height: calc(14 * var(--dp));
   }
 
+  .round-chip {
+    justify-content: center;
+    width: calc(32 * var(--dp));
+    padding: 0;
+  }
+
+  .round-chip :global(svg) {
+    width: calc(16 * var(--dp));
+    height: calc(16 * var(--dp));
+  }
+
   .spacer {
     flex: 1;
   }
 
   .context {
-    width: calc(18 * var(--dp));
-    height: calc(18 * var(--dp));
-    color: var(--app-muted);
+    width: calc(20 * var(--dp));
+    height: calc(20 * var(--dp));
+    color: var(--muted);
   }
 
   .context-used {
@@ -518,42 +686,40 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     transition: stroke-dasharray 0.6s var(--ease-out);
   }
 
+  /* Send in the accent; Stop, while the run works, in the text color. */
   .send {
     position: relative;
     display: grid;
     flex: none;
     place-items: center;
-    width: calc(34 * var(--dp));
-    height: calc(34 * var(--dp));
+    width: calc(40 * var(--dp));
+    height: calc(40 * var(--dp));
     border-radius: 50%;
-    background: var(--app-accent);
-    color: #fff;
+    background: var(--accent);
+    color: var(--accent-fg);
     transition:
       background-color 0.25s ease,
-      transform 0.2s var(--ease-out);
+      color 0.25s ease;
   }
 
-  .send :global(.send-arrow) {
+  .send > :global(svg) {
+    grid-area: 1 / 1;
     width: calc(16 * var(--dp));
     height: calc(16 * var(--dp));
+    transition: opacity 0.2s ease;
   }
 
-  .stop {
-    position: absolute;
-    width: calc(11 * var(--dp));
-    height: calc(11 * var(--dp));
-    border: 1.5px solid #fff;
-    border-radius: calc(2 * var(--dp));
+  .send > :global(.send-stop) {
     opacity: 0;
   }
 
   .gesture {
     width: 34%;
     height: calc(4 * var(--dp));
-    margin: calc(10 * var(--dp)) auto calc(8 * var(--dp));
+    margin: calc(12 * var(--dp)) auto calc(8 * var(--dp));
     border-radius: 99px;
-    background: var(--app-muted);
-    opacity: 0.6;
+    background: var(--fg);
+    opacity: 0.5;
   }
 
   .notification {
@@ -566,8 +732,8 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     gap: calc(10 * var(--dp));
     padding: calc(12 * var(--dp)) calc(14 * var(--dp));
     border-radius: calc(22 * var(--dp));
-    background: #2c302f;
-    box-shadow: 0 calc(10 * var(--dp)) calc(30 * var(--dp)) rgb(0 0 0 / 0.45);
+    background: var(--surface-2);
+    box-shadow: 0 calc(10 * var(--dp)) calc(30 * var(--dp)) rgb(0 0 0 / 0.3);
     opacity: 0;
     transform: translateY(-120%);
     transition:
@@ -582,7 +748,7 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     width: calc(26 * var(--dp));
     height: calc(26 * var(--dp));
     border-radius: 50%;
-    background: var(--cream);
+    background: var(--accent-soft);
   }
 
   .notification-icon :global(svg) {
@@ -596,29 +762,27 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   }
 
   .notification-head {
-    color: var(--app-muted);
+    color: var(--muted);
     font-size: calc(11.5 * var(--dp));
   }
 
   .notification-title {
     overflow: hidden;
     font-size: calc(13.5 * var(--dp));
-    font-weight: 500;
+    font-weight: 700;
     white-space: nowrap;
     text-overflow: ellipsis;
   }
 
   .notification-text {
-    color: var(--app-muted);
+    color: var(--muted);
     font-size: calc(13 * var(--dp));
   }
 
-  /* The static, finished chat is the default. Once the script takes over it adds .playing and drives the parts. */
+  /* The static, finished chat is the default: the fold says Done and lists no running step. Once the script takes
+     over it adds .playing and drives the parts. */
+  .tool,
   .phone:not(.playing) .empty,
-  .phone:not(.playing) .widget-tab {
-    opacity: 0;
-  }
-
   .phone:not(.playing) .title-new {
     opacity: 0;
   }
@@ -647,7 +811,7 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   }
 
   .playing:not(.typing):not(.sent) .send {
-    background: color-mix(in srgb, var(--app-accent) 45%, var(--app-bg));
+    background: color-mix(in srgb, var(--accent) 45%, var(--surface-1));
   }
 
   .playing.sent .title-new {
@@ -658,11 +822,16 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     opacity: 1;
   }
 
-  .playing.busy .send :global(.send-arrow) {
+  .playing.busy .send {
+    background: var(--fg);
+    color: var(--page);
+  }
+
+  .playing.busy .send > :global(.send-arrow) {
     opacity: 0;
   }
 
-  .playing.busy .stop {
+  .playing.busy .send > :global(.send-stop) {
     opacity: 1;
   }
 
@@ -674,17 +843,18 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     opacity: 0;
   }
 
-  .playing .tool-step.busy .tool-icon > :global(svg) {
-    opacity: 0;
-  }
-
-  .playing .tool-step.busy .tool-busy {
+  .playing .tool.on {
     opacity: 1;
   }
 
-  .playing .tool-step.busy .tool-name,
-  .playing .tool-step.busy .tool-icon {
-    color: var(--app-fg);
+  /* The step running now shows only while the steps work; the reply after them closes the fold. */
+  .phone:not(.working) .current {
+    display: none;
+  }
+
+  /* A reply's copy button and time show once it's written. */
+  .playing.busy .reply-meta {
+    opacity: 0;
   }
 
   .notification.on {

@@ -2,27 +2,43 @@
 import type { ImageMetadata } from "astro";
 import { Picture } from "astro:assets";
 
+// Every screenshot is taken once in each of the app's themes, in assets/screens/<theme>/<name>.png, and the page shows
+// the one for the theme it's in. The others stay hidden, and lazy loading leaves hidden images unfetched.
+const THEMES = ["porcelain", "clay", "cobalt", "stone", "obsidian"] as const;
+const shots = import.meta.glob<ImageMetadata>("../assets/screens/*/*.png", { eager: true, import: "default" });
+
 interface Props {
-  src: ImageMetadata;
+  /** The file name in each theme's folder, without .png. */
+  name: string;
   alt: string;
   sizes?: string;
   class?: string;
 }
 
-const { src, alt, sizes = "(max-width: 720px) 90vw, 400px", class: className } = Astro.props;
+const { name, alt, sizes = "(max-width: 720px) 90vw, 400px", class: className } = Astro.props;
+const variants = THEMES.map((theme) => {
+  const src = shots[`../assets/screens/${theme}/${name}.png`];
+  if (!src) throw new Error(`Missing screenshot ${theme}/${name}.png`);
+  return { theme, src };
+});
 ---
 
 <figure class:list={["shot", className]}>
-  <Picture
-    src={src}
-    alt={alt}
-    formats={["avif"]}
-    fallbackFormat="webp"
-    widths={[360, 540, 720, 1080].filter((width) => width <= src.width)}
-    sizes={sizes}
-    loading="lazy"
-    decoding="async"
-  />
+  {
+    variants.map(({ theme, src }) => (
+      <Picture
+        class={theme}
+        src={src}
+        alt={alt}
+        formats={["avif"]}
+        fallbackFormat="webp"
+        widths={[360, 540, 720, 1080].filter((width) => width <= src.width)}
+        sizes={sizes}
+        loading="lazy"
+        decoding="async"
+      />
+    ))
+  }
 </figure>
 
 <style>
@@ -31,12 +47,34 @@ const { src, alt, sizes = "(max-width: 720px) 90vw, 400px", class: className } =
   }
 
   .shot :global(img) {
-    display: block;
+    display: none;
     width: 100%;
     height: auto;
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-lg);
-    background: var(--app-bg);
     box-shadow: 0 30px 60px -36px rgb(0 0 0 / 0.5);
+  }
+
+  /* With no theme picked, the page follows the system between Porcelain and Stone, like theme.css. */
+  :global(:root:not([data-palette])) .shot :global(img.porcelain) {
+    display: block;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-palette])) .shot :global(img.porcelain) {
+      display: none;
+    }
+
+    :global(:root:not([data-palette])) .shot :global(img.stone) {
+      display: block;
+    }
+  }
+
+  :global(:root[data-palette="porcelain"]) .shot :global(img.porcelain),
+  :global(:root[data-palette="clay"]) .shot :global(img.clay),
+  :global(:root[data-palette="cobalt"]) .shot :global(img.cobalt),
+  :global(:root[data-palette="stone"]) .shot :global(img.stone),
+  :global(:root[data-palette="obsidian"]) .shot :global(img.obsidian) {
+    display: block;
   }
 </style>

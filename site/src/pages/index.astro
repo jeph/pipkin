@@ -7,11 +7,6 @@ import Screenshot from "../components/Screenshot.astro";
 import Base from "../layouts/Base.astro";
 import { GITHUB_URL, PI_URL, TERMUX_URL } from "../site";
 
-import extensionSelect from "../assets/screens/extension-select.png";
-import fileView from "../assets/screens/file-view.png";
-import gitChanges from "../assets/screens/git-changes.png";
-import photos from "../assets/screens/photos.png";
-import todoWidget from "../assets/screens/todo-widget.png";
 
 const title = "Pipkin: a coding agent that lives on your Android phone";
 const description =
@@ -187,12 +182,12 @@ Setting up git ...</span>
         </div>
         <div class="feature-media stacked-media" data-reveal style="--reveal-delay: 0.1s; --overlap: 12px">
           <Screenshot
-            src={extensionSelect}
+            name="extension-select"
             alt="A Pi extension asking where a build should go, shown as a native card with radio buttons and a Submit button"
           />
           <Screenshot
             class="stacked-front"
-            src={todoWidget}
+            name="todo-widget"
             alt="The bundled to-do extension's widget, showing three finished tasks above the composer"
             sizes="(max-width: 720px) 70vw, 300px"
           />
@@ -217,7 +212,7 @@ Setting up git ...</span>
         </div>
         <div class="feature-media captioned-media" data-reveal style="--reveal-delay: 0.1s">
           <Screenshot
-            src={fileView}
+            name="file-view"
             alt="A Python file open in Pipkin's file viewer with syntax highlighting and line numbers"
           />
           <p class="media-caption">
@@ -244,12 +239,12 @@ Setting up git ...</span>
         </div>
         <div class="feature-media stacked-media" data-reveal style="--reveal-delay: 0.1s">
           <Screenshot
-            src={gitChanges}
+            name="git-changes"
             alt="Pipkin's Changes view showing uncommitted git changes across three files, with added lines highlighted"
           />
           <Screenshot
             class="stacked-front"
-            src={photos}
+            name="photos"
             alt="Pipkin's reply after finding duplicate photos in the Camera folder and moving the extra copies to a Duplicates folder for review"
             sizes="(max-width: 720px) 70vw, 320px"
           />
@@ -534,14 +529,14 @@ Setting up git ...</span>
     font-size: 14px;
   }
 
-  /* Terminal */
+  /* Terminal, in the theme's colors */
   .terminal {
     width: min(480px, 100%);
     overflow: hidden;
-    border: 1px solid #2f3534;
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-lg);
-    background: #181b1a;
-    color: #fafafa;
+    background: var(--surface-1);
+    color: var(--fg);
     box-shadow: 0 30px 60px -36px rgb(0 0 0 / 0.55);
   }
 
@@ -550,16 +545,12 @@ Setting up git ...</span>
     align-items: center;
     gap: 7px;
     padding: 12px 16px;
-    border-bottom: 1px solid #252b2a;
-  }
-
-  .terminal-bar :global(svg) {
-    color: #a1a5a4;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted);
   }
 
   .terminal-bar em {
     margin-left: 10px;
-    color: #a1a5a4;
     font-family: var(--mono);
     font-size: 12px;
     font-style: normal;
@@ -578,19 +569,19 @@ Setting up git ...</span>
   }
 
   .prompt {
-    color: #b5bd68;
+    color: var(--success);
   }
 
   .root {
-    color: #f7796d;
+    color: var(--danger);
   }
 
   .dim {
-    color: #717574;
+    color: var(--faint);
   }
 
   .accent {
-    color: #dd774e;
+    color: var(--accent);
   }
 
   .cursor {
@@ -599,7 +590,7 @@ Setting up git ...</span>
     height: 1.15em;
     margin-left: 2px;
     vertical-align: text-bottom;
-    background: #fafafa;
+    background: var(--fg);
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -733,13 +724,14 @@ Setting up git ...</span>
     text-align: center;
   }
 
+  /* The pot in the theme's accent on a wash of it, like the app's empty chat. */
   .closing-mark {
     display: grid;
     place-items: center;
     width: 96px;
     height: 96px;
-    border-radius: 26px;
-    background: var(--cream);
+    border-radius: 50%;
+    background: var(--accent-soft);
   }
 
   .closing h2 {
@@ -767,8 +759,7 @@ Setting up git ...</span>
     align-items: center;
     gap: 8px;
     color: var(--fg);
-    font-family: var(--mono);
-    font-weight: 700;
+    font-weight: 800;
     text-decoration: none;
   }
 
