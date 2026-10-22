@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
@@ -28,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.ModelConfig
 import io.jeph.pipkin.ui.chat.thinkingLevelLabel
+import io.jeph.pipkin.ui.components.PillButton
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -79,7 +79,7 @@ internal fun ModelEditorScreen(draft: ModelDraft, modelId: String, onBack: () ->
     ) {
       Text(stringResource(R.string.model_remove))
     }
-    Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.models_done)) }
+    PillButton(label = stringResource(R.string.models_done), onClick = onBack, modifier = Modifier.fillMaxWidth())
   }
 }
 
@@ -137,6 +137,8 @@ private fun PriceField(@StringRes label: Int, value: String, modifier: Modifier,
     value = value,
     onValueChange = onValueChange,
     modifier = modifier,
+    shape = SettingsFieldShape,
+    colors = settingsFieldColors(),
     label = { Text(stringResource(label)) },
     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
     singleLine = true,
@@ -158,6 +160,8 @@ private fun LabeledField(
       value = value,
       onValueChange = onValueChange,
       modifier = Modifier.fillMaxWidth(),
+      shape = SettingsFieldShape,
+      colors = settingsFieldColors(),
       placeholder = placeholder?.let { { Text(it) } },
       supportingText = error?.let { { Text(it) } },
       isError = error != null,

@@ -1,10 +1,11 @@
 package io.jeph.pipkin.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,8 +17,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
@@ -135,13 +138,12 @@ private fun SubscriptionModels(
     onOpenModel = onOpenModel,
   )
   form.formError?.let { SettingsCaption(text = it, color = pipkinColors.destructive) }
-  Button(onClick = onSave, modifier = Modifier.fillMaxWidth(), enabled = form.canSave) {
-    if (form.saving) {
-      SimmeringPot(tint = pipkinColors.accentForeground)
-    } else {
-      Text(stringResource(R.string.provider_save))
-    }
-  }
+  SettingsSaveButton(
+    label = stringResource(R.string.provider_save),
+    saving = form.saving,
+    enabled = form.canSave,
+    onClick = onSave,
+  )
   SettingsSection(title = null) {
     SettingsRow(
       title = stringResource(if (usesApiKey) R.string.settings_remove_key else R.string.settings_sign_out),
@@ -181,14 +183,19 @@ private fun SubscriptionStatus(loading: Boolean, signedIn: Boolean?, usesApiKey:
 private fun SignedInBadge(label: String) {
   val colors = pipkinColors
   Row(
+    modifier = Modifier
+      .clip(CircleShape)
+      .background(colors.successSoft)
+      .padding(horizontal = PipkinTokens.Spacing.s8, vertical = PipkinTokens.Spacing.s4),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
   ) {
     StatusDot(color = colors.dotSuccess)
     Text(
       text = label,
-      color = colors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.base,
+      color = colors.foreground,
+      fontSize = PipkinTokens.FontSize.sm,
+      fontWeight = FontWeight.SemiBold,
     )
   }
 }

@@ -3,8 +3,6 @@ package io.jeph.pipkin.ui.auth
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.material3.Button
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,6 +20,8 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.PillButton
+import io.jeph.pipkin.ui.components.PillTone
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -135,7 +135,7 @@ private fun PluginStepContent(step: PluginStep, onSkip: () -> Unit, onInstall: (
 @Composable
 private fun PluginActions(onSkip: () -> Unit, onInstall: () -> Unit) {
   Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
-    OutlinedButton(onClick = onSkip) { Text(stringResource(R.string.claude_plugin_skip)) }
-    Button(onClick = onInstall) { Text(stringResource(R.string.claude_plugin_install)) }
+    PillButton(label = stringResource(R.string.claude_plugin_skip), onClick = onSkip, tone = PillTone.Tonal)
+    PillButton(label = stringResource(R.string.claude_plugin_install), onClick = onInstall)
   }
 }

@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.onboarding
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -24,8 +26,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
+import io.jeph.pipkin.ui.components.PillButton
+import io.jeph.pipkin.ui.components.PillTone
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -124,8 +129,12 @@ private fun PageHeading(tag: String?, title: String, body: String) {
     tag?.let {
       Text(
         text = it.uppercase(),
-        color = colors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.sm,
+        modifier = Modifier
+          .background(colors.accentSoft, CircleShape)
+          .padding(horizontal = PipkinTokens.Spacing.s8, vertical = PipkinTokens.Spacing.s2),
+        color = colors.accent,
+        fontSize = TAG_SIZE,
+        fontWeight = FontWeight.Bold,
         letterSpacing = TAG_SPACING,
       )
     }
@@ -133,7 +142,8 @@ private fun PageHeading(tag: String?, title: String, body: String) {
       text = title,
       color = colors.foreground,
       fontSize = TITLE_SIZE,
-      fontWeight = FontWeight.SemiBold,
+      fontWeight = FontWeight.ExtraBold,
+      letterSpacing = TITLE_TRACKING,
       textAlign = TextAlign.Center,
     )
     Text(
@@ -157,11 +167,12 @@ internal fun ColumnScope.StepButtons(spec: StepSpec, onContinue: () -> Unit, onS
     if (index == 0) {
       WizardPrimary(button.label, button.onClick, button.enabled)
     } else {
-      SecondaryButton(
-        button.label,
-        button.onClick,
-        Modifier.fillMaxWidth().heightIn(min = BUTTON_HEIGHT),
-        button.enabled,
+      PillButton(
+        label = button.label,
+        onClick = button.onClick,
+        modifier = Modifier.fillMaxWidth(),
+        tone = PillTone.Tonal,
+        enabled = button.enabled,
       )
     }
   }
@@ -175,19 +186,20 @@ internal fun ColumnScope.StepButtons(spec: StepSpec, onContinue: () -> Unit, onS
   }
 }
 
-/** A page's main action, full width. */
+/** A page's main action, a full-width filled pill. */
 @Composable
 internal fun WizardPrimary(text: String, onClick: () -> Unit, enabled: Boolean = true) {
-  PrimaryButton(text, onClick, Modifier.fillMaxWidth().heightIn(min = BUTTON_HEIGHT), enabled)
+  PillButton(label = text, onClick = onClick, modifier = Modifier.fillMaxWidth(), enabled = enabled)
 }
 
 private val TOP_BAR_HEIGHT = 56.dp
 private val BAR_BUTTON_SIZE = 40.dp
-private val BUTTON_HEIGHT = 48.dp
 private val PAGE_MAX_WIDTH = 480.dp
 private val ILLUSTRATED_MIN_HEIGHT = 480.dp
 
 // Larger than the app's type scale: each page has one title, which carries the page.
 private val TITLE_SIZE = 24.sp
 private val BODY_LINE_HEIGHT = 22.sp
-private val TAG_SPACING = 1.sp
+private val TITLE_TRACKING = (-0.025).em
+private val TAG_SIZE = 11.sp
+private val TAG_SPACING = 0.06.em

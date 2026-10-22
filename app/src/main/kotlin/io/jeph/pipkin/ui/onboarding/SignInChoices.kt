@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
@@ -32,7 +33,7 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 @Composable
 internal fun SignInChoices(authStatus: AuthStatus?, enabled: Boolean, onAction: (SetupAction) -> Unit) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.lg)
+  val shape = RoundedCornerShape(PipkinTokens.Radius.xl)
   Column(
     modifier = Modifier.fillMaxWidth().background(colors.surface1, shape).padding(vertical = PipkinTokens.Spacing.s4),
   ) {
@@ -65,7 +66,7 @@ private fun SignInRow(
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .heightIn(min = 48.dp)
+      .heightIn(min = 52.dp)
       .alpha(if (enabled) 1f else 0.5f)
       .clickable(enabled = enabled, onClick = onClick)
       .padding(horizontal = PipkinTokens.Spacing.s16),
@@ -78,6 +79,7 @@ private fun SignInRow(
       modifier = Modifier.weight(1f),
       color = colors.foreground,
       fontSize = PipkinTokens.FontSize.base,
+      fontWeight = FontWeight.SemiBold,
       // Two lines fit "OpenAI-compatible API" at the largest font size.
       maxLines = 2,
       overflow = TextOverflow.Ellipsis,

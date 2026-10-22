@@ -9,10 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
@@ -25,6 +25,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -44,6 +45,7 @@ import io.jeph.pipkin.ui.chat.ToolCallSheet
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.PillButton
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
@@ -198,7 +200,7 @@ private fun TranscriptBody(transcript: Transcript, onRetry: () -> Unit, onOpenTo
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
       Text(text = transcript.message, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.base)
-      TextButton(onClick = onRetry) { Text(stringResource(R.string.archive_retry), color = colors.accent) }
+      PillButton(label = stringResource(R.string.archive_retry), onClick = onRetry)
     }
 
     is Transcript.Loaded -> {
@@ -226,33 +228,45 @@ private fun TranscriptBody(transcript: Transcript, onRetry: () -> Unit, onOpenTo
   }
 }
 
-/** In place of the composer: the chat is archived and read only, with Restore unless its folder is gone. */
+/**
+ * In place of the composer: a card saying the chat is archived and read only, with Restore unless its folder is
+ * gone.
+ */
 @Composable
 private fun ReadOnlyBar(session: SessionInfo?, enabled: Boolean, onRestore: () -> Unit) {
   val colors = pipkinColors
   val restorable = session?.cwdExists == true
-  Column(modifier = Modifier.fillMaxWidth().background(colors.surface0).navigationBarsPadding()) {
-    HorizontalDivider(thickness = 1.dp, color = colors.border)
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(
-        horizontal = PipkinTokens.Spacing.s16,
-        vertical = PipkinTokens.Spacing.s12,
-      ),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .background(colors.surface0)
+      .navigationBarsPadding()
+      .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8)
+      .clip(RoundedCornerShape(PipkinTokens.Radius.xxl))
+      .background(colors.surface1)
+      .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s8, top = 10.dp, bottom = 10.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
+  ) {
+    Box(
+      modifier = Modifier.size(32.dp).clip(CircleShape).background(colors.surface2),
+      contentAlignment = Alignment.Center,
     ) {
       LucideIcon(icon = R.drawable.ic_lucide_archive, contentDescription = null, tint = colors.foregroundMuted)
-      Text(
-        text = stringResource(
-          if (session != null && !restorable) R.string.archive_read_only_missing else R.string.archive_read_only,
-        ),
-        modifier = Modifier.weight(1f),
-        color = if (session != null && !restorable) colors.destructive else colors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.sm,
-      )
-      Button(onClick = onRestore, enabled = enabled && restorable) {
-        Text(stringResource(R.string.archive_restore))
-      }
     }
+    Text(
+      text = stringResource(
+        if (session != null && !restorable) R.string.archive_read_only_missing else R.string.archive_read_only,
+      ),
+      modifier = Modifier.weight(1f),
+      color = if (session != null && !restorable) colors.destructive else colors.foregroundMuted,
+      fontSize = PipkinTokens.FontSize.meta,
+    )
+    PillButton(
+      label = stringResource(R.string.archive_restore),
+      onClick = onRestore,
+      enabled = enabled && restorable,
+      icon = R.drawable.ic_lucide_archive_restore,
+    )
   }
 }

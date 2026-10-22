@@ -4,36 +4,27 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.ModelConfig
 import io.jeph.pipkin.ui.components.DialogConfirm
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.PillButton
 import io.jeph.pipkin.ui.components.PipkinDialog
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SimmeringPot
@@ -109,7 +100,7 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
         }
       },
     )
-    Button(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.models_done)) }
+    PillButton(label = stringResource(R.string.models_done), onClick = onBack, modifier = Modifier.fillMaxWidth())
   }
 }
 
@@ -128,7 +119,13 @@ internal fun DiscardDialog(onDiscard: () -> Unit, onDismiss: () -> Unit) {
 
 @Composable
 internal fun FieldLabel(text: String, modifier: Modifier = Modifier) {
-  Text(text = text, modifier = modifier, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm)
+  Text(
+    text = text,
+    modifier = modifier,
+    color = pipkinColors.foregroundMuted,
+    fontSize = PipkinTokens.FontSize.sm,
+    fontWeight = FontWeight.SemiBold,
+  )
 }
 
 @Composable
@@ -143,7 +140,7 @@ internal fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> U
       color = pipkinColors.foreground,
       fontSize = PipkinTokens.FontSize.base,
     )
-    Switch(checked = checked, onCheckedChange = null)
+    SettingsSwitch(checked = checked)
   }
 }
 
@@ -211,6 +208,8 @@ private fun CustomModelField(input: CustomModelInput, onAdd: () -> Unit) {
         value = input.text,
         onValueChange = { input.text = it },
         modifier = Modifier.weight(1f),
+        shape = SettingsFieldShape,
+        colors = settingsFieldColors(),
         placeholder = { Text(stringResource(R.string.models_custom_hint)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { onAdd() }),

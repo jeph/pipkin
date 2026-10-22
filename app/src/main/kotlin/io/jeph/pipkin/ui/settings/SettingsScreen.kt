@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,7 +33,6 @@ import io.jeph.pipkin.data.BundledExtension
 import io.jeph.pipkin.data.PiExtensionUpdate
 import io.jeph.pipkin.data.PiExtensionUpdateOutcome
 import io.jeph.pipkin.data.Preferences
-import io.jeph.pipkin.ui.auth.LoginSheet
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.HeaderButton
@@ -48,7 +46,7 @@ import io.jeph.pipkin.ui.theme.ThemeMode
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
-/** Paseo-style settings: providers, agent, appearance, notifications, Termux, advanced and about cards under a header. */
+/** Settings: providers, agent, appearance, notifications, Termux, advanced and about cards under a header. */
 @Composable
 internal fun SettingsScreen(
   onBack: () -> Unit,
@@ -261,7 +259,7 @@ private fun ExtensionsSection(graph: AppGraph) {
           subtitle = stringResource(extension.summary),
           modifier = Modifier.toggleable(value = enabled, role = Role.Switch, onValueChange = toggle),
         ) {
-          Switch(checked = enabled, onCheckedChange = null)
+          SettingsSwitch(checked = enabled)
         }
       }
     }
@@ -316,7 +314,7 @@ private fun NotificationsSection(preferences: Preferences) {
         onValueChange = preferences::setInAppNotifications,
       ),
     ) {
-      Switch(checked = enabled, onCheckedChange = null)
+      SettingsSwitch(checked = enabled)
     }
   }
 }

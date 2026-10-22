@@ -21,9 +21,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.sagernet.libghostty.GhosttyExtraKeysState
@@ -47,7 +51,7 @@ private sealed interface BarKey {
   data object KeyboardToggle : BarKey
 }
 
-/** Paseo's compact two-row layout. */
+/** A compact two-row layout, so the terminal keeps most of the room above the keyboard. */
 private val ROWS = listOf(
   listOf(
     BarKey.Key(R.string.terminal_key_esc, KeyEvent.KEYCODE_ESCAPE),
@@ -87,11 +91,15 @@ internal fun TerminalKeyBar(
   val ctrl by extraKeys.ctrl.collectAsStateWithLifecycle()
   val alt by extraKeys.alt.collectAsStateWithLifecycle()
   Column(
-    modifier = modifier.fillMaxWidth().background(pipkinColors.surface1).padding(PipkinTokens.Spacing.s4),
-    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+    modifier = modifier
+      .fillMaxWidth()
+      .background(pipkinColors.surface1)
+      .topHairline(pipkinColors.border)
+      .padding(horizontal = PipkinTokens.Spacing.s6, vertical = PipkinTokens.Spacing.s6),
+    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
   ) {
     for (row in ROWS) {
-      Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4)) {
+      Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
         for (key in row) {
           when (key) {
             is BarKey.Key -> BarButton(
@@ -134,7 +142,15 @@ internal fun TerminalKeyBar(
   }
 }
 
-/** An armed modifier fills with the accent; a locked one also gets an outline. */
+/** A 1dp line along the top edge, setting a bar off from the terminal above it. */
+internal fun Modifier.topHairline(color: Color): Modifier = drawBehind {
+  drawRect(color = color, size = Size(size.width, 1.dp.toPx()))
+}
+
+/**
+ * A key on the bar. A modifier's three states read apart at a glance: off is a plain key, armed (for the next key
+ * only) is washed in the accent, and locked is filled with it.
+ */
 @Composable
 private fun RowScope.BarButton(
   label: String? = null,
@@ -144,28 +160,40 @@ private fun RowScope.BarButton(
   onClick: () -> Unit,
 ) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.md)
-  val active = sticky != StickyState.INACTIVE
-  val outline = if (sticky == StickyState.LOCKED) Modifier.border(2.dp, colors.foreground, shape) else Modifier
+  val shape = RoundedCornerShape(KEY_RADIUS)
+  val (background, content) = when (sticky) {
+    StickyState.INACTIVE -> colors.surface2 to colors.foreground
+    StickyState.ARMED -> colors.accentSoft to colors.accent
+    StickyState.LOCKED -> colors.accent to colors.accentForeground
+  }
+  val ring = if (sticky == StickyState.ARMED) {
+    Modifier.border(1.dp, colors.accent.copy(alpha = ARMED_RING_ALPHA), shape)
+  } else {
+    Modifier
+  }
   Box(
     modifier = Modifier
       .weight(1f)
       .height(36.dp)
       .clip(shape)
-      .background(if (active) colors.accent else colors.surface2)
-      .then(outline)
+      .background(background)
+      .then(ring)
       .clickable(onClick = onClick)
       .semantics { description?.let { contentDescription = it } },
     contentAlignment = Alignment.Center,
   ) {
     if (icon != null) {
-      LucideIcon(icon = icon, contentDescription = null, tint = colors.foreground)
+      LucideIcon(icon = icon, contentDescription = null, tint = content)
     } else if (label != null) {
       Text(
         text = label,
-        color = if (active) colors.accentForeground else colors.foreground,
-        fontSize = PipkinTokens.FontSize.sm,
+        color = content,
+        fontSize = PipkinTokens.FontSize.meta,
+        fontWeight = FontWeight.SemiBold,
       )
     }
   }
 }
+
+private val KEY_RADIUS = 10.dp
+private const val ARMED_RING_ALPHA = 0.5f

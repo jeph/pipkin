@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -140,6 +138,8 @@ private fun IdAndUrlFields(form: ProviderForm) {
       value = form.id,
       onValueChange = { form.id = it.trim() },
       modifier = Modifier.fillMaxWidth(),
+      shape = SettingsFieldShape,
+      colors = settingsFieldColors(),
       readOnly = form.editing,
       placeholder = { Text(stringResource(R.string.provider_id_hint)) },
       // The rule stays under a new provider's field and turns red when broken, so typing never adds or drops a line.
@@ -165,6 +165,8 @@ private fun IdAndUrlFields(form: ProviderForm) {
       value = form.baseUrl,
       onValueChange = { form.baseUrl = it },
       modifier = Modifier.fillMaxWidth(),
+      shape = SettingsFieldShape,
+      colors = settingsFieldColors(),
       placeholder = { Text(stringResource(R.string.provider_base_url_hint)) },
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
       singleLine = true,
@@ -181,6 +183,8 @@ private fun ApiKeyField(form: ProviderForm) {
       value = form.apiKey,
       onValueChange = { form.apiKey = it },
       modifier = Modifier.fillMaxWidth(),
+      shape = SettingsFieldShape,
+      colors = settingsFieldColors(),
       trailingIcon = {
         TextButton(onClick = { visible = !visible }) {
           Text(stringResource(if (visible) R.string.provider_hide_key else R.string.provider_show_key))
@@ -224,9 +228,12 @@ private fun ApiTypeField(form: ProviderForm) {
 private fun ProviderActions(form: ProviderForm, onSave: () -> Unit, onRemove: () -> Unit) {
   val colors = pipkinColors
   form.formError?.let { ErrorPanel(title = null, message = it) }
-  Button(onClick = onSave, modifier = Modifier.fillMaxWidth(), enabled = form.canSave) {
-    if (form.saving) SimmeringPot(tint = colors.accentForeground) else Text(stringResource(R.string.provider_save))
-  }
+  SettingsSaveButton(
+    label = stringResource(R.string.provider_save),
+    saving = form.saving,
+    enabled = form.canSave,
+    onClick = onSave,
+  )
   if (form.editing) {
     TextButton(
       onClick = onRemove,

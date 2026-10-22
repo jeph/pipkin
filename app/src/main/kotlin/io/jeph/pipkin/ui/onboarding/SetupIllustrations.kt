@@ -17,7 +17,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,7 +47,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -58,7 +56,7 @@ import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** A step's icon on a rounded tile; it turns into an accent check, with a small bounce, once the step is [done]. */
+/** A step's icon on a rounded accent-washed tile; it turns into an accent check, with a small bounce, once [done]. */
 @Composable
 internal fun IconTile(@DrawableRes icon: Int, done: Boolean, modifier: Modifier = Modifier) {
   val colors = pipkinColors
@@ -87,11 +85,8 @@ internal fun IconTile(@DrawableRes icon: Int, done: Boolean, modifier: Modifier 
         )
       }
     } else {
-      Box(
-        tile.background(colors.surface1, shape).border(1.dp, colors.border, shape),
-        contentAlignment = Alignment.Center,
-      ) {
-        LucideIcon(icon = icon, contentDescription = null, size = ICON_SIZE, tint = colors.foreground)
+      Box(tile.background(colors.accentSoft, shape), contentAlignment = Alignment.Center) {
+        LucideIcon(icon = icon, contentDescription = null, size = ICON_SIZE, tint = colors.accent)
       }
     }
   }
@@ -152,7 +147,6 @@ private fun PasteDemoTerminal(modifier: Modifier) {
       .clearAndSetSemantics { contentDescription = description }
       .graphicsLayer { alpha = fade(time.value, FADE_OUT_AT, CYCLE_MILLIS, from = 1f, to = 0f) }
       .background(colors.surface1, shape)
-      .border(1.dp, colors.border, shape)
       // The extra room on top is where the Paste bubble pops up.
       .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s16)
       .padding(top = PipkinTokens.Spacing.s16 + BUBBLE_ROOM),

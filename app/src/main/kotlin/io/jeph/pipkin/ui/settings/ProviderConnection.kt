@@ -22,6 +22,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
@@ -83,6 +84,7 @@ private fun ConnectionStatusRow(form: ProviderForm, onCheck: () -> Unit) {
         text = status.title,
         color = if (check is ConnectionCheck.Failed) colors.destructive else colors.foreground,
         fontSize = PipkinTokens.FontSize.base,
+        fontWeight = FontWeight.Medium,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )

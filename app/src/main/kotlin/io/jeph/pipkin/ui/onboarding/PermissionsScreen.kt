@@ -27,7 +27,7 @@ import io.jeph.pipkin.host.HostFailure
 import io.jeph.pipkin.termux.TermuxInstall
 import io.jeph.pipkin.termux.TermuxSetup
 import io.jeph.pipkin.ui.components.HeaderBar
-import io.jeph.pipkin.ui.components.RoundIconButton
+import io.jeph.pipkin.ui.components.HeaderButton
 import kotlinx.coroutines.launch
 
 /**
@@ -48,7 +48,7 @@ internal fun PermissionsScreen(onBack: () -> Unit) {
       HeaderBar(
         title = stringResource(R.string.settings_permissions),
         leading = {
-          RoundIconButton(
+          HeaderButton(
             icon = R.drawable.ic_lucide_chevron_left,
             contentDescription = stringResource(R.string.settings_back),
             onClick = onBack,

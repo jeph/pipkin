@@ -5,7 +5,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,7 +46,7 @@ import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** Paseo settings section: an optional 12sp muted title over a bordered surface1 card. */
+/** A settings section: an optional small bold muted label over a flat surface1 card. */
 @Composable
 internal fun SettingsSection(
   title: String?,
@@ -55,23 +54,15 @@ internal fun SettingsSection(
   content: @Composable ColumnScope.() -> Unit,
 ) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.lg)
+  val shape = RoundedCornerShape(PipkinTokens.Radius.xl)
   Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
-    if (title != null) {
-      Text(
-        text = title,
-        modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s4),
-        color = colors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.sm,
-      )
-    }
+    if (title != null) SectionLabel(title)
     Column(
       modifier =
         Modifier
           .fillMaxWidth()
           .clip(shape)
-          .background(colors.surface1)
-          .border(1.dp, colors.border, shape),
+          .background(colors.surface1),
       content = content,
     )
   }
@@ -99,7 +90,7 @@ internal fun SettingsRow(
     modifier =
       modifier
         .fillMaxWidth()
-        .heightIn(min = 56.dp)
+        .heightIn(min = 54.dp)
         .alpha(if (enabled) 1f else 0.5f)
         .then(if (onClick != null) Modifier.clickable(enabled = enabled, onClick = onClick) else Modifier)
         .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s8),
@@ -110,7 +101,7 @@ internal fun SettingsRow(
       Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) { leading() }
     }
     Column(modifier = Modifier.weight(1f)) {
-      Text(text = title, color = titleColor, fontSize = PipkinTokens.FontSize.base)
+      Text(text = title, color = titleColor, fontSize = PipkinTokens.FontSize.base, fontWeight = FontWeight.Medium)
       if (subtitle != null) {
         Text(
           text = subtitle,
@@ -157,12 +148,12 @@ internal fun ErrorPanel(
   standalone: Boolean = true,
 ) {
   val colors = pipkinColors
-  val wash = colors.destructive.copy(alpha = if (colors.isDark) DARK_ERROR_WASH else LIGHT_ERROR_WASH)
+  val wash = colors.dangerSoft
   Row(
     modifier =
       modifier
         .fillMaxWidth()
-        .background(wash, if (standalone) RoundedCornerShape(PipkinTokens.Radius.lg) else RectangleShape)
+        .background(wash, if (standalone) RoundedCornerShape(PANEL_RADIUS) else RectangleShape)
         .padding(
           start = if (standalone) PipkinTokens.Spacing.s12 else CARD_TEXT_START,
           top = PipkinTokens.Spacing.s12,
@@ -185,7 +176,7 @@ internal fun ErrorPanel(
           text = title,
           color = colors.foreground,
           fontSize = PipkinTokens.FontSize.base,
-          fontWeight = FontWeight.Medium,
+          fontWeight = FontWeight.SemiBold,
         )
       }
       // Without a title the message is the headline.
@@ -220,8 +211,7 @@ private fun ErrorDetail(detail: String) {
   }
 }
 
-private const val DARK_ERROR_WASH = 0.14f
-private const val LIGHT_ERROR_WASH = 0.08f
+private val PANEL_RADIUS = 16.dp
 private const val DETAIL_BACKGROUND_ALPHA = 0.7f
 
 /** Where a [SettingsRow]'s text starts after its leading icon: the row's padding, the 20dp icon box and the gap. */
@@ -263,7 +253,7 @@ internal fun <T> SegmentedControl(
   }
 }
 
-/** Paseo's dashed "add" row below a card. */
+/** A dashed "add" row below a card. */
 @Composable
 internal fun DashedActionRow(
   label: String,
@@ -272,15 +262,15 @@ internal fun DashedActionRow(
   modifier: Modifier = Modifier,
 ) {
   val colors = pipkinColors
-  val radius = PipkinTokens.Radius.lg
+  val radius = PANEL_RADIUS
   Row(
     modifier =
       modifier
         .fillMaxWidth()
-        .heightIn(min = 48.dp)
+        .heightIn(min = 52.dp)
         .drawBehind {
-          val stroke = 1.dp.toPx()
-          val dash = 4.dp.toPx()
+          val stroke = 1.5.dp.toPx()
+          val dash = 5.dp.toPx()
           drawRoundRect(
             color = colors.borderAccent,
             topLeft = Offset(stroke / 2, stroke / 2),
@@ -293,31 +283,39 @@ internal fun DashedActionRow(
         .clickable(onClick = onClick)
         .padding(horizontal = PipkinTokens.Spacing.s16),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
     LucideIcon(icon = icon, contentDescription = null, tint = colors.foregroundMuted)
-    Text(text = label, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.base)
+    Text(
+      text = label,
+      color = colors.foregroundMuted,
+      fontSize = PipkinTokens.FontSize.base,
+      fontWeight = FontWeight.SemiBold,
+    )
   }
 }
 
-/** Paseo's small outline button for row actions. */
+/** A small tonal pill for row actions. */
 @Composable
 internal fun SmallButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.xxl)
   Box(
     modifier =
       modifier
-        .heightIn(min = 28.dp)
-        .clip(shape)
+        .heightIn(min = 32.dp)
+        .clip(CircleShape)
         .background(colors.surface2)
-        .border(1.dp, colors.borderAccent, shape)
         .alpha(if (enabled) 1f else 0.5f)
         .clickable(enabled = enabled, onClick = onClick)
         .padding(horizontal = PipkinTokens.Spacing.s12),
     contentAlignment = Alignment.Center,
   ) {
-    Text(text = label, color = colors.foreground, fontSize = PipkinTokens.FontSize.sm)
+    Text(
+      text = label,
+      color = colors.foreground,
+      fontSize = PipkinTokens.FontSize.meta,
+      fontWeight = FontWeight.SemiBold,
+    )
   }
 }
 

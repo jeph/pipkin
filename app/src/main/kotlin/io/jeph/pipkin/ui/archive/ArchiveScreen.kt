@@ -4,6 +4,7 @@ import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,11 +18,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,11 +33,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -51,7 +50,6 @@ import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.HeaderButton
-import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SearchField
@@ -334,34 +332,36 @@ private fun ArchivedRow(
     selected -> stringResource(R.string.archive_deselect, title)
     else -> stringResource(R.string.archive_select, title)
   }
+  val shape = RoundedCornerShape(ROW_RADIUS)
+  val highlight = if (selected) {
+    Modifier.background(colors.accentSoft).border(1.5.dp, colors.accent.copy(alpha = SELECTED_RING_ALPHA), shape)
+  } else {
+    Modifier
+  }
   Row(
     modifier = modifier
       .fillMaxWidth()
-      .background(if (selected) colors.surface2 else Color.Transparent)
+      .padding(horizontal = PipkinTokens.Spacing.s8, vertical = PipkinTokens.Spacing.s2)
+      .clip(shape)
+      .then(highlight)
       .combinedClickable(onClickLabel = clickLabel, onClick = onClick, onLongClick = onLongClick)
       .heightIn(min = 56.dp)
       .padding(
-        start = PipkinTokens.Spacing.s16,
-        end = PipkinTokens.Spacing.s8,
+        start = PipkinTokens.Spacing.s12,
+        end = PipkinTokens.Spacing.s4,
         top = PipkinTokens.Spacing.s8,
         bottom = PipkinTokens.Spacing.s8,
       ),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
-    if (selecting) {
-      LucideIcon(
-        icon = if (selected) R.drawable.ic_lucide_circle_check else R.drawable.ic_lucide_circle,
-        contentDescription = null,
-        size = PipkinTokens.IconSize.lg,
-        tint = if (selected) colors.accent else colors.foregroundMuted,
-      )
-    }
+    if (selecting) SelectionCircle(selected)
     Column(modifier = Modifier.weight(1f)) {
       Text(
         text = title,
         color = colors.foreground,
         fontSize = PipkinTokens.FontSize.base,
+        fontWeight = FontWeight.SemiBold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
@@ -384,6 +384,9 @@ private fun ArchivedRow(
   }
 }
 
+private val ROW_RADIUS = 16.dp
+private const val SELECTED_RING_ALPHA = 0.5f
+
 /** The chat's folder with `~` for home, led by "Folder missing" once the folder is gone. */
 @Composable
 internal fun FolderLine(session: SessionInfo, home: String, modifier: Modifier = Modifier) {
@@ -404,40 +407,6 @@ internal fun FolderLine(session: SessionInfo, home: String, modifier: Modifier =
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )
-  }
-}
-
-/** Restore and Delete for the selection; Restore counts only chats whose folder still exists. */
-@Composable
-private fun BulkActions(
-  restoreCount: Int,
-  deleteCount: Int,
-  enabled: Boolean,
-  onRestore: () -> Unit,
-  onDelete: () -> Unit,
-) {
-  val colors = pipkinColors
-  Column(modifier = Modifier.fillMaxWidth().background(colors.surface0).navigationBarsPadding()) {
-    HorizontalDivider(thickness = 1.dp, color = colors.border)
-    Row(
-      modifier = Modifier.fillMaxWidth().padding(PipkinTokens.Spacing.s12),
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
-    ) {
-      OutlinedButton(onClick = onRestore, modifier = Modifier.weight(1f), enabled = enabled && restoreCount > 0) {
-        Text(stringResource(R.string.archive_restore_count, restoreCount))
-      }
-      Button(
-        onClick = onDelete,
-        modifier = Modifier.weight(1f),
-        enabled = enabled,
-        colors = ButtonDefaults.buttonColors(
-          containerColor = colors.destructive,
-          contentColor = colors.destructiveForeground,
-        ),
-      ) {
-        Text(stringResource(R.string.archive_delete_count, deleteCount))
-      }
-    }
   }
 }
 

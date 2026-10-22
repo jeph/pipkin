@@ -3,17 +3,19 @@ package io.jeph.pipkin.ui.auth
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,18 +35,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.PillButton
+import io.jeph.pipkin.ui.components.PillTone
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.settings.SettingsFieldShape
 import io.jeph.pipkin.ui.settings.copyToClipboard
+import io.jeph.pipkin.ui.settings.settingsFieldColors
 import io.jeph.pipkin.ui.settings.subscriptions
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -110,6 +121,7 @@ internal fun LoginSheet(providerId: String, onDismiss: () -> Unit) {
         text = provider?.let { stringResource(it.loginTitle) } ?: providerId,
         color = pipkinColors.foreground,
         fontSize = PipkinTokens.FontSize.lg,
+        fontWeight = FontWeight.Bold,
       )
       LoginBody(
         flow = flow,
@@ -136,7 +148,7 @@ private fun LoginBody(flow: LoginFlowState, usesApiKey: Boolean, onOpen: (String
       LeadingRow(text = outcome.message ?: stringResource(R.string.login_failed)) {
         LucideIcon(icon = R.drawable.ic_lucide_circle_alert, contentDescription = null, tint = colors.destructive)
       }
-      Button(onClick = onRetry) { Text(stringResource(R.string.login_try_again)) }
+      PillButton(label = stringResource(R.string.login_try_again), onClick = onRetry)
     }
 
     LoginOutcome.Running -> RunningContent(flow = flow, onOpen = onOpen)
@@ -177,7 +189,7 @@ private fun BrowserBlock(step: BrowserStep, onOpen: (String) -> Unit) {
     step.instructions?.let {
       Text(text = it, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.base)
     }
-    OutlinedButton(onClick = { onOpen(step.url) }) { Text(stringResource(R.string.login_open_again)) }
+    PillButton(label = stringResource(R.string.login_open_again), onClick = { onOpen(step.url) }, tone = PillTone.Tonal)
   }
 }
 
@@ -193,25 +205,38 @@ private fun DeviceCodeBlock(step: DeviceCodeStep, onOpen: (String) -> Unit) {
       fontSize = PipkinTokens.FontSize.base,
     )
     Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .background(colors.surface2, RoundedCornerShape(CODE_RADIUS))
+        .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s8)
+        .padding(vertical = PipkinTokens.Spacing.s12),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
     ) {
       Text(
         text = step.userCode,
+        modifier = Modifier.weight(1f),
         color = colors.foreground,
         fontFamily = PipkinFonts.mono,
-        fontSize = PipkinTokens.FontSize.xxl,
+        fontSize = CODE_SIZE,
+        fontWeight = FontWeight.Bold,
+        style = LocalTextStyle.current.merge(TextStyle(fontFeatureSettings = PipkinFonts.TABULAR)),
+        letterSpacing = CODE_TRACKING,
       )
       RoundIconButton(
         icon = R.drawable.ic_lucide_copy,
         contentDescription = copyLabel,
         onClick = { copyToClipboard(context, copyLabel, step.userCode) },
-        tint = colors.foregroundMuted,
+        modifier = Modifier.size(36.dp),
+        background = colors.surface3,
+        tint = colors.foreground,
       )
     }
-    OutlinedButton(onClick = { onOpen(step.verificationUri) }) {
-      Text(stringResource(R.string.login_open_uri, step.verificationUri))
-    }
+    PillButton(
+      label = stringResource(R.string.login_open_uri, step.verificationUri),
+      onClick = { onOpen(step.verificationUri) },
+      tone = PillTone.Tonal,
+    )
   }
 }
 
@@ -238,6 +263,8 @@ private fun TextPrompt(prompt: PendingPrompt, onAnswer: (String) -> Unit) {
     value = value,
     onValueChange = { value = it },
     modifier = Modifier.fillMaxWidth(),
+    shape = SettingsFieldShape,
+    colors = settingsFieldColors(),
     placeholder = prompt.placeholder?.let { { Text(it) } },
     supportingText =
       if (prompt.type == "manual_code") {
@@ -249,9 +276,11 @@ private fun TextPrompt(prompt: PendingPrompt, onAnswer: (String) -> Unit) {
     keyboardOptions = KeyboardOptions(keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text),
     singleLine = true,
   )
-  Button(onClick = { onAnswer(value.trim()) }, enabled = value.isNotBlank()) {
-    Text(stringResource(R.string.login_continue))
-  }
+  PillButton(
+    label = stringResource(R.string.login_continue),
+    onClick = { onAnswer(value.trim()) },
+    enabled = value.isNotBlank(),
+  )
 }
 
 /** A 14sp line with a 16dp leading icon or spinner. */
@@ -265,6 +294,10 @@ internal fun LeadingRow(text: String, color: Color = pipkinColors.foreground, le
     Text(text = text, color = color, fontSize = PipkinTokens.FontSize.base)
   }
 }
+
+private val CODE_RADIUS = 14.dp
+private val CODE_SIZE = 24.sp
+private val CODE_TRACKING = 0.08.em
 
 private fun openUrl(context: Context, url: String): Boolean = try {
   context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))

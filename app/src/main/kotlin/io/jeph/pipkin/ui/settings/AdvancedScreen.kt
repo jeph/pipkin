@@ -3,8 +3,10 @@ package io.jeph.pipkin.ui.settings
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -17,6 +19,8 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -26,6 +30,7 @@ import io.jeph.pipkin.agent.IdleStop
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.RoundIconButton
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -73,14 +78,16 @@ private fun Stepper(value: Int, range: IntRange, onChange: (Int) -> Unit) {
   val colors = pipkinColors
   Row(
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
     RoundIconButton(
       icon = R.drawable.ic_lucide_minus,
       contentDescription = stringResource(R.string.settings_running_chats_fewer),
       onClick = { onChange(value - 1) },
+      modifier = Modifier.size(32.dp),
       enabled = value > range.first,
-      tint = colors.foregroundMuted,
+      background = colors.surface2,
+      tint = colors.foreground,
     )
     Text(
       text = value.toString(),
@@ -88,14 +95,18 @@ private fun Stepper(value: Int, range: IntRange, onChange: (Int) -> Unit) {
       modifier = Modifier.widthIn(min = 24.dp).semantics { liveRegion = LiveRegionMode.Polite },
       color = colors.foreground,
       fontSize = PipkinTokens.FontSize.base,
+      fontWeight = FontWeight.Bold,
+      style = LocalTextStyle.current.merge(TextStyle(fontFeatureSettings = PipkinFonts.TABULAR)),
       textAlign = TextAlign.Center,
     )
     RoundIconButton(
       icon = R.drawable.ic_lucide_plus,
       contentDescription = stringResource(R.string.settings_running_chats_more),
       onClick = { onChange(value + 1) },
+      modifier = Modifier.size(32.dp),
       enabled = value < range.last,
-      tint = colors.foregroundMuted,
+      background = colors.surface2,
+      tint = colors.foreground,
     )
   }
 }

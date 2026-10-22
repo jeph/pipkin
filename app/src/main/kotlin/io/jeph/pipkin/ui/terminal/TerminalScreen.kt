@@ -4,6 +4,7 @@ import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,10 +39,10 @@ import io.github.sagernet.libghostty.compose.GhosttyDialogs
 import io.github.sagernet.libghostty.compose.GhosttyTerminal
 import io.github.sagernet.libghostty.compose.rememberGhosttyTerminalState
 import io.jeph.pipkin.R
-import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.terminal.TerminalState
+import io.jeph.pipkin.ui.components.PillButton
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.PaneControls
@@ -51,8 +51,8 @@ import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
  * One terminal tab in a pane: the pane's header with the terminal's name over its folder and the terminal's actions,
- * which acts through [controls]; libghostty's terminal; and Paseo's key bar above the keyboard. An ended shell shows a
- * bar to start another.
+ * which acts through [controls]; libghostty's terminal; and a key bar above the keyboard. An ended shell shows a bar
+ * to start another.
  */
 @Composable
 internal fun TerminalScreen(session: TerminalSession, controls: PaneControls, modifier: Modifier = Modifier) {
@@ -177,9 +177,11 @@ private fun StatusBar(state: TerminalState, onRestart: () -> Unit) {
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .background(colors.surface2)
-      .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s4),
+      .background(colors.surface1)
+      .topHairline(colors.border)
+      .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s6),
     verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
     Text(
       text = message,
@@ -188,13 +190,7 @@ private fun StatusBar(state: TerminalState, onRestart: () -> Unit) {
       modifier = Modifier.weight(1f),
     )
     if (state != TerminalState.Starting) {
-      TextButton(onClick = onRestart) {
-        Text(
-          text = stringResource(R.string.terminal_restart),
-          color = colors.accent,
-          fontSize = PipkinTokens.FontSize.sm,
-        )
-      }
+      PillButton(label = stringResource(R.string.terminal_restart), onClick = onRestart)
     }
   }
 }
