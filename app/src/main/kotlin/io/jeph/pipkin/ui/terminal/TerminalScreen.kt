@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,39 +48,49 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.PaneHeader
+import io.jeph.pipkin.ui.workspace.PublishTabActions
+import io.jeph.pipkin.ui.workspace.TabAction
+import io.jeph.pipkin.ui.workspace.TabActionSet
 import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
- * One terminal tab in a pane: the pane's header with the terminal's name over its folder and the terminal's actions,
- * which acts through [controls]; libghostty's terminal; and a key bar above the keyboard. An ended shell shows a bar
- * to start another.
+ * One terminal tab in a pane: the pane's header with the terminal's name over its folder, which acts through
+ * [controls]; libghostty's terminal; and a key bar above the keyboard. An ended shell shows a bar to start another.
+ * What the terminal can do goes to the session sheet its title opens.
  */
 @Composable
 internal fun TerminalScreen(session: TerminalSession, controls: PaneControls, modifier: Modifier = Modifier) {
   val graph = LocalContext.current.appGraph
-  var actionsOpen by remember(session) { mutableStateOf(false) }
+  var dialog by rememberSaveable(session.id) { mutableStateOf<TerminalDialog?>(null) }
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    PaneHeader(
-      title = terminalTitle(session),
-      cwd = session.cwd,
-      controls = controls,
-      actionsDescription = stringResource(R.string.terminal_actions),
-      onActions = { actionsOpen = true },
-    )
+    PaneHeader(title = terminalTitle(session), cwd = session.cwd, controls = controls)
     // The terminal view and its key state are per session; a new session starts fresh.
     key(session) { TerminalPane(session, Modifier.weight(1f)) }
   }
   LaunchedEffect(session) { session.startOnce() }
 
-  if (actionsOpen) {
-    TerminalActionsSheet(
-      session = session,
-      onNewTerminal = { graph.terminals.open(controls.pane, session.cwd) },
-      onRestart = session::start,
-      onClose = { controls.onCloseTab(WorkspaceTab.Terminal(session)) },
-      onDismiss = { actionsOpen = false },
-    )
+  PublishTabActions(
+    controls.shownTab,
+    TabActionSet(
+      title = R.string.shell_this_terminal,
+      actions = listOf(
+        TabAction(R.string.terminal_new, R.drawable.ic_lucide_square_terminal, {
+          graph.terminals.open(controls.pane, session.cwd)
+        }),
+        TabAction(R.string.terminal_rename, R.drawable.ic_lucide_pencil, { dialog = TerminalDialog.Rename }),
+        TabAction(R.string.terminal_restart, R.drawable.ic_lucide_refresh_cw, session::start),
+        TabAction(
+          R.string.terminal_close,
+          R.drawable.ic_lucide_x,
+          { dialog = TerminalDialog.ConfirmClose },
+          destructive = true,
+        ),
+      ),
+    ),
+  )
+  dialog?.let {
+    TerminalDialogs(session, it, onClose = { controls.onCloseTab(WorkspaceTab.Terminal(session)) }) { dialog = null }
   }
 }
 

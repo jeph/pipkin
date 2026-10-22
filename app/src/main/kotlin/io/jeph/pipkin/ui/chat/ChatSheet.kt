@@ -4,8 +4,6 @@ import org.json.JSONObject
 
 /** The sheet or dialog the chat screen shows over the stream; at most one at a time. */
 internal sealed interface ChatSheet {
-  data object Actions : ChatSheet
-
   /** The model picker, its search starting at [query], with the thinking levels under it. */
   data class Model(val query: String = "") : ChatSheet
 

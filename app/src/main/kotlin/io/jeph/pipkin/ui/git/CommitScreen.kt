@@ -30,6 +30,9 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.PaneHeader
+import io.jeph.pipkin.ui.workspace.PublishTabActions
+import io.jeph.pipkin.ui.workspace.TabAction
+import io.jeph.pipkin.ui.workspace.TabActionSet
 import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
@@ -44,19 +47,23 @@ internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: M
   val state by commit.state.collectAsStateWithLifecycle()
   val hideWhitespace by graph.preferences.diffHideWhitespace.collectAsStateWithLifecycle()
   val wrapLines by graph.preferences.diffWrapLines.collectAsStateWithLifecycle()
-  var actionsOpen by remember(commit) { mutableStateOf(false) }
+  PublishTabActions(
+    controls.shownTab,
+    TabActionSet(
+      title = R.string.shell_this_commit,
+      actions = listOf(
+        TabAction(R.string.git_commit_close, R.drawable.ic_lucide_x, {
+          controls.onCloseTab(WorkspaceTab.Commit(commit))
+        }, destructive = true),
+      ),
+    ),
+  )
   // A fresh list per commit, so switching commits never carries the old one's scroll position over.
   val list = remember(commit) { LazyListState() }
   LaunchedEffect(commit, hideWhitespace) { commit.load(hideWhitespace) }
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    PaneHeader(
-      title = commit.title,
-      cwd = commit.cwd,
-      controls = controls,
-      actionsDescription = stringResource(R.string.git_commit_actions),
-      onActions = { actionsOpen = true },
-    )
+    PaneHeader(title = commit.title, cwd = commit.cwd, controls = controls)
     val body = Modifier.weight(1f)
     when (val shown = state) {
       CommitDiffState.Loading -> DiffNote(text = null, modifier = body, loading = true)
@@ -83,12 +90,6 @@ internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: M
         )
       }
     }
-  }
-
-  if (actionsOpen) {
-    CommitActionsSheet(onClose = {
-      controls.onCloseTab(WorkspaceTab.Commit(commit))
-    }, onDismiss = { actionsOpen = false })
   }
 }
 

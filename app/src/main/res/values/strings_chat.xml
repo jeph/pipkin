@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Header and actions sheet -->
+    <!-- Header and the session sheet's "This chat" section -->
     <string name="chat_new_chat">New chat</string>
     <string name="chat_toggle_sidebar">Workspaces</string>
-    <string name="chat_actions">Chat actions</string>
     <string name="chat_action_rename">Rename</string>
     <string name="chat_action_reload">Reload agent</string>
     <string name="chat_action_copy_path">Copy session path</string>

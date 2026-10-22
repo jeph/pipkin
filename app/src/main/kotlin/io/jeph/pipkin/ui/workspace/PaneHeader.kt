@@ -32,18 +32,16 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import java.text.NumberFormat
 
 /**
- * The header of a screen in a pane: the pot that toggles the sidebar; the [title] as the button that opens the tab
- * menu, with the number of tabs in the workspace folder [cwd]; the screen's actions; the explorer's toggle; and, in
- * the end-side pane, the button that closes split screen. Under the title is [folder], with `~` for the Termux home,
- * or the [status] extensions set while there is one.
+ * The header of a screen in a pane: the pot that toggles the sidebar; the [title] as the button that opens the session
+ * sheet, with the number of tabs in the workspace folder [cwd]; the explorer's toggle; and, in the end-side pane, the
+ * button that closes split screen. Under the title is [folder], with `~` for the Termux home, or the [status]
+ * extensions set while there is one.
  */
 @Composable
 internal fun PaneHeader(
   title: String,
   cwd: String,
   controls: PaneControls,
-  actionsDescription: String,
-  onActions: () -> Unit,
   modifier: Modifier = Modifier,
   folder: String = cwd,
   status: AnnotatedString? = null,
@@ -60,7 +58,6 @@ internal fun PaneHeader(
     onTitleClick = controls.onOpenTabs,
     leading = { SidebarButton(controls.onToggleSidebar) },
     trailing = {
-      HeaderButton(icon = R.drawable.ic_lucide_ellipsis, contentDescription = actionsDescription, onClick = onActions)
       HeaderButton(
         icon = R.drawable.ic_lucide_panel_right,
         contentDescription = stringResource(R.string.files_explorer_open),

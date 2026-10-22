@@ -129,6 +129,19 @@ private class PanePanels(
     active = Pane.Primary
     if (secondary.currentValue != Panel.Chat) scope.launch { secondary.snapTo(Panel.Chat) }
   }
+
+  /**
+   * [pane]'s header controls; [closesSplit] when [pane] is split screen's end-side pane. The caller keeps them while
+   * these stay the same, so the shown tab's actions stay in their slot.
+   */
+  fun controls(pane: Pane, actions: ShellActions, closesSplit: Boolean, onOpenTabs: () -> Unit) = PaneControls(
+    pane = pane,
+    onToggleSidebar = { toggle(pane, Panel.Sidebar) },
+    onOpenTabs = onOpenTabs,
+    onToggleExplorer = { toggle(pane, Panel.Explorer) },
+    onCloseTab = actions::closeTab,
+    onCloseSplit = { actions.closeSplit(pane) }.takeIf { closesSplit },
+  )
 }
 
 @Composable
@@ -369,17 +382,13 @@ private fun WorkspacePanes(
       key(pane) {
         val item = items[pane]
         val panel = panels[pane].targetValue
-        // The tab menu belongs to the pane rather than either of its screens, so it stays open when archiving from it
-        // replaces the shown chat and with it the tab shown in its place; it shows the shell's snackbar over itself.
+        // The session sheet belongs to the pane rather than either of its screens, so it stays open when archiving from
+        // it replaces the shown chat and with it the tab shown in its place; it shows the shell's snackbar over itself.
         var tabsOpen by rememberSaveable { mutableStateOf(false) }
-        val controls = PaneControls(
-          pane = pane,
-          onToggleSidebar = { panels.toggle(pane, Panel.Sidebar) },
-          onOpenTabs = { tabsOpen = true },
-          onToggleExplorer = { panels.toggle(pane, Panel.Explorer) },
-          onCloseTab = actions::closeTab,
-          onCloseSplit = { actions.closeSplit(pane) }.takeIf { split && pane == endPane },
-        )
+        val closesSplit = split && pane == endPane
+        val controls = remember(pane, panels, actions, closesSplit) {
+          panels.controls(pane, actions, closesSplit) { tabsOpen = true }
+        }
         val onShownInSplit = {
           panels.show(Pane.Secondary, Panel.Chat)
         }.takeIf { pane == Pane.Primary && splitAvailable }
@@ -403,7 +412,9 @@ private fun WorkspacePanes(
           },
         )
         if (tabsOpen && item != null) {
-          WorkspaceTabsSheet(pane, item.cwd, actions, snackbar, onShownInSplit, swapPanes) { tabsOpen = false }
+          WorkspaceTabsSheet(pane, item.cwd, actions, snackbar, controls.shownTab, onShownInSplit, swapPanes) {
+            tabsOpen = false
+          }
         }
       }
     }

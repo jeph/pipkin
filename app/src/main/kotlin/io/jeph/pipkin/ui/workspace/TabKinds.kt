@@ -67,16 +67,8 @@ internal fun WorkspaceTabRow(tab: WorkspaceTab, current: Boolean, onOpen: () -> 
 @Composable
 internal fun WorkspaceTabActionsSheet(tab: WorkspaceTab, onClose: () -> Unit, onDismiss: () -> Unit) {
   when (tab) {
-    is WorkspaceTab.Terminal -> TerminalActionsSheet(
-      session = tab.session,
-      onNewTerminal = null,
-      onRestart = null,
-      onClose = onClose,
-      onDismiss = onDismiss,
-    )
-
+    is WorkspaceTab.Terminal -> TerminalActionsSheet(session = tab.session, onClose = onClose, onDismiss = onDismiss)
     is WorkspaceTab.File -> FileActionsSheet(file = tab.file, onClose = onClose, onDismiss = onDismiss)
-
     is WorkspaceTab.Commit -> CommitActionsSheet(onClose = onClose, onDismiss = onDismiss)
   }
 }

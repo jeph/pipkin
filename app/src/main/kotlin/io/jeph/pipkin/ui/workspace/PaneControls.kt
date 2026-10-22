@@ -10,7 +10,11 @@ import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.workspace.Pane
 import io.jeph.pipkin.workspace.WorkspaceTab
 
-/** What the screens a pane shows do from their headers, for the [pane] they show in. */
+/**
+ * What the screens a pane shows do from their headers, for the [pane] they show in. The shown screen puts what its tab
+ * can do in [shownTab], for the session sheet its title opens, so the pane keeps one [PaneControls] while its layout
+ * stays the same.
+ */
 internal class PaneControls(
   val pane: Pane,
   val onToggleSidebar: () -> Unit,
@@ -20,7 +24,9 @@ internal class PaneControls(
   val onCloseTab: (WorkspaceTab) -> Unit,
   /** Closes split screen from this pane; null unless split screen shows this pane on the end side. */
   val onCloseSplit: (() -> Unit)?,
-)
+) {
+  val shownTab = ShownTabActions()
+}
 
 /** The end-side pane's button that closes split screen, at the end of its screens' headers. */
 @Composable

@@ -30,6 +30,14 @@
     <string name="shell_time_minutes">%1$dm</string>
     <string name="shell_time_hours">%1$dh</string>
     <string name="shell_time_days">%1$dd</string>
+    <!-- The session sheet, opened from a screen's title: the labels over its tabs, then the section with what the shown
+         tab can do. -->
+    <string name="shell_tabs_label">Tabs</string>
+    <string name="shell_tabs_swipe_hint">Swipe to close</string>
+    <string name="shell_this_chat">This chat</string>
+    <string name="shell_this_terminal">This terminal</string>
+    <string name="shell_this_file">This file</string>
+    <string name="shell_this_commit">This commit</string>
 
     <string name="shell_session_rename">Rename</string>
     <string name="shell_rename_title">Rename chat</string>

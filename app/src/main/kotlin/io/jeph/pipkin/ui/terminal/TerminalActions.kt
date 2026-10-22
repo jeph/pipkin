@@ -23,68 +23,64 @@ internal fun terminalTitle(session: TerminalSession): String {
   return name ?: stringResource(R.string.terminal_title, session.number)
 }
 
-private enum class Stage { Menu, Rename, ConfirmClose }
+/** A dialog a terminal's actions open: renaming it, or confirming that closing it stops what runs in it. */
+internal enum class TerminalDialog { Rename, ConfirmClose }
 
 /**
- * A terminal's actions sheet: New terminal and Restart shell when given, Rename, and Close terminal, which asks first,
- * since closing stops what runs in it. [onClose] runs once the user confirms.
+ * A terminal tab's actions sheet in the session sheet's tab rows: Rename and Close terminal, which asks first, since
+ * closing stops what runs in it. [onClose] runs once the user confirms.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun TerminalActionsSheet(
+internal fun TerminalActionsSheet(session: TerminalSession, onClose: () -> Unit, onDismiss: () -> Unit) {
+  var dialog by rememberSaveable(session.id) { mutableStateOf<TerminalDialog?>(null) }
+  dialog?.let {
+    TerminalDialogs(session, it, onClose, onDismiss)
+    return
+  }
+  PipkinSheet(onDismissRequest = onDismiss) {
+    SheetRow(
+      label = stringResource(R.string.terminal_rename),
+      icon = R.drawable.ic_lucide_pencil,
+      onClick = { dialog = TerminalDialog.Rename },
+    )
+    SheetRow(
+      label = stringResource(R.string.terminal_close),
+      icon = R.drawable.ic_lucide_x,
+      labelColor = pipkinColors.destructive,
+      onClick = { dialog = TerminalDialog.ConfirmClose },
+    )
+  }
+}
+
+/** [dialog] for [session]; [onClose] runs once the user confirms closing, and [onDismiss] closes the dialog. */
+@Composable
+internal fun TerminalDialogs(
   session: TerminalSession,
-  onNewTerminal: (() -> Unit)?,
-  onRestart: (() -> Unit)?,
+  dialog: TerminalDialog,
   onClose: () -> Unit,
   onDismiss: () -> Unit,
 ) {
-  var stage by rememberSaveable(session.id) { mutableStateOf(Stage.Menu) }
   val name by session.name.collectAsStateWithLifecycle()
-  val dismissThen = { action: () -> Unit ->
-    onDismiss()
-    action()
-  }
-  when (stage) {
-    Stage.Menu -> PipkinSheet(onDismissRequest = onDismiss) {
-      onNewTerminal?.let {
-        SheetRow(
-          label = stringResource(R.string.terminal_new),
-          icon = R.drawable.ic_lucide_square_terminal,
-          onClick = { dismissThen(it) },
-        )
-      }
-      SheetRow(
-        label = stringResource(R.string.terminal_rename),
-        icon = R.drawable.ic_lucide_pencil,
-        onClick = { stage = Stage.Rename },
-      )
-      onRestart?.let {
-        SheetRow(
-          label = stringResource(R.string.terminal_restart),
-          icon = R.drawable.ic_lucide_refresh_cw,
-          onClick = { dismissThen(it) },
-        )
-      }
-      SheetRow(
-        label = stringResource(R.string.terminal_close),
-        icon = R.drawable.ic_lucide_x,
-        labelColor = pipkinColors.destructive,
-        onClick = { stage = Stage.ConfirmClose },
-      )
-    }
-
-    Stage.Rename -> RenameDialog(
+  when (dialog) {
+    TerminalDialog.Rename -> RenameDialog(
       title = stringResource(R.string.terminal_rename_title),
       initial = name.orEmpty(),
       onDismiss = onDismiss,
-      onConfirm = { dismissThen { session.rename(it) } },
+      onConfirm = {
+        onDismiss()
+        session.rename(it)
+      },
     )
 
-    Stage.ConfirmClose -> ConfirmDialog(
+    TerminalDialog.ConfirmClose -> ConfirmDialog(
       title = stringResource(R.string.terminal_close_confirm_title),
       text = stringResource(R.string.terminal_close_confirm_text),
       confirmLabel = stringResource(R.string.terminal_close_confirm),
-      onConfirm = { dismissThen(onClose) },
+      onConfirm = {
+        onDismiss()
+        onClose()
+      },
       onDismiss = onDismiss,
       destructive = true,
       icon = R.drawable.ic_lucide_square_terminal,

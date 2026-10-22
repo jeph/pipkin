@@ -66,8 +66,8 @@ A few things to know while it works:
 
 - **Files**: open the file explorer from a chat to browse and read files, with syntax highlighting for more than twenty languages. The viewer is read-only; to change a file, ask the agent or use a terminal.
 - **Changes**: in a git repository, see exactly what the agent changed, file by file. Pipkin asks you to trust a repository before it runs git there, because a repository's own settings can run programs.
-- **Terminal**: from **Chat actions → New terminal**, open a Termux shell right next to your chat.
-- **Chat actions** also lets you rename a chat, reload the agent after changing its configuration, copy the session's file path, or archive the chat.
+- **Terminal**: tap the chat's title and choose **New terminal** to open a Termux shell right next to your chat.
+- **The chat's title** opens a sheet with the workspace's tabs and, under them, what the chat can do: start another chat, rename it, reload the agent after changing its configuration, copy the session's file path, or archive it. Terminals, files, and commits open the same sheet from their own titles.
 
 On a foldable or tablet, open chats, files, changes, and terminals side by side with **Open in split screen**.
 

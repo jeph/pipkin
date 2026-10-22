@@ -44,7 +44,11 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.CloseSplitButton
 import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.PaneHeader
+import io.jeph.pipkin.ui.workspace.PublishTabActions
+import io.jeph.pipkin.ui.workspace.ShownTabActions
 import io.jeph.pipkin.ui.workspace.SidebarButton
+import io.jeph.pipkin.ui.workspace.TabAction
+import io.jeph.pipkin.ui.workspace.TabActionSet
 
 /**
  * One chat in a pane: header, stream and composer for [process]; a null process shows a starting placeholder. What
@@ -94,14 +98,15 @@ internal fun ChatScreen(
       onSheet = { sheet = it },
       modifier,
     )
-    ChatSheets(
+    PublishChatActions(
       controller,
-      sheet,
+      controls.shownTab,
       onSheet = { sheet = it },
       onNewChat = { actions.newChat(controls.pane, it) },
       onNewTerminal = { context.appGraph.terminals.open(controls.pane, process.cwd) },
       onArchive = actions::archive,
     )
+    ChatSheets(controller, sheet, onSheet = { sheet = it })
     ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive = actions::archive)
   }
 }
@@ -156,12 +161,7 @@ private fun ChatContent(
   Column(
     modifier = modifier.fillMaxSize().background(pipkinColors.surface0).closeContextDetailsOnPress(controller),
   ) {
-    ChatHeader(
-      process,
-      controls,
-      onActions = { onSheet(ChatSheet.Actions) },
-      Modifier.onUnhandledTap(dismissKeyboard),
-    )
+    ChatHeader(process, controls, Modifier.onUnhandledTap(dismissKeyboard))
     // The keyboard and a dialog both take the room the steering box and widget panels would use, so then the steering
     // box keeps to one line and a panel to a few.
     val tight = WindowInsets.isImeVisible || timeline.pendingUi != null
@@ -262,7 +262,7 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
  * in the pane's header.
  */
 @Composable
-private fun ChatHeader(process: AgentProcess, controls: PaneControls, onActions: () -> Unit, modifier: Modifier) {
+private fun ChatHeader(process: AgentProcess, controls: PaneControls, modifier: Modifier) {
   val graph = LocalContext.current.appGraph
   val sessionName by process.sessionName.collectAsStateWithLifecycle()
   val extensionTitle by process.extensionTitle.collectAsStateWithLifecycle()
@@ -276,8 +276,6 @@ private fun ChatHeader(process: AgentProcess, controls: PaneControls, onActions:
     title = extensionTitle ?: sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),
     cwd = process.cwd,
     controls = controls,
-    actionsDescription = stringResource(R.string.chat_actions),
-    onActions = onActions,
     modifier = modifier,
     status = status,
   )
@@ -298,38 +296,56 @@ private fun PlaceholderChat(controls: PaneControls, modifier: Modifier) {
   }
 }
 
+/**
+ * What the chat can do, for the session sheet's "This chat" section: start a chat or a terminal in its folder, rename
+ * it, reload its agent, copy its session file's path, and archive it. Reloading or archiving asks first while Pi works
+ * or runs background tasks; copying and archiving wait for the session file.
+ */
 @Composable
-private fun ChatSheets(
+private fun PublishChatActions(
   controller: ChatController,
-  sheet: ChatSheet?,
+  shownTab: ShownTabActions,
   onSheet: (ChatSheet?) -> Unit,
   onNewChat: (cwd: String) -> Unit,
   onNewTerminal: () -> Unit,
   onArchive: (AgentProcess) -> Unit,
 ) {
   val process = controller.process
-  val timeline by process.screenTimeline.collectAsStateWithLifecycle()
   // Reloading or archiving ends Pi, and with it a run or background tasks.
   val holdsPi by process.holdsPi.collectAsStateWithLifecycle()
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
-  val sessionName by process.sessionName.collectAsStateWithLifecycle()
   val copy = rememberCopyText()
+  val file = sessionFile
+  val actions = TabActionSet(
+    R.string.shell_this_chat,
+    listOf(
+      TabAction(R.string.chat_new_chat, R.drawable.ic_lucide_square_pen, { onNewChat(process.cwd) }),
+      TabAction(R.string.terminal_new, R.drawable.ic_lucide_square_terminal, onNewTerminal),
+      TabAction(R.string.chat_action_rename, R.drawable.ic_lucide_pencil, { onSheet(ChatSheet.Rename) }),
+      TabAction(
+        R.string.chat_action_reload,
+        R.drawable.ic_lucide_refresh_cw,
+        { if (holdsPi) onSheet(ChatSheet.ConfirmReload) else controller.reload() },
+      ),
+      TabAction(R.string.chat_action_copy_path, R.drawable.ic_lucide_copy, file?.let { { copy(it) } }),
+      TabAction(
+        R.string.chat_action_archive,
+        R.drawable.ic_lucide_archive,
+        file?.let { { if (holdsPi) onSheet(ChatSheet.ConfirmArchive) else onArchive(process) } },
+        destructive = true,
+      ),
+    ),
+  )
+  PublishTabActions(shownTab, actions)
+}
+
+@Composable
+private fun ChatSheets(controller: ChatController, sheet: ChatSheet?, onSheet: (ChatSheet?) -> Unit) {
+  val process = controller.process
+  val timeline by process.screenTimeline.collectAsStateWithLifecycle()
+  val sessionName by process.sessionName.collectAsStateWithLifecycle()
   val dismiss = { onSheet(null) }
   when (sheet) {
-    ChatSheet.Actions -> ChatActionsSheet(
-      actions = ChatActions(
-        onNewChat = { onNewChat(process.cwd) },
-        onNewTerminal = onNewTerminal,
-        onRename = { onSheet(ChatSheet.Rename) },
-        onReload = { if (holdsPi) onSheet(ChatSheet.ConfirmReload) else controller.reload() },
-        onCopyPath = sessionFile?.let { path -> { copy(path) } },
-        onArchive = sessionFile?.let {
-          { if (holdsPi) onSheet(ChatSheet.ConfirmArchive) else onArchive(process) }
-        },
-      ),
-      onDismiss = dismiss,
-    )
-
     is ChatSheet.Model -> ModelSheet(
       controller,
       timeline.model,

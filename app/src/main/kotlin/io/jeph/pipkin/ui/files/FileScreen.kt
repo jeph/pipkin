@@ -66,33 +66,43 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.PaneHeader
+import io.jeph.pipkin.ui.workspace.PublishTabActions
+import io.jeph.pipkin.ui.workspace.TabAction
+import io.jeph.pipkin.ui.workspace.TabActionSet
 import io.jeph.pipkin.workspace.WorkspaceTab
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * One open file in a pane: the pane's header with the file's name over its folder and the file's actions, which acts
- * through [controls]; a caption with the file's size and line count; and the file itself, read again each time its
- * tab shows, since Pi may have changed it. Text shows with line numbers, coloured when a grammar knows the extension;
- * images show fitted to the width.
+ * One open file in a pane: the pane's header with the file's name over its folder, which acts through [controls]; a
+ * caption with the file's size and line count; and the file itself, read again each time its tab shows, since Pi may
+ * have changed it. Text shows with line numbers, coloured when a grammar knows the extension; images show fitted to
+ * the width. Copy path and Close file go to the session sheet the title opens.
  */
 @Composable
 internal fun FileScreen(file: FileTab, controls: PaneControls, modifier: Modifier = Modifier) {
+  val context = LocalContext.current
   val state by file.state.collectAsStateWithLifecycle()
-  var actionsOpen by remember(file) { mutableStateOf(false) }
   val folder = if (file.folder.isEmpty()) file.cwd else "${file.cwd}/${file.folder}"
   LaunchedEffect(file) { file.reload() }
+  PublishTabActions(
+    controls.shownTab,
+    TabActionSet(
+      title = R.string.shell_this_file,
+      actions = listOf(
+        TabAction(R.string.file_copy_path, R.drawable.ic_lucide_copy, {
+          copyToClipboard(context, file.name, "${file.cwd}/${file.path}")
+        }),
+        TabAction(R.string.file_close, R.drawable.ic_lucide_x, {
+          controls.onCloseTab(WorkspaceTab.File(file))
+        }, destructive = true),
+      ),
+    ),
+  )
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    PaneHeader(
-      title = file.name,
-      cwd = file.cwd,
-      controls = controls,
-      actionsDescription = stringResource(R.string.file_actions),
-      onActions = { actionsOpen = true },
-      folder = folder,
-    )
+    PaneHeader(title = file.name, cwd = file.cwd, controls = controls, folder = folder)
     when (val shown = state) {
       FileState.Loading -> FileNote(Modifier.weight(1f)) {
         CircularProgressIndicator(
@@ -113,14 +123,6 @@ internal fun FileScreen(file: FileTab, controls: PaneControls, modifier: Modifie
         key(file) { LoadedFile(file, shown.content, Modifier.weight(1f)) }
       }
     }
-  }
-
-  if (actionsOpen) {
-    FileActionsSheet(
-      file = file,
-      onClose = { controls.onCloseTab(WorkspaceTab.File(file)) },
-      onDismiss = { actionsOpen = false },
-    )
   }
 }
 

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -60,13 +62,14 @@ import io.jeph.pipkin.workspace.Pane
 import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
- * The tab switcher as a sheet: the workspace's name and path over the tabs in the workspace folder [cwd] of what
- * [pane] shows, its terminals, its open files, its open commits and then its chats, the shown one highlighted. Tapping
- * a tab shows it in [pane] instead and closes the sheet; tapping one the other pane shows calls [onSwapPanes], so
- * that pane comes to this side. A chat is archived by swiping it right or from its actions sheet, which also renames it
- * and, when [onShownInSplit] is given, opens it in split screen, calling that once the second pane shows it; the sheet
- * stays open and shows the shell's [snackbar], so the archive's Undo is in reach. A terminal, a file or a commit
- * closes by swiping it right or from its actions sheet, which also renames a terminal.
+ * The session sheet: the workspace's name and path over the tabs in the workspace folder [cwd] of what [pane] shows,
+ * its terminals, its open files, its open commits and then its chats, the shown one highlighted, and under them what
+ * the shown tab can do, from [shownTab]. Tapping a tab shows it in [pane] instead and closes the sheet; tapping one the
+ * other pane shows calls [onSwapPanes], so that pane comes to this side. A chat is archived by swiping it right or from
+ * its actions sheet, which also renames it and, when [onShownInSplit] is given, opens it in split screen, calling that
+ * once the second pane shows it; the sheet stays open and shows the shell's [snackbar], so the archive's Undo is in
+ * reach. A terminal, a file or a commit closes by swiping it right or from its actions sheet, which also renames a
+ * terminal.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,6 +78,7 @@ internal fun WorkspaceTabsSheet(
   cwd: String,
   actions: ShellActions,
   snackbar: SnackbarStackState,
+  shownTab: ShownTabActions,
   onShownInSplit: (() -> Unit)?,
   onSwapPanes: () -> Unit,
   onDismiss: () -> Unit,
@@ -93,8 +97,12 @@ internal fun WorkspaceTabsSheet(
   val show = { tab: WorkspaceTab -> if (graph.tabs.show(pane, tab)) onDismiss() else swapPanes() }
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
   LaunchedEffect(tabs.chats) { archiving.forgetGone(tabs.chats) }
+  // A short window, such as a phone on its side, has no room for the tiles under the tabs without squeezing the tabs
+  // out, so there the tiles scroll at the end of the list instead.
+  val pinActions = LocalWindowInfo.current.containerDpSize.height >= PINNED_ACTIONS_MIN_HEIGHT
   PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = 0.85f) {
     TabsSheetTitle(name = projectName(cwd, home), path = tildePath(cwd, home))
+    TabsLabels()
     TabList(
       tabs = tabs,
       archiving = archiving,
@@ -105,8 +113,10 @@ internal fun WorkspaceTabsSheet(
         onSwapPanes = swapPanes,
         onActions = { menu = it },
       ),
+      footer = shownTab.current?.takeUnless { pinActions }?.let { { TabActionGrid(it, onDismiss) } },
       modifier = Modifier.weight(1f, fill = false),
     )
+    if (pinActions) shownTab.current?.let { TabActionGrid(it, onDismiss) }
     SnackbarStackOverlay(snackbar)
   }
   menu?.let { shownMenu ->
@@ -171,6 +181,21 @@ private fun TabsSheetTitle(name: String, path: String) {
         overflow = TextOverflow.StartEllipsis,
       )
     }
+  }
+}
+
+/** The labels over the tabs: what they are, and that a swipe closes one. */
+@Composable
+private fun TabsLabels() {
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(horizontal = 20.dp)
+      .padding(bottom = PipkinTokens.Spacing.s6),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    SectionLabel(stringResource(R.string.shell_tabs_label), Modifier.weight(1f))
+    SectionLabel(stringResource(R.string.shell_tabs_swipe_hint))
   }
 }
 
@@ -247,8 +272,8 @@ private class TabListCallbacks(
 )
 
 /**
- * The tab menu's rows: the workspace's open tabs, then the saved chats. What the pane shows is highlighted; opening the
- * chat the other pane shows swaps the panes.
+ * The tab menu's rows: the workspace's open tabs, then the saved chats, then [footer] when given. What the pane shows
+ * is highlighted; opening the chat the other pane shows swaps the panes.
  */
 @Composable
 private fun TabList(
@@ -256,6 +281,7 @@ private fun TabList(
   archiving: TabArchiving,
   closing: TabClosing,
   callbacks: TabListCallbacks,
+  footer: (@Composable () -> Unit)?,
   modifier: Modifier,
 ) {
   val graph = LocalContext.current.appGraph
@@ -285,6 +311,7 @@ private fun TabList(
         )
       }
     }
+    footer?.let { item(key = FOOTER_KEY) { it() } }
   }
 }
 
@@ -386,3 +413,9 @@ private class TabArchiving(private val actions: ShellActions) {
     leaving = leaving.filterTo(HashSet()) { it in listed }
   }
 }
+
+/** The window height under which the shown tab's tiles scroll at the end of the tabs rather than stay under them. */
+private val PINNED_ACTIONS_MIN_HEIGHT = 600.dp
+
+/** The list key of the tiles when they scroll at the end of the tabs. */
+private const val FOOTER_KEY = "pipkin:tab-actions"
