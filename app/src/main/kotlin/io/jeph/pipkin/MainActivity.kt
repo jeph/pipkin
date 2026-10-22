@@ -90,9 +90,9 @@ class MainActivity : ComponentActivity() {
   private fun statusBarStyle(dark: Boolean) =
     if (dark) SystemBarStyle.dark(Color.TRANSPARENT) else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
 
-  // Drawn behind three-button navigation only; gesture navigation stays transparent. androidx.activity's defaults.
-  private fun navigationBarStyle(dark: Boolean) =
-    if (dark) SystemBarStyle.dark(DARK_NAV_SCRIM) else SystemBarStyle.light(LIGHT_NAV_SCRIM, DARK_NAV_SCRIM)
+  // androidx.activity's default scrims, picked by the app's theme rather than the system's. An auto style keeps gesture
+  // navigation transparent on Android 10 to 14 and lets the system draw the scrim behind three-button navigation.
+  private fun navigationBarStyle(dark: Boolean) = SystemBarStyle.auto(LIGHT_NAV_SCRIM, DARK_NAV_SCRIM) { dark }
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
