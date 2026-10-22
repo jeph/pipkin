@@ -32,7 +32,6 @@ import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.PaneHeader
 import io.jeph.pipkin.ui.workspace.PublishTabActions
 import io.jeph.pipkin.ui.workspace.TabAction
-import io.jeph.pipkin.ui.workspace.TabActionSet
 import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
@@ -49,13 +48,10 @@ internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: M
   val wrapLines by graph.preferences.diffWrapLines.collectAsStateWithLifecycle()
   PublishTabActions(
     controls.shownTab,
-    TabActionSet(
-      title = R.string.shell_this_commit,
-      actions = listOf(
-        TabAction(R.string.git_commit_close, R.drawable.ic_lucide_x, {
-          controls.onCloseTab(WorkspaceTab.Commit(commit))
-        }, destructive = true),
-      ),
+    listOf(
+      TabAction(R.string.git_commit_close, R.drawable.ic_lucide_x, {
+        controls.onCloseTab(WorkspaceTab.Commit(commit))
+      }, destructive = true),
     ),
   )
   // A fresh list per commit, so switching commits never carries the old one's scroll position over.

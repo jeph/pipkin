@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.CapsLabel
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -47,9 +48,6 @@ internal class TabAction(
   val destructive: Boolean = false,
 )
 
-/** The shown tab's [actions], under its section [title], such as "This chat". */
-internal class TabActionSet(@StringRes val title: Int, val actions: List<TabAction>)
-
 /**
  * The actions of the tab a pane shows, which its screen sets while it's composed, for the session sheet the pane
  * opens over it. The sheet belongs to the pane rather than the screen, so it stays open when an action replaces the
@@ -57,11 +55,11 @@ internal class TabActionSet(@StringRes val title: Int, val actions: List<TabActi
  */
 @Stable
 internal class ShownTabActions {
-  var current by mutableStateOf<TabActionSet?>(null)
+  var current by mutableStateOf<List<TabAction>?>(null)
     private set
   private var owner: Any? = null
 
-  fun set(owner: Any, actions: TabActionSet) {
+  fun set(owner: Any, actions: List<TabAction>) {
     this.owner = owner
     current = actions
   }
@@ -75,26 +73,29 @@ internal class ShownTabActions {
 
 /** Sets [actions] as what the pane's shown tab can do, for as long as the calling screen is composed. */
 @Composable
-internal fun PublishTabActions(slot: ShownTabActions, actions: TabActionSet) {
+internal fun PublishTabActions(slot: ShownTabActions, actions: List<TabAction>) {
   val owner = remember { Any() }
   SideEffect { slot.set(owner, actions) }
   DisposableEffect(slot) { onDispose { slot.clear(owner) } }
 }
 
 /**
- * The session sheet's section for the shown tab: its title over its actions as tiles, three to a row; each action runs
- * after [onDismiss] closes the sheet.
+ * The session sheet's section for the shown tab: an Actions label over its [actions] as tiles, three to a row; each
+ * action runs after [onDismiss] closes the sheet.
  */
 @Composable
-internal fun TabActionGrid(set: TabActionSet, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+internal fun TabActionGrid(actions: List<TabAction>, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
   Column(
     modifier = modifier
       .padding(horizontal = PipkinTokens.Spacing.s16)
       .padding(top = PipkinTokens.Spacing.s12, bottom = PipkinTokens.Spacing.s8),
     verticalArrangement = Arrangement.spacedBy(TILE_GAP),
   ) {
-    SectionLabel(stringResource(set.title), modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s4))
-    set.actions.chunked(TILES_PER_ROW).forEach { row ->
+    SectionLabel(
+      stringResource(R.string.shell_actions_label),
+      modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s4),
+    )
+    actions.chunked(TILES_PER_ROW).forEach { row ->
       // Each row is as tall as its tallest tile, so a label that wraps doesn't leave its neighbours short.
       Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
         row.forEach { action ->

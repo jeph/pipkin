@@ -48,7 +48,6 @@ import io.jeph.pipkin.ui.workspace.PublishTabActions
 import io.jeph.pipkin.ui.workspace.ShownTabActions
 import io.jeph.pipkin.ui.workspace.SidebarButton
 import io.jeph.pipkin.ui.workspace.TabAction
-import io.jeph.pipkin.ui.workspace.TabActionSet
 
 /**
  * One chat in a pane: header, stream and composer for [process]; a null process shows a starting placeholder. What
@@ -297,7 +296,7 @@ private fun PlaceholderChat(controls: PaneControls, modifier: Modifier) {
 }
 
 /**
- * What the chat can do, for the session sheet's "This chat" section: start a chat or a terminal in its folder, rename
+ * What the chat can do, for the session sheet's actions: start a chat or a terminal in its folder, rename
  * it, reload its agent, copy its session file's path, and archive it. Reloading or archiving asks first while Pi works
  * or runs background tasks; copying and archiving wait for the session file.
  */
@@ -316,24 +315,21 @@ private fun PublishChatActions(
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
   val copy = rememberCopyText()
   val file = sessionFile
-  val actions = TabActionSet(
-    R.string.shell_this_chat,
-    listOf(
-      TabAction(R.string.chat_new_chat, R.drawable.ic_lucide_square_pen, { onNewChat(process.cwd) }),
-      TabAction(R.string.terminal_new, R.drawable.ic_lucide_square_terminal, onNewTerminal),
-      TabAction(R.string.chat_action_rename, R.drawable.ic_lucide_pencil, { onSheet(ChatSheet.Rename) }),
-      TabAction(
-        R.string.chat_action_reload,
-        R.drawable.ic_lucide_refresh_cw,
-        { if (holdsPi) onSheet(ChatSheet.ConfirmReload) else controller.reload() },
-      ),
-      TabAction(R.string.chat_action_copy_path, R.drawable.ic_lucide_copy, file?.let { { copy(it) } }),
-      TabAction(
-        R.string.chat_action_archive,
-        R.drawable.ic_lucide_archive,
-        file?.let { { if (holdsPi) onSheet(ChatSheet.ConfirmArchive) else onArchive(process) } },
-        destructive = true,
-      ),
+  val actions = listOf(
+    TabAction(R.string.chat_new_chat, R.drawable.ic_lucide_square_pen, { onNewChat(process.cwd) }),
+    TabAction(R.string.terminal_new, R.drawable.ic_lucide_square_terminal, onNewTerminal),
+    TabAction(R.string.chat_action_rename, R.drawable.ic_lucide_pencil, { onSheet(ChatSheet.Rename) }),
+    TabAction(
+      R.string.chat_action_reload,
+      R.drawable.ic_lucide_refresh_cw,
+      { if (holdsPi) onSheet(ChatSheet.ConfirmReload) else controller.reload() },
+    ),
+    TabAction(R.string.chat_action_copy_path, R.drawable.ic_lucide_copy, file?.let { { copy(it) } }),
+    TabAction(
+      R.string.chat_action_archive,
+      R.drawable.ic_lucide_archive,
+      file?.let { { if (holdsPi) onSheet(ChatSheet.ConfirmArchive) else onArchive(process) } },
+      destructive = true,
     ),
   )
   PublishTabActions(shownTab, actions)

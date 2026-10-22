@@ -68,7 +68,6 @@ import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.PaneHeader
 import io.jeph.pipkin.ui.workspace.PublishTabActions
 import io.jeph.pipkin.ui.workspace.TabAction
-import io.jeph.pipkin.ui.workspace.TabActionSet
 import io.jeph.pipkin.workspace.WorkspaceTab
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
@@ -88,16 +87,13 @@ internal fun FileScreen(file: FileTab, controls: PaneControls, modifier: Modifie
   LaunchedEffect(file) { file.reload() }
   PublishTabActions(
     controls.shownTab,
-    TabActionSet(
-      title = R.string.shell_this_file,
-      actions = listOf(
-        TabAction(R.string.file_copy_path, R.drawable.ic_lucide_copy, {
-          copyToClipboard(context, file.name, "${file.cwd}/${file.path}")
-        }),
-        TabAction(R.string.file_close, R.drawable.ic_lucide_x, {
-          controls.onCloseTab(WorkspaceTab.File(file))
-        }, destructive = true),
-      ),
+    listOf(
+      TabAction(R.string.file_copy_path, R.drawable.ic_lucide_copy, {
+        copyToClipboard(context, file.name, "${file.cwd}/${file.path}")
+      }),
+      TabAction(R.string.file_close, R.drawable.ic_lucide_x, {
+        controls.onCloseTab(WorkspaceTab.File(file))
+      }, destructive = true),
     ),
   )
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Header and the session sheet's "This chat" section -->
+    <!-- Header, and the chat's actions in the session sheet -->
     <string name="chat_new_chat">New chat</string>
     <string name="chat_toggle_sidebar">Workspaces</string>
     <string name="chat_action_rename">Rename</string>

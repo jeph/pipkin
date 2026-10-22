@@ -50,7 +50,6 @@ import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.PaneHeader
 import io.jeph.pipkin.ui.workspace.PublishTabActions
 import io.jeph.pipkin.ui.workspace.TabAction
-import io.jeph.pipkin.ui.workspace.TabActionSet
 import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
@@ -72,20 +71,17 @@ internal fun TerminalScreen(session: TerminalSession, controls: PaneControls, mo
 
   PublishTabActions(
     controls.shownTab,
-    TabActionSet(
-      title = R.string.shell_this_terminal,
-      actions = listOf(
-        TabAction(R.string.terminal_new, R.drawable.ic_lucide_square_terminal, {
-          graph.terminals.open(controls.pane, session.cwd)
-        }),
-        TabAction(R.string.terminal_rename, R.drawable.ic_lucide_pencil, { dialog = TerminalDialog.Rename }),
-        TabAction(R.string.terminal_restart, R.drawable.ic_lucide_refresh_cw, session::start),
-        TabAction(
-          R.string.terminal_close,
-          R.drawable.ic_lucide_x,
-          { dialog = TerminalDialog.ConfirmClose },
-          destructive = true,
-        ),
+    listOf(
+      TabAction(R.string.terminal_new, R.drawable.ic_lucide_square_terminal, {
+        graph.terminals.open(controls.pane, session.cwd)
+      }),
+      TabAction(R.string.terminal_rename, R.drawable.ic_lucide_pencil, { dialog = TerminalDialog.Rename }),
+      TabAction(R.string.terminal_restart, R.drawable.ic_lucide_refresh_cw, session::start),
+      TabAction(
+        R.string.terminal_close,
+        R.drawable.ic_lucide_x,
+        { dialog = TerminalDialog.ConfirmClose },
+        destructive = true,
       ),
     ),
   )

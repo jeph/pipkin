@@ -90,8 +90,8 @@ private fun HostStatus(onOpenOnboarding: () -> Unit, modifier: Modifier) {
     failure?.needsSetup == true -> stringResource(R.string.shell_termux_attention)
     failure?.needsTermuxOpen == true -> stringResource(R.string.shell_termux_open)
     else -> null
-  } ?: hello?.piVersion?.let { stringResource(R.string.shell_termux_status, it) }
-    ?: stringResource(R.string.shell_termux_status_unknown)
+  } ?: hello?.piVersion?.let { stringResource(R.string.shell_host_status, it) }
+    ?: stringResource(R.string.shell_host_status_unknown)
   Row(
     modifier = modifier
       .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
