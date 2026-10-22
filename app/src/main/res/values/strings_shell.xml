@@ -11,6 +11,13 @@
         <item quantity="one">%1$d tab in this workspace</item>
         <item quantity="other">%1$d tabs in this workspace</item>
     </plurals>
+    <!-- The line under a workspace's name in the sidebar: what its chats are doing, then how many tabs it has. -->
+    <string name="shell_workspace_waiting">Waiting for you</string>
+    <string name="shell_workspace_working">Simmering</string>
+    <plurals name="shell_workspace_tabs">
+        <item quantity="one">%1$d tab</item>
+        <item quantity="other">%1$d tabs</item>
+    </plurals>
     <string name="shell_new_chat_in_project">New chat in %1$s</string>
     <string name="shell_settings">Settings</string>
     <string name="shell_session_actions">Chat actions</string>

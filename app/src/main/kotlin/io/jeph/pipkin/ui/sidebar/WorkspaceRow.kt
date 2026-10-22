@@ -27,16 +27,21 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.theme.PipkinColors
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -44,8 +49,8 @@ import java.text.BreakIterator
 
 /**
  * A workspace's row: a letter tile in the workspace's colour (the simmering pot while Pi works in one of its chats),
- * its name over its folder, and its actions and New chat. The row is outlined in cobalt while the sidebar's pane shows
- * one of its chats or tabs. Tapping it shows the workspace; long-press opens its actions.
+ * its name over its [status], and its actions and New chat. The row is outlined in cobalt while the sidebar's pane
+ * shows one of its chats or tabs. Tapping it shows the workspace; long-press opens its actions.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -54,7 +59,7 @@ internal fun WorkspaceRow(
   folder: String,
   cwd: String,
   shown: Boolean,
-  working: Boolean,
+  status: WorkspaceStatus,
   onOpen: () -> Unit,
   onNewChat: () -> Unit,
   onActions: () -> Unit,
@@ -87,7 +92,11 @@ internal fun WorkspaceRow(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
-    WorkspaceTile(letter = remember(name) { tileLetter(name) }, tint = tileColor(cwd, colors), working = working)
+    WorkspaceTile(
+      letter = remember(name) { tileLetter(name) },
+      tint = tileColor(cwd, colors),
+      working = status.activity != WorkspaceActivity.Idle,
+    )
     Column(modifier = Modifier.weight(1f)) {
       Text(
         text = name,
@@ -97,19 +106,69 @@ internal fun WorkspaceRow(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      // The home folder's name is its path, `~`, so a second line would only repeat it.
-      if (folder != name) {
-        Text(
-          text = folder,
-          style = pathTextStyle,
-          color = colors.foregroundMuted,
-          fontSize = SUBTITLE_SIZE,
-          maxLines = 1,
-          overflow = TextOverflow.StartEllipsis,
-        )
-      }
+      // The home folder's name is its path, `~`, so the line would only repeat it.
+      StatusLine(status, folder.takeIf { it != name })
     }
     WorkspaceButtons(name, shown, onActions, onNewChat)
+  }
+}
+
+/**
+ * The line under a workspace's name: Waiting for you or Simmering after a dot while its chats need the user or work,
+ * else its [folder], then its tab count. Each part is its own text, so a right-to-left folder name can't pull the
+ * count into it; a path keeps its end when cut short, and the count always shows whole.
+ */
+@Composable
+private fun StatusLine(status: WorkspaceStatus, folder: String?) {
+  val colors = pipkinColors
+  val tabs = if (status.tabs >
+    0
+  ) {
+    pluralStringResource(R.plurals.shell_workspace_tabs, status.tabs, status.tabs)
+  } else {
+    null
+  }
+  val lead = when (status.activity) {
+    WorkspaceActivity.Waiting -> stringResource(R.string.shell_workspace_waiting) to colors.dotWarning
+    WorkspaceActivity.Working -> stringResource(R.string.shell_workspace_working) to colors.accent
+    WorkspaceActivity.Idle -> null
+  }
+  if (lead == null && folder == null && tabs == null) return
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    when {
+      lead != null -> {
+        StatusDot(lead.second)
+        Text(
+          text = lead.first,
+          modifier = Modifier.weight(1f, fill = false).padding(start = 5.dp),
+          color = lead.second,
+          fontSize = SUBTITLE_SIZE,
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+      }
+
+      folder != null -> Text(
+        text = folder,
+        modifier = Modifier.weight(1f, fill = false),
+        style = pathTextStyle,
+        color = colors.foregroundMuted,
+        fontSize = SUBTITLE_SIZE,
+        maxLines = 1,
+        overflow = TextOverflow.StartEllipsis,
+      )
+    }
+    if (tabs != null) {
+      val separator = stringResource(R.string.separator_dot)
+      Text(
+        text = if (lead != null || folder != null) separator + tabs else tabs,
+        color = colors.foregroundMuted,
+        fontSize = SUBTITLE_SIZE,
+        maxLines = 1,
+        softWrap = false,
+      )
+    }
   }
 }
 

@@ -317,25 +317,14 @@ private fun WorkspaceList(
   callbacks: WorkspaceListCallbacks,
   modifier: Modifier = Modifier,
 ) {
-  val registry = LocalContext.current.appGraph.registry
-  val processes by registry.processes.collectAsStateWithLifecycle()
-  val items = rememberPaneItems()
   if (workspaces.isEmpty()) {
-    Column(
-      modifier = modifier.fillMaxWidth().padding(horizontal = PipkinTokens.Spacing.s12),
-      verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s16, Alignment.CenterVertically),
-    ) {
-      Text(
-        text = stringResource(R.string.shell_sidebar_empty),
-        modifier = Modifier.fillMaxWidth(),
-        color = pipkinColors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.lg,
-        textAlign = TextAlign.Center,
-      )
-      AddWorkspaceRow(onClick = callbacks.onAddWorkspace)
-    }
+    NoWorkspaces(callbacks.onAddWorkspace, modifier)
     return
   }
+  val graph = LocalContext.current.appGraph
+  val processes by graph.registry.processes.collectAsStateWithLifecycle()
+  val openTabs by graph.tabs.tabs.collectAsStateWithLifecycle()
+  val items = rememberPaneItems()
   LazyColumn(
     modifier = modifier.fillMaxWidth(),
     contentPadding = PaddingValues(
@@ -359,7 +348,14 @@ private fun WorkspaceList(
           folder = tildePath(cwd, home),
           cwd = cwd,
           shown = items[pane]?.let { sameFolder(it.cwd, cwd) } == true,
-          working = anyWorking(remember(processes, cwd) { processes.values.filter { sameFolder(it.cwd, cwd) } }),
+          status = WorkspaceStatus(
+            activity = workspaceActivity(
+              remember(processes, cwd) {
+                processes.values.filter { sameFolder(it.cwd, cwd) }
+              },
+            ),
+            tabs = workspace.chats.size + openTabs.count { sameFolder(it.cwd, cwd) },
+          ),
           onOpen = { callbacks.onOpen(cwd) },
           onNewChat = { callbacks.onNewChatIn(cwd) },
           onActions = { callbacks.onActions(workspace) },
@@ -372,11 +368,20 @@ private fun WorkspaceList(
   }
 }
 
-/** Whether any of [processes] [works][AgentProcess.working]: a Pi run, or background tasks it waits on. */
+/** The sidebar with no workspaces yet: a note over the Add workspace row. */
 @Composable
-private fun anyWorking(processes: List<AgentProcess>): Boolean {
-  val working = remember(processes) {
-    if (processes.isEmpty()) flowOf(false) else combine(processes.map { it.working }) { states -> states.any { it } }
+private fun NoWorkspaces(onAddWorkspace: () -> Unit, modifier: Modifier) {
+  Column(
+    modifier = modifier.fillMaxWidth().padding(horizontal = PipkinTokens.Spacing.s12),
+    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s16, Alignment.CenterVertically),
+  ) {
+    Text(
+      text = stringResource(R.string.shell_sidebar_empty),
+      modifier = Modifier.fillMaxWidth(),
+      color = pipkinColors.foregroundMuted,
+      fontSize = PipkinTokens.FontSize.lg,
+      textAlign = TextAlign.Center,
+    )
+    AddWorkspaceRow(onClick = onAddWorkspace)
   }
-  return working.collectAsStateWithLifecycle(initialValue = false).value
 }
