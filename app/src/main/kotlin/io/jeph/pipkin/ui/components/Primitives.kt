@@ -33,11 +33,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -182,6 +186,29 @@ private fun RowScope.SheetRowContent(
 @Composable
 fun StatusDot(color: Color, modifier: Modifier = Modifier) {
   Box(modifier = modifier.size(6.dp).clip(CircleShape).background(color))
+}
+
+/**
+ * A small spaced-out label in capitals, such as a card's kind. Only the drawing is in capitals: TalkBack reads [text]
+ * as written, since it spells out short words in capitals letter by letter.
+ */
+@Composable
+internal fun CapsLabel(
+  text: String,
+  color: Color,
+  modifier: Modifier = Modifier,
+  fontSize: TextUnit = 10.5.sp,
+  fontWeight: FontWeight = FontWeight.ExtraBold,
+) {
+  Text(
+    text = text.toUpperCase(LocaleList.current),
+    modifier = modifier.semantics { contentDescription = text },
+    color = color,
+    fontSize = fontSize,
+    fontWeight = fontWeight,
+    letterSpacing = 0.06.em,
+    maxLines = 1,
+  )
 }
 
 /**

@@ -23,14 +23,13 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.TimelineState
+import io.jeph.pipkin.ui.components.CapsLabel
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -97,14 +96,7 @@ internal fun SteeringBox(
         if (compact) {
           SteeringLine(summary, Modifier.weight(1f))
         } else {
-          Text(
-            text = stringResource(R.string.chat_steering).toUpperCase(LocaleList.current),
-            modifier = Modifier.weight(1f),
-            color = colors.accent,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.ExtraBold,
-            letterSpacing = 0.06.em,
-          )
+          CapsLabel(stringResource(R.string.chat_steering), colors.accent, Modifier.weight(1f), fontSize = 11.sp)
         }
         SteerButton(stringResource(R.string.chat_steering_edit), editEnabled, filled = false, onEdit)
         SteerButton(stringResource(R.string.chat_steering_send_now), sendNowEnabled, filled = true, onSendNow)

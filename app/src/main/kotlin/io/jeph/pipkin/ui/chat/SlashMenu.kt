@@ -37,15 +37,14 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.RpcError
 import io.jeph.pipkin.agent.commands
+import io.jeph.pipkin.ui.components.CapsLabel
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -228,14 +227,7 @@ private fun CommandRow(command: SlashCommand, highlighted: Boolean, onClick: () 
       Spacer(Modifier.weight(1f))
     }
     command.source?.let { source ->
-      Text(
-        text = stringResource(source.label).toUpperCase(LocaleList.current),
-        color = colors.foregroundExtraMuted,
-        fontSize = 10.5.sp,
-        fontWeight = FontWeight.ExtraBold,
-        letterSpacing = 0.05.em,
-        maxLines = 1,
-      )
+      CapsLabel(stringResource(source.label), colors.foregroundExtraMuted)
     }
   }
 }

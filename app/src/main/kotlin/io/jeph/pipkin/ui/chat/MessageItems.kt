@@ -35,10 +35,8 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -48,6 +46,7 @@ import io.jeph.pipkin.agent.ImagePart
 import io.jeph.pipkin.agent.NoticeKind
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.text
+import io.jeph.pipkin.ui.components.CapsLabel
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.MarkdownCache
 import io.jeph.pipkin.ui.components.PipkinMarkdown
@@ -115,13 +114,7 @@ private fun PromptHeader(item: TimelineItem.User) {
   val context = LocalContext.current
   val time = remember(item.timestamp, context) { DateFormat.getTimeFormat(context).format(Date(item.timestamp)) }
   Row(modifier = Modifier.heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
-    Text(
-      text = stringResource(R.string.chat_you).toUpperCase(LocaleList.current),
-      color = colors.accent,
-      fontSize = 10.5.sp,
-      fontWeight = FontWeight.SemiBold,
-      letterSpacing = 0.06.em,
-    )
+    CapsLabel(stringResource(R.string.chat_you), colors.accent, fontWeight = FontWeight.SemiBold)
     Text(
       text = stringResource(R.string.separator_dot) + time,
       modifier = Modifier.weight(1f),

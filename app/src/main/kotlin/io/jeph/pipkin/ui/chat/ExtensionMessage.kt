@@ -34,9 +34,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.toUpperCase
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -46,6 +44,7 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.NoticeLevel
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.text
+import io.jeph.pipkin.ui.components.CapsLabel
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.MarkdownCache
 import io.jeph.pipkin.ui.components.PipkinMarkdown
@@ -158,13 +157,7 @@ internal fun ExtensionNoticeCard(item: TimelineItem.ExtensionNotice, modifier: M
   ) {
     LucideIcon(icon = look.icon, contentDescription = null, modifier = Modifier.padding(top = 1.dp), tint = look.tint)
     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-      Text(
-        text = stringResource(look.level).toUpperCase(LocaleList.current),
-        color = look.tint,
-        fontSize = 10.5.sp,
-        fontWeight = FontWeight.ExtraBold,
-        letterSpacing = 0.06.em,
-      )
+      CapsLabel(stringResource(look.level), look.tint)
       var expanded by rememberSaveable(item.key) { mutableStateOf(false) }
       FoldedContent(
         FOLDED_LINES,
