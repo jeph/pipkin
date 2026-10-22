@@ -35,7 +35,7 @@ import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.auth.LoginSheet
 import io.jeph.pipkin.ui.auth.ProviderLogo
 import io.jeph.pipkin.ui.components.HeaderBar
-import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
@@ -155,7 +155,7 @@ internal fun SettingsPage(
       HeaderBar(
         title = title,
         leading = {
-          IconButton28(
+          HeaderButton(
             icon = R.drawable.ic_lucide_chevron_left,
             contentDescription = stringResource(R.string.settings_back),
             onClick = onBack,

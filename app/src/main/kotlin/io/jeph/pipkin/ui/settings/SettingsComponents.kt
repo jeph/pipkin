@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.HorizontalDivider
@@ -226,7 +227,7 @@ private const val DETAIL_BACKGROUND_ALPHA = 0.7f
 /** Where a [SettingsRow]'s text starts after its leading icon: the row's padding, the 20dp icon box and the gap. */
 private val CARD_TEXT_START = PipkinTokens.Spacing.s16 + 20.dp + PipkinTokens.Spacing.s12
 
-/** Paseo's segmented control: a surface2 track with the selected segment raised on surface3. */
+/** A segmented control: a pill-shaped surface2 track with the selected segment raised on surface3. */
 @Composable
 internal fun <T> SegmentedControl(
   options: List<T>,
@@ -239,9 +240,9 @@ internal fun <T> SegmentedControl(
   Row(
     modifier =
       modifier
-        .clip(RoundedCornerShape(PipkinTokens.Radius.md))
+        .clip(CircleShape)
         .background(colors.surface2)
-        .padding(PipkinTokens.Spacing.s2),
+        .padding(3.dp),
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s2),
   ) {
     options.forEach { option ->
@@ -249,11 +250,11 @@ internal fun <T> SegmentedControl(
       Box(
         modifier =
           Modifier
-            .heightIn(min = 28.dp)
-            .clip(RoundedCornerShape(PipkinTokens.Radius.base))
+            .heightIn(min = 30.dp)
+            .clip(CircleShape)
             .background(if (isSelected) colors.surface3 else Color.Transparent)
             .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onSelect(option) })
-            .padding(horizontal = PipkinTokens.Spacing.s8),
+            .padding(horizontal = PipkinTokens.Spacing.s12),
         contentAlignment = Alignment.Center,
       ) {
         segment(option, isSelected)

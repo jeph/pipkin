@@ -1,10 +1,6 @@
 package io.jeph.pipkin.ui.workspace
 
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -20,9 +16,11 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.SessionInfo
+import io.jeph.pipkin.ui.components.DialogConfirm
+import io.jeph.pipkin.ui.components.DialogTextField
+import io.jeph.pipkin.ui.components.PipkinDialog
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
-import io.jeph.pipkin.ui.theme.pipkinColors
 
 private enum class Stage { Menu, Rename }
 
@@ -88,29 +86,24 @@ internal fun RenameDialog(title: String, initial: String, onDismiss: () -> Unit,
   var name by rememberSaveable(stateSaver = TextFieldValue.Saver) {
     mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
   }
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    containerColor = pipkinColors.surface1,
-    title = { Text(title) },
-    text = {
-      // In the dialog's own composition, so the field is attached when the effect runs.
-      val focusRequester = remember { FocusRequester() }
-      LaunchedEffect(Unit) { focusRequester.requestFocus() }
-      OutlinedTextField(
-        value = name,
-        onValueChange = { name = it },
-        modifier = Modifier.focusRequester(focusRequester),
-        singleLine = true,
-        label = { Text(stringResource(R.string.shell_rename_label)) },
-      )
-    },
-    confirmButton = {
-      TextButton(onClick = { onConfirm(name.text.trim()) }, enabled = name.text.isNotBlank()) {
-        Text(stringResource(R.string.shell_rename_save))
-      }
-    },
-    dismissButton = {
-      TextButton(onClick = onDismiss) { Text(stringResource(R.string.shell_cancel)) }
-    },
-  )
+  PipkinDialog(
+    title = title,
+    confirm = DialogConfirm(
+      label = stringResource(R.string.shell_rename_save),
+      onClick = { onConfirm(name.text.trim()) },
+      enabled = name.text.isNotBlank(),
+    ),
+    dismissLabel = stringResource(R.string.shell_cancel),
+    onDismiss = onDismiss,
+  ) {
+    // In the dialog's own composition, so the field is attached when the effect runs.
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    DialogTextField(
+      value = name,
+      onValueChange = { name = it },
+      modifier = Modifier.focusRequester(focusRequester),
+      placeholder = stringResource(R.string.shell_rename_label),
+    )
+  }
 }

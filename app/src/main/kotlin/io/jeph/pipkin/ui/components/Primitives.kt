@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,10 +30,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
+import io.jeph.pipkin.R
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -53,9 +62,9 @@ fun LucideIcon(
   )
 }
 
-/** Paseo's 28dp circular icon button. */
+/** A 28dp circular icon button. */
 @Composable
-fun IconButton28(
+fun RoundIconButton(
   @DrawableRes icon: Int,
   contentDescription: String,
   onClick: () -> Unit,
@@ -66,74 +75,20 @@ fun IconButton28(
   iconSize: Dp = PipkinTokens.IconSize.md,
 ) {
   Box(
-    modifier =
-      modifier
-        .alpha(if (enabled) 1f else 0.5f)
-        .size(28.dp)
-        .clip(CircleShape)
-        .background(background)
-        .clickable(enabled = enabled, onClick = onClick),
+    modifier = modifier.roundButton(size = 28.dp, background = background, enabled = enabled, onClick = onClick),
     contentAlignment = Alignment.Center,
   ) {
     LucideIcon(icon = icon, contentDescription = contentDescription, size = iconSize, tint = tint)
   }
 }
 
-/** The height of [HeaderBar]'s row below its top padding, which overlays such as Termux's waking pill stay under. */
-val HeaderBarHeight = 56.dp
-
-/**
- * 56dp header with an 8dp top pad below the status bar and a 1dp bottom border. A [status] shows in place of the
- * [subtitle], panning when it doesn't fit.
- */
-@Composable
-fun HeaderBar(
-  title: String,
-  modifier: Modifier = Modifier,
-  subtitle: String? = null,
-  status: AnnotatedString? = null,
-  leading: @Composable RowScope.() -> Unit = {},
-  trailing: @Composable RowScope.() -> Unit = {},
-) {
-  val colors = pipkinColors
-  Column(modifier = modifier.fillMaxWidth().background(colors.surface0)) {
-    Row(
-      modifier =
-        Modifier
-          .windowInsetsPadding(WindowInsets.statusBars)
-          .padding(top = PipkinTokens.Spacing.s8)
-          .fillMaxWidth()
-          .heightIn(min = HeaderBarHeight)
-          .padding(horizontal = PipkinTokens.Spacing.s12),
-      verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
-    ) {
-      leading()
-      Column(modifier = Modifier.weight(1f)) {
-        Text(
-          text = title,
-          color = colors.foreground,
-          fontSize = PipkinTokens.FontSize.base,
-          maxLines = 1,
-          overflow = TextOverflow.Ellipsis,
-        )
-        if (status != null) {
-          PanningText(status)
-        } else if (subtitle != null) {
-          Text(
-            text = subtitle,
-            color = colors.foregroundMuted,
-            fontSize = PipkinTokens.FontSize.sm,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-          )
-        }
-      }
-      trailing()
-    }
-    HorizontalDivider(thickness = 1.dp, color = colors.border)
-  }
-}
+/** A [size] circle filled with [background] that calls [onClick], dimmed while not [enabled]. */
+internal fun Modifier.roundButton(size: Dp, background: Color, enabled: Boolean, onClick: () -> Unit): Modifier =
+  alpha(if (enabled) 1f else 0.5f)
+    .size(size)
+    .clip(CircleShape)
+    .background(background)
+    .clickable(enabled = enabled, onClick = onClick)
 
 /**
  * A muted one-line caption that, when it doesn't fit, pans to its end and around again every few seconds, so all of it

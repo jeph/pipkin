@@ -45,7 +45,7 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.host.GitCommit
-import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.git.ChangesPane
 import io.jeph.pipkin.ui.git.ExplorerTab
@@ -57,17 +57,6 @@ import io.jeph.pipkin.ui.git.shownExplorerTab
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
-
-/** Paseo's mobile explorer toggle: Lucide `panel-right`, muted, at the end of a workspace header. */
-@Composable
-internal fun ExplorerToggle(onClick: () -> Unit) {
-  IconButton28(
-    icon = R.drawable.ic_lucide_panel_right,
-    contentDescription = stringResource(R.string.files_explorer_open),
-    onClick = onClick,
-    tint = pipkinColors.foregroundMuted,
-  )
-}
 
 /**
  * Paseo's compact explorer: a full-width panel beside the workspace with the Changes and Files tabs and a close
@@ -247,7 +236,7 @@ private fun ExplorerHeader(
   ) {
     for (tab in tabs) ExplorerTabButton(tab, active = tab == shown, onClick = { onSelect(tab) })
     Spacer(modifier = Modifier.weight(1f))
-    IconButton28(
+    RoundIconButton(
       icon = R.drawable.ic_lucide_x,
       contentDescription = stringResource(R.string.files_explorer_close),
       onClick = onClose,
@@ -307,7 +296,7 @@ private fun ExplorerToolbar(
     horizontalArrangement = Arrangement.spacedBy(1.dp),
   ) {
     SortKeyButton(sort.key, onClick = { preferences.setExplorerSort(sort.next()) })
-    IconButton28(
+    RoundIconButton(
       icon = if (sort.descending) R.drawable.ic_lucide_arrow_down else R.drawable.ic_lucide_arrow_up,
       contentDescription = stringResource(
         if (sort.descending) R.string.files_sort_descending else R.string.files_sort_ascending,
@@ -317,21 +306,21 @@ private fun ExplorerToolbar(
     )
     Spacer(modifier = Modifier.weight(1f))
     if (canCollapseAll) {
-      IconButton28(
+      RoundIconButton(
         icon = R.drawable.ic_lucide_chevrons_down_up,
         contentDescription = stringResource(R.string.files_collapse_all),
         onClick = onCollapseAll,
         tint = colors.foregroundExtraMuted,
       )
     }
-    IconButton28(
+    RoundIconButton(
       icon = R.drawable.ic_lucide_folder_plus,
       contentDescription = stringResource(R.string.files_new_folder),
       onClick = onNewFolder,
       enabled = enabled,
       tint = colors.foregroundExtraMuted,
     )
-    IconButton28(
+    RoundIconButton(
       icon = if (showHidden) R.drawable.ic_lucide_eye else R.drawable.ic_lucide_eye_off,
       contentDescription = stringResource(if (showHidden) R.string.files_hide_hidden else R.string.files_show_hidden),
       onClick = { preferences.setShowHiddenFiles(!showHidden) },
@@ -343,7 +332,7 @@ private fun ExplorerToolbar(
         Spinner(PipkinTokens.IconSize.md, stringResource(R.string.files_refreshing))
       }
     } else {
-      IconButton28(
+      RoundIconButton(
         icon = R.drawable.ic_lucide_refresh_cw,
         contentDescription = stringResource(R.string.files_refresh),
         onClick = onRefresh,

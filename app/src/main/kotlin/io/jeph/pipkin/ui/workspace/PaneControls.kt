@@ -6,7 +6,7 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
-import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.workspace.Pane
 import io.jeph.pipkin.workspace.WorkspaceTab
 
@@ -26,7 +26,7 @@ internal class PaneControls(
 @Composable
 internal fun CloseSplitButton(controls: PaneControls) {
   val onClose = controls.onCloseSplit ?: return
-  IconButton28(
+  HeaderButton(
     icon = R.drawable.ic_lucide_x,
     contentDescription = stringResource(R.string.shell_split_close),
     onClick = onClose,

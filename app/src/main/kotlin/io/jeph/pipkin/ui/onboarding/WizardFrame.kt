@@ -26,7 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
-import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -39,7 +39,7 @@ internal fun WizardTopBar(state: OnboardingState, step: SetupStep?, onBack: (() 
   ) {
     Box(Modifier.size(BAR_BUTTON_SIZE), contentAlignment = Alignment.Center) {
       if (onBack != null) {
-        IconButton28(
+        RoundIconButton(
           icon = R.drawable.ic_lucide_chevron_left,
           contentDescription = stringResource(R.string.onboarding_back),
           onClick = onBack,
@@ -54,7 +54,7 @@ internal fun WizardTopBar(state: OnboardingState, step: SetupStep?, onBack: (() 
     }
     Box(Modifier.size(BAR_BUTTON_SIZE), contentAlignment = Alignment.Center) {
       if (onClose != null) {
-        IconButton28(
+        RoundIconButton(
           icon = R.drawable.ic_lucide_x,
           contentDescription = stringResource(R.string.onboarding_close),
           onClick = onClose,

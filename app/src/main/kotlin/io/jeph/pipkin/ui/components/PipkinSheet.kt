@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
@@ -26,6 +28,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.dp
 import androidx.core.view.SoftwareKeyboardControllerCompat
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -59,8 +62,17 @@ fun PipkinSheet(
     onDismissRequest = onDismissRequest,
     modifier = modifier,
     sheetState = sheetState,
+    shape = SHEET_SHAPE,
     containerColor = pipkinColors.surface1,
     contentColor = pipkinColors.foreground,
+    dragHandle = {
+      BottomSheetDefaults.DragHandle(
+        width = 40.dp,
+        height = 4.dp,
+        shape = RoundedCornerShape(2.dp),
+        color = pipkinColors.surface3,
+      )
+    },
   ) {
     Column(
       modifier = Modifier
@@ -71,6 +83,8 @@ fun PipkinSheet(
     )
   }
 }
+
+private val SHEET_SHAPE = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
 
 /**
  * Closes the keyboard for a sheet and returns whether it's down, so the sheet can open. A sheet that opens

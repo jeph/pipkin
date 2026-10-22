@@ -57,7 +57,7 @@ import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.auth.LoginSheet
-import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors

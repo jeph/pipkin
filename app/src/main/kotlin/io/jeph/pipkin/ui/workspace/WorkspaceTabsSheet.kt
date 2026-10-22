@@ -52,42 +52,6 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.workspace.Pane
 import io.jeph.pipkin.workspace.WorkspaceTab
 
-/** Paseo's compact-header tab switcher trigger: the number of tabs in the workspace in a small outlined square. */
-@Composable
-internal fun TabCountButton(count: Int, onClick: () -> Unit) {
-  val colors = pipkinColors
-  val description = pluralStringResource(R.plurals.shell_tabs_button, count, count)
-  Box(
-    modifier = Modifier
-      .size(28.dp)
-      .clip(CircleShape)
-      .clickable(onClick = onClick)
-      .semantics { contentDescription = description },
-    contentAlignment = Alignment.Center,
-  ) {
-    Box(
-      modifier = Modifier
-        .sizeIn(minWidth = 16.dp, minHeight = 16.dp)
-        .border(1.dp, colors.foregroundMuted, RoundedCornerShape(PipkinTokens.Radius.sm))
-        .padding(horizontal = 2.dp),
-      contentAlignment = Alignment.Center,
-    ) {
-      // Paseo's 12sp line, without Android's font padding, keeps the badge a 16dp square.
-      Text(
-        text = count.toString(),
-        color = colors.foregroundMuted,
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Medium,
-        style = TextStyle(
-          lineHeight = 12.sp,
-          platformStyle = PlatformTextStyle(includeFontPadding = false),
-          lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
-        ),
-      )
-    }
-  }
-}
-
 /**
  * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace folder [cwd] of what
  * [pane] shows, its terminals, its open files, its open commits and then its chats, the shown one highlighted. Tapping
@@ -174,6 +138,7 @@ private fun ConfirmArchive(archiving: TabArchiving) {
     onConfirm = archiving::confirm,
     onDismiss = archiving::cancel,
     destructive = true,
+    icon = R.drawable.ic_lucide_archive,
   )
 }
 
@@ -188,6 +153,7 @@ private fun ConfirmCloseTab(closing: TabClosing) {
     onConfirm = closing::confirm,
     onDismiss = closing::cancel,
     destructive = true,
+    icon = warning.icon,
   )
 }
 

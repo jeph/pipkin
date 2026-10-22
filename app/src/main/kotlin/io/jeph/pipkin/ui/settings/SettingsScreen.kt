@@ -37,8 +37,9 @@ import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.ui.auth.LoginSheet
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.HeaderBar
-import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
@@ -64,7 +65,7 @@ internal fun SettingsScreen(
       HeaderBar(
         title = stringResource(R.string.settings_title),
         leading = {
-          IconButton28(
+          HeaderButton(
             icon = R.drawable.ic_lucide_chevron_left,
             contentDescription = stringResource(R.string.settings_back),
             onClick = onBack,
@@ -167,7 +168,7 @@ private fun AgentSection(graph: AppGraph, snackbar: SnackbarStackState, onOpenBa
       subtitle = configDir ?: stringResource(R.string.settings_config_folder_unknown),
     ) {
       if (configDir != null) {
-        IconButton28(
+        RoundIconButton(
           icon = R.drawable.ic_lucide_copy,
           contentDescription = stringResource(R.string.settings_copy),
           onClick = { copyToClipboard(context, configFolder, configDir) },
@@ -228,6 +229,7 @@ private fun UpdateExtensionsRow(update: PiExtensionUpdate, snackbar: SnackbarSta
       title = stringResource(R.string.settings_update_extensions_title),
       text = stringResource(R.string.settings_update_extensions_text),
       confirmLabel = stringResource(R.string.settings_update_extensions_confirm),
+      icon = R.drawable.ic_lucide_refresh_cw,
       onConfirm = {
         confirming = false
         update.start()

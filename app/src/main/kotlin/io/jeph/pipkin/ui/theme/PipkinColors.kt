@@ -21,6 +21,8 @@ data class PipkinColors(
   val accentForeground: Color,
   /** A wash of [accent] behind accent-coloured text, such as a selected row or the tab count. */
   val accentSoft: Color,
+  /** The accent on an inverse surface, such as a snackbar's action, light or dark enough to read there. */
+  val accentInverse: Color,
   val destructive: Color,
   val destructiveForeground: Color,
   val dotSuccess: Color,
@@ -53,6 +55,7 @@ val DarkPipkinColors =
     accent = Color(0xFF7C9CFF),
     accentForeground = Color(0xFF0A1240),
     accentSoft = Color(0x247C9CFF),
+    accentInverse = Color(0xFF2F4BD8),
     destructive = Color(0xFFFF6B7A),
     destructiveForeground = Color(0xFF2A0710),
     dotSuccess = Color(0xFF5FD49A),
@@ -79,6 +82,7 @@ val LightPipkinColors =
     accent = Color(0xFF2F4BD8),
     accentForeground = Color(0xFFFFFFFF),
     accentSoft = Color(0x172F4BD8),
+    accentInverse = Color(0xFFA9BBFF),
     destructive = Color(0xFFC42B3C),
     destructiveForeground = Color(0xFFFFFFFF),
     dotSuccess = Color(0xFF157A4A),

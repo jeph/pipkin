@@ -43,46 +43,29 @@ import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.terminal.TerminalState
-import io.jeph.pipkin.ui.chat.MenuButton
-import io.jeph.pipkin.ui.components.HeaderBar
-import io.jeph.pipkin.ui.components.IconButton28
-import io.jeph.pipkin.ui.files.ExplorerToggle
-import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import io.jeph.pipkin.ui.workspace.CloseSplitButton
 import io.jeph.pipkin.ui.workspace.PaneControls
-import io.jeph.pipkin.ui.workspace.TabCountButton
-import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
+import io.jeph.pipkin.ui.workspace.PaneHeader
 import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
- * One terminal tab in a pane: a header with the terminal's name over its folder, the workspace's tab
- * button, the terminal's actions and the explorer toggle, which act through [controls]; libghostty's terminal; and
- * Paseo's key bar above the keyboard. An ended shell shows a bar to start another.
+ * One terminal tab in a pane: the pane's header with the terminal's name over its folder and the terminal's actions,
+ * which acts through [controls]; libghostty's terminal; and Paseo's key bar above the keyboard. An ended shell shows a
+ * bar to start another.
  */
 @Composable
 internal fun TerminalScreen(session: TerminalSession, controls: PaneControls, modifier: Modifier = Modifier) {
   val graph = LocalContext.current.appGraph
-  val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(controls.pane, session.cwd)
   var actionsOpen by remember(session) { mutableStateOf(false) }
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    HeaderBar(
+    PaneHeader(
       title = terminalTitle(session),
-      subtitle = hello?.home?.let { tildePath(session.cwd, it) } ?: session.cwd,
-      leading = { MenuButton(controls.onToggleSidebar) },
-      trailing = {
-        TabCountButton(count = tabs.count, onClick = controls.onOpenTabs)
-        IconButton28(
-          icon = R.drawable.ic_lucide_ellipsis,
-          contentDescription = stringResource(R.string.terminal_actions),
-          onClick = { actionsOpen = true },
-        )
-        ExplorerToggle(controls.onToggleExplorer)
-        CloseSplitButton(controls)
-      },
+      cwd = session.cwd,
+      controls = controls,
+      actionsDescription = stringResource(R.string.terminal_actions),
+      onActions = { actionsOpen = true },
     )
     // The terminal view and its key state are per session; a new session starts fresh.
     key(session) { TerminalPane(session, Modifier.weight(1f)) }

@@ -49,13 +49,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
-import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.files.FileState
 import io.jeph.pipkin.files.FileTab
 import io.jeph.pipkin.host.FileContent
-import io.jeph.pipkin.ui.chat.MenuButton
-import io.jeph.pipkin.ui.components.HeaderBar
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.fileLanguage
@@ -63,50 +59,37 @@ import io.jeph.pipkin.ui.components.rememberHighlightedCode
 import io.jeph.pipkin.ui.components.splitLines
 import io.jeph.pipkin.ui.settings.SegmentedControl
 import io.jeph.pipkin.ui.settings.copyToClipboard
-import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import io.jeph.pipkin.ui.workspace.CloseSplitButton
 import io.jeph.pipkin.ui.workspace.PaneControls
-import io.jeph.pipkin.ui.workspace.TabCountButton
-import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
+import io.jeph.pipkin.ui.workspace.PaneHeader
 import io.jeph.pipkin.workspace.WorkspaceTab
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * One open file in a pane: a header with the file's name over its folder, the workspace's tab button,
- * the file's actions and the explorer toggle, which act through [controls]; Paseo's bar with the file's size and line
- * count; and the file itself, read again each time its tab shows, since Pi may have changed it. Text shows with line
- * numbers, coloured when a grammar knows the extension; images show fitted to the width.
+ * One open file in a pane: the pane's header with the file's name over its folder and the file's actions, which acts
+ * through [controls]; Paseo's bar with the file's size and line count; and the file itself, read again each time its
+ * tab shows, since Pi may have changed it. Text shows with line numbers, coloured when a grammar knows the extension;
+ * images show fitted to the width.
  */
 @Composable
 internal fun FileScreen(file: FileTab, controls: PaneControls, modifier: Modifier = Modifier) {
-  val graph = LocalContext.current.appGraph
-  val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(controls.pane, file.cwd)
   val state by file.state.collectAsStateWithLifecycle()
   var actionsOpen by remember(file) { mutableStateOf(false) }
   val folder = if (file.folder.isEmpty()) file.cwd else "${file.cwd}/${file.folder}"
   LaunchedEffect(file) { file.reload() }
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    HeaderBar(
+    PaneHeader(
       title = file.name,
-      subtitle = hello?.home?.let { tildePath(folder, it) } ?: folder,
-      leading = { MenuButton(controls.onToggleSidebar) },
-      trailing = {
-        TabCountButton(count = tabs.count, onClick = controls.onOpenTabs)
-        IconButton28(
-          icon = R.drawable.ic_lucide_ellipsis,
-          contentDescription = stringResource(R.string.file_actions),
-          onClick = { actionsOpen = true },
-        )
-        ExplorerToggle(controls.onToggleExplorer)
-        CloseSplitButton(controls)
-      },
+      cwd = file.cwd,
+      controls = controls,
+      actionsDescription = stringResource(R.string.file_actions),
+      onActions = { actionsOpen = true },
+      folder = folder,
     )
     when (val shown = state) {
       FileState.Loading -> FileNote(Modifier.weight(1f)) {

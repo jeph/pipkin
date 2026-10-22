@@ -40,9 +40,9 @@ import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.host.GitCommit
 import io.jeph.pipkin.host.GitDiffMode
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.files.Spinner
 import io.jeph.pipkin.ui.onboarding.PrimaryButton
@@ -176,14 +176,14 @@ private fun ChangesToolbar(
         Spinner(PipkinTokens.IconSize.md, stringResource(R.string.git_refreshing))
       }
     } else {
-      IconButton28(
+      RoundIconButton(
         icon = R.drawable.ic_lucide_refresh_cw,
         contentDescription = stringResource(R.string.git_refresh),
         onClick = onRefresh,
         tint = colors.foregroundExtraMuted,
       )
     }
-    IconButton28(
+    RoundIconButton(
       icon = R.drawable.ic_lucide_ellipsis,
       contentDescription = stringResource(R.string.git_options),
       onClick = { optionsOpen = true },

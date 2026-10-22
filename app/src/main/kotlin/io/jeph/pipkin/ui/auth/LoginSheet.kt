@@ -39,9 +39,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.core.net.toUri
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.settings.copyToClipboard
@@ -202,7 +202,7 @@ private fun DeviceCodeBlock(step: DeviceCodeStep, onOpen: (String) -> Unit) {
         fontFamily = PipkinFonts.mono,
         fontSize = PipkinTokens.FontSize.xxl,
       )
-      IconButton28(
+      RoundIconButton(
         icon = R.drawable.ic_lucide_copy,
         contentDescription = copyLabel,
         onClick = { copyToClipboard(context, copyLabel, step.userCode) },

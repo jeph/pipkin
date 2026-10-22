@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.LocalTextStyle
@@ -23,7 +23,7 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** A sheet's single-line search field: a search icon and [placeholder] on a rounded surface2 fill. */
+/** A single-line search field: a search icon and [placeholder] in a surface2 pill. */
 @Composable
 fun SearchField(
   query: String,
@@ -52,10 +52,10 @@ fun SearchField(
           Modifier
             .fillMaxWidth()
             .heightIn(min = 40.dp)
-            .background(colors.surface2, RoundedCornerShape(PipkinTokens.Radius.lg))
-            .padding(horizontal = PipkinTokens.Spacing.s12),
+            .background(colors.surface2, CircleShape)
+            .padding(horizontal = PipkinTokens.Spacing.s16),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
       ) {
         LucideIcon(icon = R.drawable.ic_lucide_search, contentDescription = null, tint = colors.foregroundMuted)
         Box(modifier = Modifier.weight(1f)) {

@@ -42,7 +42,7 @@ import io.jeph.pipkin.ui.chat.ChatStream
 import io.jeph.pipkin.ui.chat.ChatView
 import io.jeph.pipkin.ui.chat.ToolCallSheet
 import io.jeph.pipkin.ui.components.HeaderBar
-import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
@@ -166,16 +166,16 @@ private fun TranscriptHeader(
   val home = hello?.home?.takeIf { it.isNotEmpty() } ?: fallbackHome
   HeaderBar(
     title = session?.let { sessionTitle(it) } ?: stringResource(R.string.archive_title),
-    subtitle = session?.let { tildePath(it.cwd, home) },
+    folder = session?.let { tildePath(it.cwd, home) },
     leading = {
-      IconButton28(
+      HeaderButton(
         icon = R.drawable.ic_lucide_chevron_left,
         contentDescription = stringResource(R.string.archive_back),
         onClick = onBack,
       )
     },
     trailing = {
-      IconButton28(
+      HeaderButton(
         icon = R.drawable.ic_lucide_trash_2,
         contentDescription = stringResource(R.string.archive_delete),
         onClick = onDelete,

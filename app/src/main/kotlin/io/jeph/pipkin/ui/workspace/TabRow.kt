@@ -36,9 +36,9 @@ import io.jeph.pipkin.git.CommitTab
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.ui.chat.extensionStatusLine
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PanningText
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.StatusDot
 import io.jeph.pipkin.ui.files.fileIcon
@@ -192,7 +192,7 @@ private fun TabRow(
       )
       detail?.invoke()
     }
-    IconButton28(
+    RoundIconButton(
       icon = R.drawable.ic_lucide_ellipsis,
       contentDescription = actionsDescription,
       onClick = onActions,

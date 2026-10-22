@@ -34,6 +34,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.dismiss
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -93,9 +94,9 @@ internal class SnackbarEntry(val message: String, val actionLabel: String?) {
 }
 
 /**
- * [state]'s snackbars in Pipkin's colors, newest at the bottom, with any action in the accent color. Swiping one
- * sideways dismisses it without its action, so an Undo it offers is not taken. Shows nothing while a
- * [SnackbarStackOverlay] of [state] is composed.
+ * [state]'s snackbars, inverse to the theme so they stand out over any surface, newest at the bottom, with any action
+ * in the inverse accent. Swiping one sideways dismisses it without its action, so an Undo it offers is not taken.
+ * Shows nothing while a [SnackbarStackOverlay] of [state] is composed.
  */
 @Composable
 internal fun SnackbarStack(state: SnackbarStackState, modifier: Modifier = Modifier) {
@@ -159,14 +160,14 @@ private fun StackedSnackbar(state: SnackbarStackState, entry: SnackbarEntry) {
           {
             TextButton(
               onClick = entry::performAction,
-              colors = ButtonDefaults.textButtonColors(contentColor = colors.accent),
-            ) { Text(label) }
+              colors = ButtonDefaults.textButtonColors(contentColor = colors.accentInverse),
+            ) { Text(text = label, fontWeight = FontWeight.ExtraBold) }
           }
         },
-        shape = RoundedCornerShape(PipkinTokens.Radius.lg),
-        containerColor = colors.surface3,
-        contentColor = colors.foreground,
-      ) { Text(entry.message) }
+        shape = RoundedCornerShape(16.dp),
+        containerColor = colors.foreground,
+        contentColor = colors.surface0,
+      ) { Text(text = entry.message, fontWeight = FontWeight.Medium) }
     }
   }
 }

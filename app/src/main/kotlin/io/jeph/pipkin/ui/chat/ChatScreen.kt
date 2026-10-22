@@ -37,17 +37,14 @@ import io.jeph.pipkin.agent.TimelineState
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.components.HeaderBar
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
-import io.jeph.pipkin.ui.files.ExplorerToggle
-import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.CloseSplitButton
 import io.jeph.pipkin.ui.workspace.PaneControls
-import io.jeph.pipkin.ui.workspace.TabCountButton
-import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
+import io.jeph.pipkin.ui.workspace.PaneHeader
+import io.jeph.pipkin.ui.workspace.SidebarButton
 
 /**
  * One chat in a pane: header, stream and composer for [process]; a null process shows a starting placeholder. What
@@ -256,9 +253,8 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
 }
 
 /**
- * Session name (or the first message) over the project path, with `~` for the Termux home, or over the statuses
- * extensions set while there are any; the tab button with the number of tabs in the workspace sits before the actions
- * button, and the file explorer's toggle ends the row, before the second pane's button that closes split screen.
+ * Session name (or the first message) over the project path, or over the statuses extensions set while there are any,
+ * in the pane's header.
  */
 @Composable
 private fun ChatHeader(process: AgentProcess, controls: PaneControls, onActions: () -> Unit, modifier: Modifier) {
@@ -267,37 +263,18 @@ private fun ChatHeader(process: AgentProcess, controls: PaneControls, onActions:
   val extensionTitle by process.extensionTitle.collectAsStateWithLifecycle()
   val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
   val sessions by graph.sessionRepository.sessions.collectAsStateWithLifecycle()
-  val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(controls.pane, process.cwd)
   val firstMessage = sessions.firstOrNull { it.path == sessionFile }?.firstMessage?.takeIf { it.isNotBlank() }
   val statuses by process.extensionStatuses.collectAsStateWithLifecycle()
   val colors = pipkinColors
   val status = remember(statuses, colors) { extensionStatusLine(statuses, colors) }
-  HeaderBar(
+  PaneHeader(
     title = extensionTitle ?: sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),
-    subtitle = hello?.home?.let { tildePath(process.cwd, it) } ?: process.cwd,
-    status = status,
+    cwd = process.cwd,
+    controls = controls,
+    actionsDescription = stringResource(R.string.chat_actions),
+    onActions = onActions,
     modifier = modifier,
-    leading = { MenuButton(controls.onToggleSidebar) },
-    trailing = {
-      TabCountButton(count = tabs.count, onClick = controls.onOpenTabs)
-      IconButton28(
-        icon = R.drawable.ic_lucide_ellipsis,
-        contentDescription = stringResource(R.string.chat_actions),
-        onClick = onActions,
-      )
-      ExplorerToggle(controls.onToggleExplorer)
-      CloseSplitButton(controls)
-    },
-  )
-}
-
-@Composable
-internal fun MenuButton(onToggleSidebar: () -> Unit) {
-  IconButton28(
-    icon = R.drawable.ic_lucide_menu,
-    contentDescription = stringResource(R.string.chat_toggle_sidebar),
-    onClick = onToggleSidebar,
+    status = status,
   )
 }
 
@@ -307,7 +284,7 @@ private fun PlaceholderChat(controls: PaneControls, modifier: Modifier) {
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
     HeaderBar(
       title = stringResource(R.string.chat_new_chat),
-      leading = { MenuButton(controls.onToggleSidebar) },
+      leading = { SidebarButton(controls.onToggleSidebar) },
       trailing = { CloseSplitButton(controls) },
     )
     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -387,7 +364,6 @@ private fun ChatDialogs(
       initial = sessionName.orEmpty(),
       placeholder = stringResource(R.string.chat_rename_hint),
       confirmLabel = stringResource(R.string.chat_save),
-      multiline = false,
       onConfirm = {
         dismiss()
         controller.rename(it)
@@ -399,6 +375,7 @@ private fun ChatDialogs(
       title = stringResource(R.string.chat_reload_confirm_title),
       text = stringResource(R.string.chat_reload_confirm_text),
       confirmLabel = stringResource(R.string.chat_reload_confirm),
+      icon = R.drawable.ic_lucide_refresh_cw,
       onConfirm = {
         dismiss()
         controller.reload()
@@ -416,6 +393,7 @@ private fun ChatDialogs(
       },
       onDismiss = dismiss,
       destructive = true,
+      icon = R.drawable.ic_lucide_archive,
     )
 
     else -> Unit

@@ -37,8 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.termux.TermuxSetup
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -254,7 +254,7 @@ internal fun CommandBox(command: String, modifier: Modifier = Modifier) {
       fontSize = PipkinTokens.FontSize.code,
       lineHeight = PipkinTokens.LineHeight.code,
     )
-    IconButton28(
+    RoundIconButton(
       icon = R.drawable.ic_lucide_copy,
       contentDescription = stringResource(R.string.onboarding_copy_command),
       onClick = { TermuxSetup.copy(context, command) },

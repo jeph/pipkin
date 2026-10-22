@@ -50,9 +50,9 @@ import io.jeph.pipkin.data.sameFolder
 import io.jeph.pipkin.data.workspaces
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SwipeAway
@@ -160,7 +160,7 @@ internal fun SidebarIconButton(
   onClick: () -> Unit,
   tint: Color = pipkinColors.foreground,
 ) {
-  IconButton28(
+  RoundIconButton(
     icon = icon,
     contentDescription = contentDescription,
     onClick = onClick,
@@ -237,6 +237,7 @@ private fun RemoveWorkspaceDialog(removal: WorkspaceRemoval, home: String) {
     onConfirm = removal::confirm,
     onDismiss = removal::cancel,
     destructive = true,
+    icon = R.drawable.ic_lucide_folder_minus,
   )
 }
 

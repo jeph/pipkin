@@ -24,33 +24,23 @@ import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.git.CommitDiffState
 import io.jeph.pipkin.git.CommitTab
-import io.jeph.pipkin.ui.chat.MenuButton
-import io.jeph.pipkin.ui.components.HeaderBar
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
-import io.jeph.pipkin.ui.files.ExplorerToggle
-import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import io.jeph.pipkin.ui.workspace.CloseSplitButton
 import io.jeph.pipkin.ui.workspace.PaneControls
-import io.jeph.pipkin.ui.workspace.TabCountButton
-import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
+import io.jeph.pipkin.ui.workspace.PaneHeader
 import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
- * One open commit in a pane: the workspace header with the commit's title, the workspace's tab
- * button, the commit's actions and the explorer toggle, which act through [controls], then just what the commit
- * changed, every file unfolded, as the Changes tab draws a diff. It follows the global Wrap lines and Hide whitespace
- * settings; hiding whitespace reads the commit again with git's `-w`. A commit never changes, so it's read once per
- * whitespace setting.
+ * One open commit in a pane: the pane's header with the commit's title and the commit's actions, which acts through
+ * [controls], then just what the commit changed, every file unfolded, as the Changes tab draws a diff. It follows the
+ * global Wrap lines and Hide whitespace settings; hiding whitespace reads the commit again with git's `-w`. A commit
+ * never changes, so it's read once per whitespace setting.
  */
 @Composable
 internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: Modifier = Modifier) {
   val graph = LocalContext.current.appGraph
-  val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val tabs = rememberWorkspaceTabs(controls.pane, commit.cwd)
   val state by commit.state.collectAsStateWithLifecycle()
   val hideWhitespace by graph.preferences.diffHideWhitespace.collectAsStateWithLifecycle()
   val wrapLines by graph.preferences.diffWrapLines.collectAsStateWithLifecycle()
@@ -60,20 +50,12 @@ internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: M
   LaunchedEffect(commit, hideWhitespace) { commit.load(hideWhitespace) }
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    HeaderBar(
+    PaneHeader(
       title = commit.title,
-      subtitle = hello?.home?.let { tildePath(commit.cwd, it) } ?: commit.cwd,
-      leading = { MenuButton(controls.onToggleSidebar) },
-      trailing = {
-        TabCountButton(count = tabs.count, onClick = controls.onOpenTabs)
-        IconButton28(
-          icon = R.drawable.ic_lucide_ellipsis,
-          contentDescription = stringResource(R.string.git_commit_actions),
-          onClick = { actionsOpen = true },
-        )
-        ExplorerToggle(controls.onToggleExplorer)
-        CloseSplitButton(controls)
-      },
+      cwd = commit.cwd,
+      controls = controls,
+      actionsDescription = stringResource(R.string.git_commit_actions),
+      onActions = { actionsOpen = true },
     )
     val body = Modifier.weight(1f)
     when (val shown = state) {

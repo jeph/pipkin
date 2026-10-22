@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.workspace
 
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import io.jeph.pipkin.R
@@ -22,12 +23,18 @@ internal val WorkspaceTab.menuGroup: Int
     is WorkspaceTab.Commit -> 2
   }
 
-/** What closing a tab from the tab menu asks first: a title, a text and the confirm button's label. */
-internal class CloseWarning(@StringRes val title: Int, @StringRes val text: Int, @StringRes val confirm: Int)
+/** What closing a tab from the tab menu asks first: an icon, a title, a text and the confirm button's label. */
+internal class CloseWarning(
+  @DrawableRes val icon: Int,
+  @StringRes val title: Int,
+  @StringRes val text: Int,
+  @StringRes val confirm: Int,
+)
 
 /** What closing [this] from the tab menu asks first, or null when it closes without asking. */
 internal fun WorkspaceTab.closeWarning(): CloseWarning? = when (this) {
   is WorkspaceTab.Terminal -> CloseWarning(
+    icon = R.drawable.ic_lucide_square_terminal,
     title = R.string.terminal_close_confirm_title,
     text = R.string.terminal_close_confirm_text,
     confirm = R.string.terminal_close_confirm,

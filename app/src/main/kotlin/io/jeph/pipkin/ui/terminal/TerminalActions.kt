@@ -87,6 +87,7 @@ internal fun TerminalActionsSheet(
       onConfirm = { dismissThen(onClose) },
       onDismiss = onDismiss,
       destructive = true,
+      icon = R.drawable.ic_lucide_square_terminal,
     )
   }
 }

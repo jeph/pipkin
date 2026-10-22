@@ -32,8 +32,10 @@ import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.ModelConfig
-import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.DialogConfirm
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.PipkinDialog
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -114,20 +116,13 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
 /** Asks before dropping unsaved edits. */
 @Composable
 internal fun DiscardDialog(onDiscard: () -> Unit, onDismiss: () -> Unit) {
-  val colors = pipkinColors
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    confirmButton = {
-      TextButton(onClick = onDiscard, colors = ButtonDefaults.textButtonColors(contentColor = colors.destructive)) {
-        Text(stringResource(R.string.provider_discard))
-      }
-    },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.provider_keep_editing)) } },
-    title = { Text(stringResource(R.string.provider_discard_title)) },
-    text = { Text(stringResource(R.string.provider_discard_text)) },
-    containerColor = colors.surface1,
-    titleContentColor = colors.foreground,
-    textContentColor = colors.foregroundMuted,
+  PipkinDialog(
+    title = stringResource(R.string.provider_discard_title),
+    text = stringResource(R.string.provider_discard_text),
+    icon = R.drawable.ic_lucide_trash_2,
+    confirm = DialogConfirm(stringResource(R.string.provider_discard), onDiscard, destructive = true),
+    dismissLabel = stringResource(R.string.provider_keep_editing),
+    onDismiss = onDismiss,
   )
 }
 
@@ -224,7 +219,7 @@ private fun CustomModelField(input: CustomModelInput, onAdd: () -> Unit) {
       if (input.adding) {
         SimmeringPot()
       } else {
-        IconButton28(
+        RoundIconButton(
           icon = R.drawable.ic_lucide_plus,
           contentDescription = stringResource(R.string.models_custom_add),
           onClick = onAdd,

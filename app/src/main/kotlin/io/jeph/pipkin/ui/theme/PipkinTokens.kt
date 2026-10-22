@@ -26,6 +26,7 @@ object PipkinTokens {
     val xl = 18.sp
     val xxl = 20.sp
     val meta = 13.sp
+    val title = 17.sp
   }
 
   object LineHeight {

@@ -73,9 +73,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.atMostHalfTall
@@ -394,7 +394,7 @@ private fun AttachButton(controller: ChatController, model: JSONObject?) {
   val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
     if (uris.isNotEmpty()) controller.addFiles(uris)
   }
-  IconButton28(
+  RoundIconButton(
     icon = R.drawable.ic_lucide_plus,
     contentDescription = stringResource(R.string.chat_attach),
     onClick = { sheetOpen = true },
@@ -435,7 +435,7 @@ private fun PrimaryButton(action: PrimaryAction, onSend: () -> Unit, onStop: () 
       SimmeringPot(tint = colors.accentForeground)
     }
 
-    PrimaryAction.Send, PrimaryAction.Idle -> IconButton28(
+    PrimaryAction.Send, PrimaryAction.Idle -> RoundIconButton(
       icon = R.drawable.ic_lucide_arrow_up,
       contentDescription = send,
       onClick = onSend,
@@ -444,7 +444,7 @@ private fun PrimaryButton(action: PrimaryAction, onSend: () -> Unit, onStop: () 
       tint = colors.accentForeground,
     )
 
-    PrimaryAction.Stop -> IconButton28(
+    PrimaryAction.Stop -> RoundIconButton(
       icon = R.drawable.ic_lucide_square,
       contentDescription = stringResource(R.string.chat_stop),
       onClick = onStop,

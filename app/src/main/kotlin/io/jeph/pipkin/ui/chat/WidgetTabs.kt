@@ -69,9 +69,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.ExtensionWidget
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -357,7 +357,7 @@ private fun WidgetPanel(item: KeyedWidget, belowEditor: Boolean, tight: Boolean,
         fontSize = PipkinTokens.FontSize.code,
         lineHeight = PipkinTokens.LineHeight.code,
       )
-      IconButton28(
+      RoundIconButton(
         icon = R.drawable.ic_lucide_maximize_2,
         contentDescription = stringResource(R.string.chat_widget_expand),
         onClick = onExpand,

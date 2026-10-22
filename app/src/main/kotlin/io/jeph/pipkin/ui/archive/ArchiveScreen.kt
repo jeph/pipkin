@@ -50,9 +50,10 @@ import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.HeaderBar
-import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SearchField
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
@@ -283,7 +284,7 @@ private fun ArchiveHeader(
     HeaderBar(
       title = stringResource(R.string.archive_title),
       leading = {
-        IconButton28(
+        HeaderButton(
           icon = R.drawable.ic_lucide_chevron_left,
           contentDescription = stringResource(R.string.archive_back),
           onClick = onBack,
@@ -295,7 +296,7 @@ private fun ArchiveHeader(
   HeaderBar(
     title = pluralStringResource(R.plurals.archive_selected, selectedCount, selectedCount),
     leading = {
-      IconButton28(
+      HeaderButton(
         icon = R.drawable.ic_lucide_x,
         contentDescription = stringResource(R.string.archive_clear_selection),
         onClick = onClearSelection,
@@ -373,7 +374,7 @@ private fun ArchivedRow(
       maxLines = 1,
     )
     if (!selecting) {
-      IconButton28(
+      RoundIconButton(
         icon = R.drawable.ic_lucide_ellipsis,
         contentDescription = stringResource(R.string.archive_chat_actions),
         onClick = onActions,
@@ -483,5 +484,6 @@ internal fun DeleteDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Un
     onConfirm = onConfirm,
     onDismiss = onDismiss,
     destructive = true,
+    icon = R.drawable.ic_lucide_trash_2,
   )
 }

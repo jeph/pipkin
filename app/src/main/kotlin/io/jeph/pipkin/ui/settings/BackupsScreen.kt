@@ -29,7 +29,7 @@ import io.jeph.pipkin.host.Backups
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.TermuxBuild
 import io.jeph.pipkin.ui.chat.ConfirmDialog
-import io.jeph.pipkin.ui.components.IconButton28
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.theme.PipkinFonts
@@ -86,6 +86,7 @@ internal fun BackupsScreen(onBack: () -> Unit) {
       text = stringResource(R.string.backups_restore_text, backupTime(context, backup)),
       confirmLabel = stringResource(R.string.backups_restore),
       destructive = true,
+      icon = R.drawable.ic_lucide_archive_restore,
       onConfirm = {
         restoring = null
         backups.restore(backup.name)
@@ -122,6 +123,7 @@ private fun DeleteDialog(backup: BackupInfo, onConfirm: () -> Unit, onDismiss: (
     },
     confirmLabel = stringResource(R.string.backups_delete),
     destructive = true,
+    icon = R.drawable.ic_lucide_trash_2,
     onConfirm = onConfirm,
     onDismiss = onDismiss,
   )
@@ -228,7 +230,7 @@ private fun BackupRow(backup: BackupInfo, enabled: Boolean, onRestore: () -> Uni
     }
   SettingsRow(title = backupTime(context, backup), subtitle = subtitle) {
     if (backup.error == null) {
-      IconButton28(
+      RoundIconButton(
         icon = R.drawable.ic_lucide_archive_restore,
         contentDescription = stringResource(R.string.backups_restore),
         onClick = onRestore,
@@ -236,7 +238,7 @@ private fun BackupRow(backup: BackupInfo, enabled: Boolean, onRestore: () -> Uni
         tint = colors.foregroundMuted,
       )
     }
-    IconButton28(
+    RoundIconButton(
       icon = R.drawable.ic_lucide_trash_2,
       contentDescription = stringResource(R.string.backups_delete),
       onClick = onDelete,

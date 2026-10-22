@@ -24,8 +24,8 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.IdleStop
 import io.jeph.pipkin.appGraph
-import io.jeph.pipkin.ui.components.IconButton28
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -75,7 +75,7 @@ private fun Stepper(value: Int, range: IntRange, onChange: (Int) -> Unit) {
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
   ) {
-    IconButton28(
+    RoundIconButton(
       icon = R.drawable.ic_lucide_minus,
       contentDescription = stringResource(R.string.settings_running_chats_fewer),
       onClick = { onChange(value - 1) },
@@ -90,7 +90,7 @@ private fun Stepper(value: Int, range: IntRange, onChange: (Int) -> Unit) {
       fontSize = PipkinTokens.FontSize.base,
       textAlign = TextAlign.Center,
     )
-    IconButton28(
+    RoundIconButton(
       icon = R.drawable.ic_lucide_plus,
       contentDescription = stringResource(R.string.settings_running_chats_more),
       onClick = { onChange(value + 1) },

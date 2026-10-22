@@ -32,6 +32,8 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.host.ProviderConfig
+import io.jeph.pipkin.ui.components.DialogConfirm
+import io.jeph.pipkin.ui.components.PipkinDialog
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -239,19 +241,12 @@ private fun ProviderActions(form: ProviderForm, onSave: () -> Unit, onRemove: ()
 
 @Composable
 private fun RemoveDialog(id: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-  val colors = pipkinColors
-  AlertDialog(
-    onDismissRequest = onDismiss,
-    confirmButton = {
-      TextButton(onClick = onConfirm, colors = ButtonDefaults.textButtonColors(contentColor = colors.destructive)) {
-        Text(stringResource(R.string.provider_remove))
-      }
-    },
-    dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.provider_cancel)) } },
-    title = { Text(stringResource(R.string.provider_remove_title, id)) },
-    text = { Text(stringResource(R.string.provider_remove_text)) },
-    containerColor = colors.surface1,
-    titleContentColor = colors.foreground,
-    textContentColor = colors.foregroundMuted,
+  PipkinDialog(
+    title = stringResource(R.string.provider_remove_title, id),
+    text = stringResource(R.string.provider_remove_text),
+    icon = R.drawable.ic_lucide_trash_2,
+    confirm = DialogConfirm(stringResource(R.string.provider_remove), onConfirm, destructive = true),
+    dismissLabel = stringResource(R.string.provider_cancel),
+    onDismiss = onDismiss,
   )
 }

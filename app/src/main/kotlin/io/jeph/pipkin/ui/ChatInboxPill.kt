@@ -104,7 +104,7 @@ internal fun ChatInboxOverlay(shown: Boolean, onOpen: (ChatLocation) -> Unit, ab
       modifier = Modifier
         .align(Alignment.TopCenter)
         .windowInsetsPadding(WindowInsets.safeDrawing)
-        .padding(top = PipkinTokens.Spacing.s8 + HeaderBarHeight + PipkinTokens.Spacing.s8)
+        .padding(top = HeaderBarHeight + PipkinTokens.Spacing.s8)
         .padding(horizontal = PipkinTokens.Spacing.s8),
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
