@@ -127,9 +127,9 @@ internal class BuiltinCommands(private val controller: ChatController, private v
     }
   }
 
-  /** `/thinking level` sets a level the model offers; `/thinking` alone opens the picker. */
+  /** `/thinking level` sets a level the model offers; `/thinking` alone opens the model sheet, which lists them. */
   private fun thinking(level: String) {
-    if (level.isEmpty()) return navigator.openSheet(ChatSheet.Thinking)
+    if (level.isEmpty()) return navigator.openSheet(ChatSheet.Model())
     controller.launchRpc {
       val levels = process.availableThinkingLevels()
       val match = levels.firstOrNull { it.equals(level, ignoreCase = true) }

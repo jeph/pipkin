@@ -6,10 +6,8 @@ import org.json.JSONObject
 internal sealed interface ChatSheet {
   data object Actions : ChatSheet
 
-  /** The model picker, its search starting at [query]. */
+  /** The model picker, its search starting at [query], with the thinking levels under it. */
   data class Model(val query: String = "") : ChatSheet
-
-  data object Thinking : ChatSheet
 
   data object Rename : ChatSheet
 

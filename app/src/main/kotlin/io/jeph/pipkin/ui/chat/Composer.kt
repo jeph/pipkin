@@ -163,7 +163,6 @@ internal fun Composer(
           working = working,
           onSend = { if (controller.send()) hideKeyboard() },
           onOpenModelSheet = { onSheet(ChatSheet.Model()) },
-          onOpenThinkingSheet = { onSheet(ChatSheet.Thinking) },
           trailingControls = trailingControls,
         )
         WidgetPanelSlot(below.shown, tabs, true, tight, openWidget, if (below.shown != null) panelWeight else Modifier)
@@ -182,7 +181,6 @@ private fun ComposerToolbar(
   working: Boolean,
   onSend: () -> Unit,
   onOpenModelSheet: () -> Unit,
-  onOpenThinkingSheet: () -> Unit,
   trailingControls: @Composable RowScope.() -> Unit,
 ) {
   Row(
@@ -198,7 +196,7 @@ private fun ComposerToolbar(
     ) {
       AttachButton(controller, model)
       ModelChip(model, onOpenModelSheet, Modifier.weight(1f, fill = false))
-      if (supportsThinking(model)) ThinkingChip(thinkingLevel, onOpenThinkingSheet)
+      if (supportsThinking(model)) ThinkingChip(thinkingLevel, onOpenModelSheet)
     }
     val contextUsage by controller.process.contextUsage.collectAsStateWithLifecycle()
     ContextMeter(contextUsage, controller.contextDetailsOpen) { controller.contextDetailsOpen = it }

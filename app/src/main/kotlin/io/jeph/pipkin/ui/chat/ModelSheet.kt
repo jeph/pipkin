@@ -1,14 +1,16 @@
 package io.jeph.pipkin.ui.chat
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,9 +22,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
@@ -35,13 +44,26 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import org.json.JSONObject
 
-/** Both pickers wrap their content up to this share of the screen, then scroll inside. */
+/** The picker wraps its content up to this share of the screen, then scrolls inside. */
 private const val PICKER_MAX_HEIGHT = 0.8f
 
-/** The composer's model picker: a search field (starting at [initialQuery]) over the models grouped by provider. */
+/** A thinking level's pill, and the space between pills. */
+private val LEVEL_SHAPE = RoundedCornerShape(12.dp)
+private val LEVEL_GAP = 6.dp
+
+/**
+ * The composer's model picker: a search field (starting at [initialQuery]) over the models grouped by provider, and
+ * under them, for a reasoning [model], the thinking levels Pi offers for it with [thinkingLevel] picked.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ModelSheet(controller: ChatController, model: JSONObject?, initialQuery: String, onDismiss: () -> Unit) {
+internal fun ModelSheet(
+  controller: ChatController,
+  model: JSONObject?,
+  thinkingLevel: String?,
+  initialQuery: String,
+  onDismiss: () -> Unit,
+) {
   var models by remember { mutableStateOf<List<JSONObject>?>(null) }
   var query by rememberSaveable { mutableStateOf(initialQuery) }
   val accounts = LocalContext.current.appGraph.accountRepository
@@ -64,38 +86,84 @@ internal fun ModelSheet(controller: ChatController, model: JSONObject?, initialQ
       controller.setModel(selected.optString("provider"), selected.optString("id"))
       onDismiss()
     }
+    if (supportsThinking(model)) {
+      ThinkingLevels(controller, model, thinkingLevel) { level ->
+        controller.setThinkingLevel(level)
+        onDismiss()
+      }
+    }
   }
 }
 
-/** The composer's reasoning-effort picker: the levels Pi offers for the current model. */
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * The reasoning-effort levels Pi offers for [model], as pills of one width with [current] filled in cobalt. As many
+ * share a row as fit the widest name, so on a narrow screen or a large font they wrap instead of cutting it.
+ */
 @Composable
-internal fun ThinkingSheet(
-  controller: ChatController,
-  model: JSONObject?,
-  thinkingLevel: String?,
-  onDismiss: () -> Unit,
-) {
+private fun ThinkingLevels(controller: ChatController, model: JSONObject?, current: String?, onPick: (String) -> Unit) {
   var levels by remember { mutableStateOf<List<String>?>(null) }
   // Pi clamps the available levels to the model, so they reload whenever it changes.
   LaunchedEffect(controller, model) { levels = controller.query { availableThinkingLevels() }.orEmpty() }
-  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = PICKER_MAX_HEIGHT) {
-    SheetTitle(stringResource(R.string.chat_reasoning))
-    val shown = levels
-    if (shown == null) {
-      Loading()
-      return@PipkinSheet
-    }
-    Column(modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-      shown.forEach { level ->
-        SheetRow(
-          label = thinkingLevelLabel(level),
-          onClick = {
-            controller.setThinkingLevel(level)
-            onDismiss()
-          },
-          trailing = { if (level == thinkingLevel) CheckIcon() },
+  val colors = pipkinColors
+  SectionLabel(stringResource(R.string.chat_reasoning))
+  val shown = levels
+  if (shown == null) {
+    Loading()
+    return
+  }
+  EvenRows(
+    gap = LEVEL_GAP,
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s4)
+      .selectableGroup(),
+  ) {
+    shown.forEach { level ->
+      val picked = level == current
+      Box(
+        modifier = Modifier
+          .heightIn(min = 36.dp)
+          .clip(LEVEL_SHAPE)
+          .background(if (picked) colors.accent else colors.surface0)
+          .selectable(selected = picked, role = Role.RadioButton, onClick = { onPick(level) })
+          .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
+        contentAlignment = Alignment.Center,
+      ) {
+        Text(
+          text = thinkingLevelLabel(level),
+          color = if (picked) colors.accentForeground else colors.foregroundMuted,
+          fontSize = 12.5.sp,
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
         )
+      }
+    }
+  }
+}
+
+/**
+ * Lays [content] out in rows of children of one width, [gap] apart. A row holds as many as fit the widest child at its
+ * own width, and the children are spread evenly over the fewest rows that takes, so six that need two rows go three
+ * and three rather than five and one.
+ */
+@Composable
+private fun EvenRows(gap: Dp, modifier: Modifier, content: @Composable () -> Unit) {
+  Layout(content = content, modifier = modifier) { measurables, constraints ->
+    if (measurables.isEmpty()) return@Layout layout(constraints.minWidth, 0) {}
+    val width = constraints.maxWidth
+    val spacing = gap.roundToPx()
+    val widest = measurables.maxOf { it.maxIntrinsicWidth(Constraints.Infinity) }
+    val fit = ((width + spacing) / (widest + spacing)).coerceIn(1, measurables.size)
+    val rows = (measurables.size + fit - 1) / fit
+    val perRow = (measurables.size + rows - 1) / rows
+    val cell = (width - spacing * (perRow - 1)) / perRow
+    val placeables = measurables.map { it.measure(Constraints.fixedWidth(cell)) }
+    val rowHeights = placeables.chunked(perRow).map { row -> row.maxOf { it.height } }
+    layout(width, rowHeights.sum() + spacing * (rows - 1)) {
+      var y = 0
+      placeables.chunked(perRow).forEachIndexed { index, row ->
+        row.forEachIndexed { column, placeable -> placeable.placeRelative(column * (cell + spacing), y) }
+        y += rowHeights[index] + spacing
       }
     }
   }
@@ -124,7 +192,7 @@ private fun ModelList(
   }
   LazyColumn(modifier = modifier.fillMaxWidth().padding(top = PipkinTokens.Spacing.s4)) {
     groups.forEach { (provider, providerModels) ->
-      item(key = "provider:$provider") { ProviderLabel(provider) }
+      item(key = "provider:$provider") { SectionLabel(provider) }
       items(providerModels, key = { "model:$provider/${it.optString("id")}" }) { entry ->
         SheetRow(
           label = modelLabel(entry).orEmpty(),
@@ -141,14 +209,12 @@ private fun matches(model: JSONObject, query: String): Boolean = query.isEmpty()
   listOf(modelLabel(model).orEmpty(), model.optString("id"), model.optString("provider"))
     .any { it.contains(query, ignoreCase = true) }
 
+/** A muted heading over a group of the sheet's rows: a provider's models, or the thinking levels. */
 @Composable
-private fun SheetTitle(text: String) {
+private fun SectionLabel(text: String) {
   Text(
     text = text,
-    modifier = Modifier.fillMaxWidth().padding(
-      horizontal = PipkinTokens.Spacing.s16,
-      vertical = PipkinTokens.Spacing.s8,
-    ),
+    modifier = Modifier.fillMaxWidth().padding(PipkinTokens.Spacing.s16, PipkinTokens.Spacing.s8),
     color = pipkinColors.foregroundMuted,
     fontSize = PipkinTokens.FontSize.sm,
   )
@@ -157,13 +223,6 @@ private fun SheetTitle(text: String) {
 @Composable
 private fun Loading() {
   Box(modifier = Modifier.fillMaxWidth().height(44.dp), contentAlignment = Alignment.Center) { SimmeringPot() }
-}
-
-@Composable
-private fun ProviderLabel(provider: String) {
-  Column(modifier = Modifier.fillMaxWidth().padding(PipkinTokens.Spacing.s16, PipkinTokens.Spacing.s8)) {
-    Text(text = provider, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm)
-  }
 }
 
 @Composable

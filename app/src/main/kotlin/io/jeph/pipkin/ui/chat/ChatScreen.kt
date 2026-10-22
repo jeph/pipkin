@@ -330,9 +330,13 @@ private fun ChatSheets(
       onDismiss = dismiss,
     )
 
-    is ChatSheet.Model -> ModelSheet(controller, timeline.model, sheet.query, onDismiss = dismiss)
-
-    ChatSheet.Thinking -> ThinkingSheet(controller, timeline.model, timeline.thinkingLevel, onDismiss = dismiss)
+    is ChatSheet.Model -> ModelSheet(
+      controller,
+      timeline.model,
+      timeline.thinkingLevel,
+      sheet.query,
+      onDismiss = dismiss,
+    )
 
     is ChatSheet.Tool -> {
       val item = timeline.items.firstOrNull { it.key == sheet.key }
