@@ -25,8 +25,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
@@ -156,6 +158,7 @@ internal fun CommitTabRow(
   )
 }
 
+/** A tab's row: its [mark] in a tile, its title over its [detail], and its actions; the shown tab is a raised card. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TabRow(
@@ -172,21 +175,28 @@ private fun TabRow(
   Row(
     modifier = modifier
       .fillMaxWidth()
-      .padding(horizontal = PipkinTokens.Spacing.s8)
-      .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
+      .padding(horizontal = PipkinTokens.Spacing.s12, vertical = 1.dp)
+      .clip(ROW_SHAPE)
       .background(if (current) colors.surface2 else Color.Transparent)
       .combinedClickable(onClick = onOpen, onLongClick = onActions)
-      .heightIn(min = 52.dp)
-      .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4),
+      .heightIn(min = 56.dp)
+      .padding(start = 10.dp, end = PipkinTokens.Spacing.s4),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
-    Box(modifier = Modifier.size(PipkinTokens.IconSize.lg), contentAlignment = Alignment.Center) { mark() }
-    Column(modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s6)) {
+    Box(
+      modifier = Modifier
+        .size(MARK_TILE_SIZE)
+        .clip(MARK_TILE_SHAPE)
+        .background(if (current) colors.surface3 else colors.surface2),
+      contentAlignment = Alignment.Center,
+    ) { mark() }
+    Column(modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s8)) {
       Text(
         text = title,
         color = colors.foreground,
-        fontSize = PipkinTokens.FontSize.base,
+        fontSize = TITLE_SIZE,
+        fontWeight = if (current) FontWeight.Bold else FontWeight.SemiBold,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
@@ -196,11 +206,16 @@ private fun TabRow(
       icon = R.drawable.ic_lucide_ellipsis,
       contentDescription = actionsDescription,
       onClick = onActions,
-      modifier = Modifier.size(36.dp),
+      modifier = Modifier.size(32.dp),
       tint = colors.foregroundMuted,
     )
   }
 }
+
+private val ROW_SHAPE = RoundedCornerShape(16.dp)
+private val MARK_TILE_SIZE = 32.dp
+private val MARK_TILE_SHAPE = RoundedCornerShape(10.dp)
+private val TITLE_SIZE = 14.5.sp
 
 /** A row's second line; a long one keeps its end, where a folder path names the folder. */
 @Composable

@@ -1,5 +1,17 @@
 package io.jeph.pipkin.ui.sidebar
 
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextDirection
+
+/**
+ * The style of a shown path: the surrounding text's, but left to right even in a right-to-left language, so the
+ * slashes of `~/مشروع` stay between the right folders.
+ */
+internal val pathTextStyle: TextStyle
+  @Composable get() = LocalTextStyle.current.copy(textDirection = TextDirection.Ltr)
+
 /** [cwd] with the Termux [home] prefix shown as `~`. */
 internal fun tildePath(cwd: String, home: String): String = when {
   cwd == home -> "~"

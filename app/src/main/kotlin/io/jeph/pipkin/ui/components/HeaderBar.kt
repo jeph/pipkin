@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
+import io.jeph.pipkin.ui.sidebar.pathTextStyle
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -174,6 +175,7 @@ private fun CountBadge(badge: TitleBadge) {
   }
 }
 
+/** The header's folder line; a long path keeps its end, the folder that tells workspaces apart. */
 @Composable
 private fun HeaderFolder(folder: String) {
   val colors = pipkinColors
@@ -189,10 +191,11 @@ private fun HeaderFolder(folder: String) {
     )
     Text(
       text = folder,
+      style = pathTextStyle,
       color = colors.foregroundMuted,
       fontSize = PipkinTokens.FontSize.sm,
       maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
+      overflow = TextOverflow.StartEllipsis,
     )
   }
 }

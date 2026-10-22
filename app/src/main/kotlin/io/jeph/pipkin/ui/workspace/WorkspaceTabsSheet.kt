@@ -2,7 +2,10 @@ package io.jeph.pipkin.ui.workspace
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
@@ -33,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
@@ -42,10 +46,13 @@ import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
+import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SnackbarStackOverlay
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.components.SwipeAway
+import io.jeph.pipkin.ui.sidebar.pathTextStyle
+import io.jeph.pipkin.ui.sidebar.projectName
 import io.jeph.pipkin.ui.sidebar.tildePath
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -53,7 +60,7 @@ import io.jeph.pipkin.workspace.Pane
 import io.jeph.pipkin.workspace.WorkspaceTab
 
 /**
- * Paseo's mobile tab switcher as a sheet: the workspace's path over the tabs in the workspace folder [cwd] of what
+ * The tab switcher as a sheet: the workspace's name and path over the tabs in the workspace folder [cwd] of what
  * [pane] shows, its terminals, its open files, its open commits and then its chats, the shown one highlighted. Tapping
  * a tab shows it in [pane] instead and closes the sheet; tapping one the other pane shows calls [onSwapPanes], so
  * that pane comes to this side. A chat is archived by swiping it right or from its actions sheet, which also renames it
@@ -87,15 +94,7 @@ internal fun WorkspaceTabsSheet(
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
   LaunchedEffect(tabs.chats) { archiving.forgetGone(tabs.chats) }
   PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = 0.85f) {
-    // A long path keeps its end, the folder that tells workspaces apart.
-    Text(
-      text = tildePath(cwd, home),
-      modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s8),
-      color = pipkinColors.foreground,
-      fontSize = PipkinTokens.FontSize.lg,
-      maxLines = 1,
-      overflow = TextOverflow.StartEllipsis,
-    )
+    TabsSheetTitle(name = projectName(cwd, home), path = tildePath(cwd, home))
     TabList(
       tabs = tabs,
       archiving = archiving,
@@ -125,6 +124,54 @@ internal fun WorkspaceTabsSheet(
   }
   ConfirmArchive(archiving)
   ConfirmCloseTab(closing)
+}
+
+/**
+ * The workspace's name in bold over its folder; a long path keeps its end, the folder that tells workspaces apart. The
+ * home folder's name is its path, `~`, so it has no second line.
+ */
+@Composable
+private fun TabsSheetTitle(name: String, path: String) {
+  val colors = pipkinColors
+  Column(
+    modifier = Modifier.padding(
+      start = 20.dp,
+      end = 20.dp,
+      top = PipkinTokens.Spacing.s4,
+      bottom = PipkinTokens.Spacing.s12,
+    ),
+    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+  ) {
+    Text(
+      text = name,
+      color = colors.foreground,
+      fontSize = 22.sp,
+      fontWeight = FontWeight.ExtraBold,
+      letterSpacing = (-0.025).em,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+    )
+    if (path == name) return@Column
+    Row(
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
+    ) {
+      LucideIcon(
+        icon = R.drawable.ic_lucide_folder,
+        contentDescription = null,
+        size = PipkinTokens.IconSize.sm,
+        tint = colors.foregroundMuted,
+      )
+      Text(
+        text = path,
+        style = pathTextStyle,
+        color = colors.foregroundMuted,
+        fontSize = PipkinTokens.FontSize.meta,
+        maxLines = 1,
+        overflow = TextOverflow.StartEllipsis,
+      )
+    }
+  }
 }
 
 /** "Stop and archive" for a slid-out chat Pi is working in. */

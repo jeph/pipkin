@@ -7,6 +7,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.displayCutout
@@ -38,9 +39,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
@@ -50,8 +54,10 @@ import io.jeph.pipkin.data.sameFolder
 import io.jeph.pipkin.data.workspaces
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
+import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
+import io.jeph.pipkin.ui.components.PotIcon
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
@@ -112,10 +118,10 @@ internal fun Sidebar(
       onOpen = { cwd -> showThen(cwd) { actions.openWorkspace(pane, cwd) } },
       onNewChatIn = { cwd -> showThen(cwd) { actions.newChat(pane, cwd) } },
       onActions = { menuFor = it },
+      onAddWorkspace = { pickerOpen = true },
       modifier = Modifier.weight(1f),
     )
     SidebarFooter(
-      onAddWorkspace = { pickerOpen = true },
       onOpenArchive = onOpenArchive,
       onOpenSettings = onOpenSettings,
       onOpenOnboarding = onOpenOnboarding,
@@ -152,23 +158,8 @@ private fun AddWorkspacePicker(home: String, workspaces: List<Workspace>, onDism
   )
 }
 
-/** The sidebar's icon buttons: a 36dp target around a 20dp icon. */
-@Composable
-internal fun SidebarIconButton(
-  @DrawableRes icon: Int,
-  contentDescription: String,
-  onClick: () -> Unit,
-  tint: Color = pipkinColors.foreground,
-) {
-  RoundIconButton(
-    icon = icon,
-    contentDescription = contentDescription,
-    onClick = onClick,
-    modifier = Modifier.size(36.dp),
-    tint = tint,
-    iconSize = PipkinTokens.IconSize.lg,
-  )
-}
+/** The Add workspace row's key in the list, which can't be a workspace's folder. */
+private const val ADD_WORKSPACE_KEY = "add-workspace"
 
 /**
  * Removing a workspace from the sidebar asks first, then slides its row out and removes it, archiving its chats, once
@@ -282,22 +273,27 @@ private fun SidebarHeader(onClose: () -> Unit) {
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .heightIn(min = 56.dp)
-      .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s8),
+      .heightIn(min = 64.dp)
+      .padding(start = 20.dp, end = PipkinTokens.Spacing.s12),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+    horizontalArrangement = Arrangement.spacedBy(10.dp),
   ) {
-    LucideIcon(icon = R.drawable.ic_lucide_bot, contentDescription = null, size = PipkinTokens.IconSize.lg)
+    PotIcon(size = 26.dp)
     Text(
       text = stringResource(R.string.shell_sidebar_title),
       modifier = Modifier.weight(1f),
       color = pipkinColors.foreground,
-      fontSize = PipkinTokens.FontSize.lg,
+      fontSize = 26.sp,
+      fontWeight = FontWeight.ExtraBold,
+      letterSpacing = (-0.025).em,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
     )
-    SidebarIconButton(
+    HeaderButton(
       icon = R.drawable.ic_lucide_x,
       contentDescription = stringResource(R.string.shell_sidebar_close),
       onClick = onClose,
+      filled = true,
     )
   }
 }
@@ -311,22 +307,36 @@ private fun WorkspaceList(
   onOpen: (cwd: String) -> Unit,
   onNewChatIn: (cwd: String) -> Unit,
   onActions: (Workspace) -> Unit,
+  onAddWorkspace: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
   val registry = LocalContext.current.appGraph.registry
   val processes by registry.processes.collectAsStateWithLifecycle()
   val items = rememberPaneItems()
   if (workspaces.isEmpty()) {
-    Text(
-      text = stringResource(R.string.shell_sidebar_empty),
-      modifier = modifier.fillMaxWidth().wrapContentHeight(),
-      color = pipkinColors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.lg,
-      textAlign = TextAlign.Center,
-    )
+    Column(
+      modifier = modifier.fillMaxWidth().padding(horizontal = PipkinTokens.Spacing.s12),
+      verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s16, Alignment.CenterVertically),
+    ) {
+      Text(
+        text = stringResource(R.string.shell_sidebar_empty),
+        modifier = Modifier.fillMaxWidth(),
+        color = pipkinColors.foregroundMuted,
+        fontSize = PipkinTokens.FontSize.lg,
+        textAlign = TextAlign.Center,
+      )
+      AddWorkspaceRow(onClick = onAddWorkspace)
+    }
     return
   }
-  LazyColumn(modifier = modifier.fillMaxWidth()) {
+  LazyColumn(
+    modifier = modifier.fillMaxWidth(),
+    contentPadding = PaddingValues(
+      start = PipkinTokens.Spacing.s12,
+      end = PipkinTokens.Spacing.s12,
+      bottom = PipkinTokens.Spacing.s12,
+    ),
+  ) {
     items(workspaces, key = { it.cwd }) { workspace ->
       val cwd = workspace.cwd
       SwipeAway(
@@ -339,6 +349,8 @@ private fun WorkspaceList(
       ) {
         WorkspaceRow(
           name = projectName(cwd, home),
+          folder = tildePath(cwd, home),
+          cwd = cwd,
           shown = items[pane]?.let { sameFolder(it.cwd, cwd) } == true,
           working = anyWorking(remember(processes, cwd) { processes.values.filter { sameFolder(it.cwd, cwd) } }),
           onOpen = { onOpen(cwd) },
@@ -347,6 +359,7 @@ private fun WorkspaceList(
         )
       }
     }
+    item(key = ADD_WORKSPACE_KEY) { AddWorkspaceRow(onClick = onAddWorkspace, modifier = Modifier.animateItem()) }
   }
 }
 
@@ -357,72 +370,4 @@ private fun anyWorking(processes: List<AgentProcess>): Boolean {
     if (processes.isEmpty()) flowOf(false) else combine(processes.map { it.working }) { states -> states.any { it } }
   }
   return working.collectAsStateWithLifecycle(initialValue = false).value
-}
-
-/**
- * A workspace's row: its folder (the simmering pot while Pi works in one of its chats) and name, highlighted while
- * the sidebar's pane shows one of its chats or tabs, with its actions and New chat. Tapping it shows the workspace;
- * long-press opens its actions.
- */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun WorkspaceRow(
-  name: String,
-  shown: Boolean,
-  working: Boolean,
-  onOpen: () -> Unit,
-  onNewChat: () -> Unit,
-  onActions: () -> Unit,
-) {
-  val colors = pipkinColors
-  val highlight = sidebarHighlight()
-  Row(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(horizontal = PipkinTokens.Spacing.s8, vertical = PipkinTokens.Spacing.s2)
-      .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
-      .background(if (shown) highlight else Color.Transparent)
-      .combinedClickable(
-        onClickLabel = stringResource(R.string.shell_workspace_open, name),
-        onClick = onOpen,
-        onLongClick = onActions,
-      )
-      .heightIn(min = 56.dp)
-      .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4),
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
-  ) {
-    Box(modifier = Modifier.size(PipkinTokens.IconSize.lg), contentAlignment = Alignment.Center) {
-      if (working) {
-        SimmeringPot(size = PipkinTokens.IconSize.lg)
-      } else {
-        LucideIcon(
-          icon = R.drawable.ic_lucide_folder,
-          contentDescription = null,
-          size = PipkinTokens.IconSize.lg,
-          tint = colors.foregroundMuted,
-        )
-      }
-    }
-    Text(
-      text = name,
-      modifier = Modifier.weight(1f),
-      color = colors.foreground,
-      fontSize = PipkinTokens.FontSize.content,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-    )
-    SidebarIconButton(
-      icon = R.drawable.ic_lucide_ellipsis,
-      contentDescription = stringResource(R.string.archive_workspace_actions, name),
-      onClick = onActions,
-      tint = colors.foregroundMuted,
-    )
-    SidebarIconButton(
-      icon = R.drawable.ic_lucide_plus,
-      contentDescription = stringResource(R.string.shell_new_chat_in_project, name),
-      onClick = onNewChat,
-      tint = colors.foregroundMuted,
-    )
-  }
 }
