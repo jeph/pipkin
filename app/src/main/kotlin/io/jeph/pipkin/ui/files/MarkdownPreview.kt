@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.files
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,8 +39,8 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
 /**
- * Paseo's markdown preview: the file rendered in a reading frame, under a table of its front matter. Only web links
- * open, as in Paseo; a link to another file of the workspace does nothing.
+ * The markdown preview: the file rendered in a reading frame, under a table of its front matter. Only web links open;
+ * a link to another file of the workspace does nothing.
  */
 @Composable
 internal fun MarkdownPreview(source: String, modifier: Modifier) {
@@ -68,17 +69,18 @@ internal fun MarkdownPreview(source: String, modifier: Modifier) {
   }
 }
 
-/** Paseo's front matter table: muted monospace keys on surface2 beside their values, in a bordered card. */
+/** The front matter table: muted monospace keys on surface2 beside their values, in a raised card. */
 @Composable
 private fun FrontMatterTable(rows: List<Pair<String, String>>) {
   val colors = pipkinColors
-  val shape = RoundedCornerShape(PipkinTokens.Radius.lg)
+  val shape = RoundedCornerShape(PipkinTokens.Radius.xl)
   SelectionContainer {
     BoxWithConstraints(
       modifier = Modifier
         .padding(bottom = PipkinTokens.Spacing.s24)
         .fillMaxWidth()
         .clip(shape)
+        .background(colors.surface1)
         .border(1.dp, colors.border, shape),
     ) {
       // The key column's background is drawn behind each row, so it spans the row whichever cell is taller.
@@ -96,7 +98,7 @@ private fun FrontMatterTable(rows: List<Pair<String, String>>) {
               modifier = Modifier.width(keyWidth).padding(CELL_PADDING_HORIZONTAL, CELL_PADDING_VERTICAL),
               color = colors.foregroundMuted,
               fontFamily = PipkinFonts.mono,
-              fontSize = PipkinTokens.FontSize.base,
+              fontSize = PipkinTokens.FontSize.meta,
               lineHeight = TABLE_LINE_HEIGHT,
             )
             Text(
@@ -122,7 +124,7 @@ private class WebOnlyUriHandler(private val platform: UriHandler) : UriHandler {
   }
 }
 
-/** Paseo's 12dp gutter plus the reading frame's 8dp. */
+/** A 12dp gutter plus the reading frame's 8dp. */
 private val READING_INSET = 20.dp
 
 private const val KEY_SHARE = 0.3f

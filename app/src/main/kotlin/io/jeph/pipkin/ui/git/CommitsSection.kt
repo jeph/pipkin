@@ -1,6 +1,7 @@
 package io.jeph.pipkin.ui.git
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,11 +20,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -31,9 +35,11 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.GitCommit
 import io.jeph.pipkin.ui.components.LucideIcon
@@ -43,7 +49,7 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.relativeTime
 
 /**
- * Paseo's Commits section, docked under the diff: a header that folds and unfolds it with the number of commits once
+ * The Commits section, docked under the diff: a header that folds and unfolds it with the number of commits once
  * loaded, and while unfolded the commits ahead of the base, newest first, in a list up to [listMaxHeight] tall that
  * ends by saying so when the host listed only the first of them.
  */
@@ -63,12 +69,8 @@ internal fun CommitsSection(
       modifier = Modifier
         .fillMaxWidth()
         .clickable(onClick = onToggle)
-        .padding(
-          start = PipkinTokens.Spacing.s8,
-          end = PipkinTokens.Spacing.s12,
-          top = PipkinTokens.Spacing.s8,
-          bottom = PipkinTokens.Spacing.s8,
-        ),
+        .heightIn(min = 44.dp)
+        .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s8),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
     ) {
@@ -83,30 +85,41 @@ internal fun CommitsSection(
         text = stringResource(R.string.git_commits),
         color = colors.foreground,
         fontSize = PipkinTokens.FontSize.base,
+        fontWeight = FontWeight.Bold,
       )
-      if (content is CommitsContent.Loaded) {
-        val count = content.commits.commits.size
-        val description = pluralStringResource(R.plurals.git_commits_count, count, count)
-        Text(
-          text = count.toString(),
-          modifier = Modifier.semantics { contentDescription = description },
-          color = colors.foregroundMuted,
-          fontSize = PipkinTokens.FontSize.sm,
-        )
-      }
+      if (content is CommitsContent.Loaded) CommitCount(content.commits.commits.size)
     }
     if (!collapsed) CommitsContentRows(content, listMaxHeight, onOpenCommit)
   }
+}
+
+/** The number of commits as a small accent badge, read out in words. */
+@Composable
+private fun CommitCount(count: Int) {
+  val colors = pipkinColors
+  val description = pluralStringResource(R.plurals.git_commits_count, count, count)
+  Text(
+    text = count.toString(),
+    modifier = Modifier
+      .semantics { contentDescription = description }
+      .background(colors.accentSoft, RoundedCornerShape(9.dp))
+      .padding(horizontal = PipkinTokens.Spacing.s6, vertical = PipkinTokens.Spacing.s2),
+    color = colors.accent,
+    fontSize = 11.sp,
+    fontWeight = FontWeight.Bold,
+    style = LocalTextStyle.current.copy(fontFeatureSettings = PipkinFonts.TABULAR),
+    maxLines = 1,
+  )
 }
 
 @Composable
 private fun CommitsContentRows(content: CommitsContent, listMaxHeight: Dp, onOpenCommit: (GitCommit) -> Unit) {
   val colors = pipkinColors
   val notePadding = Modifier.padding(
-    start = PipkinTokens.Spacing.s8,
-    end = PipkinTokens.Spacing.s12,
+    start = PipkinTokens.Spacing.s16,
+    end = PipkinTokens.Spacing.s16,
     top = PipkinTokens.Spacing.s4,
-    bottom = PipkinTokens.Spacing.s8,
+    bottom = PipkinTokens.Spacing.s12,
   )
   when (content) {
     CommitsContent.Loading -> CommitsNote(
@@ -126,7 +139,7 @@ private fun CommitsContentRows(content: CommitsContent, listMaxHeight: Dp, onOpe
       }
       LazyColumn(
         modifier = Modifier.fillMaxWidth().heightIn(max = listMaxHeight),
-        contentPadding = PaddingValues(bottom = PipkinTokens.Spacing.s4),
+        contentPadding = PaddingValues(bottom = PipkinTokens.Spacing.s8),
       ) {
         itemsIndexed(commits, key = { _, commit -> commit.sha }) { index, commit ->
           CommitRow(commit, isFirst = index == 0, isLast = index == commits.lastIndex, onOpen = {
@@ -150,10 +163,10 @@ private fun CommitsContentRows(content: CommitsContent, listMaxHeight: Dp, onOpe
 
 @Composable
 private fun CommitsNote(text: String, color: Color, modifier: Modifier) {
-  Text(text = text, modifier = modifier, color = color, fontSize = PipkinTokens.FontSize.sm)
+  Text(text = text, modifier = modifier, color = color, fontSize = PipkinTokens.FontSize.meta)
 }
 
-/** Paseo's mobile commit row: the graph node, the short SHA, the subject, how long ago it was written, a chevron. */
+/** A commit row: the graph node, the short SHA, the subject, how long ago it was written, a chevron. */
 @Composable
 private fun CommitRow(commit: GitCommit, isFirst: Boolean, isLast: Boolean, onOpen: () -> Unit) {
   val colors = pipkinColors
@@ -161,14 +174,17 @@ private fun CommitRow(commit: GitCommit, isFirst: Boolean, isLast: Boolean, onOp
     modifier = Modifier
       .fillMaxWidth()
       .height(IntrinsicSize.Min)
+      .padding(horizontal = PipkinTokens.Spacing.s4)
+      // Rounded less than the rail is inset, so the clip never bites into the rail where rows meet.
+      .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
       .clickable(onClick = onOpen)
-      .padding(horizontal = PipkinTokens.Spacing.s8),
+      .padding(horizontal = PipkinTokens.Spacing.s12),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
     CommitGraphNode(isFirst, isLast)
     Row(
-      modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s4),
+      modifier = Modifier.weight(1f).padding(vertical = PipkinTokens.Spacing.s8),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
     ) {
@@ -199,14 +215,14 @@ private fun CommitRow(commit: GitCommit, isFirst: Boolean, isLast: Boolean, onOp
       icon = R.drawable.ic_lucide_chevron_right,
       contentDescription = null,
       size = PipkinTokens.IconSize.sm,
-      tint = colors.foregroundMuted,
+      tint = colors.foregroundExtraMuted,
     )
   }
 }
 
 /**
- * Paseo's commit graph node: an accent dot on an accent rail that joins it to the rows above and below, starting at
- * the first commit's dot and ending at the last one's.
+ * The commit graph node: an accent dot on an accent rail that joins it to the rows above and below, starting at the
+ * first commit's dot and ending at the last one's.
  */
 @Composable
 private fun CommitGraphNode(isFirst: Boolean, isLast: Boolean) {

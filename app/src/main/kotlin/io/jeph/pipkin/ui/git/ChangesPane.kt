@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.git
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,7 +54,7 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
 /**
- * The Explorer's Changes tab for the trusted [workspace], Paseo's Changes pane: the comparison selector, its totals,
+ * The Explorer's Changes tab for the trusted [workspace]: the branch, the comparison selector, its totals,
  * Refresh and the diff options, the diff as one document, and the Commits section docked under it. Nothing polls: the
  * diff, and the commits while unfolded, load when the tab shows while the Explorer is [open] (the Explorer opening,
  * switching to this tab or to this workspace), when the comparison or Hide whitespace changes, and on Refresh; the
@@ -131,7 +133,8 @@ internal fun TrustPrompt(onTrust: () -> Unit, onNotNow: () -> Unit, modifier: Mo
     Text(
       text = stringResource(R.string.git_trust_title),
       color = colors.foreground,
-      fontSize = PipkinTokens.FontSize.lg,
+      fontSize = PipkinTokens.FontSize.title,
+      fontWeight = FontWeight.Bold,
       textAlign = TextAlign.Center,
     )
     Text(
@@ -147,8 +150,8 @@ internal fun TrustPrompt(onTrust: () -> Unit, onNotNow: () -> Unit, modifier: Mo
 }
 
 /**
- * Paseo's Changes toolbar: the comparison [mode], which a tap offers to change, the diff's totals once one has loaded,
- * then Refresh, a spinner while [refreshing], and the diff options.
+ * The Changes toolbar: the branch once a diff has loaded, the comparison [mode], which a tap offers to change, the
+ * diff's totals, then Refresh, a spinner while [refreshing], and the diff options.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -164,33 +167,26 @@ private fun ChangesToolbar(
   var optionsOpen by remember { mutableStateOf(false) }
   val loaded = workspace.changes as? ChangesContent.Loaded
   Row(
-    modifier = Modifier.fillMaxWidth().height(36.dp).padding(horizontal = PipkinTokens.Spacing.s8),
+    modifier = Modifier
+      .fillMaxWidth()
+      .height(48.dp)
+      .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s8),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
+    branchLabel(loaded?.changes?.branch)?.let { BranchName(it, Modifier.weight(1f, fill = false)) }
     ModeTrigger(mode, onClick = { modesOpen = true })
     if (loaded != null) DiffStat(loaded.document.additions, loaded.document.deletions)
     Spacer(modifier = Modifier.weight(1f))
-    if (refreshing) {
-      Box(modifier = Modifier.size(28.dp), contentAlignment = Alignment.Center) {
-        Spinner(PipkinTokens.IconSize.md, stringResource(R.string.git_refreshing))
-      }
-    } else {
-      RoundIconButton(
-        icon = R.drawable.ic_lucide_refresh_cw,
-        contentDescription = stringResource(R.string.git_refresh),
-        onClick = onRefresh,
-        tint = colors.foregroundExtraMuted,
-      )
-    }
+    RefreshButton(refreshing, onRefresh)
     RoundIconButton(
       icon = R.drawable.ic_lucide_ellipsis,
       contentDescription = stringResource(R.string.git_options),
       onClick = { optionsOpen = true },
-      tint = colors.foregroundExtraMuted,
+      modifier = Modifier.size(TOOLBAR_BUTTON_SIZE),
+      tint = colors.foregroundMuted,
     )
   }
-  HorizontalDivider(thickness = 1.dp, color = colors.border)
   if (modesOpen) {
     val changes = loaded?.changes
     ModeSheet(
@@ -203,27 +199,59 @@ private fun ChangesToolbar(
   if (optionsOpen) OptionsSheet(workspace, onDismiss = { optionsOpen = false })
 }
 
-/** Paseo's compact selector trigger: the comparison's name and a small chevron, in a pill. */
+@Composable
+private fun BranchName(branch: String, modifier: Modifier) {
+  Text(
+    text = branch,
+    modifier = modifier,
+    color = pipkinColors.foreground,
+    fontSize = PipkinTokens.FontSize.base,
+    fontWeight = FontWeight.Bold,
+    maxLines = 1,
+    overflow = TextOverflow.Ellipsis,
+  )
+}
+
+/** Refresh, or a spinner in its place while [refreshing]. */
+@Composable
+private fun RefreshButton(refreshing: Boolean, onRefresh: () -> Unit) {
+  if (refreshing) {
+    Box(modifier = Modifier.size(TOOLBAR_BUTTON_SIZE), contentAlignment = Alignment.Center) {
+      Spinner(PipkinTokens.IconSize.md, stringResource(R.string.git_refreshing))
+    }
+  } else {
+    RoundIconButton(
+      icon = R.drawable.ic_lucide_refresh_cw,
+      contentDescription = stringResource(R.string.git_refresh),
+      onClick = onRefresh,
+      modifier = Modifier.size(TOOLBAR_BUTTON_SIZE),
+      tint = pipkinColors.foregroundMuted,
+    )
+  }
+}
+
+/** The comparison selector: its name and a small chevron, in an outlined pill. */
 @Composable
 private fun ModeTrigger(mode: GitDiffMode, onClick: () -> Unit) {
   val colors = pipkinColors
   val description = stringResource(R.string.git_diff_mode)
   Row(
     modifier = Modifier
-      .height(24.dp)
-      .clip(RoundedCornerShape(PipkinTokens.Radius.base))
+      .height(28.dp)
+      .clip(CircleShape)
+      .border(1.dp, colors.border, CircleShape)
       .clickable(onClick = onClick)
       .semantics { contentDescription = description }
-      .padding(horizontal = PipkinTokens.Spacing.s4),
+      .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s8),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
   ) {
-    Text(text = modeLabel(mode), color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm, maxLines = 1)
+    Text(text = modeLabel(mode), color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta, maxLines = 1)
     LucideIcon(
       icon = R.drawable.ic_lucide_chevron_down,
       contentDescription = null,
-      size = PipkinTokens.IconSize.xs,
-      tint = colors.foregroundExtraMuted,
+      size = PipkinTokens.IconSize.sm,
+      tint = colors.foregroundMuted,
     )
   }
 }
@@ -343,8 +371,8 @@ private fun MenuRow(label: String, description: String?, icon: Int?, checked: Bo
 }
 
 /**
- * The diff, or in its place Paseo's notes: checking the repository during the first load, git's error, the diff being
- * too large, or no changes. A refresh keeps what it replaces until its reply arrives.
+ * The diff, or in its place a note: checking the repository during the first load, git's error, the diff being too
+ * large, or no changes. A refresh keeps what it replaces until its reply arrives.
  */
 @Composable
 private fun ChangesBody(workspace: GitWorkspace, wrapLines: Boolean, modifier: Modifier) {
@@ -377,3 +405,5 @@ private fun ChangesBody(workspace: GitWorkspace, wrapLines: Boolean, modifier: M
     }
   }
 }
+
+private val TOOLBAR_BUTTON_SIZE = 34.dp

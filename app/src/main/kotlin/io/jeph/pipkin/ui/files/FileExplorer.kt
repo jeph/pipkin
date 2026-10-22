@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,8 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -39,14 +41,20 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.host.GitCommit
+import io.jeph.pipkin.ui.components.HeaderButton
+import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SnackbarStackState
+import io.jeph.pipkin.ui.git.ChangesContent
 import io.jeph.pipkin.ui.git.ChangesPane
 import io.jeph.pipkin.ui.git.ExplorerTab
 import io.jeph.pipkin.ui.git.GitLoss
@@ -54,12 +62,13 @@ import io.jeph.pipkin.ui.git.GitWorkspace
 import io.jeph.pipkin.ui.git.GitWorkspaces
 import io.jeph.pipkin.ui.git.TrustPrompt
 import io.jeph.pipkin.ui.git.shownExplorerTab
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
 /**
- * Paseo's compact explorer: a full-width panel beside the workspace with the Changes and Files tabs and a close
+ * The explorer: a full-width panel beside the workspace with the Changes and Files tabs and a close
  * button. Files has a toolbar to collapse every folder, create a folder at the top of the workspace, show or hide dot
  * files and refresh, and the tree of the workspace folder [cwd]. Folders expand in place, listed as they open; tapping
  * a file calls [onOpenFile] with its workspace-relative path. Each workspace keeps its own expanded folders and scroll
@@ -109,6 +118,7 @@ internal fun ExplorerPanel(
     ExplorerHeader(
       tabs = if (changesAvailable) ExplorerTab.entries else listOf(ExplorerTab.Files),
       shown = shownTab,
+      changedFiles = (repository?.changes as? ChangesContent.Loaded)?.document?.sections?.size?.takeIf { trusted },
       onSelect = { tab -> folder?.let { graph.preferences.setExplorerTab(it, tab) } },
       onClose = onClose,
     )
@@ -216,11 +226,15 @@ private fun FilesPane(
   }
 }
 
-/** Paseo's explorer tabs, the shown one highlighted, and the close button. */
+/**
+ * The explorer's tabs on a pill track, the shown one raised, Changes with its number of [changedFiles] once a diff has
+ * loaded, and the close button.
+ */
 @Composable
 private fun ExplorerHeader(
   tabs: List<ExplorerTab>,
   shown: ExplorerTab,
+  changedFiles: Int?,
   onSelect: (ExplorerTab) -> Unit,
   onClose: () -> Unit,
 ) {
@@ -230,49 +244,107 @@ private fun ExplorerHeader(
       .padding(top = PipkinTokens.Spacing.s8)
       .fillMaxWidth()
       .height(56.dp)
-      .padding(start = PipkinTokens.Spacing.s8, end = PipkinTokens.Spacing.s12),
+      .padding(horizontal = PipkinTokens.Spacing.s12),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
-    for (tab in tabs) ExplorerTabButton(tab, active = tab == shown, onClick = { onSelect(tab) })
-    Spacer(modifier = Modifier.weight(1f))
-    RoundIconButton(
+    Row(
+      modifier = Modifier
+        .weight(1f)
+        .height(42.dp)
+        .clip(CircleShape)
+        .background(colors.surface1)
+        .padding(PipkinTokens.Spacing.s4),
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
+    ) {
+      for (tab in tabs) {
+        ExplorerTabButton(
+          tab = tab,
+          active = tab == shown,
+          count = changedFiles?.takeIf { tab == ExplorerTab.Changes && it > 0 },
+          onClick = { onSelect(tab) },
+          modifier = Modifier.weight(1f),
+        )
+      }
+    }
+    HeaderButton(
       icon = R.drawable.ic_lucide_x,
       contentDescription = stringResource(R.string.files_explorer_close),
       onClick = onClose,
-      tint = colors.foregroundMuted,
+      filled = true,
     )
   }
-  HorizontalDivider(thickness = 1.dp, color = colors.border)
 }
 
-/** Paseo's explorer tab: its name, muted unless it's the [active] one, which is highlighted. */
+/**
+ * An explorer tab: its icon and name, muted unless it's the [active] one, which is raised, then its [count] as a badge
+ * that TalkBack skips, since the tab is named as before.
+ */
 @Composable
-private fun ExplorerTabButton(tab: ExplorerTab, active: Boolean, onClick: () -> Unit) {
+private fun ExplorerTabButton(tab: ExplorerTab, active: Boolean, count: Int?, onClick: () -> Unit, modifier: Modifier) {
   val colors = pipkinColors
-  Text(
-    text = stringResource(
-      when (tab) {
-        ExplorerTab.Changes -> R.string.git_explorer_changes
-        ExplorerTab.Files -> R.string.files_explorer_title
-      },
-    ),
-    modifier = Modifier
-      .clip(RoundedCornerShape(PipkinTokens.Radius.md))
-      .background(if (active) sidebarHighlight() else Color.Transparent)
+  val tint = if (active) colors.foreground else colors.foregroundMuted
+  Row(
+    modifier = modifier
+      .fillMaxHeight()
+      .clip(CircleShape)
+      .background(if (active) colors.surface2 else Color.Transparent)
       .clickable(onClick = onClick)
       .semantics { selected = active }
-      .padding(PipkinTokens.Spacing.s8),
-    color = if (active) colors.foreground else colors.foregroundMuted,
-    fontSize = PipkinTokens.FontSize.base,
+      .padding(horizontal = PipkinTokens.Spacing.s8),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
+  ) {
+    LucideIcon(
+      icon = when (tab) {
+        ExplorerTab.Changes -> R.drawable.ic_lucide_git_commit_horizontal
+        ExplorerTab.Files -> R.drawable.ic_lucide_folder
+      },
+      contentDescription = null,
+      tint = tint,
+    )
+    Text(
+      text = stringResource(
+        when (tab) {
+          ExplorerTab.Changes -> R.string.git_explorer_changes
+          ExplorerTab.Files -> R.string.files_explorer_title
+        },
+      ),
+      modifier = Modifier.weight(1f, fill = false),
+      color = tint,
+      fontSize = PipkinTokens.FontSize.base,
+      fontWeight = FontWeight.SemiBold,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+    )
+    if (count != null) TabCount(count)
+  }
+}
+
+@Composable
+private fun TabCount(count: Int) {
+  val colors = pipkinColors
+  Text(
+    text = count.toString(),
+    modifier = Modifier
+      .clearAndSetSemantics {}
+      .background(colors.accentSoft, CircleShape)
+      .defaultMinSize(minWidth = 20.dp)
+      .padding(horizontal = PipkinTokens.Spacing.s6),
+    color = colors.accent,
+    fontSize = PipkinTokens.FontSize.sm,
+    fontWeight = FontWeight.Bold,
+    style = LocalTextStyle.current.copy(fontFeatureSettings = PipkinFonts.TABULAR),
+    textAlign = TextAlign.Center,
+    maxLines = 1,
   )
 }
 
 /**
- * Paseo's Files toolbar: the sort key, which a tap moves to the next one, and beside it the direction, which a tap
- * reverses; then Collapse all while [canCollapseAll], New folder, the dot-file toggle (highlighted while they're
- * hidden) and Refresh. Collapse all comes and goes at the start of that group, so the buttons after it stay put. The
- * sort and dot-file choices are saved to preferences directly.
+ * The Files toolbar: the sort key, which a tap moves to the next one, and beside it the direction, which a tap
+ * reverses; then Collapse all while [canCollapseAll], New folder, the dot-file toggle (raised while they're hidden) and
+ * Refresh. Collapse all comes and goes at the start of that group, so the buttons after it stay put. The sort and
+ * dot-file choices are saved to preferences directly.
  */
 @Composable
 private fun ExplorerToolbar(
@@ -290,62 +362,61 @@ private fun ExplorerToolbar(
   Row(
     modifier = Modifier
       .fillMaxWidth()
-      .height(36.dp)
-      .padding(start = PipkinTokens.Spacing.s8, end = PipkinTokens.Spacing.s8),
+      .height(44.dp)
+      .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s12),
     verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(1.dp),
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s2),
   ) {
     SortKeyButton(sort.key, onClick = { preferences.setExplorerSort(sort.next()) })
-    RoundIconButton(
+    ToolbarButton(
       icon = if (sort.descending) R.drawable.ic_lucide_arrow_down else R.drawable.ic_lucide_arrow_up,
       contentDescription = stringResource(
         if (sort.descending) R.string.files_sort_descending else R.string.files_sort_ascending,
       ),
       onClick = { preferences.setExplorerSort(sort.reversed()) },
-      tint = colors.foregroundExtraMuted,
     )
     Spacer(modifier = Modifier.weight(1f))
     if (canCollapseAll) {
-      RoundIconButton(
-        icon = R.drawable.ic_lucide_chevrons_down_up,
-        contentDescription = stringResource(R.string.files_collapse_all),
-        onClick = onCollapseAll,
-        tint = colors.foregroundExtraMuted,
-      )
+      ToolbarButton(R.drawable.ic_lucide_chevrons_down_up, stringResource(R.string.files_collapse_all), onCollapseAll)
     }
-    RoundIconButton(
-      icon = R.drawable.ic_lucide_folder_plus,
-      contentDescription = stringResource(R.string.files_new_folder),
-      onClick = onNewFolder,
-      enabled = enabled,
-      tint = colors.foregroundExtraMuted,
-    )
-    RoundIconButton(
+    ToolbarButton(R.drawable.ic_lucide_folder_plus, stringResource(R.string.files_new_folder), onNewFolder, enabled)
+    ToolbarButton(
       icon = if (showHidden) R.drawable.ic_lucide_eye else R.drawable.ic_lucide_eye_off,
       contentDescription = stringResource(if (showHidden) R.string.files_hide_hidden else R.string.files_show_hidden),
       onClick = { preferences.setShowHiddenFiles(!showHidden) },
-      background = if (showHidden) Color.Transparent else sidebarHighlight(),
-      tint = colors.foregroundExtraMuted,
+      background = if (showHidden) Color.Transparent else colors.surface2,
     )
     if (refreshing) {
-      Box(modifier = Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+      Box(modifier = Modifier.size(TOOLBAR_BUTTON_SIZE), contentAlignment = Alignment.Center) {
         Spinner(PipkinTokens.IconSize.md, stringResource(R.string.files_refreshing))
       }
     } else {
-      RoundIconButton(
-        icon = R.drawable.ic_lucide_refresh_cw,
-        contentDescription = stringResource(R.string.files_refresh),
-        onClick = onRefresh,
-        enabled = enabled,
-        tint = colors.foregroundExtraMuted,
-      )
+      ToolbarButton(R.drawable.ic_lucide_refresh_cw, stringResource(R.string.files_refresh), onRefresh, enabled)
     }
   }
-  HorizontalDivider(thickness = 1.dp, color = colors.border)
+}
+
+@Composable
+private fun ToolbarButton(
+  icon: Int,
+  contentDescription: String,
+  onClick: () -> Unit,
+  enabled: Boolean = true,
+  background: Color = Color.Transparent,
+) {
+  RoundIconButton(
+    icon = icon,
+    contentDescription = contentDescription,
+    onClick = onClick,
+    modifier = Modifier.size(TOOLBAR_BUTTON_SIZE),
+    enabled = enabled,
+    background = background,
+    tint = pipkinColors.foregroundMuted,
+  )
 }
 
 /**
- * Paseo's sort trigger: the current key's name, small and muted, in a 24dp pill that a tap moves to the next key. The
+ * The sort trigger: the current key's name, small and muted, in an outlined pill that a tap moves to the next key. The
  * pill is as wide as the longest key name, so the direction arrow beside it stays put as the key changes.
  */
 @Composable
@@ -354,11 +425,12 @@ private fun SortKeyButton(key: SortKey, onClick: () -> Unit) {
   val description = stringResource(R.string.files_sort_by, label)
   Box(
     modifier = Modifier
-      .height(24.dp)
-      .clip(RoundedCornerShape(PipkinTokens.Radius.base))
+      .height(28.dp)
+      .clip(CircleShape)
+      .border(1.dp, pipkinColors.border, CircleShape)
       .clickable(onClick = onClick)
       .semantics { contentDescription = description }
-      .padding(horizontal = PipkinTokens.Spacing.s4),
+      .padding(horizontal = PipkinTokens.Spacing.s12),
     contentAlignment = Alignment.Center,
   ) {
     for (other in SortKey.entries) {
@@ -370,7 +442,7 @@ private fun SortKeyButton(key: SortKey, onClick: () -> Unit) {
 
 @Composable
 private fun SortKeyLabel(text: String, modifier: Modifier = Modifier) {
-  Text(text = text, modifier = modifier, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm)
+  Text(text = text, modifier = modifier, color = pipkinColors.foregroundMuted, fontSize = PipkinTokens.FontSize.meta)
 }
 
 @Composable
@@ -381,3 +453,5 @@ private fun sortKeyLabel(key: SortKey): String = stringResource(
     SortKey.Date -> R.string.files_sort_date
   },
 )
+
+private val TOOLBAR_BUTTON_SIZE = 32.dp

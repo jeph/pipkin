@@ -2,7 +2,6 @@ package io.jeph.pipkin.ui.files
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -46,6 +46,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
@@ -132,7 +133,7 @@ internal fun ExplorerTree(
   }
 }
 
-/** Paseo's tree row: 12dp in plus 12dp a level, a 16dp chevron or file icon, and the name at 76% strength. */
+/** A tree row: 8dp in plus 12dp a level, a 16dp chevron or file icon, and the name at 76% strength. */
 @Composable
 private fun EntryRow(
   entry: FileEntry,
@@ -144,9 +145,9 @@ private fun EntryRow(
 ) {
   TreeRow(
     depth,
-    modifier = Modifier.background(
-      if (selected) sidebarHighlight() else Color.Transparent,
-    ).clickable(onClick = onClick),
+    modifier = Modifier
+      .background(if (selected) pipkinColors.accentSoft else Color.Transparent)
+      .clickable(onClick = onClick),
   ) {
     when {
       !entry.isDirectory -> Image(
@@ -171,7 +172,7 @@ private fun EntryRow(
 }
 
 /**
- * Paseo's draft row for a new folder: a closed folder's chevron and a name field that takes focus. Done or leaving the
+ * The draft row for a new folder: a closed folder's chevron and a name field that takes focus. Done or leaving the
  * field commits a name; an empty one cancels.
  */
 @Composable
@@ -228,16 +229,20 @@ private fun NewFolderRow(onCommit: (String) -> Unit, onCancel: () -> Unit) {
   }
 }
 
+/** A tree row's shape: a rounded row inset from the panel's sides, so a highlight reads as a pill. */
 @Composable
 private fun TreeRow(depth: Int, modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) {
   Row(
-    modifier = modifier
+    modifier = Modifier
+      .padding(horizontal = PipkinTokens.Spacing.s8)
       .fillMaxWidth()
+      .clip(RoundedCornerShape(PipkinTokens.Radius.md))
+      .then(modifier)
       .padding(
-        start = PipkinTokens.Spacing.s12 + INDENT_PER_LEVEL * depth,
+        start = PipkinTokens.Spacing.s8 + INDENT_PER_LEVEL * depth,
         end = PipkinTokens.Spacing.s8,
-        top = PipkinTokens.Spacing.s6,
-        bottom = PipkinTokens.Spacing.s6,
+        top = PipkinTokens.Spacing.s8,
+        bottom = PipkinTokens.Spacing.s8,
       ),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
@@ -257,7 +262,7 @@ private fun Chevron(expanded: Boolean) {
   )
 }
 
-/** Paseo's loading spinner in a 16dp icon slot; [contentDescription] names it when nothing else says what loads. */
+/** A loading spinner in a 16dp icon slot; [contentDescription] names it when nothing else says what loads. */
 @Composable
 internal fun Spinner(size: Dp, contentDescription: String?) {
   Box(
@@ -289,11 +294,12 @@ private fun TreeFailure(message: String, onRetry: () -> Unit, modifier: Modifier
       text = stringResource(R.string.files_retry),
       modifier = Modifier
         .clip(CircleShape)
-        .border(1.dp, colors.border, CircleShape)
+        .background(colors.surface2)
         .clickable(onClick = onRetry)
-        .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s4),
-      color = colors.foregroundMuted,
+        .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s8),
+      color = colors.foreground,
       fontSize = PipkinTokens.FontSize.base,
+      fontWeight = FontWeight.SemiBold,
     )
   }
 }
@@ -313,7 +319,7 @@ private fun CenterNote(modifier: Modifier, content: @Composable () -> Unit) {
 @Composable
 internal fun sidebarHighlight(): Color = pipkinColors.surface2
 
-/** Paseo's tree names sit at 76% strength, so the file icons' colours lead. */
+/** Tree names sit at 76% strength, so the file icons' colours lead. */
 private const val NAME_ALPHA = 0.76f
 
 private val INDENT_PER_LEVEL = 12.dp

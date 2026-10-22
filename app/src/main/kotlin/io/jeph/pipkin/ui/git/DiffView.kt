@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,18 +24,27 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.GitFileKind
 import io.jeph.pipkin.syntax.Grammar
@@ -50,8 +60,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Paseo's mobile diff document: each file of [document] under a header that sticks to the top while its lines
- * scroll, then its hunks as unified rows with one gutter of line numbers, added and removed lines on green and red,
+ * A diff document: each file of [document] as a card, under a header that sticks to the top while its lines scroll,
+ * then its hunks as unified rows in a well, with one gutter of line numbers, added and removed lines on green and red,
  * coloured by the file's grammar. Long lines wrap with [wrapLines], otherwise the code scrolls sideways together, under
  * a gutter that stays put. With [onToggle] a header's tap folds or unfolds its file, folded ones being [collapsed];
  * without it every file shows unfolded. Only the rows on screen are composed, and highlighting runs off the main
@@ -65,7 +75,7 @@ internal fun DiffView(
   onToggle: ((path: String) -> Unit)?,
   state: LazyListState,
   modifier: Modifier = Modifier,
-  contentPadding: PaddingValues = PaddingValues(),
+  contentPadding: PaddingValues = PaddingValues(bottom = CARD_GAP),
 ) {
   HighlightEffect(document)
   val colors = pipkinColors
@@ -86,7 +96,7 @@ internal fun DiffView(
     for (section in document.sections) {
       val expanded = section.file.path !in collapsed
       stickyHeader(key = section.file.path, contentType = HEADER) {
-        FileHeader(section, onToggle?.let { toggle -> { toggle(section.file.path) } })
+        FileHeader(section, expanded, onToggle?.let { toggle -> { toggle(section.file.path) } })
       }
       if (expanded) {
         val rowStyle = DiffRowStyle(colors, style, gutterWidth(section.maxLineNumber, digitWidth), wrapLines, scroller)
@@ -145,48 +155,79 @@ private class DiffRowStyle(
 
 private fun LazyListScope.sectionRows(section: DiffSection, style: DiffRowStyle) {
   val path = section.file.path
+  val last = section.rows.lastIndex
   items(
     count = section.rows.size,
     key = { "$path\n$it" },
     contentType = { section.rows[it]::class },
   ) { index ->
+    val card = Modifier.cardRow(style.colors, first = index == 0, last = index == last)
     when (val row = section.rows[index]) {
-      is DiffRow.HunkHeader -> HunkHeaderRow(row.header, style)
-      is DiffRow.Line -> LineRow(row, section.highlight, style)
-      is DiffRow.Placeholder -> PlaceholderRow(row.kind)
+      is DiffRow.HunkHeader -> HunkHeaderRow(row.header, style, card)
+      is DiffRow.Line -> LineRow(row, section.highlight, style, card)
+      is DiffRow.Placeholder -> PlaceholderRow(row.kind, card)
     }
   }
 }
 
-/** The `@@` line, muted, on the hunk band. */
+/**
+ * A body row's place in its file's card: inset in the card, which ends below the [last] row, on the well of page
+ * colour whose corners round at the [first] and [last] rows. The clip happens only there, so most rows draw no layer.
+ */
+private fun Modifier.cardRow(colors: PipkinColors, first: Boolean, last: Boolean): Modifier {
+  val inCard = padding(horizontal = CARD_MARGIN)
+    .fillMaxWidth()
+    .background(colors.surface1, if (last) CardBottomShape else RectangleShape)
+    .padding(start = WELL_INSET, end = WELL_INSET, bottom = if (last) WELL_INSET else 0.dp)
+  val well = when {
+    first && last -> RoundedCornerShape(WELL_RADIUS)
+    first -> WellTopShape
+    last -> WellBottomShape
+    else -> null
+  }
+  return (if (well == null) inCard else inCard.clip(well)).background(colors.surface0)
+}
+
+/** The `@@` line, faint and slanted, on the hunk band. */
 @Composable
-private fun HunkHeaderRow(header: String, style: DiffRowStyle) {
-  Row(modifier = Modifier.fillMaxWidth().background(style.colors.surface1)) {
+private fun HunkHeaderRow(header: String, style: DiffRowStyle, modifier: Modifier) {
+  Row(modifier = modifier.fillMaxWidth().background(style.colors.surface2)) {
     CodeText(
-      text = AnnotatedString(header),
+      text = AnnotatedString(header, HunkHeaderStyle),
       style = style,
-      color = style.colors.foregroundMuted,
+      color = style.colors.foregroundExtraMuted,
       modifier = Modifier.padding(
-        start = style.gutterWidth,
-        top = PipkinTokens.Spacing.s4,
-        bottom = PipkinTokens.Spacing.s4,
+        start = PipkinTokens.Spacing.s12,
+        top = PipkinTokens.Spacing.s2,
+        bottom = PipkinTokens.Spacing.s2,
       ),
     )
   }
 }
 
 @Composable
-private fun LineRow(line: DiffRow.Line, highlight: SideHighlight?, style: DiffRowStyle) {
+private fun LineRow(line: DiffRow.Line, highlight: SideHighlight?, style: DiffRowStyle, modifier: Modifier) {
   val colors = style.colors
   val (background, numberColor) = when (line.kind) {
-    DiffLineKind.Added -> colors.dotSuccess.copy(alpha = ADDED_ALPHA) to colors.dotSuccess
-    DiffLineKind.Removed -> colors.dotDanger.copy(alpha = REMOVED_ALPHA) to colors.dotDanger
-    DiffLineKind.Context -> Color.Transparent to colors.foregroundMuted
+    DiffLineKind.Added -> colors.successSoft to colors.dotSuccess
+    DiffLineKind.Removed -> colors.dangerSoft to colors.destructive
+    DiffLineKind.Context -> Color.Transparent to colors.foregroundExtraMuted
   }
-  Row(modifier = Modifier.fillMaxWidth().background(background)) {
+  val gutterWidth = style.gutterWidth
+  // The wash again over the gutter makes it a step stronger, whatever height the wrapped line takes.
+  val gutter = if (line.kind == DiffLineKind.Context) {
+    Modifier
+  } else {
+    Modifier.drawBehind {
+      val width = gutterWidth.toPx()
+      val start = if (layoutDirection == LayoutDirection.Ltr) 0f else size.width - width
+      drawRect(background, topLeft = Offset(start, 0f), size = Size(width, size.height))
+    }
+  }
+  Row(modifier = modifier.fillMaxWidth().background(background).then(gutter)) {
     Text(
       text = line.number?.toString().orEmpty(),
-      modifier = Modifier.width(style.gutterWidth).padding(horizontal = PipkinTokens.Spacing.s8),
+      modifier = Modifier.width(gutterWidth).padding(horizontal = PipkinTokens.Spacing.s8),
       style = style.code,
       color = numberColor,
       textAlign = TextAlign.End,
@@ -197,7 +238,7 @@ private fun LineRow(line: DiffRow.Line, highlight: SideHighlight?, style: DiffRo
       text = text,
       style = style,
       color = colors.foreground,
-      modifier = Modifier.weight(1f),
+      modifier = Modifier.weight(1f).padding(start = PipkinTokens.Spacing.s8),
     )
   }
 }
@@ -240,10 +281,10 @@ private fun CodeText(text: AnnotatedString, style: DiffRowStyle, color: Color, m
 }
 
 @Composable
-private fun PlaceholderRow(kind: GitFileKind) {
+private fun PlaceholderRow(kind: GitFileKind, modifier: Modifier) {
   Text(
     text = stringResource(if (kind == GitFileKind.Binary) R.string.git_binary else R.string.git_file_too_large),
-    modifier = Modifier.fillMaxWidth().padding(PipkinTokens.Spacing.s12),
+    modifier = modifier.fillMaxWidth().padding(PipkinTokens.Spacing.s12),
     color = pipkinColors.foregroundMuted,
     fontSize = PipkinTokens.FontSize.sm,
     textAlign = TextAlign.Center,
@@ -280,6 +321,21 @@ private class SideScroller {
 
 private const val HEADER = "header"
 
-/** Paseo's line backgrounds: its success colour at 15%, its danger colour at 10%. */
-private const val ADDED_ALPHA = 0.15f
-private const val REMOVED_ALPHA = 0.1f
+private val HunkHeaderStyle = SpanStyle(fontStyle = FontStyle.Italic)
+
+/** The space between file cards, and above the first. */
+internal val CARD_GAP = PipkinTokens.Spacing.s12
+
+/** How far a file card sits in from the list's sides. */
+internal val CARD_MARGIN = PipkinTokens.Spacing.s12
+
+internal val CardShape = RoundedCornerShape(PipkinTokens.Radius.xl)
+internal val CardTopShape = RoundedCornerShape(topStart = PipkinTokens.Radius.xl, topEnd = PipkinTokens.Radius.xl)
+private val CardBottomShape =
+  RoundedCornerShape(bottomStart = PipkinTokens.Radius.xl, bottomEnd = PipkinTokens.Radius.xl)
+
+/** How far the well of lines sits in from its card's sides and bottom. */
+private val WELL_INSET = PipkinTokens.Spacing.s6
+private val WELL_RADIUS = PipkinTokens.Radius.lg
+private val WellTopShape = RoundedCornerShape(topStart = WELL_RADIUS, topEnd = WELL_RADIUS)
+private val WellBottomShape = RoundedCornerShape(bottomStart = WELL_RADIUS, bottomEnd = WELL_RADIUS)

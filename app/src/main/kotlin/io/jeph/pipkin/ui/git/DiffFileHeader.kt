@@ -1,40 +1,48 @@
 package io.jeph.pipkin.ui.git
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.text
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.GitChange
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.files.fileIcon
+import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.text.NumberFormat
 
 /**
- * Paseo's document file header: the file's name and, muted, its folder, cut off at the end where they don't fit;
- * its added and removed line counts; and the icon of how it changed. A tap calls [onToggle], when given, to fold or
- * unfold the file; a long press does nothing, as in Paseo, where it only opens the file menu Pipkin leaves out.
+ * The top of a file's diff card, over a gap that parts it from the card above: the file's type tile, its name in bold
+ * over its folder, muted, each cut off at the end where it doesn't fit; its added and removed line counts; and the icon
+ * of how it changed. The card's bottom corners round here too while the file is folded, not [expanded]. A tap calls
+ * [onToggle], when given, to fold or unfold the file; a long press does nothing.
  */
 @Composable
-internal fun FileHeader(section: DiffSection, onToggle: (() -> Unit)?) {
+internal fun FileHeader(section: DiffSection, expanded: Boolean, onToggle: (() -> Unit)?) {
   val colors = pipkinColors
   // Without a long-click handler, releasing a long press would count as a tap and fold the file.
   val clickable = if (onToggle == null) {
@@ -42,48 +50,92 @@ internal fun FileHeader(section: DiffSection, onToggle: (() -> Unit)?) {
   } else {
     Modifier.combinedClickable(onLongClick = {}, hapticFeedbackEnabled = false, onClick = onToggle)
   }
-  Column(modifier = Modifier.fillMaxWidth().background(colors.surface0)) {
+  val shape = if (expanded) CardTopShape else CardShape
+  // The page colour behind the card's corners hides the rows scrolling under it while it sticks to the top.
+  Box(modifier = Modifier.fillMaxWidth().background(colors.surface0).padding(top = CARD_GAP)) {
     Row(
       modifier = Modifier
+        .padding(horizontal = CARD_MARGIN)
         .fillMaxWidth()
+        .clip(shape)
+        .background(colors.surface1)
         .then(clickable)
-        .height(29.dp)
-        .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s8),
+        .heightIn(min = 52.dp)
+        .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
     ) {
-      Text(
-        text = headerTitle(section, colors.foregroundMuted),
-        modifier = Modifier.weight(1f),
-        color = colors.foreground,
-        fontSize = PipkinTokens.FontSize.base,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-      )
+      FileTile(section.name)
+      // Read out as one line, the name then its folder, however the two are stacked on screen.
+      val folder = section.folder
+      Column(
+        modifier = Modifier.weight(1f).clearAndSetSemantics {
+          text = AnnotatedString(if (folder.isEmpty()) section.name else "${section.name} $folder")
+        },
+      ) {
+        Text(
+          text = section.name,
+          color = colors.foreground,
+          fontSize = PipkinTokens.FontSize.base,
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
+          overflow = TextOverflow.Ellipsis,
+        )
+        if (section.folder.isNotEmpty()) {
+          Text(
+            text = section.folder,
+            color = colors.foregroundExtraMuted,
+            fontSize = PipkinTokens.FontSize.sm,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
+      }
       DiffStat(section.file.additions, section.file.deletions)
       ChangeIcon(section.file.change)
     }
-    HorizontalDivider(thickness = 1.dp, color = colors.borderAccent)
   }
 }
 
-/** The name, then the folder muted after a space, in one line so the name keeps the room it needs first. */
-private fun headerTitle(section: DiffSection, folderColor: Color): AnnotatedString = buildAnnotatedString {
-  append(section.name)
-  if (section.folder.isNotEmpty()) withStyle(SpanStyle(color = folderColor)) { append(" ${section.folder}") }
+/** The file's type icon, in its own colours, on a tinted tile. */
+@Composable
+private fun FileTile(name: String) {
+  Box(
+    modifier = Modifier
+      .size(28.dp)
+      .background(pipkinColors.infoSoft, RoundedCornerShape(9.dp)),
+    contentAlignment = Alignment.Center,
+  ) {
+    Image(
+      painter = painterResource(fileIcon(name)),
+      contentDescription = null,
+      modifier = Modifier.size(PipkinTokens.IconSize.md),
+    )
+  }
 }
 
-/** Paseo's diff stat: `+added -removed`, compact, in green and red. */
+/** A diff stat: `+added -removed`, compact, in green and red code figures. */
 @Composable
 internal fun DiffStat(additions: Int, deletions: Int) {
   val colors = pipkinColors
   Row(horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4)) {
-    Text(text = "+${compactCount(additions)}", color = colors.dotSuccess, fontSize = PipkinTokens.FontSize.sm)
-    Text(text = "-${compactCount(deletions)}", color = colors.dotDanger, fontSize = PipkinTokens.FontSize.sm)
+    StatText("+${compactCount(additions)}", colors.dotSuccess)
+    StatText("-${compactCount(deletions)}", colors.destructive)
   }
 }
 
-/** [value] as Paseo's compact count, `1.2k`, with the app language's digits and unit. */
+@Composable
+private fun StatText(text: String, color: Color) {
+  Text(
+    text = text,
+    color = color,
+    fontFamily = PipkinFonts.mono,
+    fontSize = PipkinTokens.FontSize.code,
+    maxLines = 1,
+  )
+}
+
+/** [value] as a compact count, `1.2k`, with the app language's digits and unit. */
 @Composable
 private fun compactCount(value: Int): String {
   val (scaled, unit) = compactScale(value)
@@ -96,7 +148,7 @@ private fun compactCount(value: Int): String {
   }
 }
 
-/** Paseo's change icon: a green plus for an added file, a red minus for a deleted one, a dot for any other change. */
+/** The change icon: a green plus for an added file, a red minus for a deleted one, a dot for any other change. */
 @Composable
 private fun ChangeIcon(change: GitChange) {
   val colors = pipkinColors

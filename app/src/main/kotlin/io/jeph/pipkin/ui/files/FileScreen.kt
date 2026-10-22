@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,7 +24,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -71,7 +72,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * One open file in a pane: the pane's header with the file's name over its folder and the file's actions, which acts
- * through [controls]; Paseo's bar with the file's size and line count; and the file itself, read again each time its
+ * through [controls]; a caption with the file's size and line count; and the file itself, read again each time its
  * tab shows, since Pi may have changed it. Text shows with line numbers, coloured when a grammar knows the extension;
  * images show fitted to the width.
  */
@@ -148,15 +149,18 @@ private fun LoadedFile(file: FileTab, content: FileContent, modifier: Modifier) 
 }
 
 /**
- * Paseo's file bar: the file's size and, for text, its line count, in the whisper style; for markdown, the
- * Preview and Source switch at its end, [showsPreview] saying which is selected.
+ * The file's caption: its size and, for text, its line count, small and muted; for markdown, the Preview and Source
+ * switch at its end, [showsPreview] saying which is selected.
  */
 @Composable
 private fun FileBar(size: Long, lineCount: Int?, showsPreview: Boolean?, onShowPreview: (Boolean) -> Unit) {
   val colors = pipkinColors
   val context = LocalContext.current
   Row(
-    modifier = Modifier.fillMaxWidth().height(36.dp).padding(horizontal = PipkinTokens.Spacing.s12),
+    modifier = Modifier
+      .fillMaxWidth()
+      .heightIn(min = 44.dp)
+      .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s4),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
@@ -164,12 +168,14 @@ private fun FileBar(size: Long, lineCount: Int?, showsPreview: Boolean?, onShowP
       Formatter.formatShortFileSize(context, size),
       color = colors.foregroundMuted,
       fontSize = PipkinTokens.FontSize.sm,
+      style = LocalTextStyle.current.copy(fontFeatureSettings = PipkinFonts.TABULAR),
     )
     if (lineCount != null) {
       Text(
         text = pluralStringResource(R.plurals.file_lines, lineCount, lineCount),
         color = colors.foregroundMuted,
         fontSize = PipkinTokens.FontSize.sm,
+        style = LocalTextStyle.current.copy(fontFeatureSettings = PipkinFonts.TABULAR),
       )
     }
     if (showsPreview != null) {
@@ -182,15 +188,15 @@ private fun FileBar(size: Long, lineCount: Int?, showsPreview: Boolean?, onShowP
           text = stringResource(if (preview) R.string.file_preview else R.string.file_source),
           color = if (selected) colors.foreground else colors.foregroundMuted,
           fontSize = PipkinTokens.FontSize.sm,
+          fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
         )
       }
     }
   }
-  HorizontalDivider(thickness = 1.dp, color = colors.border)
 }
 
 /**
- * [text]'s lines, coloured for [name]'s extension up to Paseo's 1 MiB highlighting budget for phones and plain past
+ * [text]'s lines, coloured for [name]'s extension up to a 1 MiB highlighting budget for phones and plain past
  * it. The lines are split off the main thread; a file ending in a line break has no empty line after it.
  */
 @Composable
@@ -204,7 +210,7 @@ private fun rememberSourceLines(text: String, name: String): List<AnnotatedStrin
   return lines.orEmpty()
 }
 
-/** Paseo's source view: a 56dp gutter of right-aligned line numbers and the lines, wrapped, in the code font. */
+/** The source view: a 56dp gutter of right-aligned, faint line numbers and the lines, wrapped, in the code font. */
 @Composable
 private fun SourceView(lines: List<AnnotatedString>, modifier: Modifier) {
   val colors = pipkinColors
@@ -222,7 +228,7 @@ private fun SourceView(lines: List<AnnotatedString>, modifier: Modifier) {
           Text(
             text = (index + 1).toString(),
             modifier = Modifier.width(GUTTER_WIDTH).padding(end = PipkinTokens.Spacing.s12),
-            color = colors.foregroundMuted,
+            color = colors.foregroundExtraMuted,
             fontFamily = PipkinFonts.mono,
             fontSize = PipkinTokens.FontSize.code,
             lineHeight = PipkinTokens.LineHeight.code,
@@ -327,7 +333,7 @@ private fun NoteText(text: String, color: Color = pipkinColors.foregroundMuted) 
   Text(text = text, color = color, fontSize = PipkinTokens.FontSize.base, textAlign = TextAlign.Center)
 }
 
-/** Paseo highlights files up to 1 MiB on phones and shows bigger ones plain. */
+/** Files up to 1 MiB are highlighted on phones, and bigger ones show plain. */
 private const val HIGHLIGHT_LIMIT = 1024 * 1024
 
 /**
