@@ -151,7 +151,9 @@ class StepStreamTest {
       listOf(StepsOutcome.Stopped, StepsOutcome.Stopped, StepsOutcome.Done, StepsOutcome.Done),
       folds.map { it.outcome },
     )
-    assertEquals(1, folds[0].failed)
+    // The command Stop ended reads stopped, not failed.
+    assertEquals(0, folds[0].failed)
+    assertEquals(StepFigure.Stopped, (folds[0].steps[0] as ToolCall).figure)
     // A failure that isn't a stop still shows, and ends its fold.
     assertEquals(1, timeline.state.value.items.count { it is TimelineItem.Error })
   }

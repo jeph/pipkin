@@ -75,6 +75,13 @@
     <string name="chat_output">Output</string>
     <string name="chat_no_output">No output</string>
     <string name="chat_running">Running…</string>
+    <!-- Notes at the end of a step's row. %1$s is a number of lines, already formatted. -->
+    <string name="chat_figure_added">+%1$s</string>
+    <string name="chat_figure_removed">-%1$s</string>
+    <!-- %1$s is a shell command's exit code, already formatted. -->
+    <string name="chat_figure_exit">exit %1$s</string>
+    <string name="chat_figure_timed_out">timed out</string>
+    <string name="chat_figure_stopped">stopped</string>
 
     <!-- A run of the agent's steps folded into one line: its state, then counts. -->
     <string name="chat_steps_working">Simmering</string>

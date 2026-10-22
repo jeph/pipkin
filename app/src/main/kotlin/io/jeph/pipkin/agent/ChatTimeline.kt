@@ -494,7 +494,7 @@ class ChatTimeline(
       rebuilt.map { item ->
         val old = (item as? ToolCall)?.let { findTool(it.id) }?.let { items[it] as ToolCall }
         if (item is ToolCall && old != null) {
-          item.copy(output = old.output, isError = old.isError, status = old.status)
+          item.copy(output = old.output, isError = old.isError, status = old.status, figure = old.figure)
         } else {
           item
         }
@@ -522,22 +522,19 @@ class ChatTimeline(
             status = ToolStatus.Running,
           )
 
-        else ->
-          tool.copy(
-            output = event.optJSONObject("result")?.optJSONArray("content").text(),
-            isError = event.optBoolean("isError"),
-            status = ToolStatus.Done,
-          )
+        else -> event.optJSONObject("result").let { result ->
+          tool.withResult(result?.optJSONArray("content").text(), event.optBoolean("isError"), result)
+        }
       }
   }
 
   private fun attachToolResult(message: JSONObject) {
     val index = findTool(message.optString("toolCallId")) ?: return
     items[index] =
-      (items[index] as ToolCall).copy(
-        output = message.optJSONArray("content").text(),
-        isError = message.optBoolean("isError"),
-        status = ToolStatus.Done,
+      (items[index] as ToolCall).withResult(
+        message.optJSONArray("content").text(),
+        message.optBoolean("isError"),
+        message,
       )
   }
 
@@ -728,6 +725,11 @@ private fun messageItems(message: JSONObject, prefix: String, settled: Boolean, 
           exitCode != 0,
           ToolStatus.Done,
           byUser = true,
+          figure = when {
+            message.optBoolean("cancelled") -> StepFigure.Stopped
+            exitCode != 0 -> StepFigure.Exit(exitCode)
+            else -> null
+          },
         ),
       )
     }

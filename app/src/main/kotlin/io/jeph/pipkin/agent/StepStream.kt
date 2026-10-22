@@ -75,7 +75,8 @@ class StepStream private constructor(val entries: List<TimelineItem>, private va
         key = "steps:${steps.first().key}",
         steps = steps,
         outcome = outcome,
-        failed = steps.count { it is TimelineItem.ToolCall && it.isError },
+        // A command Stop ended didn't fail; the fold reads Stopped instead.
+        failed = steps.count { it is TimelineItem.ToolCall && it.isError && it.figure != StepFigure.Stopped },
         current = steps.lastOrNull { it.running } ?: steps.last(),
       )
     }

@@ -29,17 +29,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.intl.LocaleList
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.toUpperCase
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
@@ -47,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.ImagePart
 import io.jeph.pipkin.agent.NoticeKind
+import io.jeph.pipkin.agent.StepFigure
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.text
 import io.jeph.pipkin.ui.components.LucideIcon
@@ -57,6 +63,7 @@ import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import java.text.NumberFormat
 import java.util.Date
 import kotlinx.coroutines.delay
 
@@ -95,8 +102,44 @@ internal fun ToolRow(presentation: ToolPresentation, onClick: () -> Unit, modifi
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )
+    presentation.figure?.let { FigureText(it) }
   }
 }
+
+/** A step's figure: lines added and removed, or how a shell command ended. Never cut short; the summary gives way. */
+@Composable
+private fun FigureText(figure: StepFigure) {
+  val colors = pipkinColors
+  val numbers = NumberFormat.getIntegerInstance()
+  val text = when (figure) {
+    is StepFigure.Lines -> buildAnnotatedString {
+      if (figure.added > 0) {
+        withStyle(SpanStyle(color = colors.dotSuccess)) {
+          append(stringResource(R.string.chat_figure_added, numbers.format(figure.added)))
+        }
+      }
+      if (figure.added > 0 && figure.removed > 0) append(' ')
+      if (figure.removed > 0) {
+        withStyle(SpanStyle(color = colors.destructive)) {
+          append(stringResource(R.string.chat_figure_removed, numbers.format(figure.removed)))
+        }
+      }
+    }
+
+    is StepFigure.Exit -> colored(
+      stringResource(R.string.chat_figure_exit, numbers.format(figure.code)),
+      colors.destructive,
+    )
+
+    StepFigure.TimedOut -> colored(stringResource(R.string.chat_figure_timed_out), colors.dotWarning)
+
+    StepFigure.Stopped -> colored(stringResource(R.string.chat_figure_stopped), colors.foregroundMuted)
+  }
+  if (text.isEmpty()) return
+  Text(text = text, fontSize = 11.5.sp, fontFamily = PipkinFonts.mono, maxLines = 1, softWrap = false)
+}
+
+private fun colored(text: String, color: Color) = AnnotatedString(text, SpanStyle(color = color))
 
 /** A step's status: a filled dot, green or red once it settled, or a cobalt ring while it runs. */
 @Composable

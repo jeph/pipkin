@@ -4,11 +4,15 @@ import androidx.annotation.DrawableRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import io.jeph.pipkin.R
+import io.jeph.pipkin.agent.StepFigure
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.agent.ToolStatus
 import org.json.JSONObject
 
-/** How a thinking block or tool call is labelled in its compact row and its detail sheet; [code] summaries are monospace. */
+/**
+ * How a thinking block or tool call is labelled in its compact row and its detail sheet; [code] summaries are
+ * monospace, and [figure] is what the row notes about a tool's result.
+ */
 internal data class ToolPresentation(
   @DrawableRes val icon: Int,
   val title: String,
@@ -16,6 +20,7 @@ internal data class ToolPresentation(
   val running: Boolean,
   val isError: Boolean,
   val code: Boolean = true,
+  val figure: StepFigure? = null,
 )
 
 @Composable
@@ -23,7 +28,7 @@ internal fun toolPresentation(item: TimelineItem.ToolCall): ToolPresentation {
   val args = item.args
   val running = item.status != ToolStatus.Done
   val path = args?.stringOrNull("path")
-  return when (item.toolName) {
+  val presentation = when (item.toolName) {
     "bash" -> ToolPresentation(
       R.drawable.ic_lucide_terminal,
       stringResource(R.string.chat_tool_shell),
@@ -58,6 +63,7 @@ internal fun toolPresentation(item: TimelineItem.ToolCall): ToolPresentation {
 
     else -> ToolPresentation(R.drawable.ic_lucide_wrench, item.toolName, path, running, item.isError)
   }
+  return presentation.copy(figure = item.figure)
 }
 
 @Composable
