@@ -126,19 +126,19 @@ private fun codeStyle(): TextStyle {
 /** Colours each file of [document] whose grammar is known and that isn't coloured for the current palette yet. */
 @Composable
 private fun HighlightEffect(document: DiffDocument) {
-  val dark = pipkinColors.isDark
+  val theme = pipkinColors
   val assets = LocalContext.current.assets
-  LaunchedEffect(document, dark) {
+  LaunchedEffect(document, theme) {
     for (section in document.sections) {
       val grammar = fileLanguage(section.file.path)?.let(Grammar::forName)
-      if (grammar == null || section.highlight?.dark == dark) continue
+      if (grammar == null || section.highlight?.theme == theme) continue
       section.highlight = withContext(Dispatchers.Default) {
         val loaded = loadGrammar(grammar, assets)
         SideHighlight(
-          dark = dark,
-          oldLines = section.oldSide.takeIf { it.isNotEmpty() }?.let { highlightCode(it, loaded, dark).splitLines() }
+          theme = theme,
+          oldLines = section.oldSide.takeIf { it.isNotEmpty() }?.let { highlightCode(it, loaded, theme).splitLines() }
             .orEmpty(),
-          newLines = section.newSide.takeIf { it.isNotEmpty() }?.let { highlightCode(it, loaded, dark).splitLines() }
+          newLines = section.newSide.takeIf { it.isNotEmpty() }?.let { highlightCode(it, loaded, theme).splitLines() }
             .orEmpty(),
         )
       }

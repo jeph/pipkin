@@ -6,6 +6,7 @@ import io.jeph.pipkin.host.GitDiff
 import io.jeph.pipkin.host.GitFile
 import io.jeph.pipkin.host.GitFileKind
 import io.jeph.pipkin.host.GitHunk
+import io.jeph.pipkin.ui.theme.StoneColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -164,7 +165,7 @@ class DiffDocumentTest {
   fun `a file whose sides didn't change keeps its highlighting and a changed one loses it`() {
     val same = GitHunk("@@ -1 +1 @@", oldStart = 1, newStart = 1, lines = listOf("-a", "+b"))
     val before = document(file("same.kt", same), file("changed.kt", same))
-    val highlight = SideHighlight(dark = true, listOf(AnnotatedString("a")), listOf(AnnotatedString("b")))
+    val highlight = SideHighlight(theme = StoneColors, listOf(AnnotatedString("a")), listOf(AnnotatedString("b")))
     before.sections.forEach { it.highlight = highlight }
     val edited = GitHunk("@@ -1 +1 @@", oldStart = 1, newStart = 1, lines = listOf("-a", "+c"))
 

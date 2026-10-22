@@ -9,6 +9,7 @@ import io.jeph.pipkin.host.GitDiff
 import io.jeph.pipkin.host.GitFile
 import io.jeph.pipkin.host.GitFileKind
 import io.jeph.pipkin.host.GitHunk
+import io.jeph.pipkin.ui.theme.PipkinColors
 
 internal enum class DiffLineKind { Context, Added, Removed }
 
@@ -28,9 +29,9 @@ internal sealed interface DiffRow {
   class Placeholder(val kind: GitFileKind) : DiffRow
 }
 
-/** A side's highlighted lines, coloured for the palette that was [dark] or not. */
+/** A side's highlighted lines, coloured for [theme]'s palette. */
 internal class SideHighlight(
-  val dark: Boolean,
+  val theme: PipkinColors,
   val oldLines: List<AnnotatedString>,
   val newLines: List<AnnotatedString>,
 )

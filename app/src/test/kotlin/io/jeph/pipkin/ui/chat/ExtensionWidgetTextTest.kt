@@ -2,14 +2,14 @@ package io.jeph.pipkin.ui.chat
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
-import io.jeph.pipkin.ui.theme.LightPipkinColors
+import io.jeph.pipkin.ui.theme.PorcelainColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** `ctx.ui.setWidget` lines as the styled text a widget's panel and sheet show. */
 class ExtensionWidgetTextTest {
-  private val colors = LightPipkinColors
+  private val colors = PorcelainColors
 
   private fun text(vararg lines: String): AnnotatedString = extensionWidgetText(lines.toList(), colors)
 

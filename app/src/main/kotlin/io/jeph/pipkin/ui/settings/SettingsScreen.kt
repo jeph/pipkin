@@ -42,7 +42,6 @@ import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.theme.PipkinTokens
-import io.jeph.pipkin.ui.theme.ThemeMode
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
@@ -271,32 +270,7 @@ private fun ExtensionsSection(graph: AppGraph) {
 private fun AppearanceSection(preferences: Preferences) {
   val theme by preferences.theme.collectAsStateWithLifecycle()
   SettingsSection(title = stringResource(R.string.settings_section_appearance)) {
-    SettingsRow(title = stringResource(R.string.settings_theme)) {
-      SegmentedControl(
-        options = listOf(ThemeMode.Light, ThemeMode.Dark, ThemeMode.System),
-        selected = theme,
-        onSelect = preferences::setTheme,
-      ) { mode, isSelected ->
-        val colors = pipkinColors
-        LucideIcon(
-          icon =
-            when (mode) {
-              ThemeMode.Light -> R.drawable.ic_lucide_sun
-              ThemeMode.Dark -> R.drawable.ic_lucide_moon
-              ThemeMode.System -> R.drawable.ic_lucide_monitor
-            },
-          contentDescription =
-            stringResource(
-              when (mode) {
-                ThemeMode.Light -> R.string.settings_theme_light
-                ThemeMode.Dark -> R.string.settings_theme_dark
-                ThemeMode.System -> R.string.settings_theme_system
-              },
-            ),
-          tint = if (isSelected) colors.foreground else colors.foregroundMuted,
-        )
-      }
-    }
+    ThemePicker(selected = theme, onSelect = preferences::setTheme)
   }
 }
 

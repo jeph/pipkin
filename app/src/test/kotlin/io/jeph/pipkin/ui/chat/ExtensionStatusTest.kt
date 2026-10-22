@@ -3,14 +3,14 @@ package io.jeph.pipkin.ui.chat
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import io.jeph.pipkin.ui.theme.LightPipkinColors
+import io.jeph.pipkin.ui.theme.PorcelainColors
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 /** `ctx.ui.setStatus` texts as the one styled line the header and tab menu show. */
 class ExtensionStatusTest {
-  private val colors = LightPipkinColors
+  private val colors = PorcelainColors
 
   private fun line(vararg statuses: Pair<String, String>): AnnotatedString? =
     extensionStatusLine(mapOf(*statuses), colors)

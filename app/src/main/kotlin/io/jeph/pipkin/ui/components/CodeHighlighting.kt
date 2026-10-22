@@ -18,8 +18,6 @@ import io.jeph.pipkin.syntax.Grammar
 import io.jeph.pipkin.syntax.LoadedGrammar
 import io.jeph.pipkin.syntax.SyntaxSession
 import io.jeph.pipkin.syntax.loadGrammar
-import io.jeph.pipkin.ui.theme.DarkPipkinColors
-import io.jeph.pipkin.ui.theme.LightPipkinColors
 import io.jeph.pipkin.ui.theme.PipkinColors
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +33,8 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun rememberHighlightedCode(code: String, language: String?): AnnotatedString {
   val grammar = language?.let(Grammar::forName) ?: return AnnotatedString(code)
-  val palette = if (pipkinColors.isDark) DarkPalette else LightPalette
+  val themeColors = pipkinColors
+  val palette = remember(themeColors) { palette(themeColors) }
   val assets = LocalContext.current.assets
   val latestCode by rememberUpdatedState(code)
   var highlighted by remember(grammar, palette) { mutableStateOf<AnnotatedString?>(null) }
@@ -55,11 +54,11 @@ internal fun rememberHighlightedCode(code: String, language: String?): Annotated
 }
 
 /**
- * [code] coloured by [grammar] for the [dark] palette or the light one, in one parse on the calling thread, for callers
- * that colour many texts off the main thread themselves.
+ * [code] coloured by [grammar] for the [theme]'s palette, in one parse on the calling thread, for callers that colour
+ * many texts off the main thread themselves.
  */
-internal fun highlightCode(code: String, grammar: LoadedGrammar, dark: Boolean): AnnotatedString {
-  val colors = captureColors(grammar, if (dark) DarkPalette else LightPalette)
+internal fun highlightCode(code: String, grammar: LoadedGrammar, theme: PipkinColors): AnnotatedString {
+  val colors = captureColors(grammar, palette(theme))
   return SyntaxSession(grammar).use { session ->
     paint(code, session.captures(code) { colors[it] != null }, colors::get)
   }
@@ -234,17 +233,13 @@ private val TOKENS = mapOf(
 )
 
 /** The syntax palette, by token, from the theme's own roles so code reads as part of the app. */
-private fun palette(colors: PipkinColors, comment: Color) = mapOf(
+private fun palette(colors: PipkinColors) = mapOf(
   Token.Plain to Color.Unspecified,
   Token.Keyword to colors.accent,
   Token.String to colors.dotSuccess,
   Token.Constant to colors.info,
-  Token.Comment to comment,
+  Token.Comment to colors.codeComment,
   Token.Function to colors.dotWarning,
   Token.Type to colors.extension,
   Token.Tag to colors.dotDanger,
 )
-
-// Comments sit between the muted and faint text colours: quieter than code, still readable at 4.5:1.
-private val DarkPalette = palette(DarkPipkinColors, comment = Color(0xFF7D85A6))
-private val LightPalette = palette(LightPipkinColors, comment = Color(0xFF5F6687))

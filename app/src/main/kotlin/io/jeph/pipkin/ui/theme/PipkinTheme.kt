@@ -12,7 +12,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.text.TextStyle
 
-val LocalPipkinColors = staticCompositionLocalOf { DarkPipkinColors }
+val LocalPipkinColors = staticCompositionLocalOf { StoneColors }
 
 /** Shorthand for the active palette inside composables. */
 val pipkinColors: PipkinColors
@@ -21,15 +21,9 @@ val pipkinColors: PipkinColors
   get() = LocalPipkinColors.current
 
 @Composable
-fun PipkinTheme(mode: ThemeMode, content: @Composable () -> Unit) {
-  val dark =
-    when (mode) {
-      ThemeMode.System -> isSystemInDarkTheme()
-      ThemeMode.Light -> false
-      ThemeMode.Dark -> true
-    }
-  val colors = if (dark) DarkPipkinColors else LightPipkinColors
-  val base = if (dark) darkColorScheme() else lightColorScheme()
+fun PipkinTheme(theme: AppTheme, content: @Composable () -> Unit) {
+  val colors = theme.colors(systemDark = isSystemInDarkTheme())
+  val base = if (colors.isDark) darkColorScheme() else lightColorScheme()
   val scheme =
     base.copy(
       primary = colors.accent,

@@ -41,12 +41,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.findViewTreeCompositionContext
-import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -430,19 +430,21 @@ private fun EmptyState(noModel: Boolean, onOpenProviders: () -> Unit, modifier: 
     horizontalAlignment = Alignment.CenterHorizontally,
     verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
   ) {
-    // The launcher icon as on the home screen: its mark on the icon's background. A launcher shows the middle 72dp of
-    // the 108dp foreground, so draw it 1.5x larger and clip.
+    // The launcher icon's mark in the theme's accent, on a wash of it. A launcher shows the middle 72dp of the 108dp
+    // foreground, so draw it 1.5x larger and clip.
+    val colors = pipkinColors
     Box(
       modifier = Modifier
         .size(EMPTY_STATE_ICON_SIZE)
         .clip(CircleShape)
-        .background(colorResource(R.color.ic_launcher_background)),
+        .background(colors.accentSoft),
       contentAlignment = Alignment.Center,
     ) {
       Image(
         painter = painterResource(R.drawable.ic_launcher_foreground),
         contentDescription = null,
         modifier = Modifier.requiredSize(EMPTY_STATE_ICON_SIZE * LAUNCHER_MASK_SCALE),
+        colorFilter = ColorFilter.tint(colors.accent),
       )
     }
     Text(

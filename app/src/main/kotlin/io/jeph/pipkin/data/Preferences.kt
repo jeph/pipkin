@@ -8,7 +8,7 @@ import io.jeph.pipkin.host.GitDiffMode
 import io.jeph.pipkin.ui.files.ExplorerSort
 import io.jeph.pipkin.ui.files.SortKey
 import io.jeph.pipkin.ui.git.ExplorerTab
-import io.jeph.pipkin.ui.theme.ThemeMode
+import io.jeph.pipkin.ui.theme.AppTheme
 import io.jeph.pipkin.workspace.SavedLayout
 import io.jeph.pipkin.workspace.savedLayoutOf
 import io.jeph.pipkin.workspace.toJson
@@ -25,9 +25,7 @@ internal class Preferences(context: Context) {
   private val setupCompleteState = MutableStateFlow(prefs.getBoolean(SETUP_COMPLETE, false))
   private val setupCommandCopiedForState = MutableStateFlow(prefs.getString(SETUP_COMMAND_COPIED_FOR, null))
   private val setupPagesPassedState = MutableStateFlow(readStringSet(SETUP_PAGES_PASSED))
-  private val themeState = prefs.getString(THEME, null).let { name ->
-    MutableStateFlow(ThemeMode.entries.firstOrNull { it.name == name } ?: ThemeMode.System)
-  }
+  private val themeState = MutableStateFlow(readTheme())
   private val lastProjectCwdState = MutableStateFlow(prefs.getString(LAST_PROJECT_CWD, null))
   private val workspacesState = MutableStateFlow(readWorkspaces())
   private val archivedState = MutableStateFlow(readArchived())
@@ -60,7 +58,7 @@ internal class Preferences(context: Context) {
   /** Onboarding pages the user moved past without finishing them: the welcome page and skipped optional steps. */
   val setupPagesPassed: StateFlow<Set<String>> = setupPagesPassedState.asStateFlow()
 
-  val theme: StateFlow<ThemeMode> = themeState.asStateFlow()
+  val theme: StateFlow<AppTheme> = themeState.asStateFlow()
 
   /** The workspace folder last opened, or last started a chat in, from the sidebar. */
   val lastProjectCwd: StateFlow<String?> = lastProjectCwdState.asStateFlow()
@@ -125,7 +123,7 @@ internal class Preferences(context: Context) {
     setupPagesPassedState.value = updated
   }
 
-  fun setTheme(theme: ThemeMode) {
+  fun setTheme(theme: AppTheme) {
     prefs.edit { putString(THEME, theme.name) }
     themeState.value = theme
   }
@@ -247,6 +245,13 @@ internal class Preferences(context: Context) {
 
   fun setSavedLayout(layout: SavedLayout) {
     prefs.edit { putString(LAYOUT, layout.toJson()) }
+  }
+
+  /** The saved theme. Before there were palettes to pick, the setting was Light or Dark, which kept their colours. */
+  private fun readTheme(): AppTheme = when (val name = prefs.getString(THEME, null)) {
+    "Light" -> AppTheme.Porcelain
+    "Dark" -> AppTheme.Cobalt
+    else -> AppTheme.entries.firstOrNull { it.name == name } ?: AppTheme.System
   }
 
   private fun readWorkspaces(): List<String> {
