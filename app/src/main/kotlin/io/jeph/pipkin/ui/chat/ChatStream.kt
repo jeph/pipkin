@@ -368,7 +368,7 @@ private class BottomAnchor(
 
 /**
  * [backgroundTasks] is what a [TimelineItem.TurnFooter] shows the chat still waits on; [expanded] holds the keys of
- * the folds whose steps are listed, which tapping a fold's line toggles.
+ * the folds whose steps are listed and the long prompts shown whole, which tapping their toggle adds or removes.
  */
 @Composable
 private fun StreamItem(
@@ -381,7 +381,15 @@ private fun StreamItem(
   modifier: Modifier,
 ) {
   when (item) {
-    is TimelineItem.User -> UserMessage(item, modifier)
+    is TimelineItem.User -> {
+      val shown = item.key in expanded
+      UserMessage(
+        item,
+        expanded = shown,
+        onToggle = { if (shown) expanded -= item.key else expanded += item.key },
+        modifier = modifier,
+      )
+    }
 
     is TimelineItem.AssistantText -> AssistantMessage(item, markdownCache, modifier)
 

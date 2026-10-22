@@ -61,10 +61,22 @@ import kotlinx.coroutines.delay
 
 private val PromptShape = RoundedCornerShape(20.dp)
 private val ImageMaxEdge = 160.dp
+private val PROMPT_LINE_HEIGHT = 21.sp
 
-/** The user's message: a full-width card headed "You" and its time, with the copy button at the end of that line. */
+/** How many lines of a long prompt show until Show more. */
+private const val PROMPT_LINES = 8
+
+/**
+ * The user's message: a full-width card headed "You" and its time, with the copy button at the end of that line. Text
+ * longer than [PROMPT_LINES] lines folds unless [expanded]; [onToggle] unfolds or folds it. Images always show whole.
+ */
 @Composable
-internal fun UserMessage(item: TimelineItem.User, modifier: Modifier = Modifier) {
+internal fun UserMessage(
+  item: TimelineItem.User,
+  expanded: Boolean,
+  onToggle: () -> Unit,
+  modifier: Modifier = Modifier,
+) {
   val colors = pipkinColors
   Column(
     modifier = modifier
@@ -80,8 +92,17 @@ internal fun UserMessage(item: TimelineItem.User, modifier: Modifier = Modifier)
     ) {
       if (item.images.isNotEmpty()) UserImages(item.images)
       if (item.text.isNotEmpty()) {
-        SelectionContainer {
-          Text(text = item.text, color = colors.foreground, fontSize = 14.5.sp, lineHeight = 21.sp)
+        FoldedContent(
+          PROMPT_LINES,
+          slackLines = 0,
+          PROMPT_LINE_HEIGHT,
+          fadeTo = colors.surface1,
+          expanded = expanded,
+          onToggle = onToggle,
+        ) {
+          SelectionContainer {
+            Text(text = item.text, color = colors.foreground, fontSize = 14.5.sp, lineHeight = PROMPT_LINE_HEIGHT)
+          }
         }
       }
     }

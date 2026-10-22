@@ -104,7 +104,15 @@ internal fun ExtensionMessage(
       )
     }
     if (item.markdown.isNotBlank()) {
-      FoldedContent(item.key, PipkinTokens.LineHeight.markdown, fadeTo = colors.surface1) {
+      var expanded by rememberSaveable(item.key) { mutableStateOf(false) }
+      FoldedContent(
+        FOLDED_LINES,
+        FOLD_SLACK_LINES,
+        PipkinTokens.LineHeight.markdown,
+        fadeTo = colors.surface1,
+        expanded = expanded,
+        onToggle = { expanded = !expanded },
+      ) {
         PipkinMarkdown(markdown = item.markdown, modifier = Modifier.fillMaxWidth(), cache = markdownCache)
       }
     }
@@ -157,7 +165,15 @@ internal fun ExtensionNoticeCard(item: TimelineItem.ExtensionNotice, modifier: M
         fontWeight = FontWeight.ExtraBold,
         letterSpacing = 0.06.em,
       )
-      FoldedContent(item.key, NOTICE_LINE_HEIGHT, fadeTo = background) {
+      var expanded by rememberSaveable(item.key) { mutableStateOf(false) }
+      FoldedContent(
+        FOLDED_LINES,
+        FOLD_SLACK_LINES,
+        NOTICE_LINE_HEIGHT,
+        fadeTo = background,
+        expanded = expanded,
+        onToggle = { expanded = !expanded },
+      ) {
         SelectionContainer {
           Text(
             text = item.appNotice?.let { stringResource(it.text) } ?: item.message,
@@ -172,59 +188,3 @@ internal fun ExtensionNoticeCard(item: TimelineItem.ExtensionNotice, modifier: M
 }
 
 private data class NoticeLook(@DrawableRes val icon: Int, @StringRes val level: Int, val tint: Color, val wash: Color)
-
-/**
- * [content] cut to [FOLDED_LINES] lines of [lineHeight] over a fade into [fadeTo], with a toggle to show all of it.
- * Content at most [FOLD_SLACK_LINES] lines taller shows whole, without the toggle, since Show more would reveal next
- * to nothing. Unfolding is kept by the row's [key] while the row scrolls away.
- */
-@Composable
-private fun FoldedContent(
-  key: String,
-  lineHeight: TextUnit,
-  fadeTo: Color,
-  content: @Composable ColumnScope.() -> Unit,
-) {
-  val colors = pipkinColors
-  val linePx = with(LocalDensity.current) { lineHeight.toPx() }
-  val foldedPx = (linePx * FOLDED_LINES).roundToInt()
-  val foldsAbovePx = (linePx * (FOLDED_LINES + FOLD_SLACK_LINES)).roundToInt()
-  var expanded by rememberSaveable(key) { mutableStateOf(false) }
-  var fullHeight by remember { mutableIntStateOf(0) }
-  val overflows = fullHeight > foldsAbovePx
-  Column {
-    Box {
-      Column(
-        modifier = Modifier
-          .fillMaxWidth()
-          .clipToBounds()
-          // Measured whole and cut here, in the same pass, so a folded message never lays out at full height first.
-          .layout { measurable, constraints ->
-            val placeable = measurable.measure(constraints.copy(maxHeight = Constraints.Infinity))
-            val height = if (expanded || placeable.height <= foldsAbovePx) placeable.height else foldedPx
-            layout(placeable.width, height) { placeable.place(0, 0) }
-          }
-          .onSizeChanged { fullHeight = it.height },
-        content = content,
-      )
-      if (overflows && !expanded) {
-        Box(
-          modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .fillMaxWidth()
-            .height(PipkinTokens.Spacing.s24)
-            .background(Brush.verticalGradient(listOf(Color.Transparent, fadeTo))),
-        )
-      }
-    }
-    if (overflows) {
-      Text(
-        text = stringResource(if (expanded) R.string.chat_show_less else R.string.chat_show_more),
-        modifier = Modifier.clickable { expanded = !expanded }.padding(top = PipkinTokens.Spacing.s8),
-        color = colors.accent,
-        fontSize = PipkinTokens.FontSize.meta,
-        fontWeight = FontWeight.Bold,
-      )
-    }
-  }
-}

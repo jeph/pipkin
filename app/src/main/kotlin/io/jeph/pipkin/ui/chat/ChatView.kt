@@ -49,7 +49,7 @@ internal class ChatView {
   val scroll = ChatScroll()
   val markdown = MarkdownCache()
 
-  /** The keys of the [io.jeph.pipkin.agent.TimelineItem.Steps] whose steps the stream lists. */
+  /** The keys of the step folds whose steps the stream lists, and of the long prompts it shows whole. */
   val expanded = mutableStateSetOf<String>()
   val widgetTabs = WidgetTabs()
   val draft = TextFieldState()
