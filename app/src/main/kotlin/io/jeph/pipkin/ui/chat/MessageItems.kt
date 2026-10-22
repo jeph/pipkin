@@ -123,7 +123,7 @@ private fun PromptHeader(item: TimelineItem.User) {
       letterSpacing = 0.06.em,
     )
     Text(
-      text = " · $time",
+      text = stringResource(R.string.separator_dot) + time,
       modifier = Modifier.weight(1f),
       color = colors.foregroundMuted,
       fontSize = 10.5.sp,
