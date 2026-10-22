@@ -60,7 +60,6 @@ internal fun StepFoldRow(
 @Composable
 private fun StepFoldLine(fold: TimelineItem.Steps, expanded: Boolean, onToggle: () -> Unit) {
   val colors = pipkinColors
-  val numbers = NumberFormat.getIntegerInstance()
   Row(
     modifier = Modifier
       .fillMaxWidth()
@@ -73,7 +72,24 @@ private fun StepFoldLine(fold: TimelineItem.Steps, expanded: Boolean, onToggle: 
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
-    OutcomeIcon(fold.outcome)
+    OutcomeIcon(fold.outcome, failed = fold.failed > 0)
+    FoldSummary(fold, Modifier.weight(1f))
+    LucideIcon(
+      icon = if (expanded) R.drawable.ic_lucide_chevron_up else R.drawable.ic_lucide_chevron_down,
+      contentDescription = null,
+      size = PipkinTokens.IconSize.sm,
+      tint = colors.foregroundMuted,
+    )
+  }
+}
+
+/** The fold's state, then its counts. They sit together, so only the separator's own spaces part them. */
+@Composable
+private fun FoldSummary(fold: TimelineItem.Steps, modifier: Modifier) {
+  val colors = pipkinColors
+  val numbers = NumberFormat.getIntegerInstance()
+  val separator = stringResource(R.string.separator_dot)
+  Row(modifier = modifier) {
     Text(
       text = stringResource(
         when (fold.outcome) {
@@ -87,41 +103,32 @@ private fun StepFoldLine(fold: TimelineItem.Steps, expanded: Boolean, onToggle: 
       fontWeight = FontWeight.SemiBold,
       maxLines = 1,
     )
-    Row(modifier = Modifier.weight(1f)) {
-      val separator = stringResource(R.string.separator_dot)
-      val count = fold.steps.size
+    val count = fold.steps.size
+    Text(
+      text = separator + pluralStringResource(R.plurals.chat_steps_count, count, numbers.format(count)),
+      modifier = Modifier.weight(1f, fill = false),
+      color = colors.foregroundMuted,
+      fontSize = 12.5.sp,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+    )
+    if (fold.failed > 0) {
       Text(
-        text = separator + pluralStringResource(R.plurals.chat_steps_count, count, numbers.format(count)),
-        color = colors.foregroundMuted,
+        text = separator + pluralStringResource(R.plurals.chat_steps_failed, fold.failed, numbers.format(fold.failed)),
+        color = colors.destructive,
         fontSize = 12.5.sp,
         maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
       )
-      if (fold.failed > 0) {
-        Text(
-          text = separator + pluralStringResource(
-            R.plurals.chat_steps_failed,
-            fold.failed,
-            numbers.format(fold.failed),
-          ),
-          color = colors.destructive,
-          fontSize = 12.5.sp,
-          maxLines = 1,
-        )
-      }
     }
-    LucideIcon(
-      icon = if (expanded) R.drawable.ic_lucide_chevron_up else R.drawable.ic_lucide_chevron_down,
-      contentDescription = null,
-      size = PipkinTokens.IconSize.sm,
-      tint = colors.foregroundMuted,
-    )
   }
 }
 
-/** A check once the run is done, a square once it was stopped, or a simmering pot while it works. */
+/**
+ * A check once the run is done, or an alert in red when some of its steps [failed]; a square once it was stopped, or
+ * a simmering pot while it works.
+ */
 @Composable
-private fun OutcomeIcon(outcome: StepsOutcome) {
+private fun OutcomeIcon(outcome: StepsOutcome, failed: Boolean) {
   val colors = pipkinColors
   // As wide as a step's dot, so the icon centres over the steps' dots.
   Box(modifier = Modifier.size(STEP_DOT_BOX), contentAlignment = Alignment.Center) {
@@ -130,11 +137,11 @@ private fun OutcomeIcon(outcome: StepsOutcome) {
       StepsOutcome.Working -> SimmeringPot(modifier = iconModifier, size = OUTCOME_ICON_SIZE, tint = colors.accent)
 
       StepsOutcome.Done -> LucideIcon(
-        icon = R.drawable.ic_lucide_check,
+        icon = if (failed) R.drawable.ic_lucide_circle_alert else R.drawable.ic_lucide_check,
         contentDescription = null,
         modifier = iconModifier,
         size = OUTCOME_ICON_SIZE,
-        tint = colors.dotSuccess,
+        tint = if (failed) colors.destructive else colors.dotSuccess,
       )
 
       StepsOutcome.Stopped -> LucideIcon(

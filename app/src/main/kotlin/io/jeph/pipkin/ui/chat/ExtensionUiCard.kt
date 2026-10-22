@@ -146,13 +146,13 @@ private fun CardLayout(
 ) {
   // Measured rather than counted in sp: Android scales large sizes less, so 2 × 24sp isn't two lines of 24sp text.
   val measurer = rememberTextMeasurer(cacheSize = 0)
-  val style = LocalTextStyle.current.merge(TextStyle(fontSize = PipkinTokens.FontSize.base))
+  val style = LocalTextStyle.current.merge(TITLE_STYLE)
   val twoLines = remember(measurer, style) { measurer.measure("\n", style).size.height }
   val policy = remember(twoLines, answersScroll) { CardMeasurePolicy(twoLines, answersScroll) }
   Layout(contents = listOf(header, answers, buttons), modifier = modifier, measurePolicy = policy)
 }
 
-/** [twoLines] is the height of two lines of the card's text, the floor of the header and of scrolling answers. */
+/** [twoLines] is the height of two lines of the card's title, the floor of the header and of scrolling answers. */
 private class CardMeasurePolicy(private val twoLines: Int, private val answersScroll: Boolean) :
   MultiContentMeasurePolicy {
   override fun MeasureScope.measure(measurables: List<List<Measurable>>, constraints: Constraints): MeasureResult {
@@ -246,14 +246,7 @@ private fun CardHeader(request: ExtensionUiRequest, number: Int, count: Int) {
       ).verticalScroll(rememberScrollState()).padding(horizontal = PipkinTokens.Spacing.s4),
       verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s4),
     ) {
-      Text(
-        text = title,
-        color = colors.foreground,
-        fontSize = 15.5.sp,
-        fontWeight = FontWeight.ExtraBold,
-        lineHeight = 20.sp,
-        letterSpacing = (-0.015).em,
-      )
+      Text(text = title, color = colors.foreground, style = LocalTextStyle.current.merge(TITLE_STYLE))
       request.message?.let { Text(text = it, color = colors.foregroundMuted, fontSize = 13.5.sp, lineHeight = 20.sp) }
     }
     request.expiresAt?.let { SecondsLeft(it) }
@@ -456,3 +449,11 @@ private val FIELD_SHAPE = RoundedCornerShape(14.dp)
 
 /** The space between the header, the answers and the buttons. */
 private val CARD_GAP = 10.dp
+
+/** The card's title; the header's floor is two lines of it. */
+private val TITLE_STYLE = TextStyle(
+  fontSize = 15.5.sp,
+  fontWeight = FontWeight.ExtraBold,
+  lineHeight = 20.sp,
+  letterSpacing = (-0.015).em,
+)

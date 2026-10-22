@@ -77,7 +77,7 @@
     <string name="chat_running">Running…</string>
     <!-- Notes at the end of a step's row. %1$s is a number of lines, already formatted. -->
     <string name="chat_figure_added">+%1$s</string>
-    <string name="chat_figure_removed">-%1$s</string>
+    <string name="chat_figure_removed">−%1$s</string>
     <!-- %1$s is a shell command's exit code, already formatted. -->
     <string name="chat_figure_exit">exit %1$s</string>
     <string name="chat_figure_timed_out">timed out</string>
