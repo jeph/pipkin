@@ -133,10 +133,10 @@ val CobaltColors =
   )
 
 /**
- * Near-black neutral greys with an orange accent: the dark theme the System choice uses. Warnings are yellow and
- * errors rose so neither reads as the accent.
+ * Near-black neutral greys with an orange accent, for a pitch-black screen. Warnings are yellow and errors rose so
+ * neither reads as the accent.
  */
-val StoneColors =
+val ObsidianColors =
   PipkinColors(
     isDark = true,
     surface0 = Color(0xFF0B0B0C),
@@ -161,4 +161,35 @@ val StoneColors =
     info = Color(0xFF5CCBDB),
     extension = Color(0xFFC9A0FF),
     codeComment = Color(0xFF86868F),
+  )
+
+/**
+ * Charcoal-to-slate greys with a violet accent: the dark theme the System choice uses. Lighter than Obsidian, and
+ * extensions are pink so they don't read as the accent.
+ */
+val StoneColors =
+  PipkinColors(
+    isDark = true,
+    surface0 = Color(0xFF1C1D20),
+    surface1 = Color(0xFF25262A),
+    surface2 = Color(0xFF2F3035),
+    surface3 = Color(0xFF3C3D43),
+    sidebar = Color(0xFF1C1D20),
+    foreground = Color(0xFFEDEDF0),
+    foregroundMuted = Color(0xFFA9AAB3),
+    foregroundExtraMuted = Color(0xFF74757E),
+    border = Color(0xFF2C2D32),
+    borderAccent = Color(0xFF3C3D43),
+    accent = Color(0xFFB79CFF),
+    accentForeground = Color(0xFF1A0E3D),
+    accentSoft = Color(0x29B79CFF),
+    accentInverse = Color(0xFF6A45D6),
+    destructive = Color(0xFFFF6E80),
+    destructiveForeground = Color(0xFF2A0710),
+    dotSuccess = Color(0xFF5ED39A),
+    dotDanger = Color(0xFFFF6E80),
+    dotWarning = Color(0xFFF5CD52),
+    info = Color(0xFF5CCFE0),
+    extension = Color(0xFFFF8FCF),
+    codeComment = Color(0xFF9A9BA9),
   )

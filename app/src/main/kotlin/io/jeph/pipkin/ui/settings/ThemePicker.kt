@@ -136,6 +136,7 @@ private val AppTheme.label: Int
     AppTheme.Clay -> R.string.settings_theme_clay
     AppTheme.Cobalt -> R.string.settings_theme_cobalt
     AppTheme.Stone -> R.string.settings_theme_stone
+    AppTheme.Obsidian -> R.string.settings_theme_obsidian
   }
 
 private val SHAPE = RoundedCornerShape(12.dp)

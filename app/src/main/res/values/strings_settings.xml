@@ -91,12 +91,13 @@
 
     <string name="settings_theme">Theme</string>
     <!-- Theme names. System follows the phone's dark mode, using Porcelain by day and Stone by night. The others are
-         named after materials: porcelain, clay, cobalt (the blue glaze) and stone. -->
+         named after materials: porcelain, clay, cobalt (the blue glaze), stone and obsidian (black volcanic glass). -->
     <string name="settings_theme_system">System</string>
     <string name="settings_theme_porcelain">Porcelain</string>
     <string name="settings_theme_clay">Clay</string>
     <string name="settings_theme_cobalt">Cobalt</string>
     <string name="settings_theme_stone">Stone</string>
+    <string name="settings_theme_obsidian">Obsidian</string>
 
     <string name="settings_in_app_notifications">In-app notifications</string>
     <string name="settings_in_app_notifications_summary">Show a pill when another chat finishes or needs your answer</string>

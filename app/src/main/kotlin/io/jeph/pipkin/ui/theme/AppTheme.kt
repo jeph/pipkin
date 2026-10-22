@@ -7,6 +7,7 @@ enum class AppTheme {
   Clay,
   Cobalt,
   Stone,
+  Obsidian,
   ;
 
   /** This theme's palette, with [systemDark] saying whether the phone is in dark mode. */
@@ -16,5 +17,6 @@ enum class AppTheme {
     Clay -> ClayColors
     Cobalt -> CobaltColors
     Stone -> StoneColors
+    Obsidian -> ObsidianColors
   }
 }

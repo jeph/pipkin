@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="window_background">#0C0F1A</color>
-    <color name="accent">#7C9CFF</color>
+    <!-- Stone's surface and accent: the dark theme System picks, which is the default. -->
+    <color name="window_background">#1C1D20</color>
+    <color name="accent">#B79CFF</color>
 </resources>
