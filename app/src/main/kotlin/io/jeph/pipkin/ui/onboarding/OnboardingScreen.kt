@@ -39,7 +39,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -61,14 +60,14 @@ import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
-import kotlinx.coroutines.delay
 
 /**
  * First-run setup, one step per page: welcome, then every [SetupStep] that still needs the user, then a closing page.
- * Steps that are already done are passed over, and finishing one moves on by itself, so the wizard reacts to what the
- * user did elsewhere (installed Termux, ran the setup command, granted a permission). Skipped optional steps and the
- * welcome are remembered, so reopening Pipkin resumes at the first step still open. Opened again after setup (a
- * "needs attention" tap), it starts at the broken step and [onClose] leaves it.
+ * Steps that are already done are passed over. Finishing the shown step, here or elsewhere (installed Termux, ran the
+ * setup command, granted a permission), turns its actions into Continue rather than moving on, so the page doesn't
+ * change under a tap the user is about to make. Skipped optional steps and the welcome are remembered, so reopening
+ * Pipkin resumes at the first step still open. Opened again after setup (a "needs attention" tap), it starts at the
+ * broken step and [onClose] leaves it.
  */
 @Composable
 internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit, onClose: (() -> Unit)?) {
@@ -113,7 +112,7 @@ internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit,
     if (history.size > 1) history.removeAt(history.lastIndex) else onClose?.invoke()
   }
 
-  AdvanceWhenDone(page, step, state) { advance(it) }
+  PassHiddenStep(page, step, state) { advance() }
   // A failure pinned to another step, such as an install that finds Termux's setup broken, shows on that step.
   val failedStep = state.currentError?.step?.takeIf { it in state.visibleSteps }
   LaunchedEffect(failedStep) { failedStep?.let { goTo(it.name) } }
@@ -157,32 +156,11 @@ internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit,
   loginProvider?.let { LoginSheet(providerId = it, onDismiss = { loginProvider = null }) }
 }
 
-/**
- * Moves on once the shown [step] gets done while it's on screen, after a beat that lets its check settle; a step that
- * was already done when the user came back to it waits for Continue. A step this phone or build no longer shows
- * (Termux swapped between builds) moves on right away.
- */
+/** Moves on right away from a step this phone or build no longer shows (Termux swapped between builds). */
 @Composable
-private fun AdvanceWhenDone(
-  page: String,
-  step: SetupStep?,
-  state: OnboardingState,
-  advance: (OnboardingState) -> Unit,
-) {
-  if (step == null) return
-  val done = state.status(step) == StepStatus.Done
-  val doneOnArrival = remember(page) { done }
-  val currentState by rememberUpdatedState(state)
-  val currentAdvance by rememberUpdatedState(advance)
-  val hidden = step !in state.visibleSteps
-  LaunchedEffect(page, done, hidden) {
-    if (hidden) {
-      currentAdvance(currentState)
-    } else if (done && !doneOnArrival) {
-      delay(DONE_PAUSE_MILLIS)
-      currentAdvance(currentState)
-    }
-  }
+private fun PassHiddenStep(page: String, step: SetupStep?, state: OnboardingState, advance: () -> Unit) {
+  val hidden = step != null && step !in state.visibleSteps
+  LaunchedEffect(page, hidden) { if (hidden) advance() }
 }
 
 @Composable
@@ -294,7 +272,6 @@ private const val WELCOME = OnboardingState.WELCOME
 private const val DONE = "done"
 private const val PAGE_MILLIS = 320
 private const val SLIDE_FRACTION = 5
-private const val DONE_PAUSE_MILLIS = 900L
 private const val WELCOME_START_SCALE = 0.85f
 private val POT_SIZE = 112.dp
 private val NOTE_LINE_HEIGHT = 19.sp
