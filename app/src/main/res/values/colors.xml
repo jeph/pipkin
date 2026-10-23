@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- The launcher icon's background per theme: Porcelain's, which System uses too, then the others'. -->
     <color name="ic_launcher_background">#E4E9FF</color>
+    <color name="ic_launcher_background_clay">#F5E2D3</color>
+    <color name="ic_launcher_background_cobalt">#161C33</color>
+    <color name="ic_launcher_background_stone">#2A2B30</color>
+    <color name="ic_launcher_background_obsidian">#121214</color>
     <color name="window_background">#F6F7FB</color>
     <color name="accent">#2F4BD8</color>
 </resources>

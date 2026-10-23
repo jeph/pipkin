@@ -1,29 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The long glyph path keeps its exact shape: the launcher renders this vector once per refresh, and
-     SimmeringPot draws the named groups as cached paths instead of rendering the vector, so it ignores this
-     group's transform.
+<!-- Porcelain's launcher icon, which System uses too, and the monochrome layer of every theme's icon. The pot's
+     outline lives in values/launcher_icon.xml, shared with the other themes' icons. SimmeringPot draws the named
+     groups as cached paths instead of rendering the vector, so it ignores this group's transform.
      The pot is scaled 1.3x about (256, 272), the centre of the smallest circle around it, which lands on the
      icon's centre. Its farthest point, a leg's end, is then 210 units from the centre, inside the 66dp
      (235-unit) circle that every launcher mask shape keeps visible. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools" android:width="108dp" android:height="108dp" android:viewportWidth="768" android:viewportHeight="768" tools:ignore="VectorPath">
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="768" android:viewportHeight="768">
     <group android:translateX="128" android:translateY="112" android:pivotX="256" android:pivotY="272" android:scaleX="1.3" android:scaleY="1.3">
         <group android:name="handle">
-            <path android:pathData="M344 245H403A12 12 0 0 1 403 269H344Z" android:fillColor="#2F4BD8" />
+            <path android:pathData="@string/pot_handle" android:fillColor="#2F4BD8" />
         </group>
         <group android:name="legs">
-            <path android:pathData="M188 355L174 397M298 355L312 397" android:fillColor="@android:color/transparent" android:strokeColor="#2F4BD8" android:strokeWidth="24" android:strokeLineCap="round" />
+            <path android:pathData="@string/pot_legs" android:fillColor="@android:color/transparent" android:strokeColor="#2F4BD8" android:strokeWidth="24" android:strokeLineCap="round" />
         </group>
         <group android:name="body">
-        <path android:pathData="M127 228H359L341 331Q337 364 304 368H182Q149 364 145 332Z M206.93898 286.00000L186.46827 303.54632L185.86234 304.11960L185.31551 304.74951L184.83306 305.42999L184.41963 306.15448L184.07921 306.91600L183.81506 307.70722L183.62975 308.52053L183.52504 309.34808L183.50195 310.18191L183.56070 311.01399L183.70072 311.83630L183.92068 312.64093L184.21844 313.42013L184.59114 314.16639L185.03519 314.87252L185.54632 315.53173L186.11960 316.13766L186.74951 316.68449L187.42999 317.16694L188.15448 317.58037L188.91600 317.92079L189.70722 318.18494L190.52053 318.37025L191.34808 318.47496L192.18191 318.49805L193.01399 318.43930L193.83630 318.29928L194.64093 318.07932L195.42013 317.78156L196.16639 317.40886L196.87252 316.96481L197.53173 316.45368L225.53173 292.45368L226.12366 291.89498L226.65944 291.28222L227.13415 290.62103L227.54344 289.91746L227.88356 289.17796L228.15139 288.40933L228.34447 287.61860L228.46103 286.81303L228.50000 286.00000L228.46103 285.18697L228.34447 284.38140L228.15139 283.59067L227.88356 282.82204L227.54344 282.08254L227.13415 281.37897L226.65944 280.71778L226.12366 280.10502L225.53173 279.54632L197.53173 255.54632L196.87252 255.03519L196.16639 254.59114L195.42013 254.21844L194.64093 253.92068L193.83630 253.70072L193.01399 253.56070L192.18191 253.50195L191.34808 253.52504L190.52053 253.62975L189.70722 253.81506L188.91600 254.07921L188.15448 254.41963L187.42999 254.83306L186.74951 255.31551L186.11960 255.86234L185.54632 256.46827L185.03519 257.12748L184.59114 257.83361L184.21844 258.57987L183.92068 259.35907L183.70072 260.16370L183.56070 260.98601L183.50195 261.81809L183.52504 262.65192L183.62975 263.47947L183.81506 264.29278L184.07921 265.08400L184.41963 265.84552L184.83306 266.57001L185.31551 267.25049L185.86234 267.88040L186.46827 268.45368L206.93898 286.00000ZM286.00000 319.50000L286.83315 319.45907L287.65827 319.33667L288.46742 319.13399L289.25281 318.85298L290.00687 318.49633L290.72235 318.06749L291.39234 317.57059L292.01041 317.01041L292.57059 316.39234L293.06749 315.72235L293.49633 315.00687L293.85298 314.25281L294.13399 313.46742L294.33667 312.65827L294.45907 311.83315L294.50000 311.00000L294.45907 310.16685L294.33667 309.34173L294.13399 308.53258L293.85298 307.74719L293.49633 306.99313L293.06749 306.27765L292.57059 305.60766L292.01041 304.98959L291.39234 304.42941L290.72235 303.93251L290.00687 303.50367L289.25281 303.14702L288.46742 302.86601L287.65827 302.66333L286.83315 302.54093L286.00000 302.50000L250.00000 302.50000L249.16685 302.54093L248.34173 302.66333L247.53258 302.86601L246.74719 303.14702L245.99313 303.50367L245.27765 303.93251L244.60766 304.42941L243.98959 304.98959L243.42941 305.60766L242.93251 306.27765L242.50367 306.99313L242.14702 307.74719L241.86601 308.53258L241.66333 309.34173L241.54093 310.16685L241.50000 311.00000L241.54093 311.83315L241.66333 312.65827L241.86601 313.46742L242.14702 314.25281L242.50367 315.00687L242.93251 315.72235L243.42941 316.39234L243.98959 317.01041L244.60766 317.57059L245.27765 318.06749L245.99313 318.49633L246.74719 318.85298L247.53258 319.13399L248.34173 319.33667L249.16685 319.45907L250.00000 319.50000L286.00000 319.50000Z" android:fillColor="#2F4BD8" android:fillType="evenOdd" />
+        <path android:pathData="@string/pot_body" android:fillColor="#2F4BD8" android:fillType="evenOdd" />
         </group>
         <group android:name="lid">
-            <path android:pathData="M130,203 H356 A15,15 0,0 1,371,218 V219 A15,15 0,0 1,356,234 H130 A15,15 0,0 1,115,219 V218 A15,15 0,0 1,130,203 Z" android:fillColor="#6F8DFF" />
+            <path android:pathData="@string/pot_lid" android:fillColor="#6F8DFF" />
         </group>
         <group android:name="steamLeft">
-            <path android:pathData="M224 178Q197 151 224 123" android:fillColor="@android:color/transparent" android:strokeColor="#565D7A" android:strokeWidth="17" android:strokeLineCap="round" />
+            <path android:pathData="@string/pot_steam_left" android:fillColor="@android:color/transparent" android:strokeColor="#565D7A" android:strokeWidth="17" android:strokeLineCap="round" />
         </group>
         <group android:name="steamRight">
-            <path android:pathData="M283 178Q256 151 283 123" android:fillColor="@android:color/transparent" android:strokeColor="#565D7A" android:strokeWidth="17" android:strokeLineCap="round" />
+            <path android:pathData="@string/pot_steam_right" android:fillColor="@android:color/transparent" android:strokeColor="#565D7A" android:strokeWidth="17" android:strokeLineCap="round" />
         </group>
     </group>
 </vector>
