@@ -1,6 +1,8 @@
 ---
 // Replaces Starlight's SiteTitle, whose logo is an image and so can't follow the theme, with the landing page's
-// launcher tile. The layout rules are Starlight's own, which an override doesn't keep.
+// launcher tile. The markup and layout rules are adapted from Starlight 0.42.6's components/SiteTitle.astro
+// (https://github.com/withastro/starlight, MIT License, Copyright (c) 2023 Astro contributors), since an override
+// doesn't keep the original's styles.
 import LauncherTile from "./LauncherTile.astro";
 import LogoDefs from "./LogoDefs.astro";
 
