@@ -7,13 +7,16 @@
 // styles key on.
 window.pipkinTheme = (() => {
   const key = "pipkin-theme";
-  /** Each theme's scheme and page color, which also tints the browser's address bar. */
+  /**
+   * Each theme's scheme, its page color, which also tints the browser's address bar, and its launcher icon as the
+   * favicon.
+   */
   const themes = {
-    porcelain: { scheme: "light", page: "#f6f7fb" },
-    clay: { scheme: "light", page: "#fbf5ec" },
-    cobalt: { scheme: "dark", page: "#0c0f1a" },
-    stone: { scheme: "dark", page: "#1c1d20" },
-    obsidian: { scheme: "dark", page: "#0b0b0c" },
+    porcelain: { scheme: "light", page: "#f6f7fb", icon: "/favicon.svg" },
+    clay: { scheme: "light", page: "#fbf5ec", icon: "/favicon-clay.svg" },
+    cobalt: { scheme: "dark", page: "#0c0f1a", icon: "/favicon-cobalt.svg" },
+    stone: { scheme: "dark", page: "#1c1d20", icon: "/favicon-stone.svg" },
+    obsidian: { scheme: "dark", page: "#0b0b0c", icon: "/favicon-obsidian.svg" },
   };
   const root = document.documentElement;
   const darkMode = matchMedia("(prefers-color-scheme: dark)");
@@ -37,6 +40,10 @@ window.pipkinTheme = (() => {
     for (const meta of document.querySelectorAll('meta[name="theme-color"]')) {
       meta.content = themes[resolve(choice, meta.media.includes("dark"))].page;
     }
+    // System keeps Porcelain's icon in dark mode too, as the app's launcher does. The page's own link comes before
+    // this script in the head, on the landing page and in the guide.
+    const icon = document.querySelector('link[rel~="icon"][type="image/svg+xml"]');
+    if (icon !== null) icon.href = themes[choice === "system" ? "porcelain" : choice].icon;
   };
 
   root.classList.add("js");

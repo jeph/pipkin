@@ -1,0 +1,28 @@
+---
+// The picked theme's launcher icon as a rounded tile, as the phone and the favicon show it: the landing page's brand
+// and the guide's site title. The pot needs LogoDefs.astro on the page.
+import Logo from "./Logo.astro";
+
+interface Props {
+  /** The tile's width and height in pixels; the pot fills about 70% of it. */
+  size?: number;
+}
+const { size = 34 } = Astro.props;
+---
+
+<span class="launcher-tile" style={`--tile-size: ${size}px`}>
+  <Logo size={Math.round(size * 0.7)} launcher />
+</span>
+
+<style>
+  .launcher-tile {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: var(--tile-size);
+    height: var(--tile-size);
+    border-radius: calc(var(--tile-size) * 0.265);
+    background: var(--icon-tile);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+</style>

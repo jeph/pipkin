@@ -2,8 +2,8 @@
 // Pipkin's launcher mark, from app/src/main/res/drawable/ic_launcher_foreground.xml without the launcher's scale.
 // The pot is drawn once by LogoDefs.astro and reused here; the steam stays inline so it can simmer.
 //
-// Like the app's header and empty chat, the mark takes the theme's accent; `launcher` keeps the launcher icon's own
-// colors instead, for the brand next to the favicon.
+// Like the app's header and empty chat, the mark takes the theme's accent; `launcher` takes the colors of the theme's
+// launcher icon instead, for LauncherTile.
 interface Props {
   size?: number;
   class?: string;
@@ -35,11 +35,11 @@ const { size = 32, class: className, simmer = false, launcher = false } = Astro.
     flex: none;
     color: var(--accent);
   }
-  /* The launcher icon's colors, from app/src/main/res/drawable/ic_launcher_foreground.xml. */
+  /* The theme's launcher icon colors, from theme.css. */
   .launcher {
-    --pot-body: #2f4bd8;
-    --pot-lid: #6f8dff;
-    --pot-steam: #565d7a;
+    --pot-body: var(--icon-body);
+    --pot-lid: var(--icon-lid);
+    --pot-steam: var(--icon-steam);
   }
   .steam {
     fill: none;

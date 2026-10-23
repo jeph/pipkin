@@ -1,0 +1,30 @@
+---
+// Replaces Starlight's SiteTitle, whose logo is an image and so can't follow the theme, with the landing page's
+// launcher tile. The layout rules are Starlight's own, which an override doesn't keep.
+import LauncherTile from "./LauncherTile.astro";
+import LogoDefs from "./LogoDefs.astro";
+
+const { siteTitle, siteTitleHref } = Astro.locals.starlightRoute;
+---
+
+<LogoDefs />
+<a href={siteTitleHref} class="site-title sl-flex">
+  <LauncherTile size={32} />
+  <span translate="no">{siteTitle}</span>
+</a>
+
+<style>
+  .site-title {
+    align-items: center;
+    gap: var(--sl-nav-gap);
+    font-size: var(--sl-text-h4);
+    color: var(--sl-color-text-accent);
+    text-decoration: none;
+    white-space: nowrap;
+    min-width: 0;
+  }
+
+  span {
+    overflow: hidden;
+  }
+</style>

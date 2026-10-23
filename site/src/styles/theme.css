@@ -58,6 +58,13 @@
   --warning: light-dark(#875700, #f5cd52);
   --info: light-dark(#0b6b78, #5ccfe0);
   --extension: light-dark(#8a3fc4, #ff8fcf);
+
+  /* The launcher icon's tile and pot, from the app's ic_launcher_foreground*.xml and ic_launcher_background*. Each
+     theme has its own, as on the phone; System keeps Porcelain's whatever the dark mode, as the app does. */
+  --icon-tile: #e4e9ff;
+  --icon-body: #2f4bd8;
+  --icon-lid: #6f8dff;
+  --icon-steam: #565d7a;
 }
 
 :root[data-palette="porcelain"] {
@@ -66,6 +73,10 @@
 
 :root[data-palette="stone"] {
   color-scheme: dark;
+  --icon-tile: #2a2b30;
+  --icon-body: #b79cff;
+  --icon-lid: #dcceff;
+  --icon-steam: #a9aab3;
 }
 
 :root[data-palette="clay"] {
@@ -87,6 +98,10 @@
   --warning: #7a6000;
   --info: #25676a;
   --extension: #7a4789;
+  --icon-tile: #f5e2d3;
+  --icon-body: #a64426;
+  --icon-lid: #d9724c;
+  --icon-steam: #6e5d53;
 }
 
 :root[data-palette="cobalt"] {
@@ -108,6 +123,10 @@
   --warning: #ffc94d;
   --info: #5ed3e6;
   --extension: #d49cff;
+  --icon-tile: #161c33;
+  --icon-body: #7c9cff;
+  --icon-lid: #b4c6ff;
+  --icon-steam: #9ca3bf;
 }
 
 :root[data-palette="obsidian"] {
@@ -129,4 +148,8 @@
   --warning: #f7d04a;
   --info: #5ccbdb;
   --extension: #c9a0ff;
+  --icon-tile: #121214;
+  --icon-body: #ff8a3d;
+  --icon-lid: #ffbc8f;
+  --icon-steam: #a3a3ab;
 }

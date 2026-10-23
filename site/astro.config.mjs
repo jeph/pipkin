@@ -16,7 +16,6 @@ export default defineConfig({
     starlight({
       title: "Pipkin",
       description: "How to set up Pipkin, connect a model, and configure the Pi agent on your Android phone.",
-      logo: { src: "./public/favicon.svg" },
       favicon: "/favicon.svg",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/jeph/pipkin" }],
       // Link previews of guide pages use the landing page's share image.
@@ -29,6 +28,7 @@ export default defineConfig({
       components: {
         ThemeProvider: "./src/components/DocsThemeProvider.astro",
         ThemeSelect: "./src/components/ThemeSelect.astro",
+        SiteTitle: "./src/components/DocsSiteTitle.astro",
       },
       markdown: { processedDirs: ["../docs/"] },
       // Starlight's 404 page would answer for the whole site, landing page included, so Vercel's default stays.

@@ -1,5 +1,5 @@
 ---
-import Logo from "./Logo.astro";
+import LauncherTile from "./LauncherTile.astro";
 import ThemeSelect from "./ThemeSelect.astro";
 import { GITHUB_URL } from "../site";
 ---
@@ -7,7 +7,7 @@ import { GITHUB_URL } from "../site";
 <header class="nav">
   <nav class="container nav-inner" aria-label="Main">
     <a class="brand" href="/" aria-label="Pipkin home">
-      <span class="brand-tile"><Logo size={24} launcher /></span>
+      <LauncherTile />
       <span>Pipkin</span>
     </a>
     <div class="links">
@@ -71,17 +71,6 @@ import { GITHUB_URL } from "../site";
     font-weight: 800;
     letter-spacing: -0.02em;
     text-decoration: none;
-  }
-
-  /* The launcher icon's tile, as the favicon shows it. */
-  .brand-tile {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
-    background: #e4e9ff;
-    box-shadow: inset 0 0 0 1px var(--border);
   }
 
   .links {
