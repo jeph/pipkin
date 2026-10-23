@@ -112,7 +112,10 @@ describe("update_extensions mode", () => {
     await run.exited;
 
     const [npm] = await npmCalls();
-    expect(() => process.kill(npm?.pid ?? 0, 0)).toThrow("ESRCH");
+    expect(npm).toBeDefined();
+    // The host is done once npm's end of Pi's output closes, which is when npm exits; npm is Pi's child, so the
+    // system reaps it rather than the host, and until then it still answers a signal.
+    await expect.poll(() => processExists(npm?.pid ?? 0), { timeout: 2000 }).toBe(false);
     await expect(access(path.join(dirs.root, "config.lock"))).rejects.toThrow("ENOENT");
   });
 
@@ -123,3 +126,13 @@ describe("update_extensions mode", () => {
     expect(await runMode("update_extensions", dirs, {})).toMatchObject({ ok: false, code: "pi_missing" });
   });
 });
+
+/** Whether a process with [pid] exists, counting one that exited and wasn't reaped yet. */
+function processExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== "ESRCH";
+  }
+}
