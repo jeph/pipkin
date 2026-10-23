@@ -149,8 +149,9 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
         </div>
       </div>
       <div class="field">
-        <span class="typed" data-part="typed"></span><span class="caret"></span>
-        <span class="placeholder">Message Pipkin…</span>
+        <span><span class="typed" data-part="typed"></span><span class="caret"></span><span class="placeholder"
+            >Message Pipkin…</span
+          ></span>
       </div>
       <div class="controls">
         <span class="chip round-chip"><Icon name="plus" size={16} /></span>
@@ -678,18 +679,19 @@ const replyHtml = reply.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
     background: var(--warning);
   }
 
+  /* As the app's field: at least 30dp tall under 12dp of padding, its line centred, so the placeholder and a typed
+     line sit in the same place. */
   .field {
-    position: relative;
-    min-height: calc(22 * var(--dp));
-    padding: calc(12 * var(--dp)) calc(6 * var(--dp)) calc(4 * var(--dp));
+    display: flex;
+    align-items: center;
+    min-height: calc(42 * var(--dp));
+    padding: calc(12 * var(--dp)) calc(6 * var(--dp)) 0;
     font-size: calc(15 * var(--dp));
+    line-height: calc(24 * var(--dp));
   }
 
   .placeholder {
-    position: absolute;
-    inset: calc(12 * var(--dp)) calc(6 * var(--dp)) calc(4 * var(--dp));
     color: var(--muted);
-    pointer-events: none;
   }
 
   .typed:not(:empty) ~ .placeholder {
