@@ -74,9 +74,8 @@ class SubagentCallsTest {
       ),
     )
     timeline.apply(JSONObject("""{"type":"agent_start"}"""))
-    timeline.apply(
-      JSONObject("""{"type":"tool_execution_start","toolCallId":"c2","toolName":"subagent","args":{"agent":"Explore"}}"""),
-    )
+    val laterCall = """{"type":"tool_execution_start","toolCallId":"c2","toolName":"subagent","args":{}}"""
+    timeline.apply(JSONObject(laterCall))
     fun phases(working: Boolean): List<SubagentPhase> {
       val subagents = ChatSubagents(emptyList(), SubagentAsker.Unknown, working)
       return timeline.state.value.items.filterIsInstance<ToolCall>().map(subagents::phase)
