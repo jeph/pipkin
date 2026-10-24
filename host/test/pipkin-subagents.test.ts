@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { type AssistantMessage, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
-import { type ExtensionFactory, SessionManager } from "@earendil-works/pi-coding-agent";
+import { type ExtensionFactory, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { capped, RESULT_LIMIT_BYTES } from "../src/pi-extensions/pipkin-subagents/runs.js";
@@ -749,6 +749,23 @@ describe("agents", () => {
   it("say they don't stand aside when the subagent tool is theirs", async () => {
     const { session } = await start(parentCalling([], childDone));
     expect(channel.sent).toEqual([{ version: 1, standingAside: false, runs: [] }]);
+    session.dispose();
+  });
+});
+
+describe("Pi's model runtime", () => {
+  // Pi keeps it private; subagents share it, and a Pi update that moves it must fail here, not on a phone.
+  it("is the model registry's runtime field in the pinned Pi, the parent session's own", async () => {
+    let modelRegistry: object | undefined;
+    const probe: ExtensionFactory = (pi) => {
+      pi.on("session_start", (_event, ctx) => {
+        modelRegistry = ctx.modelRegistry;
+      });
+    };
+    const { session } = await start(parentCalling([], childDone), { extensions: [probe, pipkinSubagents] });
+    const runtime = modelRegistry && "runtime" in modelRegistry ? modelRegistry.runtime : undefined;
+    expect(runtime).toBeInstanceOf(ModelRuntime);
+    expect(runtime).toBe(session.modelRuntime);
     session.dispose();
   });
 });
