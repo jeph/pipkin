@@ -93,6 +93,14 @@ class SubagentCallsTest {
     assertEquals("General", interrupted.agent)
     assertEquals("fix it", interrupted.description)
 
+    // A result without the run's details: the call was refused before its subagent began, so there's no file.
+    val refused = subagentFacts("c6", call("c6", "Unknown agent", isError = true), ChatSubagents.None, "/s/p.jsonl")
+    assertEquals(TranscriptSource.NotStarted("Unknown agent"), refused.source)
+    assertEquals(SubagentPhase.Failed, refused.phase)
+    // Only an error says the subagent didn't start.
+    val noDetails = subagentFacts("c7", call("c7", "ran"), ChatSubagents.None, "/s/p.jsonl")
+    assertEquals(TranscriptSource.Lookup("/s/p.jsonl", "c7"), noDetails.source)
+
     // A run in memory, or a chat with no file, has no transcript to find.
     val inMemory = ChatSubagents(listOf(run("r4", "c4", SubagentStatus.Running)), SubagentAsker.Unknown, true)
     assertEquals(TranscriptSource.None, subagentFacts("c4", call("c4"), inMemory, "/s/p.jsonl").source)

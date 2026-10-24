@@ -77,6 +77,8 @@
     <string name="subagent_archived_read_only">Subagent of an archived chat · read only</string>
     <string name="subagent_transcript_gone">This subagent\'s transcript is no longer available.</string>
     <string name="subagent_transcript_none">This subagent ran without saving a transcript.</string>
+    <!-- Over the error that kept a subagent from starting, such as an unknown agent's name, as the extension sent it. -->
+    <string name="subagent_not_started">This subagent didn\'t start:</string>
     <string name="subagent_transcript_starting">The subagent is starting…</string>
     <string name="subagent_transcript_failed">Couldn\'t read this subagent\'s transcript.</string>
     <string name="subagent_retry">Try again</string>

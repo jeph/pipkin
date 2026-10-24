@@ -3,7 +3,6 @@ package io.jeph.pipkin.ui.subagents
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -89,6 +88,9 @@ internal sealed interface SubagentTranscript {
   /** The subagent kept no file, as one of a chat not saved. */
   data object NotSaved : SubagentTranscript
 
+  /** It never began, for [reason]: Pi or an extension refused its call, or the call failed first. */
+  data class NotStarted(val reason: String) : SubagentTranscript
+
   /** It couldn't be read, for [message]; [retry] reads it again. */
   class Failed(val message: String, val retry: () -> Unit) : SubagentTranscript
 }
@@ -113,6 +115,10 @@ internal fun rememberSubagentTranscript(
   return produceState<SubagentTranscript>(SubagentTranscript.Loading, source, attempt.intValue) {
     value = SubagentTranscript.Loading
     if (source == null) return@produceState
+    if (source is TranscriptSource.NotStarted) {
+      value = SubagentTranscript.NotStarted(source.reason)
+      return@produceState
+    }
     val path = try {
       transcriptPath(graph.hostClient, source)
     } catch (error: HostRejected) {
@@ -140,7 +146,7 @@ private suspend fun transcriptPath(hostClient: HostClient, source: TranscriptSou
   is TranscriptSource.Lookup ->
     hostClient.subagentSessions(source.parentPath).firstOrNull { it.toolCallId == source.toolCallId }?.path
 
-  TranscriptSource.None -> null
+  is TranscriptSource.NotStarted, TranscriptSource.None -> null
 }
 
 /**
@@ -334,9 +340,11 @@ private fun TranscriptBody(
   when (transcript) {
     SubagentTranscript.Loading -> Waiting(if (live) R.string.subagent_transcript_starting else null)
 
-    SubagentTranscript.Gone -> Note(R.string.subagent_transcript_gone)
+    SubagentTranscript.Gone -> Note(stringResource(R.string.subagent_transcript_gone))
 
-    SubagentTranscript.NotSaved -> Note(R.string.subagent_transcript_none)
+    SubagentTranscript.NotSaved -> Note(stringResource(R.string.subagent_transcript_none))
+
+    is SubagentTranscript.NotStarted -> Note(stringResource(R.string.subagent_not_started), transcript.reason)
 
     is SubagentTranscript.Failed -> Column(
       modifier = Modifier.fillMaxSize().padding(PipkinTokens.Spacing.s24),
@@ -388,14 +396,27 @@ private fun Waiting(@StringRes text: Int?) {
   }
 }
 
+/** [text], centred, over [detail] when there is one. */
 @Composable
-private fun Note(@StringRes text: Int) {
-  Box(modifier = Modifier.fillMaxSize().padding(PipkinTokens.Spacing.s24), contentAlignment = Alignment.Center) {
+private fun Note(text: String, detail: String? = null) {
+  Column(
+    modifier = Modifier.fillMaxSize().padding(PipkinTokens.Spacing.s24),
+    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8, Alignment.CenterVertically),
+    horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
     Text(
-      text = stringResource(text),
+      text = text,
       color = pipkinColors.foregroundMuted,
       fontSize = PipkinTokens.FontSize.base,
       textAlign = TextAlign.Center,
     )
+    detail?.let {
+      Text(
+        text = it,
+        color = pipkinColors.foreground,
+        fontSize = PipkinTokens.FontSize.sm,
+        textAlign = TextAlign.Center,
+      )
+    }
   }
 }
