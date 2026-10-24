@@ -1,6 +1,7 @@
 package io.jeph.pipkin.agent
 
 import io.jeph.pipkin.host.objects
+import io.jeph.pipkin.host.strings
 import org.json.JSONObject
 
 /** Where a subagent run stands, as the `pipkin-subagents` extension reports it. */
@@ -28,7 +29,8 @@ internal enum class SubagentStatus {
  * started it. [agent] is the agent definition's name, [description] the few words the model gave the task. Times are
  * epoch milliseconds. [messages] counts the messages in the subagent's transcript, so a screen showing it knows when
  * to read it again. [inFlight] counts the subagent's tool calls handed to the parent that haven't come back, which
- * [askingSubagent] uses to tell whose question the chat's card shows.
+ * [askingSubagent] uses to tell whose question the chat's card shows. [steering] holds the steers sent to it that it
+ * hasn't read yet, oldest first, as Pi queued them.
  */
 internal data class SubagentRun(
   val id: String,
@@ -45,6 +47,7 @@ internal data class SubagentRun(
   val sessionFile: String?,
   val messages: Int,
   val inFlight: Int,
+  val steering: List<String> = emptyList(),
 ) {
   companion object {
     /** The runs in a `runs` message's data; a run missing its ids or status is left out. */
@@ -69,6 +72,7 @@ internal data class SubagentRun(
         sessionFile = json.textOrNull("sessionFile"),
         messages = json.optInt("messages"),
         inFlight = json.optInt("inFlight"),
+        steering = json.optJSONArray("steering").strings(),
       )
     }
 

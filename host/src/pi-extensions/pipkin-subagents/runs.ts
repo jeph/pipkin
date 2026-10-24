@@ -100,6 +100,7 @@ export async function runSubagent(
     sessionFile: null,
     messages: 0,
     inFlight: 0,
+    steering: [],
     sessionId: ctx.sessionManager.getSessionId(),
     controller: new AbortController(),
     stoppedByUser: false,
@@ -281,7 +282,10 @@ function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined): Pro
   return promise;
 }
 
-/** Follows the child's events into the run: turns, tokens, the latest step and the transcript's messages. */
+/**
+ * Follows the child's events into the run: turns, tokens, the latest step, the transcript's messages and Pi's queue
+ * of steers not read yet, which Pi empties of each one as the child reads it.
+ */
 function track(state: Registry, run: Run, child: AgentSession, event: AgentSessionEvent, usage: Usage): void {
   switch (event.type) {
     case "turn_start":
@@ -308,6 +312,10 @@ function track(state: Registry, run: Run, child: AgentSession, event: AgentSessi
         run.messages = messages;
         report(state);
       });
+      return;
+    case "queue_update":
+      run.steering = [...event.steering];
+      report(state);
       return;
     default:
   }
@@ -336,6 +344,8 @@ function finish(
   run.status = stop.aborted ? "stopped" : run.error !== null ? "failed" : "done";
   run.endedAt = Date.now();
   run.inFlight = 0;
+  // Steers the subagent never read end with it.
+  run.steering = [];
   run.lastActivity = null;
   report(state);
   wakeQueued(state, run.sessionId);

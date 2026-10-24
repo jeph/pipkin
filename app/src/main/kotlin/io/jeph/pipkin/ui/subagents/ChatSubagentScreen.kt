@@ -3,6 +3,7 @@ package io.jeph.pipkin.ui.subagents
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -42,6 +44,8 @@ import io.jeph.pipkin.agent.SubagentStatus
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.ui.chat.ChatController
 import io.jeph.pipkin.ui.chat.PendingDialogCard
+import io.jeph.pipkin.ui.chat.SteeringBox
+import io.jeph.pipkin.ui.chat.SteeringSummary
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.atMostHalfTall
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -59,9 +63,11 @@ private val SEND_ICON_SIZE = 18.dp
 /**
  * The subagent the chat's `subagent` tool call [toolCallId] started, in place of the chat in its pane: live while it
  * runs, read only once it's done. The chat's question card shows under the transcript, answered through the chat's
- * [controller], since the subagent's questions are the chat's. While it is active, a box steers it and Stop ends it.
- * [chatTitle] is the chat's title, [controls] the pane's.
+ * [controller], since the subagent's questions are the chat's. While it is active, a box steers it and Stop ends it,
+ * with the steers it hasn't read yet over it, as the chat's composer has Pi's queue. [chatTitle] is the chat's title,
+ * [controls] the pane's.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ChatSubagentScreen(
   controller: ChatController,
@@ -95,15 +101,35 @@ internal fun ChatSubagentScreen(
     dialog = { PendingDialogCard(controller, timeline) },
   ) {
     if (run != null && facts.phase.active) {
-      SteerBar(
-        run = run,
-        onSteer = { text -> controller.scope.launch { process.steerSubagent(run.id, text) } },
-        onStop = { controller.scope.launch { process.stopSubagent(run.id) } },
-      )
+      Column {
+        // The keyboard and a dialog take the room the steers would use, as in the chat.
+        val compact = WindowInsets.isImeVisible || timeline.pendingUi != null
+        // Weighted, so the steer box is measured first and keeps its height when the room runs short.
+        PendingSubagentSteering(run, compact, Modifier.weight(1f, fill = false))
+        SteerBar(
+          run = run,
+          onSteer = { text -> controller.scope.launch { process.steerSubagent(run.id, text) } },
+          onStop = { controller.scope.launch { process.stopSubagent(run.id) } },
+        )
+      }
     } else {
       Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.ime.union(WindowInsets.navigationBars)))
     }
   }
+}
+
+/**
+ * The steers [run] hasn't read yet, one per line, while there are any. The box has no Edit or Send now: the
+ * extension takes no steer back from the subagent's queue.
+ */
+@Composable
+private fun PendingSubagentSteering(run: SubagentRun, compact: Boolean, modifier: Modifier) {
+  if (run.steering.isEmpty()) return
+  SteeringBox(
+    summary = SteeringSummary(run.steering.joinToString("\n"), attachments = 0),
+    compact = compact,
+    modifier = modifier.padding(bottom = PipkinTokens.Spacing.s8),
+  )
 }
 
 /**

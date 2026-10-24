@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -44,37 +45,41 @@ private val BUTTON_HEIGHT = 30.dp
 private val LINE_SIZE = 13.5.sp
 private val LINE_HEIGHT = 19.5.sp
 
-/** The messages Pi queued, between the dialog card and the composer, while there are any. */
+/**
+ * The messages Pi queued, between the dialog card and the composer, while there are any. Edit and Send now are off
+ * while Pi may be taking the queue for its next turn, since it then delivers the messages regardless.
+ */
 @Composable
 internal fun PendingSteeringBox(controller: ChatController, timeline: TimelineState, compact: Boolean) {
   if (timeline.queue.isEmpty()) return
   SteeringBox(
     summary = controller.steering.summary(timeline.queue),
     compact = compact,
-    editEnabled = !timeline.queueInFlight,
-    sendNowEnabled = !timeline.queueInFlight && !controller.sending,
-    onEdit = controller.steering::edit,
-    onSendNow = controller.steering::sendNow,
     modifier = Modifier.padding(bottom = PipkinTokens.Spacing.s8),
-  )
+  ) {
+    SteerButton(stringResource(R.string.chat_steering_edit), !timeline.queueInFlight, filled = false) {
+      controller.steering.edit()
+    }
+    val sendNowEnabled = !timeline.queueInFlight && !controller.sending
+    SteerButton(stringResource(R.string.chat_steering_send_now), sendNowEnabled, filled = true) {
+      controller.steering.sendNow()
+    }
+  }
 }
 
 /**
  * The messages Pi has queued but not taken yet, one per line as typed, under a cobalt "Steering" label, so the user
- * sees what is about to steer the run; attachments show only as a count. Edit takes them back into the composer; Send
- * now stops the run and sends them at once, each as its own message. Both are off while Pi may be taking the queue
- * for its next turn, since it then delivers the messages regardless. A [compact] box leaves room for the keyboard or a
- * dialog: one line with the first message and how many lines follow it.
+ * sees what is about to steer the run; attachments show only as a count. [actions] end the label's line: the chat's
+ * Edit takes them back into the composer and Send now stops the run and sends them at once, each as its own message;
+ * a subagent's box has none. A [compact] box leaves room for the keyboard or a dialog: one line with the first message
+ * and how many lines follow it.
  */
 @Composable
 internal fun SteeringBox(
   summary: SteeringSummary,
   compact: Boolean,
-  editEnabled: Boolean,
-  sendNowEnabled: Boolean,
-  onEdit: () -> Unit,
-  onSendNow: () -> Unit,
   modifier: Modifier = Modifier,
+  actions: @Composable RowScope.() -> Unit = {},
 ) {
   val colors = pipkinColors
   Box(modifier = modifier.fillMaxWidth().padding(horizontal = 10.dp), Alignment.TopCenter) {
@@ -92,14 +97,14 @@ internal fun SteeringBox(
             bottom = if (compact) PipkinTokens.Spacing.s4 else 10.dp,
           ),
     ) {
-      Row(verticalAlignment = Alignment.CenterVertically) {
+      // As tall as the buttons, so a box with none keeps its height.
+      Row(modifier = Modifier.heightIn(min = BUTTON_HEIGHT), verticalAlignment = Alignment.CenterVertically) {
         if (compact) {
           SteeringLine(summary, Modifier.weight(1f))
         } else {
           CapsLabel(stringResource(R.string.chat_steering), colors.accent, Modifier.weight(1f), fontSize = 11.sp)
         }
-        SteerButton(stringResource(R.string.chat_steering_edit), editEnabled, filled = false, onEdit)
-        SteerButton(stringResource(R.string.chat_steering_send_now), sendNowEnabled, filled = true, onSendNow)
+        actions()
       }
       if (compact) return@Column
       if (summary.text.isNotEmpty()) {

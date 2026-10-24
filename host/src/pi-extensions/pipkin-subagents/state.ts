@@ -35,6 +35,8 @@ export interface RunView {
   messages: number;
   /** The run's tool calls handed to the parent's `executeTool()` that haven't returned or thrown. */
   inFlight: number;
+  /** The steers the app sent that the subagent hasn't read yet, oldest first, as Pi's steering queue holds them. */
+  steering: string[];
 }
 
 export interface Run extends RunView {
@@ -131,6 +133,7 @@ export function view(run: Run): RunView {
     sessionFile: run.sessionFile,
     messages: run.messages,
     inFlight: run.inFlight,
+    steering: run.steering,
   };
 }
 

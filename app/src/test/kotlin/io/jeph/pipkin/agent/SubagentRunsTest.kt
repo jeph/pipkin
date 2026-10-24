@@ -28,7 +28,8 @@ class SubagentRunsTest {
             .put("error", JSONObject.NULL)
             .put("sessionFile", "/s/subagents/p/c.jsonl")
             .put("messages", 12)
-            .put("inFlight", 1),
+            .put("inFlight", 1)
+            .put("steering", JSONArray().put("look at auth").put("and logout")),
         ),
       ),
     )
@@ -50,6 +51,7 @@ class SubagentRunsTest {
           sessionFile = "/s/subagents/p/c.jsonl",
           messages = 12,
           inFlight = 1,
+          steering = listOf("look at auth", "and logout"),
         ),
       ),
       runs,
@@ -89,6 +91,8 @@ class SubagentRunsTest {
     assertNull(run.lastActivity)
     assertNull(run.startedAt)
     assertNull(run.sessionFile)
+    // A run listing no steering has none waiting.
+    assertEquals(emptyList<String>(), run.steering)
   }
 
   @Test

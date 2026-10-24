@@ -433,6 +433,33 @@ describe("steer", () => {
     expect(messageText(subagentResults(session).get("sub1"))).toBe("steered: STEER look at auth");
     session.dispose();
   });
+
+  it("lists the steers the subagent hasn't read, until it reads each", async () => {
+    const release = latch();
+    const child: Script = async (turn) => {
+      if (turn.latest.startsWith("STEER")) return fauxAssistantMessage(`steered: ${turn.latest}`);
+      if (turn.step > 0) return fauxAssistantMessage("never steered");
+      await release.promise;
+      return fauxAssistantMessage(fauxToolCall("bash", { command: "echo working" }), { stopReason: "toolUse" });
+    };
+    const { session } = await start(parentCalling([{ id: "sub1", task: "CHILD work" }], child));
+    const prompt = session.prompt("PARENT go");
+    await eventually(() => channel.latest()[0]?.turn === 1);
+    expect(channel.latest()[0]?.steering).toEqual([]);
+    const id = channel.latest()[0]?.id;
+    channel.fromApp({ action: "steer", id, text: "STEER one" });
+    channel.fromApp({ action: "steer", id, text: "STEER two" });
+    await eventually(() => channel.latest()[0]?.steering.length === 2);
+    expect(channel.latest()[0]).toMatchObject({ status: "running", steering: ["STEER one", "STEER two"] });
+    release.open();
+    await prompt;
+    // Pi hands them to the child after its bash call, and the list empties while the child still runs.
+    const readAt = channel.sent.findLastIndex((message) => message.runs[0]?.steering.length === 2);
+    const read = channel.sent.slice(readAt + 1).find((message) => message.runs[0]?.steering.length === 0);
+    expect(read?.runs[0]?.status).toBe("running");
+    expect(channel.latest()).toEqual([expect.objectContaining({ status: "done", steering: [] })]);
+    session.dispose();
+  });
 });
 
 describe("transcripts", () => {
@@ -541,6 +568,7 @@ describe("runs messages", () => {
         // The system prompt, the task, the read call, its result and the reply.
         messages: 5,
         inFlight: 0,
+        steering: [],
       },
     ]);
     await session.prompt("PARENT again");
