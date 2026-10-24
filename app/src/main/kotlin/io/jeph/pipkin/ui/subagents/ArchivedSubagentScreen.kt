@@ -15,10 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -61,16 +58,14 @@ internal fun ArchivedSubagentScreen(path: String, toolCallId: String, onBack: ()
   val parent by rememberParentCall(path, toolCallId)
   val call = (parent as? ParentCall.Read)?.call
   val facts = subagentFacts(toolCallId, call, ChatSubagents.None, parentPath = path)
-  var attempt by remember { mutableIntStateOf(0) }
   // Until the chat's own transcript says where the subagent's is, it isn't known.
   val source = facts.source.takeIf { parent is ParentCall.Read }
-  val transcript by rememberSubagentTranscript(source, live = false, messages = 0, attempt = attempt)
+  val transcript by rememberSubagentTranscript(source, live = false, messages = 0)
   SubagentScreen(
     chatTitle = session?.let { sessionTitle(it) } ?: stringResource(R.string.archive_title),
     facts = facts,
     transcript = transcript,
     onBack = onBack,
-    onRetry = { attempt += 1 },
   ) { ReadOnlyNote() }
 }
 

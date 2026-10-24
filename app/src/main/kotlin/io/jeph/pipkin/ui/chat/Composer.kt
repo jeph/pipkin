@@ -100,11 +100,11 @@ private val ICON_SIZE = 18.dp
 
 /**
  * The composer: a tray docked to the bottom of the chat, under the keyboard's top edge when it's up, holding the
- * attachment row, a growing text field and a toolbar with attach, the model and thinking chips, the context meter,
- * [trailingControls] (reserved for voice input) and the primary send/stop button. Send stays greyed out while Pi
- * starts. The model and thinking chips open their pickers through [onSheet]. Extension widgets show as tabs at the
- * tray's top or bottom edge, and a tab opens its widget's panel in the tray, which keeps to a few lines and scrolls
- * when [tight]. The [subagents] tab, while the chat has subagents, leads the tabs above the editor.
+ * attachment row, a growing text field and a toolbar with attach, the model and thinking chips, the context meter and
+ * the primary send/stop button. Send stays greyed out while Pi starts. The model and thinking chips open their pickers
+ * through [onSheet]. Extension widgets show as tabs at the tray's top or bottom edge, and a tab opens its widget's
+ * panel in the tray, which keeps to a few lines and scrolls when [tight]. The [subagents] tab, while the chat has
+ * subagents, leads the tabs above the editor.
  */
 @Composable
 internal fun Composer(
@@ -116,7 +116,6 @@ internal fun Composer(
   onSheet: (ChatSheet) -> Unit,
   subagents: SubagentsTab?,
   modifier: Modifier = Modifier,
-  trailingControls: @Composable RowScope.() -> Unit = {},
 ) {
   val colors = pipkinColors
   val keyboard = LocalSoftwareKeyboardController.current
@@ -164,7 +163,6 @@ internal fun Composer(
           working = working,
           onSend = { if (controller.send()) hideKeyboard() },
           onOpenModelSheet = { onSheet(ChatSheet.Model()) },
-          trailingControls = trailingControls,
         )
         WidgetPanelSlot(below.shown, tabs, true, tight, openWidget, if (below.shown != null) panelWeight else Modifier)
       }
@@ -173,7 +171,7 @@ internal fun Composer(
   }
 }
 
-/** Attach, the model and thinking chips, the context meter, [trailingControls] and the send/stop button. */
+/** Attach, the model and thinking chips, the context meter and the send/stop button. */
 @Composable
 private fun ComposerToolbar(
   controller: ChatController,
@@ -182,7 +180,6 @@ private fun ComposerToolbar(
   working: Boolean,
   onSend: () -> Unit,
   onOpenModelSheet: () -> Unit,
-  trailingControls: @Composable RowScope.() -> Unit,
 ) {
   Row(
     verticalAlignment = Alignment.CenterVertically,
@@ -201,7 +198,6 @@ private fun ComposerToolbar(
     }
     val contextUsage by controller.process.contextUsage.collectAsStateWithLifecycle()
     ContextMeter(contextUsage, controller.contextDetailsOpen) { controller.contextDetailsOpen = it }
-    trailingControls()
     val processState by controller.process.state.collectAsStateWithLifecycle()
     val action = primaryAction(controller, working, processState.starting)
     PrimaryButton(action, onSend = onSend, onStop = controller::abort)

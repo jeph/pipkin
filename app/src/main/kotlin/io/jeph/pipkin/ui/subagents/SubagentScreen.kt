@@ -19,6 +19,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -87,35 +88,37 @@ internal sealed interface SubagentTranscript {
   /** The subagent kept no file, as one of a chat not saved. */
   data object NotSaved : SubagentTranscript
 
-  data class Failed(val message: String) : SubagentTranscript
+  /** It couldn't be read, for [message]; [retry] reads it again. */
+  class Failed(val message: String, val retry: () -> Unit) : SubagentTranscript
 }
 
 /**
  * The transcript at [source], read again whenever the run's [messages] count changes, at most once a [RELOAD_MILLIS],
- * and whenever [attempt] changes. A null [source] isn't known yet, so the transcript stays loading. While the subagent
- * is [live], a file that isn't there yet means it is starting: Pi writes a session's file with its first reply.
+ * and when a failed read is retried. A null [source] isn't known yet, so the transcript stays loading. While the
+ * subagent is [live], a file that isn't there yet means it is starting: Pi writes a session's file with its first reply.
  */
 @Composable
 internal fun rememberSubagentTranscript(
   source: TranscriptSource?,
   live: Boolean,
   messages: Int,
-  attempt: Int,
 ): State<SubagentTranscript> {
   val graph = LocalContext.current.appGraph
   val failed = stringResource(R.string.subagent_transcript_failed)
   val currentLive by rememberUpdatedState(live)
   val currentMessages by rememberUpdatedState(messages)
-  return produceState<SubagentTranscript>(SubagentTranscript.Loading, source, attempt) {
+  val attempt = remember { mutableIntStateOf(0) }
+  val retry = remember(attempt) { { attempt.intValue += 1 } }
+  return produceState<SubagentTranscript>(SubagentTranscript.Loading, source, attempt.intValue) {
     value = SubagentTranscript.Loading
     if (source == null) return@produceState
     val path = try {
       transcriptPath(graph.hostClient, source)
     } catch (error: HostRejected) {
-      value = SubagentTranscript.Failed(error.error)
+      value = SubagentTranscript.Failed(error.error, retry)
       return@produceState
     } catch (error: IOException) {
-      value = SubagentTranscript.Failed(error.message ?: failed)
+      value = SubagentTranscript.Failed(error.message ?: failed, retry)
       return@produceState
     }
     if (path == null) {
@@ -123,7 +126,7 @@ internal fun rememberSubagentTranscript(
       return@produceState
     }
     snapshotFlow { currentMessages }.conflate().collect {
-      value = readTranscript(graph.sessionRepository, path, currentLive, value, failed)
+      value = readTranscript(graph.sessionRepository, path, currentLive, value, failed, retry)
       delay(RELOAD_MILLIS)
     }
   }
@@ -142,7 +145,8 @@ private suspend fun transcriptPath(hostClient: HostClient, source: TranscriptSou
 /**
  * The transcript at [path] as rows. A read that fails keeps the [previous] rows of a transcript read before, since a
  * running subagent's file is read again and again; a file that isn't there is [SubagentTranscript.Gone], unless the
- * subagent is [live] and still starting.
+ * subagent is [live] and still starting. A failure with nothing to keep says [failed] when the error has no message,
+ * and offers [retry].
  */
 private suspend fun readTranscript(
   repository: SessionRepository,
@@ -150,6 +154,7 @@ private suspend fun readTranscript(
   live: Boolean,
   previous: SubagentTranscript,
   failed: String,
+  retry: () -> Unit,
 ): SubagentTranscript = try {
   val messages = repository.messages(path)
   // Off the main thread: a long transcript takes a while to turn into rows.
@@ -169,19 +174,18 @@ private suspend fun readTranscript(
   when {
     error.code == NOT_FOUND && live -> previous
     error.code == NOT_FOUND -> SubagentTranscript.Gone
-    else -> previous as? SubagentTranscript.Loaded ?: SubagentTranscript.Failed(error.error)
+    else -> previous as? SubagentTranscript.Loaded ?: SubagentTranscript.Failed(error.error, retry)
   }
 } catch (error: IOException) {
-  previous as? SubagentTranscript.Loaded ?: SubagentTranscript.Failed(error.message ?: failed)
+  previous as? SubagentTranscript.Loaded ?: SubagentTranscript.Failed(error.message ?: failed, retry)
 } catch (_: JSONException) {
-  previous as? SubagentTranscript.Loaded ?: SubagentTranscript.Failed(failed)
+  previous as? SubagentTranscript.Loaded ?: SubagentTranscript.Failed(failed, retry)
 }
 
 /**
  * A subagent in place of its chat: a header with the way back, the chat's [chatTitle] and the subagent's agent and
  * task, its status, turn, tokens and time, then its transcript with the chat's own rows, the task first. [trailing]
  * ends the header; [dialog] and [bottom] go under the transcript, as the chat's question card and composer do.
- * [onRetry] reads a transcript that failed again.
  */
 @Composable
 internal fun SubagentScreen(
@@ -189,7 +193,6 @@ internal fun SubagentScreen(
   facts: SubagentFacts,
   transcript: SubagentTranscript,
   onBack: () -> Unit,
-  onRetry: () -> Unit,
   modifier: Modifier = Modifier,
   trailing: @Composable RowScope.() -> Unit = {},
   dialog: @Composable () -> Unit = {},
@@ -203,7 +206,7 @@ internal fun SubagentScreen(
     SubagentHeader(chatTitle, facts, loaded?.stats, onBack, trailing)
     ChatStack(
       modifier = Modifier.weight(1f),
-      stream = { TranscriptBody(transcript, facts.phase.active, view, onRetry, onOpenTool = { toolKey = it }) },
+      stream = { TranscriptBody(transcript, facts.phase.active, view, onOpenTool = { toolKey = it }) },
       dialog = dialog,
       steering = {},
       composer = bottom,
@@ -325,7 +328,6 @@ private fun TranscriptBody(
   transcript: SubagentTranscript,
   live: Boolean,
   view: ChatView,
-  onRetry: () -> Unit,
   onOpenTool: (String) -> Unit,
 ) {
   when (transcript) {
@@ -346,7 +348,7 @@ private fun TranscriptBody(
         fontSize = PipkinTokens.FontSize.base,
         textAlign = TextAlign.Center,
       )
-      PillButton(label = stringResource(R.string.subagent_retry), onClick = onRetry)
+      PillButton(label = stringResource(R.string.subagent_retry), onClick = transcript.retry)
     }
 
     is SubagentTranscript.Loaded -> {

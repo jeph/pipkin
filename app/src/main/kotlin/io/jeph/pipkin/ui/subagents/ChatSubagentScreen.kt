@@ -27,9 +27,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,8 +79,7 @@ internal fun ChatSubagentScreen(
     timeline.items.firstOrNull { it is TimelineItem.ToolCall && it.id == toolCallId } as? TimelineItem.ToolCall
   }
   val facts = subagentFacts(toolCallId, call, subagents, sessionFile)
-  var attempt by remember { mutableIntStateOf(0) }
-  val transcript by rememberSubagentTranscript(facts.source, facts.phase.active, facts.run?.messages ?: 0, attempt)
+  val transcript by rememberSubagentTranscript(facts.source, facts.phase.active, facts.run?.messages ?: 0)
   val tabs = rememberWorkspaceTabs(controls.pane, process.cwd).count
   val run = facts.run
   SubagentScreen(
@@ -90,7 +87,6 @@ internal fun ChatSubagentScreen(
     facts = facts,
     transcript = transcript,
     onBack = onBack,
-    onRetry = { attempt += 1 },
     modifier = modifier,
     trailing = {
       TabsButton(tabs, controls.onOpenTabs)
