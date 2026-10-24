@@ -144,8 +144,11 @@ class ChatTimeline(
    * Each run gets back the [TurnFooter] it had while live. A run starts with a user message and ends with the reply
    * that calls no tool, as a stop, an error or an abort; Pi times each reply, so the footer spans from the user message
    * to that reply's end. Replies Pi didn't time, from before it did, get no footer.
+   *
+   * With [compactions], a compaction's summary among [messages] shows as the notice the live stream shows as Pi
+   * compacts. Without, as for a chat, it's left out: Pi's history holds only the latest one's, at its start.
    */
-  fun seed(messages: JSONArray, ifNoEventsSince: Long? = null): Boolean {
+  fun seed(messages: JSONArray, ifNoEventsSince: Long? = null, compactions: Boolean = false): Boolean {
     synchronized(lock) {
       if (ifNoEventsSince != null && appliedCount != ifNoEventsSince) return false
       items.clear()
@@ -184,6 +187,10 @@ class ChatTimeline(
           }
 
           "toolResult" -> attachToolResult(message)
+
+          "compactionSummary" -> if (compactions) {
+            items += Notice("compacted${message.piTimestamp ?: index}", NoticeKind.Compacted)
+          }
         }
         message.piTimestamp?.let { timestamp ->
           lastMessageAt = timestamp
@@ -191,15 +198,20 @@ class ChatTimeline(
         }
       }
       run?.closeIfReplied()
-      // Pi sent these after the history it just gave, so they follow its end; Pi is idle, so any run is over.
-      val unseeded = firstUnseeded?.let { it until notices.size } ?: IntRange.EMPTY
-      for (index in unseeded) notices[index] = notices[index].copy(after = lastMessageAt, afterRun = true)
-      firstUnseeded = null
-      placeNotices(messageEnds)
-      publish()
-      if (!unseeded.isEmpty()) onNoticesChanged(notices.toList())
+      placeSeededNotices(messageEnds)
       return true
     }
+  }
+
+  /** Puts the session's notices back among the items [seed] just made, those not yet seeded at the end, and publishes. */
+  private fun placeSeededNotices(messageEnds: Map<Long, Int>) {
+    // Pi sent these after the history it just gave, so they follow its end; Pi is idle, so any run is over.
+    val unseeded = firstUnseeded?.let { it until notices.size } ?: IntRange.EMPTY
+    for (index in unseeded) notices[index] = notices[index].copy(after = lastMessageAt, afterRun = true)
+    firstUnseeded = null
+    placeNotices(messageEnds)
+    publish()
+    if (!unseeded.isEmpty()) onNoticesChanged(notices.toList())
   }
 
   /** Puts [notices] back among the seeded items, each where [SavedNotice] says, keeping their order at one place. */

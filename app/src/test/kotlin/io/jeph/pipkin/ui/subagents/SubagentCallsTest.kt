@@ -1,8 +1,12 @@
 package io.jeph.pipkin.ui.subagents
 
+import io.jeph.pipkin.agent.ChatTimeline
+import io.jeph.pipkin.agent.NoticeKind
 import io.jeph.pipkin.agent.SubagentAsker
 import io.jeph.pipkin.agent.SubagentRun
 import io.jeph.pipkin.agent.SubagentStatus
+import io.jeph.pipkin.agent.TimelineItem
+import io.jeph.pipkin.agent.TimelineItem.Notice
 import io.jeph.pipkin.agent.TimelineItem.ToolCall
 import io.jeph.pipkin.agent.ToolStatus
 import org.json.JSONArray
@@ -187,6 +191,50 @@ class SubagentCallsTest {
       assertFalse(subagents.startsSubagent(call("c1", output = "theirs")))
       assertFalse(subagents.startsSubagent(call("c1", output = "blocked", isError = true)))
       assertFalse(subagents.startsSubagent(call("c1", output = "theirs", details = JSONObject().put("agent", "x"))))
+    }
+  }
+
+  @Test
+  fun anOpenScreenKeepsTheRowsItShowedWhenTheSubagentCompacts() {
+    val start = listOf(message("system", 1), message("user", 2), message("assistant", 3), message("assistant", 5))
+    val first = TranscriptHistory.of(JSONArray(start))
+    assertEquals(start, first.messages)
+
+    // A compaction keeps the reply at 5 on: the task and the reply at 3 leave Pi's context but stay on screen.
+    val compacted = listOf(message("system", 9), message("compactionSummary", 10), message("assistant", 5))
+    val second = first.after(JSONArray(compacted + message("assistant", 11)))
+    assertEquals(listOf(1L, 2, 3, 9, 10, 5, 11), second.messages.map { it.getLong("timestamp") })
+    assertEquals(3, second.base)
+
+    // Read again with the same compaction: only the new reply joins.
+    val third = second.after(JSONArray(compacted + message("assistant", 11) + message("assistant", 12)))
+    assertEquals(listOf(1L, 2, 3, 9, 10, 5, 11, 12), third.messages.map { it.getLong("timestamp") })
+
+    // A compaction that keeps nothing: every row so far stays.
+    val fourth = third.after(JSONArray(listOf(message("compactionSummary", 20), message("assistant", 21))))
+    assertEquals(listOf(1L, 2, 3, 9, 10, 5, 11, 12, 20, 21), fourth.messages.map { it.getLong("timestamp") })
+
+    // Each compaction shows where it came, as in the live chat, and the task stays first.
+    val rows = ChatTimeline().apply { seed(fourth.shown(), compactions = true) }.state.value.items
+    val compactedAt = rows.withIndex().filter { (it.value as? Notice)?.kind == NoticeKind.Compacted }.map { it.index }
+    assertEquals(2, compactedAt.size)
+    assertTrue(rows.first() is TimelineItem.User)
+
+    // A screen first opened after the compaction shows what an archived chat would: its context, with no notice.
+    val fresh = TranscriptHistory.of(JSONArray(compacted + message("assistant", 11)))
+    val freshRows = ChatTimeline().apply { seed(fresh.shown(), compactions = true) }.state.value.items
+    assertTrue(freshRows.none { it is Notice })
+    assertEquals(2, freshRows.size)
+  }
+
+  private fun message(role: String, timestamp: Long): JSONObject {
+    val message = JSONObject().put("role", role).put("timestamp", timestamp)
+    val reply = JSONArray().put(JSONObject().put("type", "text").put("text", "r$timestamp"))
+    return when (role) {
+      "user" -> message.put("content", "task")
+      "assistant" -> message.put("content", reply).put("stopReason", "stop")
+      "compactionSummary" -> message.put("summary", "earlier work").put("tokensBefore", 1000)
+      else -> message.put("content", "")
     }
   }
 

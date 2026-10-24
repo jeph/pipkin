@@ -10,6 +10,7 @@ import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.host.objects
 import io.jeph.pipkin.ui.chat.stringOrNull
 import org.json.JSONArray
+import org.json.JSONObject
 
 /** Where a subagent stands, as its tool row, the Subagents sheet and its screen show it. */
 internal enum class SubagentPhase {
@@ -255,4 +256,59 @@ internal fun transcriptStats(messages: JSONArray): TranscriptStats {
     }
   }
   return TranscriptStats(turns, tokens, first, last)
+}
+
+/**
+ * A subagent's [messages] as its open screen has read them: Pi's context, which starts at the latest compaction's
+ * summary, after the messages earlier reads had that the compaction left out. The latest read's messages start at
+ * [base].
+ */
+internal class TranscriptHistory(val messages: List<JSONObject>, val base: Int) {
+  /**
+   * The messages to show: each compaction's summary marks where it happened, except one nothing came before, as when
+   * the screen first read a transcript that had compacted, which then shows what an archived chat would.
+   */
+  fun shown(): JSONArray {
+    val first = messages.summaryFrom(0)
+    return JSONArray(messages.filterIndexed { index, _ -> index != first })
+  }
+
+  /**
+   * The history once a read gives [read]. Every message the previous reads had stays, up to the first one the read
+   * has again, so a compaction while the screen is open leaves the rows it showed in place.
+   */
+  fun after(read: JSONArray): TranscriptHistory {
+    val latest = read.objects().toList()
+    val summary = latest.summaryFrom(0) ?: return TranscriptHistory(latest, 0)
+    // The compaction the previous read had: only the messages since join.
+    val known = messages.summaryFrom(base)?.let(messages::get)
+    if (known != null && known.sameAs(latest[summary])) {
+      return TranscriptHistory(messages.subList(0, base) + latest, base)
+    }
+    // Messages before the new compaction's first kept one are gone from the context but still the subagent's.
+    val firstKept = latest.getOrNull(summary + 1)
+    val cut = firstKept?.let { kept -> (base until messages.size).firstOrNull { messages[it].sameAs(kept) } }
+      ?: messages.size
+    return TranscriptHistory(messages.subList(0, cut) + latest, cut)
+  }
+
+  companion object {
+    /** The history of a transcript first read as [read]. */
+    fun of(read: JSONArray): TranscriptHistory = TranscriptHistory(emptyList(), 0).after(read)
+  }
+}
+
+/**
+ * The index of the compaction summary Pi's context starts with from [start], after the system prompt it may carry
+ * over; null when the messages there start with no summary.
+ */
+private fun List<JSONObject>.summaryFrom(start: Int): Int? {
+  val index = (start until size).firstOrNull { this[it].optString("role") != "system" } ?: return null
+  return index.takeIf { this[it].optString("role") == "compactionSummary" }
+}
+
+/** Whether this is [other] read again, by its role and time. */
+private fun JSONObject.sameAs(other: JSONObject): Boolean {
+  val timestamp = optLong("timestamp")
+  return timestamp > 0 && timestamp == other.optLong("timestamp") && optString("role") == other.optString("role")
 }

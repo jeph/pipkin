@@ -67,6 +67,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONException
 
 /** The least time between two reads of a running subagent's transcript, which grows with every message. */
@@ -79,8 +80,16 @@ private const val NOT_FOUND = "not_found"
 internal sealed interface SubagentTranscript {
   data object Loading : SubagentTranscript
 
-  /** The transcript's rows in [state]; [taskKey] keys its first user message, the task; [stats] counts it up. */
-  data class Loaded(val state: TimelineState, val taskKey: String?, val stats: TranscriptStats) : SubagentTranscript
+  /**
+   * The transcript's rows in [state]; [taskKey] keys its first user message, the task; [stats] counts it up. [history]
+   * holds the messages read so far, which the next read adds to.
+   */
+  data class Loaded(
+    val state: TimelineState,
+    val taskKey: String?,
+    val stats: TranscriptStats,
+    val history: TranscriptHistory,
+  ) : SubagentTranscript
 
   /** Its file is gone, as after the chat it belongs to was forked and the original deleted. */
   data object Gone : SubagentTranscript
@@ -153,7 +162,8 @@ private suspend fun transcriptPath(hostClient: HostClient, source: TranscriptSou
  * The transcript at [path] as rows. A read that fails keeps the [previous] rows of a transcript read before, since a
  * running subagent's file is read again and again; a file that isn't there is [SubagentTranscript.Gone], unless the
  * subagent is [live] and still starting. A failure with nothing to keep says [failed] when the error has no message,
- * and offers [retry].
+ * and offers [retry]. Rows the [previous] read showed stay when the subagent compacts in between, as in the live chat,
+ * with the compaction's notice after them.
  */
 private suspend fun readTranscript(
   repository: SessionRepository,
@@ -163,18 +173,20 @@ private suspend fun readTranscript(
   failed: String,
   retry: () -> Unit,
 ): SubagentTranscript = try {
-  val messages = repository.messages(path)
+  val read = repository.messages(path)
   // Off the main thread: a long transcript takes a while to turn into rows.
   withContext(Dispatchers.Default) {
+    val history = (previous as? SubagentTranscript.Loaded)?.history?.after(read) ?: TranscriptHistory.of(read)
     val timeline = ChatTimeline()
-    timeline.seed(messages)
+    timeline.seed(history.shown(), compactions = true)
     val state = timeline.state.value.withStream()
     SubagentTranscript.Loaded(
       state,
       state.items.firstOrNull {
         it is TimelineItem.User
       }?.key,
-      transcriptStats(messages),
+      transcriptStats(JSONArray(history.messages)),
+      history,
     )
   }
 } catch (error: HostRejected) {
