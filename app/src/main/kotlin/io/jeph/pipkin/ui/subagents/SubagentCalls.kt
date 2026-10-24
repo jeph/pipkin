@@ -7,6 +7,7 @@ import io.jeph.pipkin.agent.SubagentResult
 import io.jeph.pipkin.agent.SubagentRun
 import io.jeph.pipkin.agent.SubagentStatus
 import io.jeph.pipkin.agent.TimelineItem
+import io.jeph.pipkin.agent.ToolStatus
 import io.jeph.pipkin.host.objects
 import io.jeph.pipkin.ui.chat.stringOrNull
 import org.json.JSONArray
@@ -49,9 +50,9 @@ internal enum class SubagentTool {
 
 /**
  * What a chat knows of its subagents now: the [runs] its extension lists, whose question the chat's card shows
- * ([asker]), whether the chat is [working], which tells a call still waiting to start from one Pi left behind, and
- * whose [tool] its `subagent` calls went to. [cutOff] holds when the runs active as the chat's Pi went away were cut
- * off, by tool call id.
+ * ([asker]), whether the chat is [working], which with a call's status tells a call still waiting to start from one an
+ * earlier run left behind, and whose [tool] its `subagent` calls go to now. [cutOff] holds when the runs active as the
+ * chat's Pi went away were cut off, by tool call id.
  */
 @Immutable
 internal class ChatSubagents(
@@ -95,8 +96,9 @@ internal class ChatSubagents(
 
 /**
  * The phase of the subagent `subagent` tool [call] started: its [run]'s while the extension lists it, else what the
- * call's result says, else [Queued] while the chat works and the run may yet appear, and [SubagentPhase.Interrupted]
- * once it doesn't.
+ * call's result says, else [Queued] while the call belongs to the run the chat is [working] on and its subagent may
+ * yet appear, and [SubagentPhase.Interrupted] once it doesn't. A run's end marks its calls done, and a chat's history
+ * loads with every call done, so a call left without a result by an earlier run stays interrupted through later ones.
  */
 internal fun subagentPhase(
   call: TimelineItem.ToolCall?,
@@ -106,7 +108,7 @@ internal fun subagentPhase(
 ): SubagentPhase = when {
   run != null -> runPhase(run, asker)
   call?.output != null -> resultPhase(call)
-  working -> SubagentPhase.Queued
+  working && call != null && call.status != ToolStatus.Done -> SubagentPhase.Queued
   else -> SubagentPhase.Interrupted
 }
 

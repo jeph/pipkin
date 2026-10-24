@@ -50,12 +50,42 @@ class SubagentCallsTest {
   }
 
   @Test
-  fun aCallWithNoResultIsQueuedWhileTheChatWorksAndInterruptedOnceItStopped() {
-    // A settled run marks its calls done, with no output: that's not a result.
+  fun aCallWithNoResultIsQueuedWhileItsRunWorksAndInterruptedOnceItEnded() {
+    val live = call("c1")
+    assertEquals(SubagentPhase.Queued, subagentPhase(live, null, SubagentAsker.Unknown, working = true))
+    assertEquals(SubagentPhase.Interrupted, subagentPhase(live, null, SubagentAsker.Unknown, working = false))
+    // A settled run marks its calls done, with no output: that's not a result, and a later run doesn't revive it.
     val settled = call("c1").copy(status = ToolStatus.Done)
-    assertEquals(SubagentPhase.Queued, subagentPhase(settled, null, SubagentAsker.Unknown, working = true))
+    assertEquals(SubagentPhase.Interrupted, subagentPhase(settled, null, SubagentAsker.Unknown, working = true))
     assertEquals(SubagentPhase.Interrupted, subagentPhase(settled, null, SubagentAsker.Unknown, working = false))
     assertEquals(SubagentPhase.Interrupted, ChatSubagents.None.phase(settled))
+  }
+
+  @Test
+  fun aCallAnEarlierRunLeftWithoutAResultStaysInterruptedWhileALaterRunWorks() {
+    val timeline = ChatTimeline()
+    timeline.seed(
+      JSONArray(
+        """[
+          {"role":"user","content":"go","timestamp":1},
+          {"role":"assistant","timestamp":2,"stopReason":"toolUse",
+            "content":[{"type":"toolCall","id":"c1","name":"subagent","arguments":{"agent":"General"}}]}
+        ]""",
+      ),
+    )
+    timeline.apply(JSONObject("""{"type":"agent_start"}"""))
+    timeline.apply(
+      JSONObject("""{"type":"tool_execution_start","toolCallId":"c2","toolName":"subagent","args":{"agent":"Explore"}}"""),
+    )
+    fun phases(working: Boolean): List<SubagentPhase> {
+      val subagents = ChatSubagents(emptyList(), SubagentAsker.Unknown, working)
+      return timeline.state.value.items.filterIsInstance<ToolCall>().map(subagents::phase)
+    }
+
+    // The later run's call waits for its subagent to appear; the earlier one's was cut off.
+    assertEquals(listOf(SubagentPhase.Interrupted, SubagentPhase.Queued), phases(working = true))
+    timeline.apply(JSONObject("""{"type":"agent_settled"}"""))
+    assertEquals(listOf(SubagentPhase.Interrupted, SubagentPhase.Interrupted), phases(working = false))
   }
 
   @Test
