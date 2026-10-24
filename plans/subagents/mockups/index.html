@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pipkin subagents — mockups</title>
+<style>
+/* The site's copies of the app's fonts; see site/src/assets/fonts/OFL.txt. */
+@font-face { font-family: "Manrope"; font-weight: 200 800; src: url("../../../site/src/assets/fonts/manrope.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 400; src: url("../../../site/src/assets/fonts/jetbrains-mono-regular.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 700; src: url("../../../site/src/assets/fonts/jetbrains-mono-bold.woff2") format("woff2"); }
+
+/* Porcelain, from PipkinColors.kt */
+:root {
+  --sans: "Manrope", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --page: #f6f7fb; --surface-1: #ebeef7; --surface-2: #dfe3f0; --surface-3: #ccd2e6;
+  --border: #d9deed; --fg: #111633; --muted: #565d7a; --faint: #959bb5;
+  --accent: #2f4bd8; --accent-fg: #ffffff; --accent-soft: #2f4bd817;
+  --success: #157a4a; --danger: #c42b3c; --warning: #875700; --extension: #8a3fc4;
+  --canvas: #e4e7f0; --ink: #111633; --ink-muted: #565d7a;
+}
+/* Stone, the System dark theme */
+.dark {
+  --page: #1c1d20; --surface-1: #25262a; --surface-2: #2f3035; --surface-3: #3c3d43;
+  --border: #2c2d32; --fg: #ededf0; --muted: #a9aab3; --faint: #74757e;
+  --accent: #b79cff; --accent-fg: #1a0e3d; --accent-soft: #b79cff29;
+  --success: #5ed39a; --danger: #ff6e80; --warning: #f5cd52; --extension: #ff8fcf;
+  --canvas: #111214; --ink: #ededf0; --ink-muted: #a9aab3;
+}
+
+* { box-sizing: border-box; margin: 0; }
+body { font-family: var(--sans); background: #c9cdd8; padding: 0; }
+.concept { background: var(--canvas); color: var(--ink); padding: 28px 32px 34px; width: max-content; }
+.concept h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+.concept .lede { color: var(--ink-muted); font-size: 13.5px; max-width: 740px; margin-top: 4px; line-height: 1.45; }
+.row { display: flex; gap: 34px; margin-top: 20px; align-items: flex-start; }
+.shot { display: flex; flex-direction: column; gap: 10px; }
+.cap { font-size: 12.5px; color: var(--ink-muted); max-width: 340px; line-height: 1.4; }
+.cap b { color: var(--ink); }
+
+.phone { width: 340px; aspect-ratio: 1080 / 2280; padding: 9px; border-radius: 46px; background: #0c0e0d;
+  box-shadow: 0 0 0 1px #2a2f2d, 0 30px 60px -30px rgb(0 0 0 / .5); }
+.screen { --dp: calc(322px / 380); position: relative; display: flex; flex-direction: column; height: 100%;
+  overflow: hidden; border-radius: 38px; background: var(--page); color: var(--fg);
+  font-size: calc(14.5 * var(--dp)); line-height: 1.45; }
+svg.i { flex: none; width: calc(14 * var(--dp)); height: calc(14 * var(--dp)); }
+
+.status { display: flex; justify-content: space-between; padding: calc(14 * var(--dp)) calc(26 * var(--dp)) calc(4 * var(--dp));
+  font-size: calc(13 * var(--dp)); font-weight: 600; }
+.appbar { display: flex; align-items: center; gap: calc(10 * var(--dp)); padding: calc(10 * var(--dp)) calc(12 * var(--dp)) calc(8 * var(--dp)); }
+.tile, .round { display: grid; place-items: center; flex: none; width: calc(36 * var(--dp)); height: calc(36 * var(--dp)); background: var(--surface-1); }
+.tile { border-radius: calc(12 * var(--dp)); color: var(--accent); }
+.round { border-radius: 50%; }
+.round svg.i { width: calc(18 * var(--dp)); height: calc(18 * var(--dp)); }
+.tile svg { width: calc(22 * var(--dp)); height: calc(22 * var(--dp)); }
+.title { display: grid; flex: 1; min-width: 0; line-height: 1.3; }
+.title .t { font-size: calc(17 * var(--dp)); font-weight: 800; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.title .sub { display: flex; align-items: center; gap: calc(5 * var(--dp)); color: var(--muted); font-size: calc(12 * var(--dp)); white-space: nowrap; overflow: hidden; }
+.title .sub svg.i { width: calc(12 * var(--dp)); height: calc(12 * var(--dp)); }
+.title .sub.ext { color: var(--warning); font-weight: 600; }
+.crumb { color: var(--muted); font-size: calc(11.5 * var(--dp)); display: flex; align-items: center; gap: calc(3 * var(--dp)); }
+.crumb svg.i { width: calc(11 * var(--dp)); height: calc(11 * var(--dp)); }
+.tabcount { display: grid; place-items: center; width: calc(16 * var(--dp)); height: calc(16 * var(--dp)); border: 1.5px solid currentColor;
+  border-radius: calc(4 * var(--dp)); font-size: calc(10 * var(--dp)); font-weight: 700; line-height: 1; }
+
+.timeline { position: relative; display: flex; flex: 1; flex-direction: column; justify-content: flex-end; min-height: 0;
+  padding: 0 calc(14 * var(--dp)) calc(8 * var(--dp)); overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent, black calc(28 * var(--dp))); }
+.timeline > * + * { margin-top: calc(10 * var(--dp)); }
+.prompt { padding: calc(6 * var(--dp)) calc(14 * var(--dp)) calc(12 * var(--dp)); border-radius: calc(18 * var(--dp)); background: var(--surface-1); }
+.prompt-head { display: flex; align-items: center; gap: calc(4 * var(--dp)); min-height: calc(26 * var(--dp)); color: var(--muted); font-size: calc(10.5 * var(--dp)); font-weight: 500; }
+.you { color: var(--accent); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.task-label { color: var(--extension); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.reply { font-size: calc(15 * var(--dp)); line-height: 1.5; }
+.reply b { font-weight: 700; }
+code { font-family: var(--mono); font-size: .86em; background: var(--surface-1); padding: 0 .3em; border-radius: 4px; }
+
+.fold, .tool { display: flex; align-items: center; gap: calc(8 * var(--dp)); min-height: calc(30 * var(--dp)); padding: 0 calc(4 * var(--dp)); white-space: nowrap; }
+.fold { font-size: calc(12.5 * var(--dp)); color: var(--muted); }
+.fold b { color: var(--fg); font-weight: 600; }
+.fold > svg.i:last-child { margin-left: auto; color: var(--muted); }
+.tools { margin-top: 0 !important; }
+.tool { position: relative; color: var(--muted); }
+.tool::before, .tool::after { content: ""; position: absolute; left: calc(10.25 * var(--dp)); width: calc(1.5 * var(--dp)); background: var(--border); }
+.tool::before { top: 0; height: calc(50% - 10 * var(--dp)); }
+.tool:not(:last-child)::after { top: calc(50% + 10 * var(--dp)); bottom: 0; }
+.tool .n { color: var(--fg); font-size: calc(12.5 * var(--dp)); font-weight: 600; }
+.tool .d { flex: 1; overflow: hidden; text-overflow: ellipsis; font-family: var(--mono); font-size: calc(11.5 * var(--dp)); }
+.tool .d.prose { font-family: var(--sans); font-size: calc(12.5 * var(--dp)); }
+.tool.run > svg.i { color: var(--accent); }
+.fig { font-family: var(--mono); font-size: calc(11.5 * var(--dp)); }
+.run-time { display: flex; align-items: center; gap: calc(8 * var(--dp)); color: var(--muted); font-size: calc(12 * var(--dp)); font-variant-numeric: tabular-nums; padding: 0 calc(4 * var(--dp)); }
+.run-time svg { width: calc(14 * var(--dp)); height: calc(14 * var(--dp)); color: var(--accent); }
+
+/* Subagent run card (concepts 1-3) */
+.runcard { border: 1px solid var(--border); border-radius: calc(14 * var(--dp)); padding: calc(4 * var(--dp)) 0; }
+.runcard-head { display: flex; align-items: center; gap: calc(8 * var(--dp)); padding: calc(6 * var(--dp)) calc(12 * var(--dp)); font-size: calc(12.5 * var(--dp)); color: var(--muted); }
+.runcard-head b { color: var(--fg); font-weight: 700; }
+.runcard-head .sp { flex: 1; }
+.agent { display: grid; grid-template-columns: calc(18 * var(--dp)) 1fr auto; column-gap: calc(8 * var(--dp)); align-items: center;
+  padding: calc(7 * var(--dp)) calc(12 * var(--dp)); border-top: 1px solid var(--border); }
+.agent .nm { font-size: calc(13.5 * var(--dp)); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent .nm span { color: var(--muted); font-weight: 500; }
+.agent .tm { font-size: calc(11.5 * var(--dp)); color: var(--muted); font-variant-numeric: tabular-nums; }
+.agent .ln { grid-column: 2 / 4; font-family: var(--mono); font-size: calc(11 * var(--dp)); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agent .ln.prose { font-family: var(--sans); font-size: calc(12 * var(--dp)); }
+.agent .ln.ask { font-family: var(--sans); color: var(--warning); font-weight: 600; font-size: calc(12 * var(--dp)); }
+.agent .ln.ok { font-family: var(--sans); font-size: calc(12 * var(--dp)); }
+.agent > svg { width: calc(16 * var(--dp)); height: calc(16 * var(--dp)); }
+.st-run { color: var(--accent); } .st-done { color: var(--success); } .st-stop { color: var(--danger); } .st-ask { color: var(--warning); }
+.agent.sel { background: var(--accent-soft); }
+.agent .x { width: calc(26 * var(--dp)); height: calc(26 * var(--dp)); border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; }
+.agent .x svg.i { width: calc(12 * var(--dp)); height: calc(12 * var(--dp)); }
+
+/* Extension dialog card (ExtensionUiCard) */
+.card { margin: 0 calc(10 * var(--dp)) calc(8 * var(--dp)); padding: calc(12 * var(--dp)) calc(12 * var(--dp)) calc(10 * var(--dp));
+  border-radius: calc(22 * var(--dp)); background: var(--surface-1); }
+.card-head { display: flex; gap: calc(6 * var(--dp)); align-items: flex-start; padding: 0 calc(4 * var(--dp)); }
+.card-head .tx { flex: 1; display: flex; flex-direction: column; gap: calc(4 * var(--dp)); }
+.card-head .tt { font-size: calc(16 * var(--dp)); font-weight: 700; line-height: 1.3; }
+.card-head .mm { color: var(--muted); font-size: calc(13.5 * var(--dp)); line-height: 1.45; font-family: var(--mono); font-size: calc(12.5 * var(--dp)); }
+.pill { display: inline-flex; align-items: center; gap: calc(5 * var(--dp)); height: calc(22 * var(--dp)); padding: 0 calc(9 * var(--dp)); border-radius: 999px;
+  background: var(--surface-2); color: var(--muted); font-size: calc(11.5 * var(--dp)); font-weight: 700; white-space: nowrap; }
+.pill.from { background: var(--accent-soft); color: var(--accent); align-self: flex-start; }
+.pill.from svg.i { width: calc(12 * var(--dp)); height: calc(12 * var(--dp)); }
+.choices { margin-top: calc(8 * var(--dp)); display: flex; flex-direction: column; gap: calc(2 * var(--dp)); }
+.choice { display: flex; align-items: center; gap: calc(10 * var(--dp)); min-height: calc(40 * var(--dp)); padding: 0 calc(10 * var(--dp));
+  border-radius: calc(12 * var(--dp)); color: var(--muted); font-size: calc(14 * var(--dp)); }
+.choice .r { width: calc(18 * var(--dp)); height: calc(18 * var(--dp)); border: 2px solid var(--faint); border-radius: 50%; display: grid; place-items: center; }
+.choice.on { background: var(--accent-soft); color: var(--fg); }
+.choice.on .r { border-color: var(--accent); }
+.choice.on .r::after { content: ""; width: calc(9 * var(--dp)); height: calc(9 * var(--dp)); border-radius: 50%; background: var(--accent); }
+.btns { display: flex; justify-content: flex-end; gap: calc(8 * var(--dp)); margin-top: calc(8 * var(--dp)); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: calc(6 * var(--dp)); height: calc(36 * var(--dp)); padding: 0 calc(16 * var(--dp));
+  border-radius: 999px; font-size: calc(13.5 * var(--dp)); font-weight: 700; background: var(--surface-2); color: var(--fg); white-space: nowrap; }
+.btn.primary { background: var(--accent); color: var(--accent-fg); }
+.btn.danger { background: transparent; box-shadow: inset 0 0 0 1.5px var(--danger); color: var(--danger); }
+.btn svg.i { width: calc(14 * var(--dp)); height: calc(14 * var(--dp)); }
+
+/* Composer */
+.composer { position: relative; display: flex; flex-direction: column; padding: 0 calc(10 * var(--dp)); border-radius: calc(22 * var(--dp)) calc(22 * var(--dp)) 0 0; background: var(--surface-1); }
+.strip { display: flex; gap: calc(6 * var(--dp)); margin: calc(8 * var(--dp)) calc(2 * var(--dp)) 0; }
+.wtab { display: flex; align-items: center; gap: calc(6 * var(--dp)); height: calc(26 * var(--dp)); padding: 0 calc(10 * var(--dp)); border-radius: 999px;
+  background: var(--surface-2); color: var(--muted); font-size: calc(12.5 * var(--dp)); font-weight: 600; white-space: nowrap; }
+.wtab svg.i { width: calc(13 * var(--dp)); height: calc(13 * var(--dp)); }
+.wtab.on { background: var(--accent-soft); color: var(--accent); }
+.wtab .cnt { font-variant-numeric: tabular-nums; }
+.dot { width: calc(6 * var(--dp)); height: calc(6 * var(--dp)); border-radius: 50%; background: var(--warning); }
+.panel { margin: calc(8 * var(--dp)) calc(2 * var(--dp)) 0; border-radius: calc(14 * var(--dp)); background: var(--page); padding: calc(4 * var(--dp)) 0; }
+.panel.text { padding: calc(10 * var(--dp)) calc(12 * var(--dp)); font-family: var(--mono); font-size: calc(11.5 * var(--dp)); line-height: 1.6; white-space: pre; color: var(--fg); }
+.panel .ph { display: flex; align-items: center; justify-content: space-between; padding: calc(6 * var(--dp)) calc(12 * var(--dp)); font-size: calc(12.5 * var(--dp)); font-weight: 700; }
+.panel .ph a { color: var(--danger); font-weight: 700; font-size: calc(12 * var(--dp)); }
+.panel .agent:first-of-type { border-top: 1px solid var(--border); }
+.a { color: var(--accent); } .g { color: var(--success); } .w { color: var(--warning); } .m { color: var(--muted); } .r { color: var(--danger); }
+.field { display: flex; align-items: center; min-height: calc(42 * var(--dp)); padding: calc(12 * var(--dp)) calc(6 * var(--dp)) 0; font-size: calc(15 * var(--dp)); color: var(--muted); }
+.controls { display: flex; align-items: center; gap: calc(8 * var(--dp)); margin-top: calc(8 * var(--dp)); font-size: calc(13 * var(--dp)); font-weight: 600; }
+.chip { display: inline-flex; align-items: center; gap: calc(5 * var(--dp)); height: calc(32 * var(--dp)); padding: 0 calc(12 * var(--dp)); border-radius: 999px; background: var(--surface-2); white-space: nowrap; }
+.chip.rc { width: calc(32 * var(--dp)); padding: 0; justify-content: center; }
+.chip svg.i { width: calc(14 * var(--dp)); height: calc(14 * var(--dp)); }
+.sp { flex: 1; }
+.send { display: grid; place-items: center; width: calc(40 * var(--dp)); height: calc(40 * var(--dp)); border-radius: 50%; background: var(--accent); color: var(--accent-fg); }
+.send.stop { background: var(--fg); color: var(--page); }
+.send svg.i { width: calc(15 * var(--dp)); height: calc(15 * var(--dp)); }
+.gesture { width: 34%; height: calc(4 * var(--dp)); margin: calc(12 * var(--dp)) auto calc(8 * var(--dp)); border-radius: 99px; background: var(--fg); opacity: .5; }
+
+/* Bottom sheet (PipkinSheet) */
+.scrim { position: absolute; inset: 0; background: rgb(0 0 0 / .32); }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; top: var(--top, 22%); display: flex; flex-direction: column;
+  border-radius: calc(26 * var(--dp)) calc(26 * var(--dp)) 0 0; background: var(--surface-1); }
+.handle { width: calc(36 * var(--dp)); height: calc(4 * var(--dp)); border-radius: 99px; background: var(--surface-3); margin: calc(10 * var(--dp)) auto calc(6 * var(--dp)); }
+.sheet-head { display: flex; align-items: center; gap: calc(10 * var(--dp)); padding: calc(4 * var(--dp)) calc(18 * var(--dp)) calc(10 * var(--dp)); }
+.sheet-head .t { font-size: calc(17 * var(--dp)); font-weight: 800; }
+.sheet-head .s { font-size: calc(12.5 * var(--dp)); color: var(--muted); }
+.sheet-body { flex: 1; overflow: hidden; padding: 0 calc(14 * var(--dp)); display: flex; flex-direction: column; justify-content: flex-start; }
+.srow > svg.i.st-run { color: var(--accent); } .srow > svg.i.st-done { color: var(--success); }
+.sheet-body > * + * { margin-top: calc(8 * var(--dp)); }
+.sheet-foot { display: flex; gap: calc(8 * var(--dp)); padding: calc(10 * var(--dp)) calc(14 * var(--dp)) 0; border-top: 1px solid var(--border); }
+.sheet-foot .btn { flex: 1; }
+.meta { display: flex; gap: calc(10 * var(--dp)); color: var(--muted); font-size: calc(12 * var(--dp)); font-variant-numeric: tabular-nums; padding: 0 calc(4 * var(--dp)); }
+.section { color: var(--muted); font-size: calc(11 * var(--dp)); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: calc(12 * var(--dp)) calc(18 * var(--dp)) calc(4 * var(--dp)); }
+.srow { display: flex; align-items: center; gap: calc(12 * var(--dp)); min-height: calc(46 * var(--dp)); padding: 0 calc(18 * var(--dp)); font-size: calc(14.5 * var(--dp)); }
+.srow > svg.i { width: calc(18 * var(--dp)); height: calc(18 * var(--dp)); color: var(--muted); }
+.srow .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.srow .tx .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srow .tx .s { color: var(--muted); font-size: calc(12 * var(--dp)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.srow.shown { background: var(--accent-soft); }
+.srow.child { min-height: calc(40 * var(--dp)); padding-left: calc(30 * var(--dp)); position: relative; }
+.srow.child::before { content: ""; position: absolute; left: calc(27 * var(--dp)); top: 0; bottom: 50%; width: calc(10 * var(--dp));
+  border-left: 1.5px solid var(--border); border-bottom: 1.5px solid var(--border); border-bottom-left-radius: calc(6 * var(--dp)); }
+.srow.child .ic { margin-left: calc(14 * var(--dp)); }
+.srow.child .tx .t { font-size: calc(13.5 * var(--dp)); }
+.tag { font-size: calc(11 * var(--dp)); font-weight: 700; color: var(--muted); }
+.tag.a { color: var(--accent); }
+
+/* Tablet */
+.tablet { width: 900px; height: 560px; padding: 10px; border-radius: 30px; background: #0c0e0d; box-shadow: 0 0 0 1px #2a2f2d, 0 30px 60px -30px rgb(0 0 0 / .5); }
+.tablet .screen { --dp: 0.86px; border-radius: 22px; flex-direction: row; }
+.pane { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.pane + .pane { border-left: 1px solid var(--border); }
+.pane .composer { border-radius: calc(22 * var(--dp)) calc(22 * var(--dp)) 0 0; margin: 0 calc(8 * var(--dp)); }
+.pane.focus .appbar { box-shadow: inset 0 calc(-2 * var(--dp)) 0 var(--accent); }
+
+/* Edge cases: the Agents panel at the app's limits (PANEL_MAX_HEIGHT 180dp, 68dp when tight) */
+.panel.max { position: relative; max-height: calc(180 * var(--dp)); overflow: hidden; padding: 0;
+  mask-image: linear-gradient(to bottom, black 78%, transparent); }
+.panel.tight { position: relative; max-height: calc(68 * var(--dp)); overflow: hidden; padding: calc(2 * var(--dp)) 0;
+  mask-image: linear-gradient(to bottom, black 70%, transparent); }
+.panel .ph .acts { display: flex; align-items: center; gap: calc(12 * var(--dp)); }
+.expand { display: grid; place-items: center; width: calc(26 * var(--dp)); height: calc(26 * var(--dp)); border-radius: 50%; background: var(--surface-2); color: var(--muted); }
+.expand svg.i { width: calc(13 * var(--dp)); height: calc(13 * var(--dp)); }
+.panel.tight .expand { position: absolute; right: calc(8 * var(--dp)); top: calc(5 * var(--dp)); }
+.agent.compact { grid-template-columns: calc(18 * var(--dp)) 1fr auto; padding: calc(6 * var(--dp)) calc(12 * var(--dp)); border-top: 0; }
+.panel.tight .expand + .agent.compact { padding-right: calc(44 * var(--dp)); }
+.agent .ln.fail { font-family: var(--sans); color: var(--danger); font-size: calc(12 * var(--dp)); }
+.agent.more { grid-template-columns: calc(18 * var(--dp)) 1fr auto; color: var(--muted); font-size: calc(13 * var(--dp)); font-weight: 600; }
+.strip.scroll { overflow: hidden; mask-image: linear-gradient(to right, black 82%, transparent); }
+.kbd { background: var(--surface-2); padding: calc(8 * var(--dp)) calc(4 * var(--dp)) calc(10 * var(--dp)); display: flex; flex-direction: column; gap: calc(9 * var(--dp)); }
+.kbd .kr { display: flex; gap: calc(5 * var(--dp)); justify-content: center; }
+.kbd .k { width: calc(31 * var(--dp)); height: calc(42 * var(--dp)); border-radius: calc(6 * var(--dp)); background: var(--page); display: grid; place-items: center;
+  font-size: calc(17 * var(--dp)); color: var(--fg); }
+.kbd .k.w { width: calc(46 * var(--dp)); background: var(--surface-3); }
+.kbd .k.sp { width: calc(180 * var(--dp)); }
+.typed { color: var(--fg); }
+.typed::after { content: ""; display: inline-block; width: 1.5px; height: 1.1em; margin-left: 1px; vertical-align: text-bottom; background: var(--accent); }
+.group { color: var(--muted); font-size: calc(11 * var(--dp)); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: calc(10 * var(--dp)) calc(14 * var(--dp)) calc(4 * var(--dp)); }
+.group.w { color: var(--warning); }
+
+/* Archive */
+.search { margin: calc(4 * var(--dp)) calc(14 * var(--dp)) calc(8 * var(--dp)); height: calc(44 * var(--dp)); border-radius: 999px; background: var(--surface-1);
+  display: flex; align-items: center; gap: calc(10 * var(--dp)); padding: 0 calc(16 * var(--dp)); color: var(--muted); font-size: calc(14 * var(--dp)); }
+.search svg.i { width: calc(16 * var(--dp)); height: calc(16 * var(--dp)); }
+.arow { display: flex; align-items: center; gap: calc(12 * var(--dp)); min-height: calc(56 * var(--dp)); margin: calc(2 * var(--dp)) calc(8 * var(--dp));
+  padding: calc(8 * var(--dp)) calc(4 * var(--dp)) calc(8 * var(--dp)) calc(12 * var(--dp)); border-radius: calc(16 * var(--dp)); }
+.arow .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
+.arow .t { font-size: calc(14 * var(--dp)); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.arow .s { display: flex; gap: calc(6 * var(--dp)); align-items: center; color: var(--muted); font-size: calc(12 * var(--dp)); white-space: nowrap; }
+.arow .s svg.i { width: calc(12 * var(--dp)); height: calc(12 * var(--dp)); }
+.arow .when { color: var(--muted); font-size: calc(12 * var(--dp)); }
+.arow .more { width: calc(32 * var(--dp)); height: calc(32 * var(--dp)); display: grid; place-items: center; color: var(--muted); }
+.arow .more svg.i { width: calc(16 * var(--dp)); height: calc(16 * var(--dp)); }
+.readonly { display: flex; align-items: center; gap: calc(10 * var(--dp)); padding: calc(10 * var(--dp)) calc(14 * var(--dp)) calc(4 * var(--dp)); }
+.readonly .note { flex: 1; color: var(--muted); font-size: calc(12.5 * var(--dp)); }
+.dialog { position: absolute; left: calc(24 * var(--dp)); right: calc(24 * var(--dp)); top: 34%; padding: calc(22 * var(--dp)); border-radius: calc(26 * var(--dp));
+  background: var(--surface-1); display: flex; flex-direction: column; gap: calc(10 * var(--dp)); }
+.dialog .dt { font-size: calc(18 * var(--dp)); font-weight: 800; }
+.dialog .dx { color: var(--muted); font-size: calc(14 * var(--dp)); line-height: 1.5; }
+.dialog .btns { margin-top: calc(10 * var(--dp)); }
+.btn.destructive { background: var(--danger); color: #fff; }
+
+/* Chat inbox pill, tray and heads-up notification */
+.inbox { position: absolute; left: 0; right: 0; top: calc(98 * var(--dp)); display: flex; flex-direction: column; align-items: center; gap: calc(8 * var(--dp)); padding: 0 calc(8 * var(--dp)); z-index: 3; }
+.ipill { display: flex; align-items: center; gap: calc(8 * var(--dp)); max-width: calc(260 * var(--dp)); min-height: calc(34 * var(--dp)); padding: 0 calc(12 * var(--dp)) 0 calc(7 * var(--dp));
+  border-radius: 999px; background: var(--fg); color: var(--page); font-size: calc(12.5 * var(--dp)); font-weight: 600; box-shadow: 0 calc(3 * var(--dp)) calc(10 * var(--dp)) rgb(0 0 0 / .25); }
+.ipill .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ipill .why { white-space: nowrap; opacity: .65; font-weight: 500; }
+.badge { flex: none; display: grid; place-items: center; width: calc(22 * var(--dp)); height: calc(22 * var(--dp)); border-radius: 50%; background: var(--warning); color: var(--page); }
+.badge svg.i { width: calc(13 * var(--dp)); height: calc(13 * var(--dp)); }
+.badge.lg { width: calc(28 * var(--dp)); height: calc(28 * var(--dp)); }
+.badge.lg svg.i { width: calc(17 * var(--dp)); height: calc(17 * var(--dp)); }
+.badge.ok { background: var(--success); }
+.dots { display: flex; }
+.dots span { width: calc(19 * var(--dp)); height: calc(19 * var(--dp)); border-radius: 50%; border: calc(2.5 * var(--dp)) solid var(--fg); background: var(--warning); }
+.dots span + span { margin-left: calc(-7 * var(--dp)); }
+.dots span.ok { background: var(--success); }
+.tray { align-self: stretch; padding: calc(10 * var(--dp)) calc(8 * var(--dp)) calc(8 * var(--dp)); border-radius: calc(26 * var(--dp)); background: var(--surface-1); box-shadow: 0 calc(6 * var(--dp)) calc(24 * var(--dp)) rgb(0 0 0 / .3); }
+.tray-head { display: flex; align-items: center; padding: 0 0 calc(4 * var(--dp)) calc(10 * var(--dp)); }
+.tray-head .t { flex: 1; font-size: calc(16 * var(--dp)); font-weight: 800; }
+.tray-head .c { color: var(--accent); font-size: calc(12.5 * var(--dp)); font-weight: 700; padding: calc(8 * var(--dp)) calc(12 * var(--dp)); }
+.irow { display: flex; gap: calc(12 * var(--dp)); padding: calc(8 * var(--dp)); }
+.irow .tx { flex: 1; min-width: 0; display: grid; }
+.irow .nm { font-size: calc(13.5 * var(--dp)); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.irow .dt { color: var(--muted); font-size: calc(12 * var(--dp)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.irow .ag { color: var(--fg); font-weight: 600; }
+.irow .tm { color: var(--faint); font-size: calc(12 * var(--dp)); padding-top: calc(2 * var(--dp)); }
+.headsup { position: absolute; left: calc(8 * var(--dp)); right: calc(8 * var(--dp)); top: calc(40 * var(--dp)); z-index: 3; padding: calc(14 * var(--dp)) calc(16 * var(--dp));
+  border-radius: calc(24 * var(--dp)); background: var(--surface-2); box-shadow: 0 calc(6 * var(--dp)) calc(24 * var(--dp)) rgb(0 0 0 / .3); display: grid; gap: calc(3 * var(--dp)); }
+.headsup .hd { display: flex; align-items: center; gap: calc(6 * var(--dp)); color: var(--muted); font-size: calc(11.5 * var(--dp)); }
+.headsup .hd .ap { color: var(--accent); font-weight: 600; }
+.headsup .ti { font-size: calc(14 * var(--dp)); font-weight: 700; }
+.headsup .bd { font-size: calc(13 * var(--dp)); color: var(--muted); white-space: pre-line; }
+.lock { position: absolute; inset: 0; background: linear-gradient(160deg, var(--surface-2), var(--page)); }
+.lock .clock { position: absolute; left: 0; right: 0; top: 34%; text-align: center; font-size: calc(64 * var(--dp)); font-weight: 300; color: var(--fg); }
+.lock .date { position: absolute; left: 0; right: 0; top: 46%; text-align: center; color: var(--muted); font-size: calc(14 * var(--dp)); }
+</style>
+</head>
+<body>
+
+<!-- ===================== Subagents tab ===================== -->
+<section class="concept" id="design">
+  <h2>The chosen design · a Subagents tab that opens a sheet</h2>
+  <p class="lede">The <b>Subagents</b> tab on the message box never unfolds a panel. Tapping it opens the list of the chat's subagents in a sheet, and a row there opens that subagent in place of the chat, in the same pane, so it never touches your own split screen. Finished runs leave the list at your next message; the subagent tool row in the chat keeps the way back to them.</p>
+  <div class="row">
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="tile" data-logo></span>
+          <div class="title"><span class="t">Fix login redirect</span><span class="sub"><i data-i="folder"></i>~/web-app</span></div>
+          <span class="round"><span class="tabcount">2</span></span>
+          <span class="round"><i data-i="panel_right"></i></span>
+        </header>
+        <div class="timeline">
+          <div class="prompt"><div class="prompt-head"><span class="you">You</span><span>· 9:40 AM</span></div>Why does login loop back to /login after Google sign-in?</div>
+          <p class="reply">I'll send two agents: one through the redirect code, one to review the session change.</p>
+          <div class="tools"><div class="tool run"><i data-i="bot"></i><span class="n">Explore</span><span class="d prose">auth redirect flow</span><span class="fig m">0:42</span></div><div class="tool"><i data-i="bot"></i><span class="n">Review</span><span class="d prose">session.ts diff</span><span class="fig m">done</span></div></div>
+          <div class="run-time"><span data-logo-sm></span>1m 52s · waiting on 1 subagent</div>
+        </div>
+        <div class="composer">
+          <div class="strip">
+            <span class="wtab"><i data-i="panel_top"></i>Todos <span class="cnt">3/5</span></span>
+            <span class="wtab"><i data-i="bot"></i>Subagents <span class="cnt">1</span></span>
+          </div>
+          <div class="field">Message Pipkin…</div>
+          <div class="controls"><span class="chip rc"><i data-i="plus"></i></span><span class="chip">GPT-6</span><span class="sp"></span><span class="send stop"><i data-i="square"></i></span></div>
+          <div class="gesture"></div>
+        </div>
+      </div></div>
+      <p class="cap"><b>Chat.</b> The tab shows how many subagents are running and takes no other room.</p>
+    </div>
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="tile" data-logo></span>
+          <div class="title"><span class="t">Fix login redirect</span><span class="sub"><i data-i="folder"></i>~/web-app</span></div>
+          <span class="round"><span class="tabcount">2</span></span>
+          <span class="round"><i data-i="panel_right"></i></span>
+        </header>
+        <div class="timeline"></div>
+        <div class="scrim"></div>
+        <div class="sheet" style="--top: 40%">
+          <div class="handle"></div>
+          <div class="sheet-head">
+            <span class="tile" style="width:calc(32*var(--dp));height:calc(32*var(--dp))"><i data-i="bot"></i></span>
+            <div class="title"><span class="t">Subagents</span><span class="s m" style="font-size:calc(12.5*var(--dp))">2 runs · 1 running · 33k tokens</span></div>
+          </div>
+          <div class="group">Running</div>
+          <div class="agent"><i data-i="dot" class="st-run"></i><span class="nm">Explore <span>· auth redirect flow</span></span><span class="tm">0:42 <i data-i="chevron_right"></i></span><span class="ln">read src/auth/logout.ts · turn 4</span></div>
+          <div class="group">Finished</div>
+          <div class="agent"><i data-i="check" class="st-done"></i><span class="nm">Review <span>· session.ts diff</span></span><span class="tm">2:05 <i data-i="chevron_right"></i></span><span class="ln ok m">Done · 21k tokens</span></div>
+          <div class="sp"></div>
+          <div class="sheet-foot"><span class="btn danger"><i data-i="square"></i>Stop all</span></div>
+          <div class="gesture"></div>
+        </div>
+      </div></div>
+      <p class="cap"><b>Subagents sheet.</b> Opens from the tab. Each row opens that subagent; Stop all ends every run in this chat.</p>
+    </div>
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="round"><i data-i="chevron_left"></i></span>
+          <div class="title"><span class="crumb">Fix login redirect <i data-i="chevron_right"></i></span><span class="t">Explore · auth redirect flow</span></div>
+          <span class="round"><span class="tabcount">2</span></span>
+        </header>
+        <div class="meta" style="padding:0 calc(16*var(--dp)) calc(6*var(--dp))"><span class="a" style="font-weight:700">Running</span><span>Turn 4</span><span>12.4k tokens</span><span>0:42</span></div>
+        <div class="timeline">
+          <div class="prompt"><div class="prompt-head"><span class="task-label">Task</span><span>· from the main agent</span></div>Trace how /login redirects after OAuth and where the session cookie is set.</div>
+          <div class="tools">
+            <div class="tool"><i data-i="file_text"></i><span class="n">Read</span><span class="d">src/auth/session.ts</span></div>
+            <div class="tool"><i data-i="search"></i><span class="n">Grep</span><span class="d">redirect src/auth</span></div>
+            <div class="tool"><i data-i="file_text"></i><span class="n">Read</span><span class="d">src/auth/callback.ts</span></div>
+          </div>
+          <p class="reply">The guard on <code>/app</code> runs before the callback writes the cookie, so it sees no session.</p>
+          <div class="tools"><div class="tool run"><i data-i="file_text"></i><span class="n">Read</span><span class="d">src/auth/logout.ts</span></div></div>
+        </div>
+        <div class="composer">
+          <div class="field">Steer Explore…</div>
+          <div class="controls"><span class="btn danger" style="height:calc(32*var(--dp))"><i data-i="square"></i>Stop</span><span class="sp"></span><span class="send"><i data-i="arrow_up"></i></span></div>
+          <div class="gesture"></div>
+        </div>
+      </div></div>
+      <p class="cap"><b>Subagent screen.</b> Opens in the pane that shows its chat, on any screen size. Back returns to the chat.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== Edge cases ===================== -->
+<section class="concept" id="edge-cases">
+  <h2>Edge cases · nothing unfolds over the chat</h2>
+  <p class="lede">With no panel, the Subagents tab is one chip however many runs there are. A dot on it means a subagent waits on you. The list lives in the sheet, grouped with waiting runs first, and earlier runs stay reachable from their tool row.</p>
+  <div class="row">
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="tile" data-logo></span>
+          <div class="title"><span class="t">Audit the API handlers</span><span class="sub"><i data-i="folder"></i>~/api</span></div>
+          <span class="round"><span class="tabcount">2</span></span>
+          <span class="round"><i data-i="panel_right"></i></span>
+        </header>
+        <div class="timeline"></div>
+        <div class="scrim"></div>
+        <div class="sheet" style="--top: 9%">
+          <div class="handle"></div>
+          <div class="sheet-head">
+            <span class="tile" style="width:calc(32*var(--dp));height:calc(32*var(--dp))"><i data-i="bot"></i></span>
+            <div class="title"><span class="t">Subagents</span><span class="s m" style="font-size:calc(12.5*var(--dp))">8 runs · 4 running · 61k tokens</span></div>
+          </div>
+          <div class="group w">Waiting for you</div>
+          <div class="agent"><i data-i="dot" class="st-ask"></i><span class="nm">General <span>· fix users.ts</span></span><span class="tm">1:12</span><span class="ln ask">Allow edit? src/routes/users.ts</span></div>
+          <div class="group">Running</div>
+          <div class="agent"><i data-i="dot" class="st-run"></i><span class="nm">Explore <span>· billing routes</span></span><span class="tm">0:58</span><span class="ln">grep requireAuth src/routes/billing</span></div>
+          <div class="agent"><i data-i="dot" class="st-run"></i><span class="nm">Explore <span>· admin routes</span></span><span class="tm">0:51</span><span class="ln">read src/routes/admin/index.ts</span></div>
+          <div class="agent"><i data-i="dot" class="st-run"></i><span class="nm">Explore <span>· webhooks</span></span><span class="tm">0:33</span><span class="ln">thinking</span></div>
+          <div class="group">Finished</div>
+          <div class="agent"><i data-i="x" class="st-stop"></i><span class="nm">Explore <span>· legacy v1</span></span><span class="tm">0:20</span><span class="ln fail">Failed · rate limited by the provider</span></div>
+          <div class="agent"><i data-i="check" class="st-done"></i><span class="nm">Explore <span>· auth routes</span></span><span class="tm">1:40</span><span class="ln ok m">Done · 2 handlers lack checks</span></div>
+          <div class="agent"><i data-i="check" class="st-done"></i><span class="nm">Explore <span>· public routes</span></span><span class="tm">1:05</span><span class="ln ok m">Done · all public by design</span></div>
+          <div class="agent"><i data-i="check" class="st-done"></i><span class="nm">Explore <span>· health checks</span></span><span class="tm">0:22</span><span class="ln ok m">Done · nothing to report</span></div>
+          <div class="sp"></div>
+          <div class="sheet-foot"><span class="btn danger"><i data-i="square"></i>Stop all</span></div>
+          <div class="gesture"></div>
+        </div>
+      </div></div>
+      <p class="cap"><b>Eight runs.</b> The sheet grows to 90% of the screen and scrolls past that. A failed run says why.</p>
+    </div>
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="tile" data-logo></span>
+          <div class="title"><span class="t">Audit the API handlers</span><span class="sub"><i data-i="folder"></i>~/api</span></div>
+          <span class="round"><span class="tabcount">2</span></span>
+          <span class="round"><i data-i="panel_right"></i></span>
+        </header>
+        <div class="timeline">
+          <div class="prompt"><div class="prompt-head"><span class="you">You</span><span>· 10:02 AM</span></div>Check every handler in src/routes for missing auth checks.</div>
+          <div class="tools"><div class="tool run"><i data-i="bot"></i><span class="n">General</span><span class="d prose">fix users.ts</span><span class="fig m">asking</span></div><div class="tool run"><i data-i="bot"></i><span class="n">Explore</span><span class="d prose">orders.ts</span><span class="fig m">1:10</span></div><div class="tool"><i data-i="bot"></i><span class="n">Explore</span><span class="d prose">billing.ts</span><span class="fig m">queued</span></div><div class="tool"><i data-i="bot"></i><span class="n">5 more subagents</span><span class="d prose"></span><span class="fig m">4 done</span></div></div>
+          <div class="run-time"><span data-logo-sm></span>3m 22s · waiting on 4 subagents</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="tx"><span class="pill from"><i data-i="bot"></i>From a subagent</span><span class="tt">Allow edit?</span><span class="mm">src/routes/users.ts  +12 −3</span></div><span class="pill">1 of 3</span></div>
+          <div class="choices"><div class="choice on"><span class="r"></span>Yes</div><div class="choice"><span class="r"></span>Yes, for this chat</div><div class="choice"><span class="r"></span>No</div></div>
+          <div class="btns"><span class="btn primary">Submit</span></div>
+        </div>
+        <div class="composer">
+          <div class="strip">
+            <span class="wtab"><i data-i="panel_top"></i>Todos <span class="cnt">2/6</span></span>
+            <span class="wtab"><i data-i="bot"></i>Subagents <span class="cnt">4</span><span class="dot"></span></span>
+          </div>
+          <div class="field">Message Pipkin…</div>
+          <div class="controls"><span class="chip rc"><i data-i="plus"></i></span><span class="chip">GPT-6</span><span class="sp"></span><span class="send stop"><i data-i="square"></i></span></div>
+          <div class="gesture"></div>
+        </div>
+      </div></div>
+      <p class="cap"><b>Questions from subagents.</b> Three questions from two subagents queue in the existing card. With two subagents waiting on a check at once, the card can't tell whose question this is, so it says "From a subagent"; with one, it names it. The tab adds only its dot.</p>
+    </div>
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="tile" data-logo></span>
+          <div class="title"><span class="t">Audit the API handlers</span><span class="sub"><i data-i="folder"></i>~/api</span></div>
+          <span class="round"><span class="tabcount">2</span></span>
+          <span class="round"><i data-i="panel_right"></i></span>
+        </header>
+        <div class="timeline">
+          <div class="run-time"><span data-logo-sm></span>3m 30s · waiting on 4 subagents</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><div class="tx"><span class="pill from"><i data-i="bot"></i>General · fix users.ts</span><span class="tt">Allow edit?</span><span class="mm">src/routes/users.ts  +12 −3</span></div></div>
+          <div class="choices"><div class="choice on"><span class="r"></span>Yes</div><div class="choice"><span class="r"></span>Yes, for this chat</div><div class="choice"><span class="r"></span>No</div></div>
+          <div class="btns"><span class="btn primary">Submit</span></div>
+        </div>
+        <div class="composer">
+          <div class="strip scroll">
+            <span class="wtab"><i data-i="panel_top"></i>Todos <span class="cnt">2/6</span></span>
+            <span class="wtab"><i data-i="bot"></i>Subagents <span class="cnt">4</span><span class="dot"></span></span>
+            <span class="wtab"><i data-i="terminal"></i>Background <span class="cnt">2</span></span>
+            <span class="wtab"><i data-i="panel_top"></i>Plan mode</span>
+          </div>
+          <div class="field"><span class="typed">Also skip the legacy v1 routes</span></div>
+          <div class="controls"><span class="chip rc"><i data-i="plus"></i></span><span class="chip">GPT-6</span><span class="sp"></span><span class="send"><i data-i="arrow_up"></i></span></div>
+          <div style="height:calc(8*var(--dp))"></div>
+        </div>
+        <div class="kbd">
+          <div class="kr"><span class="k">q</span><span class="k">w</span><span class="k">e</span><span class="k">r</span><span class="k">t</span><span class="k">y</span><span class="k">u</span><span class="k">i</span><span class="k">o</span><span class="k">p</span></div>
+          <div class="kr"><span class="k">a</span><span class="k">s</span><span class="k">d</span><span class="k">f</span><span class="k">g</span><span class="k">h</span><span class="k">j</span><span class="k">k</span><span class="k">l</span></div>
+          <div class="kr"><span class="k w">⇧</span><span class="k">z</span><span class="k">x</span><span class="k">c</span><span class="k">v</span><span class="k">b</span><span class="k">n</span><span class="k">m</span><span class="k w">⌫</span></div>
+          <div class="kr"><span class="k w">?123</span><span class="k">,</span><span class="k sp"></span><span class="k">.</span><span class="k w">⏎</span></div>
+        </div>
+      </div></div>
+      <p class="cap"><b>Worst case: typing while a subagent asks.</b> The keyboard, a question and four widget tabs. Only the chat shrinks, since the tab strip stays one row and scrolls sideways.</p>
+    </div>
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="tile" data-logo></span>
+          <div class="title"><span class="t">Fix login redirect</span><span class="sub"><i data-i="folder"></i>~/web-app</span></div>
+          <span class="round"><span class="tabcount">2</span></span>
+          <span class="round"><i data-i="panel_right"></i></span>
+        </header>
+        <div class="timeline">
+          <div class="tools"><div class="tool"><i data-i="bot"></i><span class="n">Explore</span><span class="d prose">auth redirect flow</span><span class="fig m">done</span></div><div class="tool" style="background:var(--accent-soft);border-radius:calc(10*var(--dp))"><i data-i="bot"></i><span class="n">Review</span><span class="d prose">session.ts diff</span><span class="fig m">done <i data-i="chevron_right"></i></span></div></div>
+          <p class="reply">The guard runs before the callback sets the cookie. I moved the check after it.</p>
+        </div>
+      </div></div>
+      <p class="cap"><b>Earlier runs.</b> Each subagent has its own tool row. After a run leaves the Subagents tab, tapping its row opens that subagent's screen.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== Archive ===================== -->
+<section class="concept" id="archive">
+  <h2>Archive · subagents stay with their chat</h2>
+  <p class="lede">Subagent transcripts never get archive rows of their own. The archived chat's row says how many subagents it ran; inside the read-only transcript, each subagent's tool row opens that subagent, read-only too. Restoring or deleting the chat takes its subagent transcripts with it.</p>
+  <div class="row">
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="round"><i data-i="chevron_left"></i></span>
+          <div class="title"><span class="t">Archive</span></div>
+        </header>
+        <div class="search"><i data-i="search"></i>Search by title or folder</div>
+        <div class="arow"><div class="tx"><span class="t">Fix login redirect</span><span class="s">~/web-app · <i data-i="bot"></i>2 subagents</span></div><span class="when">2h ago</span><span class="more"><i data-i="ellipsis"></i></span></div>
+        <div class="arow"><div class="tx"><span class="t">Audit the API handlers</span><span class="s">~/api · <i data-i="bot"></i>8 subagents</span></div><span class="when">Yesterday</span><span class="more"><i data-i="ellipsis"></i></span></div>
+        <div class="arow"><div class="tx"><span class="t">Upgrade Gradle</span><span class="s">~/android-app</span></div><span class="when">Mon</span><span class="more"><i data-i="ellipsis"></i></span></div>
+        <div class="arow"><div class="tx"><span class="t">Write release notes</span><span class="s"><span style="color:var(--danger)">Folder missing</span> ~/old-site</span></div><span class="when">Oct 12</span><span class="more"><i data-i="ellipsis"></i></span></div>
+        <div class="sp"></div>
+        <div class="gesture"></div>
+      </div></div>
+      <p class="cap"><b>Archive page.</b> One row per chat, as today. A chat that ran subagents says how many under its folder.</p>
+    </div>
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="round"><i data-i="chevron_left"></i></span>
+          <div class="title"><span class="crumb">Archive</span><span class="t">Fix login redirect</span></div>
+          <span class="round"><i data-i="trash" style="color:var(--danger)"></i></span>
+        </header>
+        <div class="timeline">
+          <div class="prompt"><div class="prompt-head"><span class="you">You</span><span>· 9:40 AM</span></div>Why does login loop back to /login after Google sign-in?</div>
+          <div class="tools"><div class="tool"><i data-i="bot"></i><span class="n">Explore</span><span class="d prose">auth redirect flow</span><span class="fig m">done <i data-i="chevron_right"></i></span></div><div class="tool"><i data-i="bot"></i><span class="n">Review</span><span class="d prose">session.ts diff</span><span class="fig m">done <i data-i="chevron_right"></i></span></div></div>
+          <p class="reply">The guard runs before the callback sets the cookie. I moved the check after it.</p>
+        </div>
+        <div class="readonly"><span class="note">Archived · read only</span></div>
+        <div class="gesture"></div>
+      </div></div>
+      <p class="cap"><b>Archived chat.</b> The read-only transcript keeps a tool row for each subagent; tapping one opens it read-only.</p>
+    </div>
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="round"><i data-i="chevron_left"></i></span>
+          <div class="title"><span class="crumb">Archive <i data-i="chevron_right"></i> Fix login redirect <i data-i="chevron_right"></i></span><span class="t">Explore · auth redirect flow</span></div>
+        </header>
+        <div class="meta" style="padding:0 calc(16*var(--dp)) calc(6*var(--dp))"><span class="g" style="font-weight:700">Done</span><span>6 turns</span><span>18k tokens</span><span>1m 48s</span></div>
+        <div class="timeline">
+          <div class="prompt"><div class="prompt-head"><span class="task-label">Task</span><span>· from the main agent</span></div>Trace how /login redirects after OAuth and where the session cookie is set.</div>
+          <div class="tools">
+            <div class="tool"><i data-i="file_text"></i><span class="n">Read</span><span class="d">src/auth/session.ts</span></div>
+            <div class="tool"><i data-i="search"></i><span class="n">Grep</span><span class="d">redirect src/auth</span></div>
+            <div class="tool"><i data-i="file_text"></i><span class="n">Read</span><span class="d">src/auth/logout.ts</span></div>
+          </div>
+          <p class="reply">The guard on <code>/app</code> runs before the callback writes the cookie, so it sees no session and redirects back to <code>/login</code>.</p>
+        </div>
+        <div class="readonly"><span class="note">Subagent of an archived chat · read only</span></div>
+        <div class="gesture"></div>
+      </div></div>
+      <p class="cap"><b>Archived subagent.</b> Read-only like its chat, with no steer box. Back returns to the chat's transcript.</p>
+    </div>
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="round"><i data-i="chevron_left"></i></span>
+          <div class="title"><span class="t">Archive</span></div>
+        </header>
+        <div class="search"><i data-i="search"></i>Search by title or folder</div>
+        <div class="arow"><div class="tx"><span class="t">Fix login redirect</span><span class="s">~/web-app · <i data-i="bot"></i>2 subagents</span></div><span class="when">2h ago</span><span class="more"><i data-i="ellipsis"></i></span></div>
+        <div class="arow"><div class="tx"><span class="t">Audit the API handlers</span><span class="s">~/api · <i data-i="bot"></i>8 subagents</span></div><span class="when">Yesterday</span><span class="more"><i data-i="ellipsis"></i></span></div>
+        <div class="sp"></div>
+        <div class="scrim"></div>
+        <div class="dialog">
+          <span class="dt">Delete this chat?</span>
+          <span class="dx">Its session file and the transcripts of its 2 subagents are deleted. This can't be undone.</span>
+          <div class="btns"><span class="btn">Cancel</span><span class="btn destructive">Delete</span></div>
+        </div>
+      </div></div>
+      <p class="cap"><b>Deleting.</b> The dialog names the subagent transcripts that go with the chat.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== Notification pill ===================== -->
+<section class="concept" id="inbox">
+  <h2>Subagents that need you, in the chat inbox</h2>
+  <p class="lede">A subagent's question waits in its chat, like any of the chat's dialogs, so the chat inbox pill and the heads-up notification already cover it. They add the subagent's name when the subagents extension can tell which one asked, and say only "needs you" when it can't. Tapping opens the chat, where the question card is.</p>
+  <div class="row">
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="tile" data-logo></span>
+          <div class="title"><span class="t">Upgrade Gradle</span><span class="sub"><i data-i="folder"></i>~/android-app</span></div>
+          <span class="round"><span class="tabcount">2</span></span>
+          <span class="round"><i data-i="panel_right"></i></span>
+        </header>
+        <div class="inbox">
+          <div class="ipill"><span class="badge"><i data-i="message_circle_question"></i></span><span class="t">Fix login redirect</span><span class="why">Explore needs you</span></div>
+        </div>
+        <div class="timeline">
+          <div class="prompt"><div class="prompt-head"><span class="you">You</span><span>· 9:38 AM</span></div>Bump Gradle to 9.8 and fix whatever breaks.</div>
+          <div class="tools"><div class="tool"><i data-i="terminal"></i><span class="n">Shell</span><span class="d">./gradlew check</span></div></div>
+          <p class="reply">The build passes on 9.8. Two deprecation warnings remain in the lint config; I left them for you.</p>
+        </div>
+        <div class="composer">
+          <div class="field">Message Pipkin…</div>
+          <div class="controls"><span class="chip rc"><i data-i="plus"></i></span><span class="chip">GPT-6</span><span class="sp"></span><span class="send"><i data-i="arrow_up"></i></span></div>
+          <div class="gesture"></div>
+        </div>
+      </div></div>
+      <p class="cap"><b>One chat waiting.</b> You're in another chat. The pill names the chat and the subagent that asked; tapping opens that chat at its question card.</p>
+    </div>
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="status"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <header class="appbar">
+          <span class="tile" data-logo></span>
+          <div class="title"><span class="t">Upgrade Gradle</span><span class="sub"><i data-i="folder"></i>~/android-app</span></div>
+          <span class="round"><span class="tabcount">2</span></span>
+          <span class="round"><i data-i="panel_right"></i></span>
+        </header>
+        <div class="timeline">
+          <div class="prompt"><div class="prompt-head"><span class="you">You</span><span>· 9:38 AM</span></div>Bump Gradle to 9.8 and fix whatever breaks.</div>
+          <p class="reply">The build passes on 9.8.</p>
+        </div>
+        <div class="scrim" style="z-index:2"></div>
+        <div class="inbox">
+          <div class="ipill"><span class="dots"><span></span><span></span><span class="ok"></span></span><span class="t">3 chats<span class="why"> · 2 waiting</span></span></div>
+          <div class="tray">
+            <div class="tray-head"><span class="t">Other chats</span><span class="c">Clear all</span></div>
+            <div class="irow"><span class="badge lg"><i data-i="message_circle_question"></i></span><div class="tx"><span class="nm">Fix login redirect</span><span class="dt"><span class="ag">Explore</span> needs you · Allow bash? npm test -- auth</span></div><span class="tm">now</span></div>
+            <div class="irow"><span class="badge lg"><i data-i="message_circle_question"></i></span><div class="tx"><span class="nm">Audit the API handlers</span><span class="dt">needs you · Allow edit? src/routes/users.ts</span></div><span class="tm">1 min. ago</span></div>
+            <div class="irow"><span class="badge lg ok"><i data-i="check"></i></span><div class="tx"><span class="nm">Docs cleanup</span><span class="dt">finished · Renamed the three guide pages.</span></div><span class="tm">4 min. ago</span></div>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="field">Message Pipkin…</div>
+          <div class="controls"><span class="chip rc"><i data-i="plus"></i></span><span class="chip">GPT-6</span><span class="sp"></span><span class="send"><i data-i="arrow_up"></i></span></div>
+          <div class="gesture"></div>
+        </div>
+      </div></div>
+      <p class="cap"><b>Several chats.</b> One entry per chat, as today. "Audit the API handlers" has two subagents asking at once, so its row can't name one and says only "needs you".</p>
+    </div>
+    <div class="shot">
+      <div class="phone"><div class="screen">
+        <div class="lock"><div class="clock">9:41</div><div class="date">Saturday, October 24</div></div>
+        <div class="status" style="position:relative;z-index:3"><span>9:41</span><span>▾ ▴ ▮</span></div>
+        <div class="headsup">
+          <div class="hd"><span data-logo-sm></span><span class="ap">Pipkin</span><span>· web-app · gpt-6-astra · now</span></div>
+          <span class="ti">Explore needs your answer: Fix login redirect</span>
+          <span class="bd">Allow bash?
+npm test -- auth</span>
+        </div>
+      </div></div>
+      <p class="cap"><b>Pipkin in the background.</b> The heads-up notification names the subagent the same way. Tapping opens the chat at the question.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+// Lucide paths: the site's Icon.astro set, plus bot, message-square, chevrons and a filled dot.
+const P = {
+  panel_right: ["M5,3h14a2,2 0 0,1 2,2v14a2,2 0 0,1 -2,2h-14a2,2 0 0,1 -2,-2v-14a2,2 0 0,1 2,-2z", "M15 3v18"],
+  brain: ["M12 18V5", "M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4", "M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5", "M17.997 5.125a4 4 0 0 1 2.526 5.77", "M18 18a4 4 0 0 0 2-7.464", "M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517", "M6 18a4 4 0 0 1-2-7.464", "M6.003 5.125a4 4 0 0 0-2.526 5.77"],
+  wrench: ["M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z"],
+  terminal: ["M12 19h8", "m4 17 6-6-6-6"],
+  file_text: ["M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z", "M14 2v5a1 1 0 0 0 1 1h5", "M10 9H8", "M16 13H8", "M16 17H8"],
+  plus: ["M5 12h14", "M12 5v14"],
+  arrow_up: ["m5 12 7-7 7 7", "M12 19V5"],
+  square: ["M5,3h14a2,2 0 0,1 2,2v14a2,2 0 0,1 -2,2h-14a2,2 0 0,1 -2,-2v-14a2,2 0 0,1 2,-2z"],
+  check: ["M20 6 9 17l-5-5"],
+  folder: ["M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"],
+  columns_2: ["M5,3h14a2,2 0 0,1 2,2v14a2,2 0 0,1 -2,2h-14a2,2 0 0,1 -2,-2v-14a2,2 0 0,1 2,-2z", "M12 3v18"],
+  search: ["m21 21-4.34-4.34", "M3 11a8 8 0 1 0 16 0a8 8 0 1 0 -16 0"],
+  square_terminal: ["m7 11 2-2-2-2", "M11 13h4", "M5,3h14a2,2 0 0,1 2,2v14a2,2 0 0,1 -2,2h-14a2,2 0 0,1 -2,-2v-14a2,2 0 0,1 2,-2z"],
+  x: ["M18 6 6 18", "m6 6 12 12"],
+  chevron_up: ["m18 15-6-6-6 6"],
+  chevron_down: ["m6 9 6 6 6-6"],
+  chevron_left: ["m15 18-6-6 6-6"],
+  chevron_right: ["m9 18 6-6-6-6"],
+  panel_top: ["M5,3h14a2,2 0 0,1 2,2v14a2,2 0 0,1 -2,2h-14a2,2 0 0,1 -2,-2v-14a2,2 0 0,1 2,-2z", "M3 9h18"],
+  bot: ["M12 8V4H8", "M6,8h12a2,2 0 0,1 2,2v8a2,2 0 0,1 -2,2h-12a2,2 0 0,1 -2,-2v-8a2,2 0 0,1 2,-2z", "M2 14h2", "M20 14h2", "M15 13v2", "M9 13v2"],
+  message: ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"],
+  maximize: ["M15 3h6v6", "m21 3-7 7", "m3 21 7-7", "M9 21H3v-6"],
+  ellipsis: ["M11,12a1,1 0 1,0 2,0a1,1 0 1,0 -2,0", "M18,12a1,1 0 1,0 2,0a1,1 0 1,0 -2,0", "M4,12a1,1 0 1,0 2,0a1,1 0 1,0 -2,0"],
+  trash: ["M10 11v6", "M14 11v6", "M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6", "M3 6h18", "M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"],
+  message_circle_question: ["M7.9 20A9 9 0 1 0 4 16.1L2 22Z", "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3", "M12 17h.01"],
+};
+const svgNS = "http://www.w3.org/2000/svg";
+for (const el of document.querySelectorAll("i[data-i]")) {
+  const name = el.dataset.i;
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("class", ("i " + el.className).trim());
+  if (el.getAttribute("style")) svg.setAttribute("style", el.getAttribute("style"));
+  if (name === "dot") {
+    svg.innerHTML = '<circle cx="12" cy="12" r="5" fill="currentColor"/><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".35"/>';
+  } else {
+    svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor"); svg.setAttribute("stroke-width", "1.5");
+    svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round");
+    for (const d of P[name]) { const p = document.createElementNS(svgNS, "path"); p.setAttribute("d", d); svg.appendChild(p); }
+  }
+  el.replaceWith(svg);
+}
+// Pipkin's pot, from site/src/components/LogoDefs.astro.
+const POT = `<g fill="currentColor"><path d="M344 245H403A12 12 0 0 1 403 269H344Z"/><path d="M188 355L174 397M298 355L312 397" fill="none" stroke="currentColor" stroke-width="24" stroke-linecap="round"/><path d="M127 228H359L341 331Q337 364 304 368H182Q149 364 145 332Z"/><path d="M130,203 H356 A15,15 0,0 1,371,218 V219 A15,15 0,0 1,356,234 H130 A15,15 0,0 1,115,219 V218 A15,15 0,0 1,130,203 Z"/></g><path d="M224 178Q197 151 224 123M283 178Q256 151 283 123" fill="none" stroke="currentColor" stroke-width="17" stroke-linecap="round"/>`;
+for (const el of document.querySelectorAll("[data-logo], [data-logo-sm]")) {
+  el.insertAdjacentHTML("beforeend", `<svg viewBox="98 104 320 320" style="color:var(--accent)${el.hasAttribute("data-logo-sm") ? ";width:calc(14*var(--dp));height:calc(14*var(--dp))" : ""}">${POT}</svg>`);
+}
+if (location.hash === "#dark") document.body.classList.add("dark");
+</script>
+</body>
+</html>
