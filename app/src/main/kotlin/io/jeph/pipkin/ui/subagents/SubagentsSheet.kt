@@ -57,7 +57,8 @@ private val RING_SIZE = 14.dp
 
 /**
  * [process]'s subagents as its [timeline] shows them now. Standing aside, Pipkin subagents lists no runs, so the chat
- * shows no Subagents tab and names no subagent as a question's asker, and its `subagent` calls are ordinary tool rows.
+ * shows no Subagents tab and names no subagent as a question's asker, and of its `subagent` calls only the finished
+ * ones Pipkin subagents made draw as subagents.
  */
 @Composable
 internal fun rememberChatSubagents(process: AgentProcess, timeline: TimelineState): ChatSubagents {

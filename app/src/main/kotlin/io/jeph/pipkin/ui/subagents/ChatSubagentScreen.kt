@@ -28,8 +28,10 @@ import androidx.compose.foundation.text.input.clearText
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,6 +86,11 @@ internal fun ChatSubagentScreen(
   val call = remember(timeline.items, toolCallId) {
     timeline.items.firstOrNull { it is TimelineItem.ToolCall && it.id == toolCallId } as? TimelineItem.ToolCall
   }
+  // Pipkin subagents standing aside after a reload or a reconnect, a call with no result is another extension's and
+  // starts nothing to show; the screen closes, so it doesn't come back when the next connection starts.
+  val gone = call != null && !subagents.startsSubagent(call)
+  val latestOnBack by rememberUpdatedState(onBack)
+  LaunchedEffect(gone) { if (gone) latestOnBack() }
   val facts = subagentFacts(toolCallId, call, subagents, sessionFile)
   val transcript by rememberSubagentTranscript(facts.source, facts.phase.active, facts.run?.messages ?: 0)
   val tabs = rememberWorkspaceTabs(controls.pane, process.cwd).count

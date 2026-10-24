@@ -33,14 +33,14 @@ internal enum class SubagentPhase {
   val active: Boolean get() = this == Queued || this == Running || this == Asking
 }
 
-/** Whose `subagent` tool a chat's calls went to, which decides whether they show as subagents. */
+/**
+ * Whose `subagent` tool a chat's calls go to now. A finished call is Pipkin subagents' only when its result says so,
+ * whoever's tool it is now: the user may have installed another extension's `subagent` tool and reloaded since, or
+ * removed one, leaving calls of both in the chat. A call with no result goes to the tool's owner now, since another
+ * extension's call cut off can't be told from a subagent interrupted.
+ */
 internal enum class SubagentTool {
-  /**
-   * Pipkin subagents', in a chat Pi runs, or not known, as in an archived chat. Either way a finished call is theirs
-   * only when its result says so: the user may since have installed another extension's `subagent` tool and reloaded,
-   * leaving its calls before then in the chat. One with no result is taken for theirs, since another extension's call
-   * cut off can't be told from a subagent interrupted.
-   */
+  /** Pipkin subagents', in a chat Pi runs, or not known, as in an archived chat. */
   Pipkin,
 
   /** Another extension's, which Pipkin subagents stands aside for: its calls are ordinary tool calls. */
@@ -82,8 +82,9 @@ internal class ChatSubagents(
 
   /** Whether [call] is the agent's call starting one of Pipkin's subagents, rather than an ordinary tool call. */
   fun startsSubagent(call: TimelineItem.ToolCall): Boolean {
-    if (call.toolName != SUBAGENT_TOOL || call.byUser || tool == SubagentTool.Other) return false
-    return call.output == null || SubagentResult.from(call.details)?.pipkins == true
+    if (call.toolName != SUBAGENT_TOOL || call.byUser) return false
+    if (call.output == null) return tool == SubagentTool.Pipkin
+    return SubagentResult.from(call.details)?.pipkins == true
   }
 
   companion object {

@@ -160,32 +160,34 @@ class SubagentCallsTest {
   }
 
   @Test
-  fun pipkinsSubagentCallsDrawAsSubagentsAndOthersAsToolRows() {
+  fun anUnfinishedCallFollowsTheToolsOwnerNow() {
     val pipkin = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = true)
-    val ranDetails = JSONObject().put("id", "r1").put("status", "done")
     assertTrue(pipkin.startsSubagent(call("c1")))
+    // Unfinished in an archived chat: it can't be told from another extension's call cut off, so it stays a subagent.
+    assertTrue(ChatSubagents.None.startsSubagent(call("c1")))
     // A `!subagent` the user ran, or any other tool, is never one.
     assertFalse(pipkin.startsSubagent(call("c1").copy(byUser = true)))
     assertFalse(pipkin.startsSubagent(call("c1").copy(toolName = "read")))
 
-    // Standing aside, another extension's `subagent` tool is an ordinary tool, running or done.
+    // Standing aside, another extension's `subagent` tool is an ordinary tool while it runs.
     val other = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = true, tool = SubagentTool.Other)
     assertFalse(other.startsSubagent(call("c1")))
-    assertFalse(other.startsSubagent(call("c1", output = "theirs", details = ranDetails)))
   }
 
   @Test
-  fun aFinishedCallIsASubagentOnlyWhenItsResultSaysSoInALiveChatAsInAnArchivedOne() {
+  fun aFinishedCallIsASubagentOnlyWhenItsResultSaysSoWhoeverOwnsTheToolNow() {
     val live = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = true)
-    for (subagents in listOf(live, ChatSubagents.None)) {
-      val marked = JSONObject().put("extension", "pipkin-subagents").put("status", "failed")
-      assertTrue(subagents.startsSubagent(call("c1", output = "Unknown agent", isError = true, details = marked)))
+    // Standing aside, Pipkin's own calls from before the user installed another `subagent` tool stay subagents.
+    val other = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = true, tool = SubagentTool.Other)
+    for (subagents in listOf(live, ChatSubagents.None, other)) {
+      val marked = JSONObject().put("extension", "pipkin-subagents").put("status", "done")
+      assertTrue(subagents.startsSubagent(call("c1", output = "found it", details = marked)))
+      val failed = JSONObject().put("extension", "pipkin-subagents").put("status", "failed")
+      assertTrue(subagents.startsSubagent(call("c1", output = "Unknown agent", isError = true, details = failed)))
       // An older build's results name the run or its transcript.
       assertTrue(subagents.startsSubagent(call("c1", output = "done", details = JSONObject().put("id", "r1"))))
       val inMemory = JSONObject().put("sessionFile", "/s/sub.jsonl")
       assertTrue(subagents.startsSubagent(call("c1", output = "done", details = inMemory)))
-      // Unfinished: it can't be told from another extension's call cut off, so it stays a subagent.
-      assertTrue(subagents.startsSubagent(call("c1")))
       // Another extension's result, as one made before the user replaced Pipkin's tool and reloaded: no details, or
       // details of its own; a call refused before any extension ran has none either.
       assertFalse(subagents.startsSubagent(call("c1", output = "theirs")))
