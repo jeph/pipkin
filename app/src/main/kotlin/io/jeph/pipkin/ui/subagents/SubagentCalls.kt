@@ -68,8 +68,14 @@ internal class ChatSubagents(
 
   fun phase(run: SubagentRun): SubagentPhase = runPhase(run, asker)
 
-  /** The runs queued or running, which the Subagents tab counts. */
+  /** The runs queued or running, which the Subagents tab's number counts. */
   val active: Int get() = runs.count { it.status.active }
+
+  /** The runs working, those asking the user included, which the words "running" count. */
+  val running: Int get() = runs.count { it.status == SubagentStatus.Running }
+
+  /** The runs waiting for a slot to start. */
+  val queued: Int get() = runs.count { it.status == SubagentStatus.Queued }
 
   /** A subagent may be waiting on the user: the chat's question comes from one, named or not. */
   val waiting: Boolean get() = asker != SubagentAsker.Unknown

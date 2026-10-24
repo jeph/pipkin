@@ -181,7 +181,7 @@ private fun ChatContent(
   val subagents = rememberChatSubagents(process, timeline)
   val streamSubagents = remember(subagents, onOpenSubagent) { StreamSubagents(subagents, onOpenSubagent) }
   val subagentsTab = subagents.takeIf { it.runs.isNotEmpty() }?.let {
-    SubagentsTab(it.active, it.waiting, onClick = { onSheet(ChatSheet.Subagents) })
+    SubagentsTab(it.running, it.queued, it.waiting, onClick = { onSheet(ChatSheet.Subagents) })
   }
   val keyboard = LocalSoftwareKeyboardController.current
   val focus = LocalFocusManager.current

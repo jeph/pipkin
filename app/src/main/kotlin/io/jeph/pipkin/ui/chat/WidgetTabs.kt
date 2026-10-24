@@ -157,11 +157,15 @@ internal fun widgetEdge(widgets: Map<String, ExtensionWidget>, tabs: WidgetTabs,
 }
 
 /**
- * The Subagents tab: how many of the chat's subagents are [active], whether one is [waiting] on the user, and what
- * tapping it does, which opens the list of the chat's subagents rather than a panel.
+ * The Subagents tab: how many of the chat's subagents are [running] (asking the user included) and [queued], whether
+ * one is [waiting] on the user, and what tapping it does, which opens the list of the chat's subagents rather than a
+ * panel.
  */
 @Immutable
-internal class SubagentsTab(val active: Int, val waiting: Boolean, val onClick: () -> Unit)
+internal class SubagentsTab(val running: Int, val queued: Int, val waiting: Boolean, val onClick: () -> Unit) {
+  /** The runs queued or running, which the tab's number counts. */
+  val active: Int get() = running + queued
+}
 
 /**
  * The widgets Pi draws on one edge of the editor as tabs hanging from that edge of the composer: its top border for
@@ -239,14 +243,21 @@ internal fun WidgetTabStrip(
 
 /**
  * The Subagents tab: a pill like a widget's, with the bot icon, its label, how many subagents are queued or running,
- * and a yellow dot while one waits on the user. It never opens a panel; tapping it opens the list of subagents.
+ * and a yellow dot while one waits on the user. TalkBack reads the running and queued ones apart. It never opens a
+ * panel; tapping it opens the list of subagents.
  */
 @Composable
 private fun SubagentsTabChip(tab: SubagentsTab, modifier: Modifier) {
   val colors = pipkinColors
-  val count = remember(tab.active) { NumberFormat.getIntegerInstance().format(tab.active) }
-  val running = pluralStringResource(R.plurals.subagents_tab_description, tab.active, count)
-  val description = if (tab.waiting) stringResource(R.string.subagents_tab_waiting, running) else running
+  val numbers = remember { NumberFormat.getIntegerInstance() }
+  val count = remember(tab.active) { numbers.format(tab.active) }
+  val running = pluralStringResource(R.plurals.subagents_tab_description, tab.running, numbers.format(tab.running))
+  val active = if (tab.queued > 0) {
+    pluralStringResource(R.plurals.subagents_tab_queued, tab.queued, running, numbers.format(tab.queued))
+  } else {
+    running
+  }
+  val description = if (tab.waiting) stringResource(R.string.subagents_tab_waiting, active) else active
   Row(
     modifier = modifier
       .height(TAB_HEIGHT)

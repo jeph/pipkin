@@ -24,13 +24,19 @@
     <!-- The Subagents tab on the message box, and its list. -->
     <string name="subagents_title">Subagents</string>
     <plurals name="subagents_tab_description">
-        <!-- What TalkBack reads for the Subagents tab. %1$s is the number of subagents queued or running, already
-             formatted. -->
+        <!-- What TalkBack reads for the Subagents tab. %1$s is the number of subagents running, those asking the user
+             included, already formatted. -->
         <item quantity="one">Subagents, %1$s running</item>
         <item quantity="other">Subagents, %1$s running</item>
     </plurals>
+    <plurals name="subagents_tab_queued">
+        <!-- What TalkBack reads for the Subagents tab while subagents wait for a slot to start. %1$s is the tab's
+             description without them, such as "Subagents, 4 running", %2$s the number queued, already formatted. -->
+        <item quantity="one">%1$s, %2$s queued</item>
+        <item quantity="other">%1$s, %2$s queued</item>
+    </plurals>
     <!-- What TalkBack reads for the Subagents tab while a subagent waits on the user. %1$s is the tab's description
-         without it, such as "Subagents, 2 running". -->
+         without it, such as "Subagents, 2 running, 1 queued". -->
     <string name="subagents_tab_waiting">%1$s, a subagent needs you</string>
     <string name="subagents_open_list">Show subagents</string>
     <plurals name="subagents_runs">
@@ -39,9 +45,15 @@
         <item quantity="other">%1$s runs</item>
     </plurals>
     <plurals name="subagents_running">
-        <!-- %1$s is the number of the chat's subagents queued or running, already formatted. -->
+        <!-- %1$s is the number of the chat's subagents running, those asking the user included, already formatted. -->
         <item quantity="one">%1$s running</item>
         <item quantity="other">%1$s running</item>
+    </plurals>
+    <plurals name="subagents_queued">
+        <!-- After subagents_running, while any wait for a slot to start: %1$s is the number of the chat's subagents
+             queued, already formatted. -->
+        <item quantity="one">%1$s queued</item>
+        <item quantity="other">%1$s queued</item>
     </plurals>
     <!-- %1$s is a token count, already shortened, such as 12.4K. -->
     <string name="subagents_tokens">%1$s tokens</string>

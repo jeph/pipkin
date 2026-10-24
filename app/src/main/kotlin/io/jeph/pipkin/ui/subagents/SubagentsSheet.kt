@@ -73,10 +73,10 @@ internal fun rememberChatSubagents(process: AgentProcess, timeline: TimelineStat
 
 /**
  * The chat's subagents in a sheet that grows to most of the screen and then scrolls: a header with how many there
- * are, how many are active and the tokens they used, then the runs grouped Waiting for you, Running and Finished.
- * A waiting run's line is the [question] the chat's card asks. Tapping a run opens it through [onOpen], with its tool
- * call's id; [onStopAll] stops every active one. Closes once the chat has no subagents left, as after the user's next
- * message.
+ * are, how many are running and queued and the tokens they used, then the runs grouped Waiting for you, Running and
+ * Finished. A waiting run's line is the [question] the chat's card asks. Tapping a run opens it through [onOpen], with
+ * its tool call's id; [onStopAll] stops every active one. Closes once the chat has no subagents left, as after the
+ * user's next message.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,16 +109,22 @@ internal fun SubagentsSheet(
   }
 }
 
-/** The bot icon beside "Subagents", over how many runs there are, how many are active, and the tokens they used. */
+/**
+ * The bot icon beside "Subagents", over how many runs there are, how many are running (asking the user included) and,
+ * when any, queued, and the tokens they used.
+ */
 @Composable
 private fun SheetHeader(subagents: ChatSubagents) {
   val colors = pipkinColors
   val numbers = remember { NumberFormat.getIntegerInstance() }
   val runs = subagents.runs.size
+  val running = subagents.running
+  val queued = subagents.queued
   val tokens = subagents.runs.sumOf { it.tokens }
   val summary = listOfNotNull(
     pluralStringResource(R.plurals.subagents_runs, runs, numbers.format(runs)),
-    pluralStringResource(R.plurals.subagents_running, subagents.active, numbers.format(subagents.active)),
+    pluralStringResource(R.plurals.subagents_running, running, numbers.format(running)),
+    if (queued > 0) pluralStringResource(R.plurals.subagents_queued, queued, numbers.format(queued)) else null,
     if (tokens > 0) tokensText(tokens) else null,
   ).joinToString(stringResource(R.string.separator_dot))
   Row(

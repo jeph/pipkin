@@ -69,6 +69,9 @@ class SubagentCallsTest {
     assertEquals(listOf(queued, running), groups.running)
     assertEquals(listOf(done, failed), groups.finished)
     assertEquals(3, subagents.active)
+    // "Running" counts the one asking but not the queued one.
+    assertEquals(2, subagents.running)
+    assertEquals(1, subagents.queued)
     assertTrue(subagents.waiting)
     assertFalse(ChatSubagents(listOf(running), SubagentAsker.Unknown, true).waiting)
   }
