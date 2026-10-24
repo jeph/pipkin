@@ -159,26 +159,29 @@ class SubagentRunsTest {
   fun stoppingTheRunThatAskedEndsItsQuestions() {
     val asker = SubagentAsker.One(run("r1", "call_1", inFlight = 1))
 
-    assertEquals(true, stopEndsQuestions(asker, "r1"))
-    assertEquals(true, stopEndsQuestions(asker, runId = null))
+    assertEquals(queued, questionsStopCancels(asker, "r1", queued))
+    assertEquals(queued, questionsStopCancels(asker, runId = null, queued))
   }
 
   @Test
   fun stoppingAnotherRunLeavesTheQuestion() {
-    assertEquals(false, stopEndsQuestions(SubagentAsker.One(run("r1", "call_1", inFlight = 1)), "r2"))
+    val asker = SubagentAsker.One(run("r1", "call_1", inFlight = 1))
+    assertEquals(emptyList<String>(), questionsStopCancels(asker, "r2", queued))
   }
 
   @Test
   fun withSeveralAskingOnlyStopAllEndsTheQuestions() {
-    assertEquals(false, stopEndsQuestions(SubagentAsker.Several, "r1"))
-    assertEquals(true, stopEndsQuestions(SubagentAsker.Several, runId = null))
+    assertEquals(emptyList<String>(), questionsStopCancels(SubagentAsker.Several, "r1", queued))
+    assertEquals(queued, questionsStopCancels(SubagentAsker.Several, runId = null, queued))
   }
 
   @Test
   fun aQuestionThatMayBeTheParentsSurvivesEveryStop() {
-    assertEquals(false, stopEndsQuestions(SubagentAsker.Unknown, "r1"))
-    assertEquals(false, stopEndsQuestions(SubagentAsker.Unknown, runId = null))
+    assertEquals(emptyList<String>(), questionsStopCancels(SubagentAsker.Unknown, "r1", queued))
+    assertEquals(emptyList<String>(), questionsStopCancels(SubagentAsker.Unknown, runId = null, queued))
   }
+
+  private val queued = listOf("ui_1", "ui_2")
 
   private fun asking(vararg items: TimelineItem) = TimelineState(
     items = items.toList(),

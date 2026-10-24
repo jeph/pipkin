@@ -338,12 +338,15 @@ internal class AgentProcess(
     stopSubagents(JSONObject().put("action", "stopAll"), runId = null)
   }
 
-  /** Sends the stop, then cancels the questions only the stopped runs could have asked; see [stopEndsQuestions]. */
+  /**
+   * Sends the stop, then cancels the questions only the stopped runs could have asked; see [questionsStopCancels].
+   * The questions are taken with the asker, before sending: one arriving meanwhile wasn't part of that reckoning.
+   */
   private suspend fun stopSubagents(data: JSONObject, runId: String?) {
     val asker = askingSubagent(timeline.state.value, subagentRunsState.value)
+    val cancelled = questionsStopCancels(asker, runId, timeline.pendingDialogIds())
     sendSubagents(data)
-    if (!stopEndsQuestions(asker, runId)) return
-    timeline.pendingDialogIds().forEach { respondUi(it, UiAnswer.Cancelled) }
+    cancelled.forEach { respondUi(it, UiAnswer.Cancelled) }
   }
 
   private suspend fun sendSubagents(data: JSONObject) {
