@@ -118,3 +118,38 @@ internal const val SUBAGENT_TOOL = "subagent"
 
 /** The Pipkin channel topic the `pipkin-subagents` extension and the app talk on. */
 internal const val SUBAGENTS_TOPIC = "subagents"
+
+/**
+ * What a finished `subagent` tool call's result `details` say about its run: the run's [id], [agent] and
+ * [description], the transcript at [sessionFile] (null for a subagent that ran in memory), how it ended, and the
+ * [tokens] it used. They outlive the run's place in [SubagentRun]'s list, so the tool row leads back to it.
+ */
+internal data class SubagentResult(
+  val id: String?,
+  val agent: String?,
+  val description: String?,
+  val sessionFile: String?,
+  val status: SubagentStatus?,
+  val tokens: Long?,
+) {
+  companion object {
+    /** The result of a call whose `details` are [details]; null when they hold none of a subagent's. */
+    fun from(details: JSONObject?): SubagentResult? {
+      if (details == null) return null
+      val result = SubagentResult(
+        id = details.textOrNull("id"),
+        agent = details.textOrNull("agent"),
+        description = details.textOrNull("description"),
+        sessionFile = details.textOrNull("sessionFile"),
+        status = details.textOrNull("status")?.let(SubagentStatus::from),
+        tokens = details.optJSONObject("usage")?.optLong("totalTokens")?.takeIf { it > 0 },
+      )
+      return result.takeUnless { it == EMPTY }
+    }
+
+    private val EMPTY = SubagentResult(null, null, null, null, null, null)
+  }
+}
+
+private fun JSONObject.textOrNull(name: String): String? =
+  if (isNull(name)) null else optString(name).takeIf { it.isNotEmpty() }

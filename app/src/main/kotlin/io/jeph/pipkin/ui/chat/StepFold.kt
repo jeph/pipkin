@@ -36,7 +36,7 @@ import java.text.NumberFormat
 /**
  * A run of steps folded into one line: Working while the run works, Done once it's done or Stopped, with how many steps
  * it took. Tapping it lists the steps under it, or folds them again. Folded while the run works, the step running now
- * shows under the line, so the chat doesn't grow with every step.
+ * shows under the line, so the chat doesn't grow with every step; a subagent's shows as its [subagents] row.
  */
 @Composable
 internal fun StepFoldRow(
@@ -44,14 +44,31 @@ internal fun StepFoldRow(
   expanded: Boolean,
   onToggle: () -> Unit,
   onOpenTool: (key: String) -> Unit,
+  subagents: StreamSubagents,
   modifier: Modifier = Modifier,
 ) {
   Column(modifier = modifier.fillMaxWidth()) {
     StepFoldLine(fold, expanded, onToggle)
-    if (!expanded && fold.outcome == StepsOutcome.Working) {
-      val current = fold.current
-      ToolRow(stepPresentation(current), onClick = { onOpenTool(current.key) })
-    }
+    if (!expanded && fold.outcome == StepsOutcome.Working) StepRow(fold.current, subagents, onOpenTool)
+  }
+}
+
+/**
+ * A thinking block's or tool call's row, which opens its detail sheet through [onOpenTool]; a call starting a subagent
+ * shows as its [SubagentToolRow] instead, which opens the subagent.
+ */
+@Composable
+internal fun StepRow(
+  step: TimelineItem,
+  subagents: StreamSubagents,
+  onOpenTool: (key: String) -> Unit,
+  modifier: Modifier = Modifier,
+) {
+  when {
+    step is TimelineItem.ToolCall && step.isSubagentCall -> SubagentToolRow(step, subagents, modifier)
+    step is TimelineItem.ToolCall -> ToolRow(toolPresentation(step), onClick = { onOpenTool(step.key) }, modifier)
+    step is TimelineItem.Thinking -> ToolRow(toolPresentation(step), onClick = { onOpenTool(step.key) }, modifier)
+    else -> error("Only thinking blocks and tool calls are steps")
   }
 }
 
@@ -137,14 +154,6 @@ private fun OutcomeIcon(outcome: StepsOutcome) {
       tint = colors.foregroundMuted,
     )
   }
-}
-
-/** A step's row or thinking block's presentation, for the fold's step running now. */
-@Composable
-private fun stepPresentation(step: TimelineItem): ToolPresentation = when (step) {
-  is TimelineItem.ToolCall -> toolPresentation(step)
-  is TimelineItem.Thinking -> toolPresentation(step)
-  else -> error("A fold holds only steps")
 }
 
 /**

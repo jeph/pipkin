@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -37,8 +38,10 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -61,6 +64,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -76,6 +80,7 @@ import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import java.text.NumberFormat
 
 private val TAB_HEIGHT = 26.dp
 private val TAB_LABEL_MAX_WIDTH = 150.dp
@@ -152,21 +157,39 @@ internal fun widgetEdge(widgets: Map<String, ExtensionWidget>, tabs: WidgetTabs,
 }
 
 /**
+ * The Subagents tab: how many of the chat's subagents are [active], whether one is [waiting] on the user, and what
+ * tapping it does, which opens the list of the chat's subagents rather than a panel.
+ */
+@Immutable
+internal class SubagentsTab(val active: Int, val waiting: Boolean, val onClick: () -> Unit)
+
+/**
  * The widgets Pi draws on one edge of the editor as tabs hanging from that edge of the composer: its top border for
  * widgets above the editor, its bottom border for those below. The strip unfolds out of the border with its first
  * widget and folds back with its last, a tab added later rises out of the border, and one removed fades. A label
  * stops at 150 dp, and a strip with more tabs than fit scrolls sideways, fading at an edge it continues past. A tab
- * opens its widget's panel, or closes it when open.
+ * opens its widget's panel, or closes it when open. The [subagents] tab, while the chat has subagents, comes first.
  */
 @Composable
-internal fun WidgetTabStrip(edge: WidgetEdge, tabs: WidgetTabs, belowEditor: Boolean, modifier: Modifier = Modifier) {
+internal fun WidgetTabStrip(
+  edge: WidgetEdge,
+  tabs: WidgetTabs,
+  belowEditor: Boolean,
+  modifier: Modifier = Modifier,
+  subagents: SubagentsTab? = null,
+) {
   val widgets = edge.widgets
-  // Kept while the strip folds away, which it does once there are no widgets left to show.
+  val visible = widgets.isNotEmpty() || subagents != null
+  // Kept while the strip folds away, which it does once there are no tabs left to show.
   var shown by remember { mutableStateOf(widgets) }
-  if (widgets.isNotEmpty()) shown = widgets
+  var shownSubagents by remember { mutableStateOf(subagents) }
+  if (visible) {
+    shown = widgets
+    shownSubagents = subagents
+  }
   val fromBorder = if (belowEditor) -1 else 1
   AnimatedVisibility(
-    visible = widgets.isNotEmpty(),
+    visible = visible,
     modifier = modifier,
     enter = expandVertically(expandFrom = if (belowEditor) Alignment.Top else Alignment.Bottom) +
       slideInVertically { it * fromBorder },
@@ -174,7 +197,10 @@ internal fun WidgetTabStrip(edge: WidgetEdge, tabs: WidgetTabs, belowEditor: Boo
       slideOutVertically { it * fromBorder },
   ) {
     // The tabs the strip showed when it unfolded rose with it; any other rises on its own when it first shows.
-    val risen = remember { shown.mapTo(HashSet()) { it.key } }
+    val risen = remember {
+      shown.mapTo(HashSet()) { it.key }.apply { if (shownSubagents != null) add(SUBAGENTS_TAB_KEY) }
+    }
+    val rising = { key: String -> Animatable(if (risen.add(key)) 1f else 0f) }
     val state = rememberLazyListState()
     LazyRow(
       modifier = Modifier
@@ -187,8 +213,16 @@ internal fun WidgetTabStrip(edge: WidgetEdge, tabs: WidgetTabs, belowEditor: Boo
       contentPadding = PaddingValues(horizontal = PipkinTokens.Spacing.s2),
       horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
+      // First, so the dot of a subagent waiting on the user never scrolls out of sight behind the widgets.
+      shownSubagents?.let { tab ->
+        item(key = SUBAGENTS_TAB_KEY) {
+          val rise = remember { rising(SUBAGENTS_TAB_KEY) }
+          LaunchedEffect(Unit) { rise.animateTo(0f, tween(TAB_RISE_MILLIS)) }
+          SubagentsTabChip(tab, Modifier.animateItem().risenBy(rise, fromBorder))
+        }
+      }
       items(shown, key = { it.key }) { item ->
-        val rise = remember { Animatable(if (risen.add(item.key)) 1f else 0f) }
+        val rise = remember { rising(item.key) }
         LaunchedEffect(Unit) { rise.animateTo(0f, tween(TAB_RISE_MILLIS)) }
         WidgetTab(
           label = widgetLabel(item.key),
@@ -196,14 +230,62 @@ internal fun WidgetTabStrip(edge: WidgetEdge, tabs: WidgetTabs, belowEditor: Boo
           changed = tabs.changed(item.key, item.widget),
           belowEditor = belowEditor,
           onClick = { tabs.toggle(item.key, belowEditor) },
-          modifier = Modifier
-            .animateItem()
-            .graphicsLayer { translationY = rise.value * size.height * fromBorder },
+          modifier = Modifier.animateItem().risenBy(rise, fromBorder),
         )
       }
     }
   }
 }
+
+/**
+ * The Subagents tab: a pill like a widget's, with the bot icon, its label, how many subagents are queued or running,
+ * and a yellow dot while one waits on the user. It never opens a panel; tapping it opens the list of subagents.
+ */
+@Composable
+private fun SubagentsTabChip(tab: SubagentsTab, modifier: Modifier) {
+  val colors = pipkinColors
+  val count = remember(tab.active) { NumberFormat.getIntegerInstance().format(tab.active) }
+  val running = pluralStringResource(R.plurals.subagents_tab_description, tab.active, count)
+  val description = if (tab.waiting) stringResource(R.string.subagents_tab_waiting, running) else running
+  Row(
+    modifier = modifier
+      .height(TAB_HEIGHT)
+      .clip(CircleShape)
+      .background(colors.surface2)
+      .clickable(onClickLabel = stringResource(R.string.subagents_open_list), role = Role.Button, onClick = tab.onClick)
+      .clearAndSetSemantics { contentDescription = description }
+      .padding(horizontal = 10.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
+  ) {
+    LucideIcon(
+      icon = R.drawable.ic_lucide_bot,
+      contentDescription = null,
+      size = PipkinTokens.IconSize.xs,
+      tint = colors.foregroundMuted,
+    )
+    Text(
+      text = stringResource(R.string.subagents_title),
+      color = colors.foregroundMuted,
+      fontSize = 11.5.sp,
+      fontWeight = FontWeight.SemiBold,
+      maxLines = 1,
+    )
+    if (tab.active > 0) {
+      Text(
+        text = count,
+        color = colors.foregroundMuted,
+        fontSize = 11.5.sp,
+        style = LocalTextStyle.current.copy(fontFeatureSettings = PipkinFonts.TABULAR),
+        maxLines = 1,
+      )
+    }
+    if (tab.waiting) Box(modifier = Modifier.size(7.dp).background(colors.dotWarning, CircleShape))
+  }
+}
+
+/** The Subagents tab's key among the widgets' in the strip; no widget key starts with Pipkin's own prefix. */
+private const val SUBAGENTS_TAB_KEY = "pipkin:subagents"
 
 /**
  * One tab: a pill with an icon for its edge, the label, and a chevron while it's open or a yellow dot when the widget
@@ -263,6 +345,10 @@ private fun WidgetTab(
     }
   }
 }
+
+/** Moves a tab [rise] of its height out of the border, [fromBorder] being which way that is: 1 is down, -1 up. */
+private fun Modifier.risenBy(rise: Animatable<Float, AnimationVector1D>, fromBorder: Int): Modifier =
+  graphicsLayer { translationY = rise.value * size.height * fromBorder }
 
 /**
  * Fades the ends of a tab strip or a panel where it scrolls past them, so a tab or a line cut off at the edge reads as

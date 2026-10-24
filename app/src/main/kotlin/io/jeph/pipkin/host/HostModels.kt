@@ -78,6 +78,32 @@ internal data class SessionInfo(
 }
 
 /**
+ * One subagent transcript of a chat, from the host's `subagent_sessions` mode: the file at [path], started by the
+ * chat's `subagent` tool call [toolCallId] for its [agent] and [description]. Times are epoch milliseconds.
+ */
+internal data class SubagentSession(
+  val path: String,
+  val toolCallId: String,
+  val agent: String,
+  val description: String,
+  val created: Long,
+  val modified: Long,
+  val messageCount: Int,
+) {
+  companion object {
+    fun from(json: JSONObject) = SubagentSession(
+      path = json.getString("path"),
+      toolCallId = json.optString("toolCallId"),
+      agent = json.optString("agent"),
+      description = json.optString("description"),
+      created = json.optLong("created"),
+      modified = json.optLong("modified"),
+      messageCount = json.optInt("messageCount"),
+    )
+  }
+}
+
+/**
  * A provider Pi ships that Pipkin connects (`BUILTIN_PROVIDERS` in the host). [type] is the
  * configured credential type, `oauth` or `api_key`, if any. [models] are every model Pi offers for
  * it with `models.json` overrides applied; [extraIds] are the ones `models.json` adds. [enabled]

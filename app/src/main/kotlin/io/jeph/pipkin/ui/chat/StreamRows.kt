@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -68,10 +69,17 @@ import kotlinx.coroutines.delay
 
 /**
  * A tool call's or thinking block's one-line row: the tool's icon, the bold title and a muted summary, in monospace for
- * a tool's arguments. The icon is cobalt while the step runs, red once it failed, and muted once it's done.
+ * a tool's arguments, then [trailing], such as a subagent's status. The icon is cobalt while the step runs, red once
+ * it failed, and muted once it's done. [onClickLabel] says what a tap does, for TalkBack.
  */
 @Composable
-internal fun ToolRow(presentation: ToolPresentation, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun ToolRow(
+  presentation: ToolPresentation,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+  onClickLabel: String? = null,
+  trailing: @Composable RowScope.() -> Unit = {},
+) {
   val colors = pipkinColors
   Row(
     modifier =
@@ -79,7 +87,7 @@ internal fun ToolRow(presentation: ToolPresentation, onClick: () -> Unit, modifi
         .fillMaxWidth()
         .heightIn(min = 30.dp)
         .clip(RoundedCornerShape(PipkinTokens.Radius.md))
-        .clickable(onClick = onClick)
+        .clickable(onClickLabel = onClickLabel, onClick = onClick)
         .padding(horizontal = PipkinTokens.Spacing.s4),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
@@ -102,6 +110,7 @@ internal fun ToolRow(presentation: ToolPresentation, onClick: () -> Unit, modifi
       overflow = TextOverflow.Ellipsis,
     )
     presentation.figure?.let { FigureText(it) }
+    trailing()
   }
 }
 
@@ -221,11 +230,16 @@ private val NoticeKind.icon: Int
   }
 
 /**
- * Live `m:ss` while the run works, then how long it took. While the chat waits on [backgroundTasks], the simmering
- * pot stays, saying how many.
+ * Live `m:ss` while the run works, then how long it took. While the run waits on [subagents] queued or running, it
+ * says how many. While the chat waits on [backgroundTasks], the simmering pot stays, saying how many.
  */
 @Composable
-internal fun TurnFooterRow(item: TimelineItem.TurnFooter, backgroundTasks: Int, modifier: Modifier = Modifier) {
+internal fun TurnFooterRow(
+  item: TimelineItem.TurnFooter,
+  backgroundTasks: Int,
+  modifier: Modifier = Modifier,
+  subagents: Int = 0,
+) {
   Row(
     modifier = modifier.fillMaxWidth().heightIn(min = 28.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -238,6 +252,10 @@ internal fun TurnFooterRow(item: TimelineItem.TurnFooter, backgroundTasks: Int, 
     } else {
       SimmeringPot(size = PipkinTokens.IconSize.sm)
       RunningElapsed(item.startedAt)
+      if (subagents > 0) {
+        val count = NumberFormat.getIntegerInstance().format(subagents)
+        FooterText(pluralStringResource(R.plurals.chat_waiting_on_subagents, subagents, count))
+      }
     }
     if (backgroundTasks == 0) return@Row
     FooterText(pluralStringResource(R.plurals.chat_background_tasks_running, backgroundTasks, backgroundTasks))

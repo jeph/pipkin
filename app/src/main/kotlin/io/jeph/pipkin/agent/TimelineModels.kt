@@ -62,7 +62,9 @@ sealed interface TimelineItem {
   /**
    * While [argsStreaming], [args] is only parsed until the argument the chat row shows (`path`, or `command` for
    * `bash`) is final; [ChatTimeline.streamingArguments] has the raw text that has arrived so far. A call [byUser] is
-   * a `!command` the user ran, not a step of the agent's. [figure] is what its row notes about the result.
+   * a `!command` the user ran, not a step of the agent's. [figure] is what its row notes about the result. [details]
+   * are the result's `details`, kept only for a `subagent` call ([SUBAGENT_TOOL]), whose row leads to the run's
+   * transcript through them once the run is gone; see [SubagentResult].
    */
   data class ToolCall(
     override val key: String,
@@ -75,6 +77,7 @@ sealed interface TimelineItem {
     val argsStreaming: Boolean = false,
     val byUser: Boolean = false,
     val figure: StepFigure? = null,
+    val details: JSONObject? = null,
   ) : TimelineItem
 
   data class Error(override val key: String, val cause: ErrorCause) : TimelineItem

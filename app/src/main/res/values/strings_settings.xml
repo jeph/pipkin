@@ -71,6 +71,8 @@
     <string name="settings_extension_background_summary">Commands that keep running while the agent waits, such as servers and long builds</string>
     <string name="settings_extension_web_access">Pipkin web access</string>
     <string name="settings_extension_web_access_summary">Web search and page fetching</string>
+    <string name="settings_extension_subagents">Pipkin subagents</string>
+    <string name="settings_extension_subagents_summary">Subagents the agent hands tasks to, which you can follow, steer and stop</string>
     <string name="settings_extensions_caption">Idle chats reload to pick up a change. A working chat picks it up the next time its agent starts.</string>
 
     <string name="settings_advanced">Advanced</string>

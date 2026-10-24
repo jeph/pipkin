@@ -23,6 +23,9 @@ internal sealed interface ChatSheet {
   /** The whole of the extension widget with this key. */
   data class Widget(val key: String) : ChatSheet
 
+  /** The chat's subagents, from the Subagents tab. */
+  data object Subagents : ChatSheet
+
   /** `/fork`: the user messages (`entryId`, `text`) a fork can start from. */
   data class Fork(val messages: List<JSONObject>) : ChatSheet
 }

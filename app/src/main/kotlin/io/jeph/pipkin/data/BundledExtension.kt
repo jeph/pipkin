@@ -38,4 +38,12 @@ internal enum class BundledExtension(
     asset = "pipkin-extensions/pipkin-web-access.js",
     usesRuntimePackages = true,
   ),
+
+  /** Hands the agent's tasks to subagents in the same Pi; it tells the app about their runs over Pipkin's channel. */
+  Subagents(
+    "pipkin-subagents",
+    R.string.settings_extension_subagents,
+    R.string.settings_extension_subagents_summary,
+    asset = "pipkin-extensions/pipkin-subagents.js",
+  ),
 }

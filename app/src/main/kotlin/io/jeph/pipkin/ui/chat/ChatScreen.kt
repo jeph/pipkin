@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.chat
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,20 +41,24 @@ import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
+import io.jeph.pipkin.ui.subagents.ChatSubagentScreen
+import io.jeph.pipkin.ui.subagents.SubagentsSheet
+import io.jeph.pipkin.ui.subagents.rememberChatSubagents
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.CloseSplitButton
 import io.jeph.pipkin.ui.workspace.PaneControls
-import io.jeph.pipkin.ui.workspace.PaneHeader
 import io.jeph.pipkin.ui.workspace.PublishTabActions
 import io.jeph.pipkin.ui.workspace.ShownTabActions
 import io.jeph.pipkin.ui.workspace.SidebarButton
 import io.jeph.pipkin.ui.workspace.TabAction
+import kotlinx.coroutines.launch
 
 /**
  * One chat in a pane: header, stream and composer for [process]; a null process shows a starting placeholder. What
  * the screen keeps of each chat comes from [views]. The header's buttons, and `/resume`, act through [controls]: the
- * tab menu, the explorer, the sidebar and, in the second pane, closing split screen.
+ * tab menu, the explorer, the sidebar and, in the second pane, closing split screen. A subagent the chat started opens
+ * in its place, in the same pane, until Back.
  */
 @Composable
 internal fun ChatScreen(
@@ -88,15 +94,31 @@ internal fun ChatScreen(
     }
     LaunchedEffect(controller) { controller.collectEffects() }
     LaunchedEffect(controller) { controller.steering.collectQueue() }
-    ChatContent(
-      controller,
-      snackbar,
-      controls,
-      onOpenProviders,
-      onOpenOnboarding,
-      onSheet = { sheet = it },
-      modifier,
-    )
+    // The pane's own: a subagent shows in place of its chat and never in the other pane or as a tab of its own.
+    var subagent by rememberSaveable { mutableStateOf<String?>(null) }
+    val shownSubagent = subagent
+    if (shownSubagent != null) {
+      BackHandler { subagent = null }
+      ChatSubagentScreen(
+        controller = controller,
+        toolCallId = shownSubagent,
+        chatTitle = chatTitle(process),
+        controls = controls,
+        onBack = { subagent = null },
+        modifier = modifier,
+      )
+    } else {
+      ChatContent(
+        controller,
+        snackbar,
+        controls,
+        onOpenProviders,
+        onOpenOnboarding,
+        onSheet = { sheet = it },
+        onOpenSubagent = { subagent = it },
+        modifier,
+      )
+    }
     PublishChatActions(
       controller,
       controls.shownTab,
@@ -105,7 +127,7 @@ internal fun ChatScreen(
       onNewTerminal = { context.appGraph.terminals.open(controls.pane, process.cwd) },
       onArchive = actions::archive,
     )
-    ChatSheets(controller, sheet, onSheet = { sheet = it })
+    ChatSheets(controller, sheet, onSheet = { sheet = it }, onOpenSubagent = { subagent = it })
     ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive = actions::archive)
   }
 }
@@ -135,6 +157,7 @@ private fun rememberNavigator(
   }
 }
 
+/** The chat's header, stream, question card and composer; a subagent's tool row or the Subagents list opens it. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ChatContent(
@@ -144,11 +167,17 @@ private fun ChatContent(
   onOpenProviders: () -> Unit,
   onOpenOnboarding: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
+  onOpenSubagent: (toolCallId: String) -> Unit,
   modifier: Modifier,
 ) {
   val process = controller.process
   val timeline by process.screenTimeline.collectAsStateWithLifecycle()
   val working by process.working.collectAsStateWithLifecycle()
+  val subagents = rememberChatSubagents(process, timeline)
+  val streamSubagents = remember(subagents, onOpenSubagent) { StreamSubagents(subagents, onOpenSubagent) }
+  val subagentsTab = subagents.takeIf { it.runs.isNotEmpty() }?.let {
+    SubagentsTab(it.active, it.waiting, onClick = { onSheet(ChatSheet.Subagents) })
+  }
   val keyboard = LocalSoftwareKeyboardController.current
   val focus = LocalFocusManager.current
   val dismissKeyboard = remember(keyboard, focus) {
@@ -167,7 +196,16 @@ private fun ChatContent(
     ChatStack(
       modifier = Modifier.weight(1f),
       stream = {
-        StreamArea(controller, timeline, snackbar, onOpenProviders, onOpenOnboarding, onSheet, dismissKeyboard)
+        StreamArea(
+          controller,
+          timeline,
+          streamSubagents,
+          snackbar,
+          onOpenProviders,
+          onOpenOnboarding,
+          onSheet,
+          dismissKeyboard,
+        )
       },
       dialog = { PendingDialogCard(controller, timeline) },
       steering = { PendingSteeringBox(controller, timeline, compact = tight) },
@@ -179,17 +217,22 @@ private fun ChatContent(
           working = working,
           tight = tight,
           onSheet = onSheet,
+          subagents = subagentsTab,
         )
       },
     )
   }
 }
 
-/** The stream, with the snackbars over its bottom (or its top while a dialog or steering waits) and the slash menu. */
+/**
+ * The stream, with the snackbars over its bottom (or its top while a dialog or steering waits) and the slash menu;
+ * [subagents] is what its subagent rows show and open.
+ */
 @Composable
 private fun StreamArea(
   controller: ChatController,
   timeline: TimelineState,
+  subagents: StreamSubagents,
   snackbar: SnackbarStackState,
   onOpenProviders: () -> Unit,
   onOpenOnboarding: () -> Unit,
@@ -209,6 +252,7 @@ private fun StreamArea(
       onOpenOnboarding = onOpenOnboarding,
       onRestart = process::restart,
       backgroundTasks = backgroundTasks,
+      subagents = subagents,
     )
     // A dialog card or the steering box fills the space over the composer, so snackbars move up under the header.
     val raised = timeline.pendingUi != null || timeline.queue.isNotEmpty()
@@ -222,7 +266,7 @@ private fun StreamArea(
 
 /** The first extension dialog Pi waits on, between the stream and the composer. */
 @Composable
-private fun PendingDialogCard(controller: ChatController, timeline: TimelineState) {
+internal fun PendingDialogCard(controller: ChatController, timeline: TimelineState) {
   val request = timeline.pendingUi ?: return
   ExtensionUiCard(
     request = request,
@@ -253,30 +297,6 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
       .padding(start = 10.dp, end = 10.dp, bottom = PipkinTokens.Spacing.s6)
       .widthIn(max = PipkinTokens.contentMaxWidth)
       .fillMaxWidth(),
-  )
-}
-
-/**
- * Session name (or the first message) over the project path, or over the statuses extensions set while there are any,
- * in the pane's header.
- */
-@Composable
-private fun ChatHeader(process: AgentProcess, controls: PaneControls, modifier: Modifier) {
-  val graph = LocalContext.current.appGraph
-  val sessionName by process.sessionName.collectAsStateWithLifecycle()
-  val extensionTitle by process.extensionTitle.collectAsStateWithLifecycle()
-  val sessionFile by process.sessionFile.collectAsStateWithLifecycle()
-  val sessions by graph.sessionRepository.sessions.collectAsStateWithLifecycle()
-  val firstMessage = sessions.firstOrNull { it.path == sessionFile }?.firstMessage?.takeIf { it.isNotBlank() }
-  val statuses by process.extensionStatuses.collectAsStateWithLifecycle()
-  val colors = pipkinColors
-  val status = remember(statuses, colors) { extensionStatusLine(statuses, colors) }
-  PaneHeader(
-    title = extensionTitle ?: sessionName ?: firstMessage ?: stringResource(R.string.chat_new_chat),
-    cwd = process.cwd,
-    controls = controls,
-    modifier = modifier,
-    status = status,
   )
 }
 
@@ -336,7 +356,12 @@ private fun PublishChatActions(
 }
 
 @Composable
-private fun ChatSheets(controller: ChatController, sheet: ChatSheet?, onSheet: (ChatSheet?) -> Unit) {
+private fun ChatSheets(
+  controller: ChatController,
+  sheet: ChatSheet?,
+  onSheet: (ChatSheet?) -> Unit,
+  onOpenSubagent: (toolCallId: String) -> Unit,
+) {
   val process = controller.process
   val timeline by process.screenTimeline.collectAsStateWithLifecycle()
   val sessionName by process.sessionName.collectAsStateWithLifecycle()
@@ -364,6 +389,17 @@ private fun ChatSheets(controller: ChatController, sheet: ChatSheet?, onSheet: (
       val widget = widgets[sheet.key]
       if (widget != null) WidgetSheet(KeyedWidget(sheet.key, widget), controller.view.widgetTabs, onDismiss = dismiss)
     }
+
+    ChatSheet.Subagents -> SubagentsSheet(
+      subagents = rememberChatSubagents(process, timeline),
+      question = timeline.pendingUi?.title,
+      onOpen = {
+        dismiss()
+        onOpenSubagent(it)
+      },
+      onStopAll = { controller.scope.launch { process.stopAllSubagents() } },
+      onDismiss = dismiss,
+    )
 
     else -> Unit
   }

@@ -81,7 +81,7 @@ internal fun PaneHeader(
  * shows, and past [MAX_SHOWN_TABS] that number with a plus. TalkBack reads the whole count.
  */
 @Composable
-private fun TabsButton(tabs: Int, onClick: () -> Unit) {
+internal fun TabsButton(tabs: Int, onClick: () -> Unit) {
   val colors = pipkinColors
   val description = pluralStringResource(R.plurals.shell_tabs_button, tabs, tabs)
   val number = remember(tabs) { NumberFormat.getIntegerInstance().format(tabs.coerceAtMost(MAX_SHOWN_TABS)) }

@@ -92,7 +92,8 @@ private const val LAUNCHER_MASK_SCALE = 1.5f
  * Keeps the end in view while the user is at the bottom; dragging away stops following. Opens where [view] says the
  * chat was left, with the replies it has parsed, and records where it is when it leaves. While Pi starts under a
  * history already shown, a pinned [LoadingPill] replaces the banner. [onRestart] retries a failed start and restarts
- * an exited Pi. The last run's footer shows the [backgroundTasks] the chat still waits on.
+ * an exited Pi. The last run's footer shows the [backgroundTasks] the chat still waits on, and the open run's the
+ * subagents it waits on. [subagents] is what the `subagent` tool rows show and open.
  */
 @Suppress("LongParameterList") // One parameter per thing the stream shows or hands back to the chat.
 @Composable
@@ -105,6 +106,7 @@ internal fun ChatStream(
   onOpenOnboarding: () -> Unit,
   onRestart: () -> Unit,
   backgroundTasks: Int,
+  subagents: StreamSubagents,
   modifier: Modifier = Modifier,
 ) {
   val scroll = view.scroll
@@ -138,6 +140,7 @@ internal fun ChatStream(
       follow,
       view,
       backgroundTasks,
+      subagents,
       onRestart,
       onOpenOnboarding,
       onOpenTool,
@@ -222,12 +225,12 @@ private fun StreamList(
   follow: State<Boolean>,
   view: ChatView,
   backgroundTasks: Int,
+  subagents: StreamSubagents,
   onRestart: () -> Unit,
   onOpenOnboarding: () -> Unit,
   onOpenTool: (key: String) -> Unit,
 ) {
   val items = rows.items
-  val markdownCache = view.markdown
   val recomposer = LocalView.current.findViewTreeCompositionContext() as Recomposer
   val anchor = remember(listState, follow, recomposer) { BottomAnchor(listState, follow, recomposer) }
   val gate = remember(listState) { FirstDrawGate(listState) }
@@ -248,7 +251,7 @@ private fun StreamList(
         anchor.beforeMeasure(constraints.maxHeight, itemCount)
         val placeable = measurable.measure(constraints)
         layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-      }.drawWithContent { if (gate.isOpen(items, firstItemIndex, markdownCache)) drawContent() }
+      }.drawWithContent { if (gate.isOpen(items, firstItemIndex, view.markdown)) drawContent() }
       .fillMaxSize(),
     contentPadding = PaddingValues(
       start = PipkinTokens.Spacing.s16,
@@ -275,8 +278,9 @@ private fun StreamList(
       }
       StreamItem(
         item = item,
-        markdownCache = markdownCache,
+        markdownCache = view.markdown,
         backgroundTasks = if (item.key == lastFooterKey) backgroundTasks else 0,
+        subagents = subagents,
         expanded = view.expanded,
         onOpenTool = onOpenTool,
         onRestart = onRestart,
@@ -367,14 +371,16 @@ private class BottomAnchor(
 }
 
 /**
- * [backgroundTasks] is what a [TimelineItem.TurnFooter] shows the chat still waits on; [expanded] holds the keys of
- * the folds whose steps are listed and the long prompts shown whole, which tapping their toggle adds or removes.
+ * [backgroundTasks] is what a [TimelineItem.TurnFooter] shows the chat still waits on, beside the [subagents] the open
+ * run waits on; [expanded] holds the keys of the folds whose steps are listed and the long prompts shown whole, which
+ * tapping their toggle adds or removes.
  */
 @Composable
 private fun StreamItem(
   item: TimelineItem,
   markdownCache: MarkdownCache,
   backgroundTasks: Int,
+  subagents: StreamSubagents,
   expanded: MutableSet<String>,
   onOpenTool: (key: String) -> Unit,
   onRestart: () -> Unit,
@@ -388,6 +394,7 @@ private fun StreamItem(
         expanded = shown,
         onToggle = { if (shown) expanded -= item.key else expanded += item.key },
         modifier = modifier,
+        task = item.key == subagents.taskKey,
       )
     }
 
@@ -397,15 +404,17 @@ private fun StreamItem(
 
     is TimelineItem.ExtensionNotice -> ExtensionNoticeCard(item, modifier)
 
-    is TimelineItem.Thinking -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
-
-    is TimelineItem.ToolCall -> ToolRow(toolPresentation(item), onClick = { onOpenTool(item.key) }, modifier)
+    is TimelineItem.Thinking, is TimelineItem.ToolCall -> StepRow(item, subagents, onOpenTool, modifier)
 
     is TimelineItem.Error -> ErrorRow(item.cause.text(LocalResources.current), modifier)
 
     is TimelineItem.Notice -> NoticeRow(item.kind, modifier)
 
-    is TimelineItem.TurnFooter -> TurnFooterRow(item, backgroundTasks, modifier)
+    is TimelineItem.TurnFooter -> {
+      // Only the open run's footer has no duration yet, and only that run waits on subagents.
+      val waitedOn = if (item.durationMillis == null) subagents.chat.active else 0
+      TurnFooterRow(item, backgroundTasks, modifier, subagents = waitedOn)
+    }
 
     is TimelineItem.ExitBanner -> ExitBannerCard(item, onRestart, modifier)
 
@@ -416,6 +425,7 @@ private fun StreamItem(
         expanded = shown,
         onToggle = { if (shown) expanded -= item.key else expanded += item.key },
         onOpenTool = onOpenTool,
+        subagents = subagents,
         modifier = modifier,
       )
     }

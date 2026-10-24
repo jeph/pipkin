@@ -68,6 +68,7 @@ private const val PROMPT_LINES = 8
 /**
  * The user's message: a full-width card headed "You" and its time, with the copy button at the end of that line. Text
  * longer than [PROMPT_LINES] lines folds unless [expanded]; [onToggle] unfolds or folds it. Images always show whole.
+ * A subagent's [task] is the first message of its transcript, which the main agent wrote, so it's headed as the task.
  */
 @Composable
 internal fun UserMessage(
@@ -75,6 +76,7 @@ internal fun UserMessage(
   expanded: Boolean,
   onToggle: () -> Unit,
   modifier: Modifier = Modifier,
+  task: Boolean = false,
 ) {
   val colors = pipkinColors
   Column(
@@ -84,7 +86,7 @@ internal fun UserMessage(
       .background(colors.surface1)
       .padding(start = 14.dp, top = PipkinTokens.Spacing.s4, end = PipkinTokens.Spacing.s4, bottom = 11.dp),
   ) {
-    PromptHeader(item)
+    PromptHeader(item, task)
     Column(
       modifier = Modifier.padding(end = PipkinTokens.Spacing.s8),
       verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
@@ -109,14 +111,18 @@ internal fun UserMessage(
 }
 
 @Composable
-private fun PromptHeader(item: TimelineItem.User) {
+private fun PromptHeader(item: TimelineItem.User, task: Boolean) {
   val colors = pipkinColors
   val context = LocalContext.current
   val time = remember(item.timestamp, context) { DateFormat.getTimeFormat(context).format(Date(item.timestamp)) }
   Row(modifier = Modifier.heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically) {
-    CapsLabel(stringResource(R.string.chat_you), colors.accent, fontWeight = FontWeight.SemiBold)
+    if (task) {
+      CapsLabel(stringResource(R.string.subagent_task), colors.extension, fontWeight = FontWeight.SemiBold)
+    } else {
+      CapsLabel(stringResource(R.string.chat_you), colors.accent, fontWeight = FontWeight.SemiBold)
+    }
     Text(
-      text = stringResource(R.string.separator_dot) + time,
+      text = stringResource(R.string.separator_dot) + if (task) stringResource(R.string.subagent_task_from) else time,
       modifier = Modifier.weight(1f),
       color = colors.foregroundMuted,
       fontSize = 10.5.sp,

@@ -115,6 +115,11 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     call("hello", JSONObject())
   }
 
+  /** The transcripts of the subagents the chat saved at [path] ran, oldest first, read from their files' headers. */
+  suspend fun subagentSessions(path: String): List<SubagentSession> =
+    call("subagent_sessions", JSONObject().put("path", path)).optJSONArray("sessions").objects()
+      .map(SubagentSession::from)
+
   /** Sign-in to a provider Pi ships: OAuth, or Pi prompting for an API key. Cancelling the caller aborts the login. */
   suspend fun login(providerId: String, ui: LoginUi) {
     call("login", JSONObject().put("providerId", providerId), LOGIN_TIMEOUT_MILLIS) { channel, line ->

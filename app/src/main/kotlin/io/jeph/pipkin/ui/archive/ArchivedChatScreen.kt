@@ -41,6 +41,7 @@ import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ChatStream
 import io.jeph.pipkin.ui.chat.ChatView
+import io.jeph.pipkin.ui.chat.StreamSubagents
 import io.jeph.pipkin.ui.chat.ToolCallSheet
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.HeaderButton
@@ -50,6 +51,7 @@ import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.sidebar.tildePath
+import io.jeph.pipkin.ui.subagents.ChatSubagents
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.sessionTitle
@@ -71,7 +73,8 @@ private sealed interface Transcript {
 /**
  * The archived chat in session file [path], read from its file without starting Pi: the chat's stream with no
  * composer. Restore takes it out of the archive and reopens it as a live chat through [onRestored]; Delete removes
- * its file. Leaves on its own once the chat is no longer archived.
+ * its file. A subagent's tool row opens the subagent through [onOpenSubagent], with its tool call's id. Leaves on its
+ * own once the chat is no longer archived.
  */
 @Composable
 internal fun ArchivedChatScreen(
@@ -79,6 +82,7 @@ internal fun ArchivedChatScreen(
   actions: ShellActions,
   onBack: () -> Unit,
   onRestored: (ChatLocation) -> Unit,
+  onOpenSubagent: (toolCallId: String) -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
   val archived by graph.sessionArchive.archived.collectAsStateWithLifecycle()
@@ -96,7 +100,12 @@ internal fun ArchivedChatScreen(
   Column(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
     TranscriptHeader(session, actions.home, deleteEnabled = !busy, onBack, onDelete = { confirmingDelete = true })
     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-      TranscriptBody(transcript, onRetry = { attempt += 1 }, onOpenTool = { toolKey = it })
+      TranscriptBody(
+        transcript,
+        onRetry = { attempt += 1 },
+        onOpenTool = { toolKey = it },
+        onOpenSubagent = onOpenSubagent,
+      )
       SnackbarStack(snackbar, Modifier.align(Alignment.BottomCenter).padding(PipkinTokens.Spacing.s16))
     }
     ReadOnlyBar(
@@ -192,7 +201,12 @@ private fun TranscriptHeader(
 }
 
 @Composable
-private fun TranscriptBody(transcript: Transcript, onRetry: () -> Unit, onOpenTool: (String) -> Unit) {
+private fun TranscriptBody(
+  transcript: Transcript,
+  onRetry: () -> Unit,
+  onOpenTool: (String) -> Unit,
+  onOpenSubagent: (String) -> Unit,
+) {
   val colors = pipkinColors
   when (transcript) {
     Transcript.Loading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { SimmeringPot() }
@@ -226,6 +240,8 @@ private fun TranscriptBody(transcript: Transcript, onRetry: () -> Unit, onOpenTo
         onOpenOnboarding = {},
         onRestart = {},
         backgroundTasks = 0,
+        // No Pi runs an archived chat, so every subagent it shows has finished, or was interrupted.
+        subagents = remember(onOpenSubagent) { StreamSubagents(ChatSubagents.None, onOpenSubagent) },
       )
     }
   }

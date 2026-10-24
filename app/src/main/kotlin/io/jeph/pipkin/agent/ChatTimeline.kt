@@ -494,7 +494,13 @@ class ChatTimeline(
       rebuilt.map { item ->
         val old = (item as? ToolCall)?.let { findTool(it.id) }?.let { items[it] as ToolCall }
         if (item is ToolCall && old != null) {
-          item.copy(output = old.output, isError = old.isError, status = old.status, figure = old.figure)
+          item.copy(
+            output = old.output,
+            isError = old.isError,
+            status = old.status,
+            figure = old.figure,
+            details = old.details,
+          )
         } else {
           item
         }
@@ -504,7 +510,12 @@ class ChatTimeline(
     items.addAll(if (first < 0) items.size else first, merged)
   }
 
+  /**
+   * A top-level tool call's progress. A call with a `parentToolCallId` is one a subagent made through that `subagent`
+   * call: it belongs to the subagent's own transcript, so it never becomes a row of the chat.
+   */
   private fun toolExecution(event: JSONObject) {
+    if (!event.optStringOrNull("parentToolCallId").isNullOrEmpty()) return
     val id = event.optString("toolCallId")
     val args = event.optJSONObject("args")
     val index =
@@ -523,7 +534,7 @@ class ChatTimeline(
           )
 
         else -> event.optJSONObject("result").let { result ->
-          tool.withResult(result?.optJSONArray("content").text(), event.optBoolean("isError"), result)
+          tool.finished(result?.optJSONArray("content").text(), event.optBoolean("isError"), result)
         }
       }
   }
@@ -531,11 +542,21 @@ class ChatTimeline(
   private fun attachToolResult(message: JSONObject) {
     val index = findTool(message.optString("toolCallId")) ?: return
     items[index] =
-      (items[index] as ToolCall).withResult(
+      (items[index] as ToolCall).finished(
         message.optJSONArray("content").text(),
         message.optBoolean("isError"),
         message,
       )
+  }
+
+  /**
+   * This call finished with [output], failed or not, and [result], the result holding its `details`. A `subagent`
+   * call keeps them, since they lead its row to the run's transcript once the run is gone.
+   */
+  private fun ToolCall.finished(output: String?, failed: Boolean, result: JSONObject?): ToolCall {
+    val done = withResult(output, failed, result)
+    if (toolName != SUBAGENT_TOOL) return done
+    return done.copy(details = result?.optJSONObject("details"))
   }
 
   private fun compactionEnd(event: JSONObject) {

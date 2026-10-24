@@ -61,6 +61,7 @@ import io.jeph.pipkin.ui.settings.ProvidersScreen
 import io.jeph.pipkin.ui.settings.SettingsScreen
 import io.jeph.pipkin.ui.settings.SubscriptionScreen
 import io.jeph.pipkin.ui.settings.ownsDraft
+import io.jeph.pipkin.ui.subagents.ArchivedSubagentScreen
 import io.jeph.pipkin.ui.theme.PipkinTheme
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -192,7 +193,8 @@ private fun Screen(
       onSidePanelOpen = onSidePanelOpen,
     )
 
-    Destination.Archive, is Destination.ArchivedChat -> ArchivePage(top, navigator, actions, requestedChat)
+    Destination.Archive, is Destination.ArchivedChat, is Destination.ArchivedSubagent ->
+      ArchivePage(top, navigator, actions, requestedChat)
 
     Destination.Settings, Destination.Permissions, Destination.Backups, Destination.Advanced, Destination.Licenses,
     is Destination.License,
@@ -271,7 +273,10 @@ private fun SettingsPages(top: Destination, navigator: AppNavigator) {
   }
 }
 
-/** The archive list, or one archived chat's transcript; restoring that one reopens it on the main screen. */
+/**
+ * The archive list, one archived chat's transcript, or the transcript of a subagent it ran; restoring a chat reopens it
+ * on the main screen.
+ */
 @Composable
 private fun ArchivePage(
   top: Destination,
@@ -279,15 +284,22 @@ private fun ArchivePage(
   actions: ShellActions,
   requestedChat: MutableStateFlow<ChatLocation?>,
 ) {
-  if (top is Destination.ArchivedChat) {
-    ArchivedChatScreen(
+  when (top) {
+    is Destination.ArchivedChat -> ArchivedChatScreen(
       path = top.path,
       actions = actions,
       onBack = { navigator.pop() },
       onRestored = { requestedChat.value = it },
+      onOpenSubagent = { navigator.push(Destination.ArchivedSubagent(top.path, it)) },
     )
-  } else {
-    ArchiveScreen(
+
+    is Destination.ArchivedSubagent -> ArchivedSubagentScreen(
+      path = top.path,
+      toolCallId = top.toolCallId,
+      onBack = { navigator.pop() },
+    )
+
+    else -> ArchiveScreen(
       actions = actions,
       onBack = { navigator.pop() },
       onOpenChat = { navigator.push(Destination.ArchivedChat(it)) },

@@ -104,7 +104,7 @@ private val ICON_SIZE = 18.dp
  * [trailingControls] (reserved for voice input) and the primary send/stop button. Send stays greyed out while Pi
  * starts. The model and thinking chips open their pickers through [onSheet]. Extension widgets show as tabs at the
  * tray's top or bottom edge, and a tab opens its widget's panel in the tray, which keeps to a few lines and scrolls
- * when [tight].
+ * when [tight]. The [subagents] tab, while the chat has subagents, leads the tabs above the editor.
  */
 @Composable
 internal fun Composer(
@@ -114,6 +114,7 @@ internal fun Composer(
   working: Boolean,
   tight: Boolean,
   onSheet: (ChatSheet) -> Unit,
+  subagents: SubagentsTab?,
   modifier: Modifier = Modifier,
   trailingControls: @Composable RowScope.() -> Unit = {},
 ) {
@@ -142,7 +143,7 @@ internal fun Composer(
     contentAlignment = Alignment.TopCenter,
   ) {
     Column(modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth()) {
-      WidgetTabStrip(above, tabs, belowEditor = false)
+      WidgetTabStrip(above, tabs, belowEditor = false, subagents = subagents)
       // Not clipped: the attachment remove buttons overhang their thumbnails. Weighted, so the tab strips keep their
       // height when the composer has to shrink.
       Column(modifier = Modifier.weight(1f, fill = false).fillMaxWidth()) {

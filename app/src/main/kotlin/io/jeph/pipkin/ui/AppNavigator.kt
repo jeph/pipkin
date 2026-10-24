@@ -51,6 +51,12 @@ sealed interface Destination {
 
   /** The read-only transcript of the archived chat in session file [path]. */
   data class ArchivedChat(val path: String) : Destination
+
+  /**
+   * The read-only transcript of the subagent the archived chat in session file [path] started with its `subagent`
+   * tool call [toolCallId].
+   */
+  data class ArchivedSubagent(val path: String, val toolCallId: String) : Destination
 }
 
 /** The screen stack; never empty. Main thread only. */
@@ -92,40 +98,78 @@ class AppNavigator(initial: List<Destination>) {
     /** A stable string per destination, also used as its saveable-state key. */
     fun key(d: Destination): String = when (d) {
       Destination.Main -> MAIN
+
       Destination.Settings -> SETTINGS
+
       Destination.Permissions -> PERMISSIONS
+
       Destination.Advanced -> ADVANCED
+
       Destination.Backups -> BACKUPS
+
       Destination.Licenses -> LICENSES
+
       is Destination.License -> LICENSE + d.path
+
       Destination.Onboarding -> ONBOARDING
+
       Destination.Providers -> PROVIDERS
+
       Destination.AddProvider -> ADD_PROVIDER
+
       is Destination.Subscription -> SUBSCRIPTION + d.id
+
       is Destination.ProviderEditor -> PROVIDER + d.id.orEmpty()
+
       Destination.AddModels -> ADD_MODELS
+
       is Destination.ModelEditor -> MODEL + d.modelId
+
       Destination.Archive -> ARCHIVE
+
       is Destination.ArchivedChat -> ARCHIVED_CHAT + d.path
+
+      // A tool call id has no line break; a path comes last, since it may hold any other character.
+      is Destination.ArchivedSubagent -> ARCHIVED_SUBAGENT + d.toolCallId + "\n" + d.path
     }
 
     private fun destination(key: String): Destination? = when {
       key == MAIN -> Destination.Main
+
       key == SETTINGS -> Destination.Settings
+
       key == PERMISSIONS -> Destination.Permissions
+
       key == ADVANCED -> Destination.Advanced
+
       key == BACKUPS -> Destination.Backups
+
       key == LICENSES -> Destination.Licenses
+
       key.startsWith(LICENSE) -> Destination.License(key.removePrefix(LICENSE))
+
       key == ONBOARDING -> Destination.Onboarding
+
       key == PROVIDERS -> Destination.Providers
+
       key == ADD_PROVIDER -> Destination.AddProvider
+
       key == ADD_MODELS -> Destination.AddModels
+
       key == ARCHIVE -> Destination.Archive
+
       key.startsWith(ARCHIVED_CHAT) -> Destination.ArchivedChat(key.removePrefix(ARCHIVED_CHAT))
+
+      key.startsWith(ARCHIVED_SUBAGENT) -> key.removePrefix(ARCHIVED_SUBAGENT).let { rest ->
+        Destination.ArchivedSubagent(path = rest.substringAfter('\n'), toolCallId = rest.substringBefore('\n'))
+      }
+
       key.startsWith(MODEL) -> Destination.ModelEditor(key.removePrefix(MODEL))
+
       key.startsWith(SUBSCRIPTION) -> Destination.Subscription(key.removePrefix(SUBSCRIPTION))
+
       key.startsWith(PROVIDER) -> Destination.ProviderEditor(key.removePrefix(PROVIDER).ifEmpty { null })
+
       else -> null
     }
 
@@ -145,5 +189,6 @@ class AppNavigator(initial: List<Destination>) {
     private const val MODEL = "model:"
     private const val ARCHIVE = "archive"
     private const val ARCHIVED_CHAT = "archived-chat:"
+    private const val ARCHIVED_SUBAGENT = "archived-subagent:"
   }
 }

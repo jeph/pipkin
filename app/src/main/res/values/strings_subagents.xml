@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- A subagent's status at the end of its tool row in the chat, lower case beside a running time such as 0:42. -->
+    <string name="subagent_row_queued">queued</string>
+    <string name="subagent_row_asking">asking</string>
+    <string name="subagent_row_done">done</string>
+    <string name="subagent_row_failed">failed</string>
+    <string name="subagent_row_stopped">stopped</string>
+    <string name="subagent_row_interrupted">interrupted</string>
+    <!-- What TalkBack reads for a subagent's tool row. %1$s is the agent's name, such as Explore, %2$s the few words
+         the model gave its task, %3$s its status or running time. -->
+    <string name="subagent_row_description">Subagent %1$s, %2$s, %3$s</string>
+    <string name="subagent_open">Open subagent</string>
+
+    <!-- A subagent's status in the Subagents list and on its screen. -->
+    <string name="subagent_status_queued">Queued</string>
+    <string name="subagent_status_running">Running</string>
+    <string name="subagent_status_asking">Waiting for your answer</string>
+    <string name="subagent_status_done">Done</string>
+    <string name="subagent_status_failed">Failed</string>
+    <string name="subagent_status_stopped">Stopped</string>
+    <string name="subagent_status_interrupted">Interrupted</string>
+
+    <!-- The Subagents tab on the message box, and its list. -->
+    <string name="subagents_title">Subagents</string>
+    <plurals name="subagents_tab_description">
+        <!-- What TalkBack reads for the Subagents tab. %1$s is the number of subagents queued or running, already
+             formatted. -->
+        <item quantity="one">Subagents, %1$s running</item>
+        <item quantity="other">Subagents, %1$s running</item>
+    </plurals>
+    <!-- What TalkBack reads for the Subagents tab while a subagent waits on the user. %1$s is the tab's description
+         without it, such as "Subagents, 2 running". -->
+    <string name="subagents_tab_waiting">%1$s, a subagent needs you</string>
+    <string name="subagents_open_list">Show subagents</string>
+    <plurals name="subagents_runs">
+        <!-- %1$s is the number of the chat's subagents in the list, already formatted. -->
+        <item quantity="one">%1$s run</item>
+        <item quantity="other">%1$s runs</item>
+    </plurals>
+    <plurals name="subagents_running">
+        <!-- %1$s is the number of the chat's subagents queued or running, already formatted. -->
+        <item quantity="one">%1$s running</item>
+        <item quantity="other">%1$s running</item>
+    </plurals>
+    <!-- %1$s is a token count, already shortened, such as 12.4K. -->
+    <string name="subagents_tokens">%1$s tokens</string>
+    <string name="subagents_group_waiting">Waiting for you</string>
+    <string name="subagents_group_running">Running</string>
+    <string name="subagents_group_finished">Finished</string>
+    <!-- A failed subagent's line in the list. %1$s is the error the extension reported, as it sent it. -->
+    <string name="subagents_failed_because">Failed · %1$s</string>
+    <!-- A finished subagent's line in the list. %1$s is the tokens it used, such as "21K tokens". -->
+    <string name="subagents_done_tokens">Done · %1$s</string>
+    <string name="subagents_stop_all">Stop all</string>
+
+    <!-- The subagent screen. -->
+    <!-- The screen's title. %1$s is the agent's name, such as Explore, %2$s the few words the model gave its task. -->
+    <string name="subagent_title">%1$s · %2$s</string>
+    <string name="subagent_back">Back to the chat</string>
+    <!-- %1$s is the title of the chat that started the subagent. -->
+    <string name="subagent_breadcrumb">Subagent of %1$s</string>
+    <!-- %1$s is the number of the turn the running subagent is on, already formatted. -->
+    <string name="subagent_turn">Turn %1$s</string>
+    <plurals name="subagent_turns">
+        <!-- %1$s is how many turns the subagent took, already formatted. -->
+        <item quantity="one">%1$s turn</item>
+        <item quantity="other">%1$s turns</item>
+    </plurals>
+    <string name="subagent_task">Task</string>
+    <string name="subagent_task_from">from the main agent</string>
+    <!-- The placeholder of the box that steers a running subagent. %1$s is the agent's name, such as Explore. -->
+    <string name="subagent_steer_placeholder">Steer %1$s…</string>
+    <!-- %1$s is the agent's name, such as Explore. -->
+    <string name="subagent_steer_send">Send to %1$s</string>
+    <string name="subagent_stop">Stop</string>
+    <string name="subagent_archived_read_only">Subagent of an archived chat · read only</string>
+    <string name="subagent_transcript_gone">This subagent\'s transcript is no longer available.</string>
+    <string name="subagent_transcript_none">This subagent ran without saving a transcript.</string>
+    <string name="subagent_transcript_starting">The subagent is starting…</string>
+    <string name="subagent_transcript_failed">Couldn\'t read this subagent\'s transcript.</string>
+    <string name="subagent_retry">Try again</string>
+
+    <!-- The chat's run footer while it waits on its subagents. -->
+    <plurals name="chat_waiting_on_subagents">
+        <!-- %1$s is the number of subagents queued or running, already formatted. -->
+        <item quantity="one">waiting on %1$s subagent</item>
+        <item quantity="other">waiting on %1$s subagents</item>
+    </plurals>
+</resources>
