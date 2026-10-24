@@ -200,32 +200,41 @@ class SubagentCallsTest {
     val first = TranscriptHistory.of(JSONArray(start))
     assertEquals(start, first.messages)
 
-    // A compaction keeps the reply at 5 on: the task and the reply at 3 leave Pi's context but stay on screen.
+    // A compaction keeps the reply at 5 on: the task and the reply at 3 leave Pi's context but stay on screen, and
+    // the kept reply stays where it was, before the compaction.
     val compacted = listOf(message("system", 9), message("compactionSummary", 10), message("assistant", 5))
     val second = first.after(JSONArray(compacted + message("assistant", 11)))
-    assertEquals(listOf(1L, 2, 3, 9, 10, 5, 11), second.messages.map { it.getLong("timestamp") })
-    assertEquals(3, second.base)
+    assertEquals(listOf(1L, 2, 3, 5, 9, 10, 11), second.messages.map { it.getLong("timestamp") })
 
     // Read again with the same compaction: only the new reply joins.
     val third = second.after(JSONArray(compacted + message("assistant", 11) + message("assistant", 12)))
-    assertEquals(listOf(1L, 2, 3, 9, 10, 5, 11, 12), third.messages.map { it.getLong("timestamp") })
+    assertEquals(listOf(1L, 2, 3, 5, 9, 10, 11, 12), third.messages.map { it.getLong("timestamp") })
 
     // A compaction that keeps nothing: every row so far stays.
     val fourth = third.after(JSONArray(listOf(message("compactionSummary", 20), message("assistant", 21))))
-    assertEquals(listOf(1L, 2, 3, 9, 10, 5, 11, 12, 20, 21), fourth.messages.map { it.getLong("timestamp") })
+    assertEquals(listOf(1L, 2, 3, 5, 9, 10, 11, 12, 20, 21), fourth.messages.map { it.getLong("timestamp") })
 
-    // Each compaction shows where it came, as in the live chat, and the task stays first.
-    val rows = ChatTimeline().apply { seed(fourth.shown(), compactions = true) }.state.value.items
-    val compactedAt = rows.withIndex().filter { (it.value as? Notice)?.kind == NoticeKind.Compacted }.map { it.index }
-    assertEquals(2, compactedAt.size)
-    assertTrue(rows.first() is TimelineItem.User)
+    // Each compaction shows where it came, as in the live chat, after the rows shown before it.
+    assertEquals(
+      listOf("task", "r3", "r5", "compacted", "r11", "r12", "compacted", "r21"),
+      rows(fourth.shown()),
+    )
 
     // A screen first opened after the compaction shows what an archived chat would: its context, with no notice.
     val fresh = TranscriptHistory.of(JSONArray(compacted + message("assistant", 11)))
-    val freshRows = ChatTimeline().apply { seed(fresh.shown(), compactions = true) }.state.value.items
-    assertTrue(freshRows.none { it is Notice })
-    assertEquals(2, freshRows.size)
+    assertEquals(listOf("r5", "r11"), rows(fresh.shown()))
   }
+
+  /** The task, replies and compaction notices among the rows a subagent screen seeds from [messages]. */
+  private fun rows(messages: JSONArray): List<String> =
+    ChatTimeline().apply { seed(messages, compactions = true) }.state.value.items.mapNotNull { item ->
+      when (item) {
+        is TimelineItem.User -> "task"
+        is TimelineItem.AssistantText -> item.markdown
+        is Notice -> if (item.kind == NoticeKind.Compacted) "compacted" else null
+        else -> null
+      }
+    }
 
   private fun message(role: String, timestamp: Long): JSONObject {
     val message = JSONObject().put("role", role).put("timestamp", timestamp)
