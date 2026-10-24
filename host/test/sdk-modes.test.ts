@@ -87,6 +87,104 @@ describe("modes backed by the Pi SDK", () => {
     expect(await runMode("session_messages", dirs, { path: gone })).toMatchObject({ ok: false, code: "not_found" });
   });
 
+  /** Writes a subagent transcript of [parent] the way Pipkin subagents saves one, started at [time]. */
+  async function writeSubagent(parent: string, parentId: string, id: string, time: string, messages: object[]) {
+    const dir = path.join(path.dirname(parent), "subagents", parentId);
+    await mkdir(dir, { recursive: true });
+    const file = path.join(dir, `${time.replaceAll(/[:.]/g, "-")}_${id}.jsonl`);
+    const header = { type: "session", version: 3, id, timestamp: time, cwd: dirs.home, parentSession: parent };
+    const link = {
+      type: "custom",
+      customType: "pipkin-subagent",
+      id: "c0",
+      parentId: null,
+      timestamp: time,
+      data: { agent: "Explore", description: `task ${id}`, task: `Do ${id}`, toolCallId: `call_${id}` },
+    };
+    const entries = messages.map((message, index) => ({
+      type: "message",
+      id: `e${index}`,
+      parentId: index === 0 ? "c0" : `e${index - 1}`,
+      timestamp: time,
+      message,
+    }));
+    await writeFile(file, [header, link, ...entries].map((line) => JSON.stringify(line) + "\n").join(""));
+    return file;
+  }
+
+  it("counts each session's subagents and keeps their transcripts out of the list", async () => {
+    const parent = await writeSession(dirs.home, "parent", [USER, ASSISTANT]);
+    await writeSession(dirs.home, "lonely", [USER, ASSISTANT]);
+    await writeSubagent(parent, "parent", "s1", "2026-10-12T00:00:02.000Z", [USER, ASSISTANT]);
+    await writeSubagent(parent, "parent", "s2", "2026-10-12T00:00:03.000Z", [USER]);
+    await writeFile(path.join(path.dirname(parent), "subagents", "parent", "notes.txt"), "not a transcript");
+    const result = await runMode("sessions", dirs, {});
+    expect(result).toMatchObject({ ok: true });
+    const listed = (result.data as { sessions: { id: string; subagents: number }[] }).sessions;
+    expect(listed.map(({ id, subagents }) => ({ id, subagents })).toSorted((a, b) => a.id.localeCompare(b.id))).toEqual([
+      { id: "lonely", subagents: 0 },
+      { id: "parent", subagents: 2 },
+    ]);
+  });
+
+  it("lists a session's subagent transcripts, oldest first", async () => {
+    const parent = await writeSession(dirs.home, "parent", [USER, ASSISTANT]);
+    const later = await writeSubagent(parent, "parent", "s2", "2026-10-12T00:00:03.000Z", [USER]);
+    const earlier = await writeSubagent(parent, "parent", "s1", "2026-10-12T00:00:02.000Z", [USER, ASSISTANT]);
+    expect(await runMode("subagent_sessions", dirs, { path: parent })).toEqual({
+      type: "pipkin_result",
+      ok: true,
+      data: {
+        sessions: [
+          {
+            path: earlier,
+            toolCallId: "call_s1",
+            agent: "Explore",
+            description: "task s1",
+            created: Date.parse("2026-10-12T00:00:02.000Z"),
+            modified: expect.any(Number),
+            messageCount: 2,
+          },
+          {
+            path: later,
+            toolCallId: "call_s2",
+            agent: "Explore",
+            description: "task s2",
+            created: Date.parse("2026-10-12T00:00:03.000Z"),
+            modified: expect.any(Number),
+            messageCount: 1,
+          },
+        ],
+      },
+    });
+  });
+
+  it("lists no subagents for a session that has none", async () => {
+    const parent = await writeSession(dirs.home, "parent", [USER, ASSISTANT]);
+    expect(await runMode("subagent_sessions", dirs, { path: parent })).toEqual({
+      type: "pipkin_result",
+      ok: true,
+      data: { sessions: [] },
+    });
+  });
+
+  it("refuses to list subagents of a file outside the sessions folder", async () => {
+    await mkdir(path.join(dirs.configDir, "sessions"), { recursive: true });
+    const outside = path.join(dirs.configDir, "settings.json");
+    await writeFile(outside, "{}");
+    expect(await runMode("subagent_sessions", dirs, { path: outside })).toMatchObject({ ok: false, code: "outside_sessions" });
+  });
+
+  it("reads a subagent's messages from its transcript", async () => {
+    const parent = await writeSession(dirs.home, "parent", [USER, ASSISTANT]);
+    const file = await writeSubagent(parent, "parent", "s1", "2026-10-12T00:00:02.000Z", [USER, ASSISTANT]);
+    expect(await runMode("session_messages", dirs, { path: file })).toEqual({
+      type: "pipkin_result",
+      ok: true,
+      data: { messages: [USER, ASSISTANT] },
+    });
+  });
+
   const BUILTIN = ["anthropic", "openai-codex", "google", "zai", "kimi-coding"].map((id) => ({
     id,
     name: expect.any(String),

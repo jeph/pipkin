@@ -22,6 +22,7 @@ import { rpc } from "./modes/rpc.js";
 import { saveAttachments } from "./modes/save-attachments.js";
 import { sessionMessages } from "./modes/session-messages.js";
 import { sessions } from "./modes/sessions.js";
+import { subagentSessions } from "./modes/subagent-sessions.js";
 import { subscriptionSave } from "./modes/subscription-save.js";
 import { terminal } from "./modes/terminal.js";
 import { updateExtensions } from "./modes/update-extensions.js";
@@ -114,6 +115,8 @@ async function main(): Promise<void> {
       return respond(ctx, sessions);
     case "session_messages":
       return respond(ctx, sessionMessages);
+    case "subagent_sessions":
+      return respond(ctx, subagentSessions);
     case "delete_sessions":
       return respond(ctx, deleteSessions);
     case "files":

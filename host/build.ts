@@ -88,6 +88,13 @@ await Promise.all([
   }),
   build({
     ...common,
+    entryPoints: ["src/pi-extensions/pipkin-subagents/index.ts"],
+    outfile: `${out}/pipkin-extensions/pipkin-subagents.js`,
+    // Pi resolves these to its own copies when it loads an extension.
+    external: ["@earendil-works/*", "typebox"],
+  }),
+  build({
+    ...common,
     entryPoints: ["src/pi-extensions/pipkin-web-access/index.ts"],
     outfile: `${out}/pipkin-extensions/pipkin-web-access.js`,
     banner: { js: webAccessNotices },
