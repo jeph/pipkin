@@ -35,8 +35,8 @@ import java.text.NumberFormat
 
 /**
  * A run of steps folded into one line: Working while the run works, Done once it's done or Stopped, with how many steps
- * and how many failed. Tapping it lists the steps under it, or folds them again. Folded while the run works, the step
- * running now shows under the line, so the chat doesn't grow with every step.
+ * it took. Tapping it lists the steps under it, or folds them again. Folded while the run works, the step running now
+ * shows under the line, so the chat doesn't grow with every step.
  */
 @Composable
 internal fun StepFoldRow(
@@ -70,7 +70,7 @@ private fun StepFoldLine(fold: TimelineItem.Steps, expanded: Boolean, onToggle: 
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
-    OutcomeIcon(fold.outcome, failed = fold.failed > 0)
+    OutcomeIcon(fold.outcome)
     FoldSummary(fold, Modifier.weight(1f))
     LucideIcon(
       icon = if (expanded) R.drawable.ic_lucide_chevron_up else R.drawable.ic_lucide_chevron_down,
@@ -81,7 +81,7 @@ private fun StepFoldLine(fold: TimelineItem.Steps, expanded: Boolean, onToggle: 
   }
 }
 
-/** The fold's state, then its counts. They sit together, so only the separator's own spaces part them. */
+/** The fold's state, then its step count. They sit together, so only the separator's own spaces part them. */
 @Composable
 private fun FoldSummary(fold: TimelineItem.Steps, modifier: Modifier) {
   val colors = pipkinColors
@@ -110,32 +110,24 @@ private fun FoldSummary(fold: TimelineItem.Steps, modifier: Modifier) {
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )
-    if (fold.failed > 0) {
-      Text(
-        text = separator + pluralStringResource(R.plurals.chat_steps_failed, fold.failed, numbers.format(fold.failed)),
-        color = colors.destructive,
-        fontSize = 12.5.sp,
-        maxLines = 1,
-      )
-    }
   }
 }
 
 /**
- * A check once the run is done, or an alert in red when some of its steps [failed]; a square once it was stopped, or
- * a simmering pot while it works. As big as a step's icon, so it centres over the steps' icons.
+ * A check once the run is done, a square once it was stopped, or a simmering pot while it works. As big as a step's
+ * icon, so it centres over the steps' icons.
  */
 @Composable
-private fun OutcomeIcon(outcome: StepsOutcome, failed: Boolean) {
+private fun OutcomeIcon(outcome: StepsOutcome) {
   val colors = pipkinColors
   when (outcome) {
     StepsOutcome.Working -> SimmeringPot(size = STEP_ICON_SIZE, tint = colors.accent)
 
     StepsOutcome.Done -> LucideIcon(
-      icon = if (failed) R.drawable.ic_lucide_circle_alert else R.drawable.ic_lucide_check,
+      icon = R.drawable.ic_lucide_check,
       contentDescription = null,
       size = STEP_ICON_SIZE,
-      tint = if (failed) colors.destructive else colors.dotSuccess,
+      tint = colors.dotSuccess,
     )
 
     StepsOutcome.Stopped -> LucideIcon(

@@ -120,13 +120,12 @@ sealed interface TimelineItem {
   /**
    * Two or more [steps] in a row, which the stream folds into one line: thinking blocks and the agent's tool calls.
    * Keyed by its first step, so the key holds as steps arrive. [current] is the step the folded line shows while the
-   * run [outcome] says is still going; [failed] counts the tool calls that failed.
+   * run [outcome] says is still going.
    */
   data class Steps(
     override val key: String,
     val steps: List<TimelineItem>,
     val outcome: StepsOutcome,
-    val failed: Int,
     val current: TimelineItem,
   ) : TimelineItem
 }

@@ -57,13 +57,10 @@ class StepStreamTest {
   }
 
   @Test
-  fun aFoldSaysHowItsRunWentAndCountsFailures() {
-    val steps = listOf(tool("a", failed = true), tool("b", failed = true), tool("c"))
+  fun aFoldSaysHowItsRunWent() {
+    val steps = listOf(tool("a"), tool("b"), tool("c"))
 
-    val working = fold(steps + TurnFooter("t0", 0, null))
-    assertEquals(StepsOutcome.Working, working.outcome)
-    assertEquals(2, working.failed)
-
+    assertEquals(StepsOutcome.Working, fold(steps + TurnFooter("t0", 0, null)).outcome)
     assertEquals(StepsOutcome.Done, fold(steps + TurnFooter("t0", 0, 5)).outcome)
     assertEquals(StepsOutcome.Stopped, fold(steps + TurnFooter("t0", 0, 5, stopped = true)).outcome)
     // A reply after the steps means the run went on past them.
@@ -151,8 +148,6 @@ class StepStreamTest {
       listOf(StepsOutcome.Stopped, StepsOutcome.Stopped, StepsOutcome.Done, StepsOutcome.Done),
       folds.map { it.outcome },
     )
-    // The command Stop ended reads stopped, not failed.
-    assertEquals(0, folds[0].failed)
     assertEquals(StepFigure.Stopped, (folds[0].steps[0] as ToolCall).figure)
     // A failure that isn't a stop still shows, and ends its fold.
     assertEquals(1, timeline.state.value.items.count { it is TimelineItem.Error })

@@ -91,11 +91,6 @@
         <item quantity="one">%1$s step</item>
         <item quantity="other">%1$s steps</item>
     </plurals>
-    <plurals name="chat_steps_failed">
-        <!-- %1$s is the number of steps that failed, already formatted. -->
-        <item quantity="one">%1$s failed</item>
-        <item quantity="other">%1$s failed</item>
-    </plurals>
     <string name="chat_steps_expand">Show steps</string>
     <string name="chat_steps_collapse">Hide steps</string>
 
