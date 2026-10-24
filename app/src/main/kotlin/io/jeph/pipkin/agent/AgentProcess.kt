@@ -124,6 +124,12 @@ internal class AgentProcess(
    */
   private val backgroundTasksState = MutableStateFlow(0)
 
+  /**
+   * The `pipkin-subagents` extension's runs, as it last listed them over Pipkin's channel. Not saved: the runs live in
+   * Pi's process, so every new connection starts with none; finished ones stay reachable from their tool rows.
+   */
+  private val subagentRunsState = MutableStateFlow<List<SubagentRun>>(emptyList())
+
   /** Pi's setTitle requests and renames so far, so a cancelled [moveSession] knows whether the title changed since. */
   @Volatile
   private var extensionTitleChanges = 0
@@ -212,6 +218,9 @@ internal class AgentProcess(
   /** The `pipkin-background` extension's running tasks, plus finished ones whose result the agent hasn't started on. */
   val backgroundTasks: StateFlow<Int> = backgroundTasksState.asStateFlow()
 
+  /** The chat's subagents since the user's last message, running or finished; see [SubagentRun]. */
+  val subagentRuns: StateFlow<List<SubagentRun>> = subagentRunsState.asStateFlow()
+
   /** Whether the chat shows as working: a run is [busy], or the agent waits on [backgroundTasks]. */
   val working: StateFlow<Boolean> = combine(busy, backgroundTasksState) { running, tasks -> running || tasks > 0 }
     .stateIn(processScope, SharingStarted.Eagerly, false)
@@ -255,6 +264,7 @@ internal class AgentProcess(
     connection?.close()
     connection = null
     backgroundTasksState.value = 0
+    subagentRunsState.value = emptyList()
     timeline.clearDialogs()
     stateFlow.value = AgentProcessState.Starting
   }
@@ -265,6 +275,7 @@ internal class AgentProcess(
     connection?.close()
     connection = null
     backgroundTasksState.value = 0
+    subagentRunsState.value = emptyList()
     job.cancel()
   }
 
@@ -300,6 +311,31 @@ internal class AgentProcess(
       channel.sendLine("""{"type":"${HostProtocol.CHANNEL}","topic":"$BACKGROUND_TOPIC","data":{"action":"stop"}}""")
     } catch (_: IOException) {
       // Pi is gone, and its tasks with it.
+    }
+  }
+
+  /** Sends [text] to the running subagent [runId], which reads it after its current tool call, like a steer. */
+  suspend fun steerSubagent(runId: String, text: String) {
+    sendSubagents(JSONObject().put("action", "steer").put("id", runId).put("text", text))
+  }
+
+  /** Stops subagent [runId]; its `subagent` tool call returns, saying the user stopped it, and the parent carries on. */
+  suspend fun stopSubagent(runId: String) {
+    sendSubagents(JSONObject().put("action", "stop").put("id", runId))
+  }
+
+  /** Stops every subagent the chat runs or has queued. */
+  suspend fun stopAllSubagents() {
+    sendSubagents(JSONObject().put("action", "stopAll"))
+  }
+
+  private suspend fun sendSubagents(data: JSONObject) {
+    val channel = connection?.channel ?: return
+    val line = JSONObject().put("type", HostProtocol.CHANNEL).put("topic", SUBAGENTS_TOPIC).put("data", data)
+    try {
+      channel.sendLine(line.toString())
+    } catch (_: IOException) {
+      // Pi is gone, and its subagents with it.
     }
   }
 
@@ -460,6 +496,7 @@ internal class AgentProcess(
   private suspend fun attempt(): HostRejected? {
     stateFlow.value = AgentProcessState.Starting
     backgroundTasksState.value = 0
+    subagentRunsState.value = emptyList()
     val disabled = disabledExtensions.value
     if (disabled != extensionUiConfiguration) {
       takeDownExtensionUi()
@@ -552,6 +589,7 @@ internal class AgentProcess(
     val stderr = exit?.optString("stderr").orEmpty()
     stateFlow.value = AgentProcessState.Exited(code, signal, stderr)
     backgroundTasksState.value = 0
+    subagentRunsState.value = emptyList()
     timeline.showExit(code, stderr)
   }
 
@@ -576,7 +614,10 @@ internal class AgentProcess(
   /** A message from one of Pipkin's bundled extensions; topics the app doesn't know are left alone. */
   private fun onChannel(line: JSONObject) {
     val data = line.optJSONObject("data") ?: return
-    if (line.optString("topic") == BACKGROUND_TOPIC) backgroundTasksState.value = data.optInt("active")
+    when (line.optString("topic")) {
+      BACKGROUND_TOPIC -> backgroundTasksState.value = data.optInt("active")
+      SUBAGENTS_TOPIC -> if (data.has("runs")) subagentRunsState.value = SubagentRun.listFrom(data)
+    }
   }
 
   private fun onEvent(event: JSONObject) {
