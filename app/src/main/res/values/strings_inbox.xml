@@ -6,6 +6,9 @@
     <string name="inbox_failed">failed</string>
     <string name="inbox_exited">stopped</string>
     <string name="inbox_waiting">needs you</string>
+    <!-- inbox_waiting when Pipkin can tell which of the chat's subagents asked; %1$s is its agent's name, such as
+         Explore, as in "Fix login redirect Explore needs you". -->
+    <string name="inbox_waiting_subagent">%1$s needs you</string>
 
     <!-- The pill when several chats are in it; the number of chats. -->
     <plurals name="inbox_chats">

@@ -50,7 +50,10 @@ internal data class BackupInfo(
 /** The backups folder and the backups in it, newest first. */
 internal data class Backups(val dir: String, val backups: List<BackupInfo>)
 
-/** One Pi session file; times are epoch milliseconds. [cwdExists] is false once its workspace folder is gone. */
+/**
+ * One Pi session file; times are epoch milliseconds. [cwdExists] is false once its workspace folder is gone.
+ * [subagents] counts the transcripts of the subagents the chat ran, which are kept, archived and deleted with it.
+ */
 internal data class SessionInfo(
   val path: String,
   val id: String,
@@ -61,6 +64,7 @@ internal data class SessionInfo(
   val modified: Long,
   val messageCount: Int,
   val firstMessage: String,
+  val subagents: Int = 0,
 ) {
   companion object {
     fun from(json: JSONObject) = SessionInfo(
@@ -73,6 +77,7 @@ internal data class SessionInfo(
       modified = json.optLong("modified"),
       messageCount = json.optInt("messageCount"),
       firstMessage = json.optString("firstMessage"),
+      subagents = json.optInt("subagents"),
     )
   }
 }

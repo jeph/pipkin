@@ -32,8 +32,11 @@ internal object ChatNotification {
       (it as? TimelineItem.User)?.text?.takeIf(String::isNotBlank)
     }
 
-  /** [process]'s [ChatInbox] entry for [reason], now; null before Pi names its session file, which can't be opened. */
-  fun inboxEntry(process: AgentProcess, reason: InboxReason, detail: String?): InboxEntry? {
+  /**
+   * [process]'s [ChatInbox] entry for [reason], now, naming [asker] as the subagent that asked; null before Pi names
+   * its session file, which can't be opened.
+   */
+  fun inboxEntry(process: AgentProcess, reason: InboxReason, detail: String?, asker: String? = null): InboxEntry? {
     val sessionPath = process.sessionFile.value ?: return null
     return InboxEntry(
       location = ChatLocation(process.cwd, sessionPath),
@@ -41,6 +44,7 @@ internal object ChatNotification {
       title = chatTitle(process),
       detail = detail?.takeIf { it.isNotBlank() },
       at = System.currentTimeMillis(),
+      asker = asker,
     )
   }
 

@@ -37,6 +37,11 @@
     <string name="archive_empty">No archived chats</string>
     <string name="archive_no_matches">No matching chats</string>
     <string name="archive_folder_missing">Folder missing</string>
+    <!-- After an archived chat's folder: how many subagents the chat ran, whose transcripts are kept with it. -->
+    <plurals name="archive_subagents">
+        <item quantity="one">%1$d subagent</item>
+        <item quantity="other">%1$d subagents</item>
+    </plurals>
     <plurals name="archive_selected">
         <item quantity="one">%1$d selected</item>
         <item quantity="other">%1$d selected</item>
@@ -64,6 +69,16 @@
     <plurals name="archive_delete_text">
         <item quantity="one">Its session file is deleted. This can\'t be undone.</item>
         <item quantity="other">Their session files are deleted. This can\'t be undone.</item>
+    </plurals>
+    <!-- archive_delete_text for one chat that ran subagents; the number of its subagents. -->
+    <plurals name="archive_delete_text_subagents">
+        <item quantity="one">Its session file and the transcript of its subagent are deleted. This can\'t be undone.</item>
+        <item quantity="other">Its session file and the transcripts of its %1$d subagents are deleted. This can\'t be undone.</item>
+    </plurals>
+    <!-- archive_delete_text for several chats, any of which ran subagents; the number of their subagents together. -->
+    <plurals name="archive_delete_text_many_subagents">
+        <item quantity="one">Their session files and the transcript of their subagent are deleted. This can\'t be undone.</item>
+        <item quantity="other">Their session files and the transcripts of their %1$d subagents are deleted. This can\'t be undone.</item>
     </plurals>
     <string name="archive_chat_actions">Archived chat actions</string>
 

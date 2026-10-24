@@ -10,7 +10,8 @@ internal enum class InboxReason { Finished, Failed, Exited, Waiting }
 
 /**
  * A chat the user hasn't seen since [reason] happened in it at [at] (epoch millis): its [title] and [detail] (the
- * reply, error or question) as they were then, either null when there was none.
+ * reply, error or question) as they were then, either null when there was none. [asker] names the subagent whose
+ * question the chat waits on, set only when no one else could have asked it (see [askingSubagent]).
  */
 internal data class InboxEntry(
   val location: ChatLocation,
@@ -18,6 +19,7 @@ internal data class InboxEntry(
   val title: String?,
   val detail: String?,
   val at: Long,
+  val asker: String? = null,
 )
 
 /**
@@ -50,6 +52,22 @@ internal class ChatInbox {
   fun dialogGone(sessionPath: String) {
     entriesState.update { entries ->
       entries.filterNot { it.location.sessionPath == sessionPath && it.reason == InboxReason.Waiting }
+    }
+  }
+
+  /**
+   * Names [asker] as the subagent whose question the chat in [sessionPath] waits on, once that's known after its entry
+   * went in, keeping the entry's place and time.
+   */
+  fun nameAsker(sessionPath: String, asker: String) {
+    entriesState.update { entries ->
+      entries.map { entry ->
+        if (entry.location.sessionPath == sessionPath && entry.reason == InboxReason.Waiting) {
+          entry.copy(asker = asker)
+        } else {
+          entry
+        }
+      }
     }
   }
 

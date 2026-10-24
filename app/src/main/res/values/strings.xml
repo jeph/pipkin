@@ -18,6 +18,9 @@
 
     <string name="dialog_notification_channel">Questions from chats</string>
     <string name="dialog_notification_waiting">Agent needs your answer</string>
+    <!-- dialog_notification_waiting when Pipkin can tell which of the chat's subagents asked; %1$s is its agent's
+         name, such as Explore. -->
+    <string name="dialog_notification_waiting_subagent">%1$s needs your answer</string>
     <string name="dialog_notification_text">Open the chat to answer.</string>
 
     <!-- A chat notification's headline, such as Agent finished, then the chat's title. -->

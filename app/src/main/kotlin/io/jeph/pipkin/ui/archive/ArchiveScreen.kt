@@ -50,6 +50,7 @@ import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.chat.ConfirmDialog
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.HeaderButton
+import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SearchField
@@ -263,6 +264,7 @@ private fun ArchivePageOverlays(page: ArchivePage) {
         page.delete(sessions)
       },
       onDismiss = { page.deleting = null },
+      subagents = sessions.sumOf { it.subagents },
     )
   }
 }
@@ -309,8 +311,8 @@ private fun ArchiveHeader(
 }
 
 /**
- * One archived chat: its title over its folder (flagged when the folder is gone) and when it was archived. While
- * selecting, a check circle leads and tapping toggles the selection.
+ * One archived chat: its title over its folder (flagged when the folder is gone) and how many subagents it ran, and
+ * when it was archived. While selecting, a check circle leads and tapping toggles the selection.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -365,7 +367,7 @@ private fun ArchivedRow(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      FolderLine(session, home)
+      FolderAndSubagents(session, home)
     }
     Text(
       text = relativeTime(entry.archivedAt),
@@ -386,6 +388,36 @@ private fun ArchivedRow(
 
 private val ROW_RADIUS = 16.dp
 private const val SELECTED_RING_ALPHA = 0.5f
+
+/** The chat's [FolderLine], then how many subagents it ran, whose transcripts stay with it. */
+@Composable
+private fun FolderAndSubagents(session: SessionInfo, home: String) {
+  val colors = pipkinColors
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    FolderLine(session, home, Modifier.weight(1f, fill = false))
+    val count = session.subagents
+    if (count == 0) return@Row
+    Text(
+      text = stringResource(R.string.separator_dot),
+      color = colors.foregroundMuted,
+      fontSize = PipkinTokens.FontSize.sm,
+    )
+    LucideIcon(
+      icon = R.drawable.ic_lucide_bot,
+      contentDescription = null,
+      modifier = Modifier.padding(end = PipkinTokens.Spacing.s4),
+      size = PipkinTokens.IconSize.xs,
+      tint = colors.foregroundMuted,
+    )
+    Text(
+      text = pluralStringResource(R.plurals.archive_subagents, count, count),
+      color = colors.foregroundMuted,
+      fontSize = PipkinTokens.FontSize.sm,
+      maxLines = 1,
+      softWrap = false,
+    )
+  }
+}
 
 /** The chat's folder with `~` for home, led by "Folder missing" once the folder is gone. */
 @Composable
@@ -444,11 +476,20 @@ internal fun ArchivedChatActions(
   }
 }
 
+/**
+ * Asks before deleting [count] chats for good; [subagents], how many subagents they ran together, says their
+ * transcripts go too.
+ */
 @Composable
-internal fun DeleteDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+internal fun DeleteDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit, subagents: Int = 0) {
+  val text = when {
+    subagents == 0 -> pluralStringResource(R.plurals.archive_delete_text, count)
+    count == 1 -> pluralStringResource(R.plurals.archive_delete_text_subagents, subagents, subagents)
+    else -> pluralStringResource(R.plurals.archive_delete_text_many_subagents, subagents, subagents)
+  }
   ConfirmDialog(
     title = pluralStringResource(R.plurals.archive_delete_title, count, count),
-    text = pluralStringResource(R.plurals.archive_delete_text, count),
+    text = text,
     confirmLabel = stringResource(R.string.archive_delete),
     onConfirm = onConfirm,
     onDismiss = onDismiss,

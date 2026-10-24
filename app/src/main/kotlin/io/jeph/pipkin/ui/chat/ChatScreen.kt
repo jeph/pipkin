@@ -36,6 +36,7 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.TimelineState
+import io.jeph.pipkin.agent.askingSubagent
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.components.HeaderBar
@@ -264,14 +265,19 @@ private fun StreamArea(
   }
 }
 
-/** The first extension dialog Pi waits on, between the stream and the composer. */
+/**
+ * The first extension dialog Pi waits on, between the stream and the composer, naming the subagent that asked it
+ * when Pipkin can tell; the label follows the chat's subagents and tool calls as they change.
+ */
 @Composable
 internal fun PendingDialogCard(controller: ChatController, timeline: TimelineState) {
   val request = timeline.pendingUi ?: return
+  val runs by controller.process.subagentRuns.collectAsStateWithLifecycle()
   ExtensionUiCard(
     request = request,
     number = timeline.pendingUiNumber,
     count = timeline.pendingUiCount,
+    asker = askingSubagent(timeline, runs),
     onAnswer = { controller.respondUi(request.id, it) },
     modifier = Modifier.padding(bottom = PipkinTokens.Spacing.s8),
   )

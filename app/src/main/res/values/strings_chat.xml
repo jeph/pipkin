@@ -184,6 +184,11 @@
     <string name="chat_no">No</string>
     <string name="chat_dialog_counter">%1$d of %2$d</string>
     <string name="chat_dialog_seconds_left">%1$ds</string>
+    <!-- Above a dialog's title when one of several subagents asked it and Pipkin can't tell which. -->
+    <string name="chat_dialog_from_subagents">From a subagent</string>
+    <!-- Read by screen readers for the label above a dialog's title naming the subagent that asked it; %1$s is the
+         agent's name and the few words describing its task, such as "General · fix users.ts". -->
+    <string name="chat_dialog_from_subagent">Asked by subagent %1$s</string>
 
     <!-- Extension widgets -->
     <string name="chat_widget_open">Open widget</string>

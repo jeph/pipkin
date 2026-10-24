@@ -196,7 +196,7 @@ private fun RowScope.SinglePillContent(entry: InboxEntry) {
     overflow = TextOverflow.Ellipsis,
   )
   Text(
-    text = stringResource(entry.reason.label),
+    text = reasonText(entry),
     color = colors.surface0.copy(alpha = PILL_DIM_ALPHA),
     fontSize = PILL_TEXT_SIZE,
     fontWeight = FontWeight.Medium,
@@ -304,6 +304,10 @@ private fun InboxRow(entry: InboxEntry, now: Long, onOpen: (InboxEntry) -> Unit)
   val colors = pipkinColors
   val detail = entry.detail?.lineSequence()?.map(String::trim)?.firstOrNull(String::isNotEmpty)
     ?: if (entry.reason == InboxReason.Waiting) stringResource(R.string.dialog_notification_text) else null
+  val reason = reasonText(entry)
+  val asker = entry.waitingOn
+  val separator = stringResource(R.string.separator_dot)
+  val askerStyle = SpanStyle(color = colors.foreground, fontWeight = FontWeight.SemiBold)
   Row(
     modifier = Modifier
       .fillMaxWidth()
@@ -323,8 +327,13 @@ private fun InboxRow(entry: InboxEntry, now: Long, onOpen: (InboxEntry) -> Unit)
         overflow = TextOverflow.Ellipsis,
       )
       Text(
-        text = listOfNotNull(stringResource(entry.reason.label), detail)
-          .joinToString(stringResource(R.string.separator_dot)),
+        text = buildAnnotatedString {
+          append(reason)
+          // The subagent's name stands out, as the chat's title does above it.
+          val start = asker?.let { reason.indexOf(it) } ?: -1
+          if (asker != null && start >= 0) addStyle(askerStyle, start, start + asker.length)
+          detail?.let { append(separator + it) }
+        },
         color = colors.foregroundMuted,
         fontSize = PipkinTokens.FontSize.sm,
         maxLines = 1,
@@ -376,6 +385,15 @@ private val InboxReason.label: Int
     InboxReason.Exited -> R.string.inbox_exited
     InboxReason.Waiting -> R.string.inbox_waiting
   }
+
+/** The subagent whose question the chat waits on, when Pipkin can tell; null for any other entry. */
+private val InboxEntry.waitingOn: String?
+  get() = asker?.takeIf { reason == InboxReason.Waiting }
+
+/** What happened in [entry]'s chat, as in "needs you", or "Explore needs you" when its subagent Explore asked. */
+@Composable
+private fun reasonText(entry: InboxEntry): String =
+  entry.waitingOn?.let { stringResource(R.string.inbox_waiting_subagent, it) } ?: stringResource(entry.reason.label)
 
 /** The time now, moving on each minute while composed, for the list's "5 min. ago". */
 @Composable

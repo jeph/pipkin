@@ -59,6 +59,42 @@ class ChatInboxTest {
   }
 
   @Test
+  fun aWaitingEntryKeepsTheSubagentThatAsked() {
+    inbox.add(entry("a", InboxReason.Waiting, asker = "Explore"))
+
+    assertEquals(listOf("a" to "Explore"), askers())
+  }
+
+  @Test
+  fun namingTheAskerLaterKeepsTheEntrysPlaceAndTime() {
+    inbox.add(entry("a", InboxReason.Waiting, at = 1))
+    inbox.add(entry("b", InboxReason.Waiting, at = 2))
+
+    inbox.nameAsker("a", "Explore")
+
+    assertEquals(listOf("b" to null, "a" to "Explore"), askers())
+    assertEquals(listOf(2L, 1L), inbox.entries.value.map { it.at })
+  }
+
+  @Test
+  fun namingAnAskerLeavesOtherReasonsAndMissingChatsAlone() {
+    inbox.add(entry("a", InboxReason.Finished))
+
+    inbox.nameAsker("a", "Explore")
+    inbox.nameAsker("gone", "Explore")
+
+    assertEquals(listOf("a" to null), askers())
+  }
+
+  @Test
+  fun aNewEntryReplacesTheAskerOfTheChatsEarlierOne() {
+    inbox.add(entry("a", InboxReason.Waiting, asker = "Explore"))
+    inbox.add(entry("a", InboxReason.Waiting))
+
+    assertEquals(listOf("a" to null), askers())
+  }
+
+  @Test
   fun openingOneLeavesTheOthers() {
     inbox.add(entry("a", InboxReason.Finished))
     inbox.add(entry("b", InboxReason.Waiting))
@@ -118,6 +154,8 @@ class ChatInboxTest {
 
   private fun contents() = inbox.entries.value.map { it.location.sessionPath to it.reason }
 
-  private fun entry(path: String, reason: InboxReason, at: Long = 0) =
-    InboxEntry(ChatLocation("/cwd", path), reason, title = null, detail = null, at = at)
+  private fun askers() = inbox.entries.value.map { it.location.sessionPath to it.asker }
+
+  private fun entry(path: String, reason: InboxReason, at: Long = 0, asker: String? = null) =
+    InboxEntry(ChatLocation("/cwd", path), reason, title = null, detail = null, at = at, asker = asker)
 }
