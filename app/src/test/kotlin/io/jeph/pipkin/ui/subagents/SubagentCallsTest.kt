@@ -120,6 +120,36 @@ class SubagentCallsTest {
     assertNull(transcriptStats(JSONArray()).durationMillis)
   }
 
+  @Test
+  fun pipkinsSubagentCallsDrawAsSubagentsAndOthersAsToolRows() {
+    val pipkin = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = true)
+    val ranDetails = JSONObject().put("id", "r1").put("status", "done")
+    assertTrue(pipkin.startsSubagent(call("c1")))
+    // A call refused before the extension ran has no details, but it was still a subagent's to start.
+    assertTrue(pipkin.startsSubagent(call("c1", output = "blocked", isError = true)))
+    // A `!subagent` the user ran, or any other tool, is never one.
+    assertFalse(pipkin.startsSubagent(call("c1").copy(byUser = true)))
+    assertFalse(pipkin.startsSubagent(call("c1").copy(toolName = "read")))
+
+    // Standing aside, another extension's `subagent` tool is an ordinary tool, running or done.
+    val other = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = true, tool = SubagentTool.Other)
+    assertFalse(other.startsSubagent(call("c1")))
+    assertFalse(other.startsSubagent(call("c1", output = "theirs", details = ranDetails)))
+  }
+
+  @Test
+  fun anArchivedCallIsASubagentOnlyWhenItsResultNamesTheRunOrNeverCame() {
+    val archived = ChatSubagents.None
+    assertTrue(archived.startsSubagent(call("c1", output = "done", details = JSONObject().put("id", "r1"))))
+    val inMemory = JSONObject().put("sessionFile", "/s/sub.jsonl")
+    assertTrue(archived.startsSubagent(call("c1", output = "done", details = inMemory)))
+    // Interrupted: it can't be told from another extension's call cut off, so it stays a subagent.
+    assertTrue(archived.startsSubagent(call("c1")))
+    // Another extension's result: no details, or details of its own.
+    assertFalse(archived.startsSubagent(call("c1", output = "theirs")))
+    assertFalse(archived.startsSubagent(call("c1", output = "theirs", details = JSONObject().put("agent", "x"))))
+  }
+
   private fun run(id: String, toolCallId: String, status: SubagentStatus) = SubagentRun(
     id = id,
     toolCallId = toolCallId,

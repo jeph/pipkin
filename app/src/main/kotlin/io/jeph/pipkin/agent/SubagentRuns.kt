@@ -144,6 +144,12 @@ internal data class SubagentResult(
   val status: SubagentStatus?,
   val tokens: Long?,
 ) {
+  /**
+   * Whether these are Pipkin subagents' details of a run: they name the run or its transcript. Another extension's
+   * `subagent` tool may return details of its own, which name neither.
+   */
+  val ran: Boolean get() = id != null || sessionFile != null
+
   companion object {
     /** The result of a call whose `details` are [details]; null when they hold none of a subagent's. */
     fun from(details: JSONObject?): SubagentResult? {

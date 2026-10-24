@@ -34,6 +34,7 @@ export { pipkinSubagents };
 
 export interface RunsMessage {
   version: number;
+  standingAside: boolean;
   runs: RunView[];
 }
 

@@ -130,6 +130,12 @@ internal class AgentProcess(
    */
   private val subagentRunsState = MutableStateFlow<List<SubagentRun>>(emptyList())
 
+  /**
+   * Whether the `pipkin-subagents` extension stands aside for another extension's `subagent` tool, as it last said;
+   * reset with the runs, since each connection's Pi says so again.
+   */
+  private val subagentsStandingAsideState = MutableStateFlow(false)
+
   /** Pi's setTitle requests and renames so far, so a cancelled [moveSession] knows whether the title changed since. */
   @Volatile
   private var extensionTitleChanges = 0
@@ -221,6 +227,9 @@ internal class AgentProcess(
   /** The chat's subagents since the user's last message, running or finished; see [SubagentRun]. */
   val subagentRuns: StateFlow<List<SubagentRun>> = subagentRunsState.asStateFlow()
 
+  /** Whether the chat's `subagent` tool is another extension's, whose calls are ordinary tool calls to Pipkin. */
+  val subagentsStandingAside: StateFlow<Boolean> = subagentsStandingAsideState.asStateFlow()
+
   /** Whether the chat shows as working: a run is [busy], or the agent waits on [backgroundTasks]. */
   val working: StateFlow<Boolean> = combine(busy, backgroundTasksState) { running, tasks -> running || tasks > 0 }
     .stateIn(processScope, SharingStarted.Eagerly, false)
@@ -264,7 +273,7 @@ internal class AgentProcess(
     connection?.close()
     connection = null
     backgroundTasksState.value = 0
-    subagentRunsState.value = emptyList()
+    clearSubagents()
     timeline.clearDialogs()
     stateFlow.value = AgentProcessState.Starting
   }
@@ -275,7 +284,7 @@ internal class AgentProcess(
     connection?.close()
     connection = null
     backgroundTasksState.value = 0
-    subagentRunsState.value = emptyList()
+    clearSubagents()
     job.cancel()
   }
 
@@ -504,7 +513,7 @@ internal class AgentProcess(
   private suspend fun attempt(): HostRejected? {
     stateFlow.value = AgentProcessState.Starting
     backgroundTasksState.value = 0
-    subagentRunsState.value = emptyList()
+    clearSubagents()
     val disabled = disabledExtensions.value
     if (disabled != extensionUiConfiguration) {
       takeDownExtensionUi()
@@ -597,7 +606,7 @@ internal class AgentProcess(
     val stderr = exit?.optString("stderr").orEmpty()
     stateFlow.value = AgentProcessState.Exited(code, signal, stderr)
     backgroundTasksState.value = 0
-    subagentRunsState.value = emptyList()
+    clearSubagents()
     timeline.showExit(code, stderr)
   }
 
@@ -624,8 +633,18 @@ internal class AgentProcess(
     val data = line.optJSONObject("data") ?: return
     when (line.optString("topic")) {
       BACKGROUND_TOPIC -> backgroundTasksState.value = data.optInt("active")
-      SUBAGENTS_TOPIC -> if (data.has("runs")) subagentRunsState.value = SubagentRun.listFrom(data)
+
+      SUBAGENTS_TOPIC -> if (data.has("runs")) {
+        subagentsStandingAsideState.value = data.optBoolean("standingAside")
+        subagentRunsState.value = SubagentRun.listFrom(data)
+      }
     }
+  }
+
+  /** Forgets what the last connection's Pi said about its subagents. */
+  private fun clearSubagents() {
+    subagentRunsState.value = emptyList()
+    subagentsStandingAsideState.value = false
   }
 
   private fun onEvent(event: JSONObject) {

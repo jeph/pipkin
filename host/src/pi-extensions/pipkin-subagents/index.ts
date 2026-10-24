@@ -110,7 +110,8 @@ export default function pipkinSubagents(pi: ExtensionAPI): void {
 
   /**
    * Registers once every extension has loaded, and only when none of them has a `subagent` tool: Pi refuses to start
-   * when two extensions register one tool name at load, so one the user installed wins instead.
+   * when two extensions register one tool name at load, so one the user installed wins instead. Standing aside, it
+   * still tells the app, which then draws that tool's calls as ordinary tool rows rather than as subagents.
    */
   let owned: boolean | undefined;
   pi.on("session_start", (_event, ctx) => {
@@ -118,8 +119,8 @@ export default function pipkinSubagents(pi: ExtensionAPI): void {
       owned = !pi.getAllTools().some((tool) => tool.name === TOOL_NAME);
       if (owned) register(ctx);
     }
-    if (!owned) return;
-    state.current = ctx.sessionManager.getSessionId();
+    state.standingAside = !owned;
+    state.current = owned ? ctx.sessionManager.getSessionId() : undefined;
     // A reload or a reconnected app may have missed the last list.
     report(state, true);
   });

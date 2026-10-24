@@ -1,6 +1,7 @@
 package io.jeph.pipkin.ui.subagents
 
 import androidx.compose.runtime.Immutable
+import io.jeph.pipkin.agent.SUBAGENT_TOOL
 import io.jeph.pipkin.agent.SubagentAsker
 import io.jeph.pipkin.agent.SubagentResult
 import io.jeph.pipkin.agent.SubagentRun
@@ -31,12 +32,33 @@ internal enum class SubagentPhase {
   val active: Boolean get() = this == Queued || this == Running || this == Asking
 }
 
+/** Whose `subagent` tool a chat's calls went to, which decides whether they show as subagents. */
+internal enum class SubagentTool {
+  /** Pipkin subagents', in a chat Pi runs. */
+  Pipkin,
+
+  /** Another extension's, which Pipkin subagents stands aside for: its calls are ordinary tool calls. */
+  Other,
+
+  /**
+   * Not known, as in an archived chat: a call is Pipkin subagents' when its result carries the run's details, or
+   * when it never got a result, since another extension's call cut off can't be told from a subagent interrupted.
+   */
+  Archived,
+}
+
 /**
  * What a chat knows of its subagents now: the [runs] its extension lists, whose question the chat's card shows
- * ([asker]), and whether the chat is [working], which tells a call still waiting to start from one Pi left behind.
+ * ([asker]), whether the chat is [working], which tells a call still waiting to start from one Pi left behind, and
+ * whose [tool] its `subagent` calls went to.
  */
 @Immutable
-internal class ChatSubagents(val runs: List<SubagentRun>, val asker: SubagentAsker, val working: Boolean) {
+internal class ChatSubagents(
+  val runs: List<SubagentRun>,
+  val asker: SubagentAsker,
+  val working: Boolean,
+  val tool: SubagentTool = SubagentTool.Pipkin,
+) {
   /** The run [toolCallId] started, while the extension still lists it. */
   fun run(toolCallId: String): SubagentRun? = runs.firstOrNull { it.toolCallId == toolCallId }
 
@@ -50,9 +72,19 @@ internal class ChatSubagents(val runs: List<SubagentRun>, val asker: SubagentAsk
   /** A subagent may be waiting on the user: the chat's question comes from one, named or not. */
   val waiting: Boolean get() = asker != SubagentAsker.Unknown
 
+  /** Whether [call] is the agent's call starting one of Pipkin's subagents, rather than an ordinary tool call. */
+  fun startsSubagent(call: TimelineItem.ToolCall): Boolean {
+    if (call.toolName != SUBAGENT_TOOL || call.byUser) return false
+    return when (tool) {
+      SubagentTool.Pipkin -> true
+      SubagentTool.Other -> false
+      SubagentTool.Archived -> call.output == null || SubagentResult.from(call.details)?.ran == true
+    }
+  }
+
   companion object {
     /** A chat with no Pi behind it, as an archived one: every call that never got a result was interrupted. */
-    val None = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = false)
+    val None = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = false, tool = SubagentTool.Archived)
   }
 }
 

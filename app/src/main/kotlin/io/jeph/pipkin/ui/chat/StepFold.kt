@@ -54,8 +54,9 @@ internal fun StepFoldRow(
 }
 
 /**
- * A thinking block's or tool call's row, which opens its detail sheet through [onOpenTool]; a call starting a subagent
- * shows as its [SubagentToolRow] instead, which opens the subagent.
+ * A thinking block's or tool call's row, which opens its detail sheet through [onOpenTool]; a call starting one of
+ * Pipkin's subagents ([io.jeph.pipkin.ui.subagents.ChatSubagents.startsSubagent]) shows as its [SubagentToolRow]
+ * instead, which opens the subagent.
  */
 @Composable
 internal fun StepRow(
@@ -65,7 +66,7 @@ internal fun StepRow(
   modifier: Modifier = Modifier,
 ) {
   when {
-    step is TimelineItem.ToolCall && step.isSubagentCall -> SubagentToolRow(step, subagents, modifier)
+    step is TimelineItem.ToolCall && subagents.chat.startsSubagent(step) -> SubagentToolRow(step, subagents, modifier)
     step is TimelineItem.ToolCall -> ToolRow(toolPresentation(step), onClick = { onOpenTool(step.key) }, modifier)
     step is TimelineItem.Thinking -> ToolRow(toolPresentation(step), onClick = { onOpenTool(step.key) }, modifier)
     else -> error("Only thinking blocks and tool calls are steps")

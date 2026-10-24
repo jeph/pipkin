@@ -704,13 +704,23 @@ describe("agents", () => {
     session.dispose();
   });
 
-  it("stand aside when another extension has a subagent tool", async () => {
+  it("stand aside when another extension has a subagent tool, and tell the app so after each session start", async () => {
     const { session } = await start(parentCalling([{ id: "sub1", task: "CHILD x" }], () => fauxAssistantMessage("x")), {
       extensions: [theirSubagent, pipkinSubagents],
     });
+    const standingAside = { version: 1, standingAside: true, runs: [] };
+    expect(channel.sent).toEqual([standingAside]);
     await session.prompt("PARENT go");
     expect(messageText(subagentResults(session).get("sub1"))).toBe("theirs");
-    expect(channel.sent).toEqual([]);
+    expect(channel.sent).toEqual([standingAside]);
+    await session.reload();
+    expect(channel.sent).toEqual([standingAside, standingAside]);
+    session.dispose();
+  });
+
+  it("say they don't stand aside when the subagent tool is theirs", async () => {
+    const { session } = await start(parentCalling([], childDone));
+    expect(channel.sent).toEqual([{ version: 1, standingAside: false, runs: [] }]);
     session.dispose();
   });
 });

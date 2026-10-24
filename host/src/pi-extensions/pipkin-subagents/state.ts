@@ -55,6 +55,11 @@ export interface Registry {
   runs: Map<string, Run>;
   /** The session Pi shows the app, whose runs the `runs` messages list. */
   current: string | undefined;
+  /**
+   * Whether the current session's `subagent` tool is another extension's, Pipkin subagents standing aside: the app
+   * then draws its calls as ordinary tool rows.
+   */
+  standingAside: boolean;
   timer: NodeJS.Timeout | undefined;
   lastSentAt: number;
   lastSent: string | undefined;
@@ -70,6 +75,7 @@ export function registry(): Registry {
     nextId: 1,
     runs: new Map(),
     current: undefined,
+    standingAside: false,
     timer: undefined,
     lastSentAt: 0,
     lastSent: undefined,
@@ -129,18 +135,19 @@ export function view(run: Run): RunView {
 }
 
 /**
- * Sends the current session's runs now. [force] sends even an unchanged list, as after `session_start`, when the app
- * may have missed the last one.
+ * Sends the current session's runs now, and whether Pipkin subagents stands aside in it. [force] sends even an
+ * unchanged list, as after `session_start`, when the app may have missed the last one.
  */
 export function report(state: Registry, force = false): void {
   clearTimeout(state.timer);
   state.timer = undefined;
   const runs = [...state.runs.values()].filter((run) => run.sessionId === state.current).map(view);
-  const payload = JSON.stringify(runs);
+  const message = { version: PROTOCOL_VERSION, standingAside: state.standingAside, runs };
+  const payload = JSON.stringify(message);
   if (!force && payload === state.lastSent) return;
   state.lastSent = payload;
   state.lastSentAt = Date.now();
-  state.channel.send(TOPIC, { version: PROTOCOL_VERSION, runs });
+  state.channel.send(TOPIC, message);
 }
 
 /** Sends the runs at most every THROTTLE_MS, for changes the app only shows as they go: turns, tokens, activity. */

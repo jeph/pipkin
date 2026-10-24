@@ -55,12 +55,19 @@ import java.text.NumberFormat
 private const val SHEET_MAX_HEIGHT = 0.9f
 private val RING_SIZE = 14.dp
 
-/** [process]'s subagents as its [timeline] shows them now. */
+/**
+ * [process]'s subagents as its [timeline] shows them now. Standing aside, Pipkin subagents lists no runs, so the chat
+ * shows no Subagents tab and names no subagent as a question's asker, and its `subagent` calls are ordinary tool rows.
+ */
 @Composable
 internal fun rememberChatSubagents(process: AgentProcess, timeline: TimelineState): ChatSubagents {
   val runs by process.subagentRuns.collectAsStateWithLifecycle()
   val busy by process.busy.collectAsStateWithLifecycle()
-  return remember(runs, timeline, busy) { ChatSubagents(runs, askingSubagent(timeline, runs), busy) }
+  val standingAside by process.subagentsStandingAside.collectAsStateWithLifecycle()
+  return remember(runs, timeline, busy, standingAside) {
+    val tool = if (standingAside) SubagentTool.Other else SubagentTool.Pipkin
+    ChatSubagents(runs, askingSubagent(timeline, runs), busy, tool)
+  }
 }
 
 /**

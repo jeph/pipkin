@@ -10,7 +10,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
-import io.jeph.pipkin.agent.SUBAGENT_TOOL
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.ui.subagents.ChatSubagents
 import io.jeph.pipkin.ui.subagents.SubagentPhase
@@ -36,10 +35,6 @@ internal class StreamSubagents(
     val None = StreamSubagents(ChatSubagents.None, onOpen = {})
   }
 }
-
-/** Whether [item] is the agent's call starting a subagent, which shows as a [SubagentToolRow]. */
-internal val TimelineItem.isSubagentCall: Boolean
-  get() = this is TimelineItem.ToolCall && toolName == SUBAGENT_TOOL && !byUser
 
 /**
  * The tool row of the agent's `subagent` [call]: the bot icon, the agent's name and the task's few words, then the
