@@ -655,12 +655,14 @@ describe("agents", () => {
     session.dispose();
   });
 
-  it("fail an unknown agent's call, listing the agents", async () => {
+  it("fail an unknown agent's call, listing the agents, with details saying whose result it is", async () => {
     const { session } = await start(parentCalling([{ id: "sub1", agent: "Nope", task: "CHILD x" }], () => fauxAssistantMessage("x")));
     await session.prompt("PARENT go");
     const result = subagentResults(session).get("sub1");
     expect(result?.isError).toBe(true);
     expect(messageText(result)).toBe('Unknown agent "Nope". Available agents: Explore, General.');
+    // The app tells Pipkin subagents' results from another `subagent` tool's by this marker alone.
+    expect(result?.details).toEqual({ extension: "pipkin-subagents", agent: "Nope", description: "a task", status: "failed" });
     expect(channel.sent.flatMap((message) => message.runs)).toEqual([]);
     session.dispose();
   });
@@ -751,7 +753,9 @@ describe("agents", () => {
     const results = subagentResults(session);
     expect(messageText(results.get("sub1"))).toBe("model faux-2");
     expect(results.get("sub2")?.isError).toBe(true);
-    expect(messageText(results.get("sub2"))).toContain('Unknown model "faux/nope"');
+    expect(messageText(results.get("sub2"))).toBe('Unknown model "faux/nope": give it as provider/id, as Pi lists it');
+    expect(results.get("sub2")?.details).toMatchObject({ extension: "pipkin-subagents", status: "failed" });
+    expect(results.get("sub1")?.details).toMatchObject({ extension: "pipkin-subagents", status: "done" });
     session.dispose();
   });
 

@@ -34,17 +34,16 @@ internal enum class SubagentPhase {
 
 /** Whose `subagent` tool a chat's calls went to, which decides whether they show as subagents. */
 internal enum class SubagentTool {
-  /** Pipkin subagents', in a chat Pi runs. */
+  /**
+   * Pipkin subagents', in a chat Pi runs, or not known, as in an archived chat. Either way a finished call is theirs
+   * only when its result says so: the user may since have installed another extension's `subagent` tool and reloaded,
+   * leaving its calls before then in the chat. One with no result is taken for theirs, since another extension's call
+   * cut off can't be told from a subagent interrupted.
+   */
   Pipkin,
 
   /** Another extension's, which Pipkin subagents stands aside for: its calls are ordinary tool calls. */
   Other,
-
-  /**
-   * Not known, as in an archived chat: a call is Pipkin subagents' when its result carries the run's details, or
-   * when it never got a result, since another extension's call cut off can't be told from a subagent interrupted.
-   */
-  Archived,
 }
 
 /**
@@ -82,17 +81,13 @@ internal class ChatSubagents(
 
   /** Whether [call] is the agent's call starting one of Pipkin's subagents, rather than an ordinary tool call. */
   fun startsSubagent(call: TimelineItem.ToolCall): Boolean {
-    if (call.toolName != SUBAGENT_TOOL || call.byUser) return false
-    return when (tool) {
-      SubagentTool.Pipkin -> true
-      SubagentTool.Other -> false
-      SubagentTool.Archived -> call.output == null || SubagentResult.from(call.details)?.ran == true
-    }
+    if (call.toolName != SUBAGENT_TOOL || call.byUser || tool == SubagentTool.Other) return false
+    return call.output == null || SubagentResult.from(call.details)?.pipkins == true
   }
 
   companion object {
     /** A chat with no Pi behind it, as an archived one: every call that never got a result was interrupted. */
-    val None = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = false, tool = SubagentTool.Archived)
+    val None = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = false)
   }
 }
 
@@ -126,7 +121,7 @@ private fun runPhase(run: SubagentRun, asker: SubagentAsker): SubagentPhase = wh
   SubagentStatus.Stopped -> SubagentPhase.Stopped
 }
 
-/** A finished call's phase from its result; one Pi refused before the extension ran has no details, only its error. */
+/** A finished call's phase from its result's status, or from whether it's an error when the result names none. */
 private fun resultPhase(call: TimelineItem.ToolCall): SubagentPhase = when (SubagentResult.from(call.details)?.status) {
   SubagentStatus.Failed -> SubagentPhase.Failed
   SubagentStatus.Stopped -> SubagentPhase.Stopped
@@ -181,8 +176,8 @@ internal sealed interface TranscriptSource {
   data object None : TranscriptSource
 
   /**
-   * Pi or an extension refused the call, or it failed, before its subagent began, or before it saved anything, as for
-   * a model without an API key, for [reason], its error.
+   * The call failed before its subagent began, as for an unknown agent, or before it saved anything, as for a model
+   * without an API key, for [reason], its error.
    */
   data class NotStarted(val reason: String) : TranscriptSource
 }
@@ -209,8 +204,6 @@ internal fun subagentFacts(
     result != null -> result.sessionFile?.let(TranscriptSource::File)
       ?: call?.takeIf { it.isError }?.output?.let(TranscriptSource::NotStarted)
       ?: TranscriptSource.None
-
-    call?.output != null && call.isError -> TranscriptSource.NotStarted(call.output)
 
     parentPath != null -> TranscriptSource.Lookup(parentPath, toolCallId)
 

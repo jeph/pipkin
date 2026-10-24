@@ -140,9 +140,16 @@ internal const val SUBAGENT_TOOL = "subagent"
 internal const val SUBAGENTS_TOPIC = "subagents"
 
 /**
+ * What `details` of every result the `pipkin-subagents` extension returns carry in `extension`, a call that never
+ * became a run included, so its results can be told from another extension's `subagent` tool's.
+ */
+internal const val SUBAGENT_DETAILS_EXTENSION = "pipkin-subagents"
+
+/**
  * What a finished `subagent` tool call's result `details` say about its run: the run's [id], [agent] and
  * [description], the transcript at [sessionFile] (null for a subagent that ran in memory), how it ended, and the
- * [tokens] it used. They outlive the run's place in [SubagentRun]'s list, so the tool row leads back to it.
+ * [tokens] it used. They outlive the run's place in [SubagentRun]'s list, so the tool row leads back to it. [marked]
+ * says they carry [SUBAGENT_DETAILS_EXTENSION].
  */
 internal data class SubagentResult(
   val id: String?,
@@ -151,12 +158,13 @@ internal data class SubagentResult(
   val sessionFile: String?,
   val status: SubagentStatus?,
   val tokens: Long?,
+  val marked: Boolean = false,
 ) {
   /**
-   * Whether these are Pipkin subagents' details of a run: they name the run or its transcript. Another extension's
-   * `subagent` tool may return details of its own, which name neither.
+   * Whether these are Pipkin subagents' details: they carry its marker or, as an older build's runs did, name the run
+   * or its transcript. Another extension's `subagent` tool may return details of its own, which do neither.
    */
-  val ran: Boolean get() = id != null || sessionFile != null
+  val pipkins: Boolean get() = marked || id != null || sessionFile != null
 
   companion object {
     /** The result of a call whose `details` are [details]; null when they hold none of a subagent's. */
@@ -169,6 +177,7 @@ internal data class SubagentResult(
         sessionFile = details.textOrNull("sessionFile"),
         status = details.textOrNull("status")?.let(SubagentStatus::from),
         tokens = details.optJSONObject("usage")?.optLong("totalTokens")?.takeIf { it > 0 },
+        marked = details.textOrNull("extension") == SUBAGENT_DETAILS_EXTENSION,
       )
       return result.takeUnless { it == EMPTY }
     }

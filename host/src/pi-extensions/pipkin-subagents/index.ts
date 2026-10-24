@@ -9,10 +9,15 @@
  * by Stop, `/reload`, switching session or quitting, stops it through the tool's signal.
  */
 import { StringEnum } from "@earendil-works/pi-ai";
-import { type ExtensionAPI, type ExtensionContext, getAgentDir } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
+import {
+  type ExtensionAPI,
+  type ExtensionContext,
+  type ExtensionToolContext,
+  getAgentDir,
+} from "@earendil-works/pi-coding-agent";
+import { type Static, Type } from "typebox";
 import { type AgentDefinition, type Agents, agentToolNames, loadAgents, THINKING_LEVELS, unknownAgentText } from "./agents.js";
-import { runSubagent } from "./runs.js";
+import { type RunRequest, runSubagent, startFailure } from "./runs.js";
 import { dropFinished, MAX_RUNNING, registry, report } from "./state.js";
 
 export const TOOL_NAME = "subagent";
@@ -64,6 +69,34 @@ function resolveModel(ctx: ExtensionContext, spec: string | undefined): NonNulla
   return model;
 }
 
+/** What [params] ask for, with every name resolved; throws saying what's wrong, as for an unknown agent or model. */
+function settleRequest(
+  pi: ExtensionAPI,
+  toolCallId: string,
+  params: Static<typeof SubagentParams>,
+  ctx: ExtensionToolContext,
+): RunRequest {
+  const agents = loadAgents(getAgentDir(), ctx.cwd, ctx.isProjectTrusted());
+  const agent = agents.byName.get(params.agent);
+  if (!agent) throw new Error(unknownAgentText(agents, params.agent));
+  // A blank model is no model: models sometimes send an empty string for an argument they mean to leave out.
+  const model = resolveModel(ctx, params.model?.trim() || agent.model);
+  const thinking = params.thinking ?? agent.thinking ?? ctx.thinkingLevel ?? pi.getThinkingLevel();
+  const toolInfo = pi.getAllTools();
+  const readOnly = new Set(toolInfo.filter((tool) => tool.annotations?.readOnlyHint).map((tool) => tool.name));
+  const callable = ctx.tools.map((tool) => ({ name: tool.name, readOnly: readOnly.has(tool.name) }));
+  return {
+    toolCallId,
+    agent,
+    task: params.task,
+    description: params.description,
+    model,
+    thinking,
+    toolNames: agentToolNames(agent, callable),
+    toolInfo,
+  };
+}
+
 export default function pipkinSubagents(pi: ExtensionAPI): void {
   const state = registry();
 
@@ -80,25 +113,12 @@ export default function pipkinSubagents(pi: ExtensionAPI): void {
       // Several calls in one reply are the way to run subagents in parallel.
       executionMode: "parallel",
       async execute(toolCallId, params, signal, _onUpdate, toolCtx) {
-        const agents = loadAgents(getAgentDir(), toolCtx.cwd, toolCtx.isProjectTrusted());
-        const agent = agents.byName.get(params.agent);
-        if (!agent) throw new Error(unknownAgentText(agents, params.agent));
-        // A blank model is no model: models sometimes send an empty string for an argument they mean to leave out.
-        const model = resolveModel(toolCtx, params.model?.trim() || agent.model);
-        const thinking = params.thinking ?? agent.thinking ?? toolCtx.thinkingLevel ?? pi.getThinkingLevel();
-        const toolInfo = pi.getAllTools();
-        const readOnly = new Set(toolInfo.filter((tool) => tool.annotations?.readOnlyHint).map((tool) => tool.name));
-        const callable = toolCtx.tools.map((tool) => ({ name: tool.name, readOnly: readOnly.has(tool.name) }));
-        const request = {
-          toolCallId,
-          agent,
-          task: params.task,
-          description: params.description,
-          model,
-          thinking,
-          toolNames: agentToolNames(agent, callable),
-          toolInfo,
-        };
+        let request: RunRequest;
+        try {
+          request = settleRequest(pi, toolCallId, params, toolCtx);
+        } catch (error) {
+          return startFailure(params, error);
+        }
         return runSubagent(state, request, signal, toolCtx);
       },
     });

@@ -57,7 +57,14 @@ export interface SubagentUsage {
   cost: number;
 }
 
+/**
+ * Marks every result's `details` as Pipkin subagents', a call that never became a run included, so the app can tell
+ * them from those of another extension's `subagent` tool, once installed in its place.
+ */
+export const DETAILS_EXTENSION = "pipkin-subagents";
+
 export interface SubagentDetails {
+  extension: typeof DETAILS_EXTENSION;
   id: string;
   agent: string;
   description: string;
@@ -65,6 +72,29 @@ export interface SubagentDetails {
   sessionFile?: string | null;
   status: RunStatus;
   usage: SubagentUsage;
+}
+
+/** A call refused before it became a run, as for an unknown agent or model: no run, no transcript. */
+export interface StartFailureDetails {
+  extension: typeof DETAILS_EXTENSION;
+  agent: string;
+  description: string;
+  status: "failed";
+}
+
+/**
+ * The error result of a call that failed before it became a run. Returned rather than thrown, which Pi would turn
+ * into the same error text but with empty details, so the result still says whose it is.
+ */
+export function startFailure(
+  params: { agent: string; description: string },
+  error: unknown,
+): AgentToolResult<StartFailureDetails> {
+  return {
+    content: [text(error instanceof Error ? error.message : String(error))],
+    details: { extension: DETAILS_EXTENSION, agent: params.agent, description: params.description, status: "failed" },
+    isError: true,
+  };
 }
 
 /** Everything a run needs, settled before it's added: a call naming no valid agent or model never becomes a run. */
@@ -355,6 +385,7 @@ function finish(
   report(state);
   wakeQueued(state, run.sessionId);
   const details: SubagentDetails = {
+    extension: DETAILS_EXTENSION,
     id: run.id,
     agent: run.agent,
     description: run.description,
