@@ -108,6 +108,21 @@ class SubagentCallsTest {
   }
 
   @Test
+  fun aRunThatFailedBeforeSavingAnythingShowsItsError() {
+    val failed = run("r1", "c1", SubagentStatus.Failed).copy(error = "No API key for x", messages = 0)
+    val listed = ChatSubagents(listOf(failed), SubagentAsker.Unknown, working = false)
+    val output = "The subagent failed: No API key for x"
+    val call = call("c1", output, isError = true, details = JSONObject().put("id", "r1").put("status", "failed"))
+    fun source(subagents: ChatSubagents) = subagentFacts("c1", call, subagents, "/s/p.jsonl").source
+    assertEquals(TranscriptSource.NotStarted("No API key for x"), source(listed))
+    // Once the run is dropped, its result says the same.
+    assertEquals(TranscriptSource.NotStarted(output), source(ChatSubagents.None))
+    // One that failed later ran in memory: nothing to show but that.
+    val later = ChatSubagents(listOf(failed.copy(messages = 3)), SubagentAsker.Unknown, working = false)
+    assertEquals(TranscriptSource.None, source(later))
+  }
+
+  @Test
   fun statsCountRepliesTokensAndTimeFromFirstMessageToLastReplysEnd() {
     val messages = JSONArray(
       """[{"role":"user","content":"go","timestamp":1000},

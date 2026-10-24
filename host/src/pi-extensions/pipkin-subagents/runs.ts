@@ -3,6 +3,7 @@
  * tools through `ctx.executeTool()`, so every call the child makes passes the parent's `tool_call` and `tool_result`
  * handlers, the user's permission extensions among them, and asks in the parent's UI.
  */
+import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import type { ImageContent, TextContent, Usage } from "@earendil-works/pi-ai";
 import {
@@ -60,7 +61,8 @@ export interface SubagentDetails {
   id: string;
   agent: string;
   description: string;
-  sessionFile: string | null;
+  /** Left out when the run ended before Pi wrote its transcript, as when the model had no API key. */
+  sessionFile?: string | null;
   status: RunStatus;
   usage: SubagentUsage;
 }
@@ -347,13 +349,16 @@ function finish(
   // Steers the subagent never read end with it.
   run.steering = [];
   run.lastActivity = null;
+  // Pi writes a transcript only once it holds the task, so a run failing first, as for a model without an API key,
+  // names a file that never appeared; the app then shows the run's error rather than a missing transcript.
+  if (run.sessionFile && !existsSync(run.sessionFile)) delete run.sessionFile;
   report(state);
   wakeQueued(state, run.sessionId);
   const details: SubagentDetails = {
     id: run.id,
     agent: run.agent,
     description: run.description,
-    sessionFile: run.sessionFile,
+    ...(run.sessionFile === undefined ? {} : { sessionFile: run.sessionFile }),
     status: run.status,
     usage: {
       input: usage.input,
@@ -381,7 +386,7 @@ function stoppedText(run: Run, reply: string): string {
 }
 
 /** [reply] cut at RESULT_LIMIT_BYTES of UTF-8, on a character boundary, with where the rest is. */
-export function capped(reply: string, sessionFile: string | null): string {
+export function capped(reply: string, sessionFile: string | null | undefined): string {
   const bytes = Buffer.from(reply, "utf8");
   if (bytes.length <= RESULT_LIMIT_BYTES) return reply;
   let end = RESULT_LIMIT_BYTES;

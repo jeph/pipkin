@@ -171,7 +171,10 @@ internal sealed interface TranscriptSource {
   /** The subagent ran in memory, as for a chat not yet saved, or its chat has no file to look under. */
   data object None : TranscriptSource
 
-  /** Pi or an extension refused the call, or it failed, before its subagent began, for [reason], its error. */
+  /**
+   * Pi or an extension refused the call, or it failed, before its subagent began, or before it saved anything, as for
+   * a model without an API key, for [reason], its error.
+   */
   data class NotStarted(val reason: String) : TranscriptSource
 }
 
@@ -187,11 +190,21 @@ internal fun subagentFacts(
 ): SubagentFacts {
   val run = subagents.run(toolCallId)
   val result = SubagentResult.from(call?.details)
+  // A run that failed before Pi saved anything has no file to name; its error says why.
   val source = when {
-    run != null -> run.sessionFile?.let(TranscriptSource::File) ?: TranscriptSource.None
-    result != null -> result.sessionFile?.let(TranscriptSource::File) ?: TranscriptSource.None
+    run != null -> run.sessionFile?.let(TranscriptSource::File)
+      ?: run.error?.takeIf { run.status == SubagentStatus.Failed && run.messages == 0 }
+        ?.let(TranscriptSource::NotStarted)
+      ?: TranscriptSource.None
+
+    result != null -> result.sessionFile?.let(TranscriptSource::File)
+      ?: call?.takeIf { it.isError }?.output?.let(TranscriptSource::NotStarted)
+      ?: TranscriptSource.None
+
     call?.output != null && call.isError -> TranscriptSource.NotStarted(call.output)
+
     parentPath != null -> TranscriptSource.Lookup(parentPath, toolCallId)
+
     else -> TranscriptSource.None
   }
   return SubagentFacts(

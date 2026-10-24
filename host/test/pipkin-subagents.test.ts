@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { type AssistantMessage, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
+import { type AssistantMessage, fauxAssistantMessage, fauxProvider, fauxToolCall } from "@earendil-works/pi-ai";
 import { type ExtensionFactory, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -538,6 +538,29 @@ describe("results", () => {
     expect(messageText(result)).toBe("The subagent failed: scripted provider failure");
     expect(result?.details).toMatchObject({ status: "failed" });
     expect(channel.latest()).toEqual([expect.objectContaining({ status: "failed", error: "scripted provider failure" })]);
+    session.dispose();
+  });
+
+  it("leave out the transcript of a run that failed before Pi saved it", async () => {
+    const { session, runtime } = await start(
+      parentCalling([{ id: "sub1", task: "CHILD keyless", model: "keyless/k-1" }], childDone),
+      { persist: true },
+    );
+    const keyless = fauxProvider({ provider: "keyless", models: [{ id: "k-1" }] });
+    runtime.registerNativeProvider({ ...keyless.provider, auth: { apiKey: { name: "Keyless", resolve: async () => undefined } } });
+    await session.prompt("PARENT go");
+    const result = subagentResults(session).get("sub1");
+    expect(result?.isError).toBe(true);
+    expect(messageText(result)).toContain("No API key");
+    expect(result?.details).toMatchObject({ status: "failed" });
+    expect(result?.details).not.toHaveProperty("sessionFile");
+    const run = channel.latest()[0];
+    expect(run).toMatchObject({ status: "failed", error: expect.stringContaining("No API key") });
+    expect(run).not.toHaveProperty("sessionFile");
+    // While it ran, its entry named the file Pi would write.
+    expect(channel.sent.flatMap((message) => message.runs)).toContainEqual(
+      expect.objectContaining({ status: "running", sessionFile: expect.any(String) }),
+    );
     session.dispose();
   });
 });

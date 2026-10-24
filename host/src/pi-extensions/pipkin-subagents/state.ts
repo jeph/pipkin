@@ -31,7 +31,11 @@ export interface RunView {
   tokens: number;
   lastActivity: string | null;
   error: string | null;
-  sessionFile: string | null;
+  /**
+   * The run's transcript file; null while it runs in memory. Left out once the run ended before Pi wrote the file,
+   * as Pi does with the task, so it names no file; a running run's may not exist yet.
+   */
+  sessionFile?: string | null;
   messages: number;
   /** The run's tool calls handed to the parent's `executeTool()` that haven't returned or thrown. */
   inFlight: number;
@@ -130,7 +134,7 @@ export function view(run: Run): RunView {
     tokens: run.tokens,
     lastActivity: run.lastActivity,
     error: run.error,
-    sessionFile: run.sessionFile,
+    ...(run.sessionFile === undefined ? {} : { sessionFile: run.sessionFile }),
     messages: run.messages,
     inFlight: run.inFlight,
     steering: run.steering,
