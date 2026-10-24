@@ -232,6 +232,8 @@ export interface ParentOptions {
   persist?: boolean;
   projectTrusted?: boolean;
   ui: FakeUi;
+  /** Extension files Pi loads itself, as it does those in its `extensions/` folder. */
+  extensionPaths?: string[];
 }
 
 export interface Parent {
@@ -260,6 +262,7 @@ export async function makeParent(dir: Dir, script: Script, options: ParentOption
     noThemes: true,
     noContextFiles: true,
     extensionFactories: options.extensions ?? [pipkinSubagents],
+    additionalExtensionPaths: options.extensionPaths ?? [],
   });
   await resourceLoader.reload();
   const { session } = await createAgentSession({

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { type AssistantMessage, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
-import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
+import { type ExtensionFactory, SessionManager } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { capped, RESULT_LIMIT_BYTES } from "../src/pi-extensions/pipkin-subagents/runs.js";
@@ -462,6 +462,9 @@ describe("transcripts", () => {
       }),
     );
     const messages = lines.filter((line) => line.type === "message").length;
+    // What the host's session_messages mode gives the app for this transcript.
+    const context = SessionManager.open(file).buildSessionContext().messages.map((message) => message.role);
+    expect(context).toEqual(["system", "user", "assistant", "toolResult", "assistant"]);
     expect(channel.latest()).toEqual([expect.objectContaining({ sessionFile: file, messages })]);
     session.dispose();
   });
