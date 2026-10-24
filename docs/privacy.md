@@ -27,7 +27,7 @@ Everything else lives in Termux's storage on your phone, which you can also open
 
 [Configure the agent](/docs/configure/) lists where each of these is kept.
 
-If you've turned on Android's backup to your Google account, Android may include Pipkin's settings in it, as it does for other apps. Pipkin's private connection key to its helper in Termux is left out of those backups. Chats, sign-ins, and API keys are in Termux, not in Pipkin's app storage, so Pipkin's own backup doesn't contain them.
+If you've turned on Android's backup to your Google account, Android may include Pipkin's settings in it, as it does for other apps. Pipkin's private connection key to its helper in Termux is left out of those backups. Chats, sign-ins, and API keys are in Termux, not in Pipkin's app storage, so Android's backup of Pipkin doesn't contain them.
 
 ## What leaves your phone
 
@@ -50,7 +50,12 @@ Pipkin asks for these Android permissions:
 - **Running in the background and keeping the phone awake**, so a chat can keep working while you use other apps or lock the screen.
 - **Asking to uninstall an app**, used only to offer removing a copy of Termux that Pipkin can't use. Android asks you to confirm.
 
-When you attach a photo, Android's photo picker gives Pipkin only the photos you choose. Pipkin doesn't ask for access to your contacts, location, camera, microphone, or the rest of your photos and files.
+When you attach a photo, Android's photo picker gives Pipkin only the photos you choose. Pipkin itself doesn't ask for access to your contacts, location, camera, microphone, or the rest of your photos and files.
+
+Setup also asks you to give Termux two permissions in Termux's own name:
+
+- **Access to your phone's shared storage**, such as Downloads, Documents, and your photos, so the agent can work on files outside Termux. With it, the agent can read and change files there when a chat calls for it, and send what it reads to your model provider like any other file. You can turn it off in Android's settings for Termux.
+- **Running in the background without battery limits**, so the agent keeps working while the screen is off.
 
 ## Deleting your data
 
@@ -63,6 +68,10 @@ Pipkin is a developer tool that isn't directed at children under 13.
 ## Changes
 
 If Pipkin's handling of data changes, this page is updated with a new date at the top.
+
+## This website
+
+This website has no analytics, cookies, or tracking. It's hosted by [Vercel](https://vercel.com), which, like any web host, receives your IP address and browser details when you open a page. Pipkin's releases are downloaded from [GitHub](https://github.com/jeph/pipkin/releases).
 
 ## Contact
 

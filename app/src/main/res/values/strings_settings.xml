@@ -117,6 +117,7 @@
     <string name="settings_licenses_components">Code, fonts and icons</string>
     <string name="settings_licenses_syntax">Syntax highlighting</string>
     <string name="settings_privacy_policy">Privacy policy</string>
+    <string name="settings_no_browser">No app on this device can open web pages.</string>
 
     <string name="login_title_claude">Sign in to Claude</string>
     <string name="login_title_openai">Sign in to OpenAI</string>

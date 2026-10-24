@@ -1,5 +1,9 @@
 package io.jeph.pipkin.ui.settings
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,9 +27,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.AppGraph
 import io.jeph.pipkin.R
@@ -318,7 +322,6 @@ private fun AdvancedSection(onOpenAdvanced: () -> Unit) {
 @Composable
 private fun AboutSection(onOpenLicenses: () -> Unit) {
   val context = LocalContext.current
-  val uriHandler = LocalUriHandler.current
   val version = remember(context) {
     context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
   }
@@ -333,10 +336,7 @@ private fun AboutSection(onOpenLicenses: () -> Unit) {
       )
     }
     SettingsDivider()
-    SettingsRow(
-      title = stringResource(R.string.settings_privacy_policy),
-      onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) },
-    ) {
+    SettingsRow(title = stringResource(R.string.settings_privacy_policy), onClick = { openPrivacyPolicy(context) }) {
       LucideIcon(
         icon = R.drawable.ic_lucide_external_link,
         contentDescription = null,
@@ -347,3 +347,11 @@ private fun AboutSection(onOpenLicenses: () -> Unit) {
 }
 
 private const val PRIVACY_POLICY_URL = "https://pipkin.jeph.io/docs/privacy/"
+
+private fun openPrivacyPolicy(context: Context) {
+  try {
+    context.startActivity(Intent(Intent.ACTION_VIEW, PRIVACY_POLICY_URL.toUri()))
+  } catch (_: ActivityNotFoundException) {
+    Toast.makeText(context, R.string.settings_no_browser, Toast.LENGTH_SHORT).show()
+  }
+}
