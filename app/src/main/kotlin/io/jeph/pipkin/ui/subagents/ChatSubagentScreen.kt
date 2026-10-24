@@ -108,6 +108,7 @@ internal fun ChatSubagentScreen(
         PendingSubagentSteering(run, compact, Modifier.weight(1f, fill = false))
         SteerBar(
           run = run,
+          draft = controller.view.steerDraft(run.toolCallId),
           onSteer = { text -> controller.scope.launch { process.steerSubagent(run.id, text) } },
           onStop = { controller.scope.launch { process.stopSubagent(run.id) } },
         )
@@ -133,14 +134,13 @@ private fun PendingSubagentSteering(run: SubagentRun, compact: Boolean, modifier
 }
 
 /**
- * The box that steers a running subagent, docked like the chat's composer: the draft, Stop, and Send, which the
- * subagent reads after its current tool call. Send waits until the subagent leaves the queue, since a queued one has
- * nothing to read it yet.
+ * The box that steers a running subagent, docked like the chat's composer: the [draft], kept with the chat's view as
+ * the composer's is, so it outlives rotation, Stop, and Send, which the subagent reads after its current tool call.
+ * Send waits until the subagent leaves the queue, since a queued one has nothing to read it yet.
  */
 @Composable
-private fun SteerBar(run: SubagentRun, onSteer: (String) -> Unit, onStop: () -> Unit) {
+private fun SteerBar(run: SubagentRun, draft: TextFieldState, onSteer: (String) -> Unit, onStop: () -> Unit) {
   val colors = pipkinColors
-  val draft = remember(run.id) { TextFieldState() }
   val style = LocalTextStyle.current.copy(color = colors.foreground, fontSize = PipkinTokens.FontSize.content)
   val canSend = run.status == SubagentStatus.Running && draft.text.isNotBlank()
   Box(

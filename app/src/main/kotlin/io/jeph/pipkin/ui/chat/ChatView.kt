@@ -43,7 +43,8 @@ internal class ChatScroll {
 /**
  * What the chat screen keeps of one chat while another one shows or the activity is recreated, as on rotation or
  * folding: its [scroll] position, its replies' parsed [markdown], so switching back draws the chat as it was from the
- * first frame, the step folds it has [expanded], its [widgetTabs], and the composer's unsent [draft].
+ * first frame, the step folds it has [expanded], its [widgetTabs], the composer's unsent [draft], and the unsent
+ * steers of its subagents' screens ([steerDraft]).
  */
 internal class ChatView {
   val scroll = ChatScroll()
@@ -53,6 +54,13 @@ internal class ChatView {
   val expanded = mutableStateSetOf<String>()
   val widgetTabs = WidgetTabs()
   val draft = TextFieldState()
+  private val steerDrafts = HashMap<String, TextFieldState>()
+
+  /**
+   * The unsent steer for the subagent the chat's `subagent` call [toolCallId] started. Keyed by the call rather than
+   * the run's id, which a restarted Pi counts again from the first.
+   */
+  fun steerDraft(toolCallId: String): TextFieldState = steerDrafts.getOrPut(toolCallId) { TextFieldState() }
 }
 
 /**
