@@ -41,6 +41,7 @@ export default defineConfig({
         { label: "Extensions", slug: "docs/extensions" },
         { label: "Run in the background", slug: "docs/background" },
         { label: "Acknowledgements", slug: "docs/acknowledgements" },
+        { label: "Privacy policy", slug: "docs/privacy" },
       ],
     }),
   ],

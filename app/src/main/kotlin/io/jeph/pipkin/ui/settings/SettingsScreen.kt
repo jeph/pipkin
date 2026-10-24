@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -313,10 +314,11 @@ private fun AdvancedSection(onOpenAdvanced: () -> Unit) {
   }
 }
 
-/** The app's version, and a row into the open-source licences it ships. */
+/** The app's version, a row into the open-source licences it ships, and a link to the privacy policy on the website. */
 @Composable
 private fun AboutSection(onOpenLicenses: () -> Unit) {
   val context = LocalContext.current
+  val uriHandler = LocalUriHandler.current
   val version = remember(context) {
     context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
   }
@@ -330,5 +332,18 @@ private fun AboutSection(onOpenLicenses: () -> Unit) {
         tint = pipkinColors.foregroundMuted,
       )
     }
+    SettingsDivider()
+    SettingsRow(
+      title = stringResource(R.string.settings_privacy_policy),
+      onClick = { uriHandler.openUri(PRIVACY_POLICY_URL) },
+    ) {
+      LucideIcon(
+        icon = R.drawable.ic_lucide_external_link,
+        contentDescription = null,
+        tint = pipkinColors.foregroundMuted,
+      )
+    }
   }
 }
+
+private const val PRIVACY_POLICY_URL = "https://pipkin.jeph.io/docs/privacy/"

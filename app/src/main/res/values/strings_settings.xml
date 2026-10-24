@@ -116,6 +116,7 @@
     <string name="settings_licenses_caption">Pipkin is open source under the MIT License. It\'s built with the code, fonts and icons below, each under its own license.</string>
     <string name="settings_licenses_components">Code, fonts and icons</string>
     <string name="settings_licenses_syntax">Syntax highlighting</string>
+    <string name="settings_privacy_policy">Privacy policy</string>
 
     <string name="login_title_claude">Sign in to Claude</string>
     <string name="login_title_openai">Sign in to OpenAI</string>
