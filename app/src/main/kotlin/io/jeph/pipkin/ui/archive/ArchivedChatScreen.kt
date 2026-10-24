@@ -135,6 +135,7 @@ internal fun ArchivedChatScreen(
         }
       },
       onDismiss = { confirmingDelete = false },
+      subagents = session?.subagents ?: 0,
     )
   }
 }
