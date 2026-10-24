@@ -321,12 +321,20 @@ internal class AgentProcess(
 
   /** Stops subagent [runId]; its `subagent` tool call returns, saying the user stopped it, and the parent carries on. */
   suspend fun stopSubagent(runId: String) {
-    sendSubagents(JSONObject().put("action", "stop").put("id", runId))
+    stopSubagents(JSONObject().put("action", "stop").put("id", runId), runId)
   }
 
   /** Stops every subagent the chat runs or has queued. */
   suspend fun stopAllSubagents() {
-    sendSubagents(JSONObject().put("action", "stopAll"))
+    stopSubagents(JSONObject().put("action", "stopAll"), runId = null)
+  }
+
+  /** Sends the stop, then cancels the questions only the stopped runs could have asked; see [stopEndsQuestions]. */
+  private suspend fun stopSubagents(data: JSONObject, runId: String?) {
+    val asker = askingSubagent(timeline.state.value, subagentRunsState.value)
+    sendSubagents(data)
+    if (!stopEndsQuestions(asker, runId)) return
+    timeline.pendingDialogIds().forEach { respondUi(it, UiAnswer.Cancelled) }
   }
 
   private suspend fun sendSubagents(data: JSONObject) {

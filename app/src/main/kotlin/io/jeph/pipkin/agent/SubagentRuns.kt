@@ -113,6 +113,18 @@ internal fun askingSubagent(timeline: TimelineState, runs: List<SubagentRun>): S
   }
 }
 
+/**
+ * Whether stopping run [runId], or every run when it's null, should cancel all the questions the chat's card queues.
+ * The extension that asked keeps waiting after a run stops, so the card would otherwise outlive the run. [asker] makes
+ * this safe: when it isn't [SubagentAsker.Unknown], the parent has no calls of its own running, so every queued
+ * question came from the subagents in flight.
+ */
+internal fun stopEndsQuestions(asker: SubagentAsker, runId: String?): Boolean = when (asker) {
+  SubagentAsker.Unknown -> false
+  SubagentAsker.Several -> runId == null
+  is SubagentAsker.One -> runId == null || asker.run.id == runId
+}
+
 /** The tool the `pipkin-subagents` extension registers. */
 internal const val SUBAGENT_TOOL = "subagent"
 

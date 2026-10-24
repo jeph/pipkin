@@ -151,6 +151,31 @@ class SubagentRunsTest {
     assertEquals(SubagentAsker.Unknown, askingSubagent(timeline, listOf(explore)))
   }
 
+  @Test
+  fun stoppingTheRunThatAskedEndsItsQuestions() {
+    val asker = SubagentAsker.One(run("r1", "call_1", inFlight = 1))
+
+    assertEquals(true, stopEndsQuestions(asker, "r1"))
+    assertEquals(true, stopEndsQuestions(asker, runId = null))
+  }
+
+  @Test
+  fun stoppingAnotherRunLeavesTheQuestion() {
+    assertEquals(false, stopEndsQuestions(SubagentAsker.One(run("r1", "call_1", inFlight = 1)), "r2"))
+  }
+
+  @Test
+  fun withSeveralAskingOnlyStopAllEndsTheQuestions() {
+    assertEquals(false, stopEndsQuestions(SubagentAsker.Several, "r1"))
+    assertEquals(true, stopEndsQuestions(SubagentAsker.Several, runId = null))
+  }
+
+  @Test
+  fun aQuestionThatMayBeTheParentsSurvivesEveryStop() {
+    assertEquals(false, stopEndsQuestions(SubagentAsker.Unknown, "r1"))
+    assertEquals(false, stopEndsQuestions(SubagentAsker.Unknown, runId = null))
+  }
+
   private fun asking(vararg items: TimelineItem) = TimelineState(
     items = items.toList(),
     pendingUi = ExtensionUiRequest(
