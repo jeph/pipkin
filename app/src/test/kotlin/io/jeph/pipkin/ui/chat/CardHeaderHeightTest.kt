@@ -34,4 +34,22 @@ class CardHeaderHeightTest {
     assertEquals(50, cardHeaderHeight(300, 400, room = 100, headerFloor = 60, answersFloor = 72, answersScroll = true))
     assertEquals(0, cardHeaderHeight(300, 400, room = 0, headerFloor = 60, answersFloor = 72, answersScroll = true))
   }
+
+  @Test
+  fun thePillNamingWhoAskedLeavesTheAnswersTheirRoom() {
+    // The case at font scale 2.0: a two-line title and three choices, in a card held to half the chat.
+    val title = 80
+    val pill = 44
+    val answers = 180
+    fun answersShown(asker: Int): Int {
+      val max = dialogMaxHeight(height = 800, left = 500, belowDialog = 200, floor = 0, extra = asker)
+      // Buttons and gaps take 120 of the card.
+      val room = max - 120
+      val header = cardHeaderHeight(title + asker, answers, room, title + asker, title + 24, answersScroll = true)
+      return minOf(answers, room - header)
+    }
+    // Without the pill's room on top of the half, the same card would show 156 of the answers' 180.
+    assertEquals(answers, answersShown(asker = 0))
+    assertEquals(answers, answersShown(asker = pill))
+  }
 }

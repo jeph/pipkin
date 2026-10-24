@@ -94,7 +94,23 @@ internal fun ExtensionUiCard(
   modifier: Modifier = Modifier,
 ) {
   val colors = pipkinColors
-  Box(modifier = modifier.fillMaxWidth().padding(horizontal = 10.dp), Alignment.TopCenter) {
+  // The pill naming who asked, with its gap to the title, measured rather than counted in sp, as Android scales large
+  // sizes less. It comes on top of the card's half of the chat, rather than out of the answers.
+  val measurer = rememberTextMeasurer(cacheSize = 0)
+  val pillStyle = LocalTextStyle.current.merge(PILL_TEXT_STYLE)
+  val density = LocalDensity.current
+  val askerShown = asker != SubagentAsker.Unknown
+  val askerRoom = remember(measurer, pillStyle, density, askerShown) {
+    if (!askerShown) return@remember 0
+    with(density) {
+      maxOf(measurer.measure("", pillStyle).size.height, PILL_MIN_HEIGHT.roundToPx()) +
+        PipkinTokens.Spacing.s4.roundToPx()
+    }
+  }
+  Box(
+    modifier = modifier.dialogExtraHeight(askerRoom).fillMaxWidth().padding(horizontal = 10.dp),
+    Alignment.TopCenter,
+  ) {
     key(request.id) {
       val cardModifier = Modifier
         .widthIn(max = PipkinTokens.contentMaxWidth)
@@ -108,11 +124,10 @@ internal fun ExtensionUiCard(
           bottom = 10.dp,
         )
       val header: @Composable () -> Unit = { CardHeader(request, asker, number, count) }
-      val askerShown = asker != SubagentAsker.Unknown
       when (request.method) {
         "select" -> ChoiceCard(
           header = header,
-          askerShown = askerShown,
+          askerRoom = askerRoom,
           choices = request.options,
           onSubmit = { onAnswer(UiAnswer.Value(request.options[it])) },
           onDismiss = { onAnswer(UiAnswer.Cancelled) },
@@ -122,14 +137,14 @@ internal fun ExtensionUiCard(
         // Pi reads a cancelled `confirm` as No, so the card needs no Dismiss.
         "confirm" -> ChoiceCard(
           header = header,
-          askerShown = askerShown,
+          askerRoom = askerRoom,
           choices = listOf(stringResource(R.string.chat_yes), stringResource(R.string.chat_no)),
           onSubmit = { onAnswer(UiAnswer.Confirmed(it == 0)) },
           onDismiss = null,
           modifier = cardModifier,
         )
 
-        "input", "editor" -> TextCard(request, header, askerShown, onAnswer, cardModifier)
+        "input", "editor" -> TextCard(request, header, askerRoom, onAnswer, cardModifier)
       }
     }
   }
@@ -138,7 +153,7 @@ internal fun ExtensionUiCard(
 /**
  * Stacks [header], [answers] and [buttons], with the buttons always whole. Pi puts no limit on a title or a message,
  * so when the header and answers together outgrow the card, each first keeps a floor: the header two lines, under the
- * pill naming who asked when [askerShown], and the answers two lines inside a field's padding when [answersScroll], or
+ * [askerRoom] of the pill naming who asked, and the answers two lines inside a field's padding when [answersScroll], or
  * all of them when they can't scroll, as a one-line field can't. What's left over is split evenly, and a part that
  * needs less than its share gives the rest to the other; a part shorter than its need scrolls inside it. When even the
  * floors don't fit, answers that can't scroll stay whole and the header gets the rest, and otherwise the two floors
@@ -147,7 +162,7 @@ internal fun ExtensionUiCard(
 @Composable
 private fun CardLayout(
   header: @Composable () -> Unit,
-  askerShown: Boolean,
+  askerRoom: Int,
   answers: @Composable () -> Unit,
   buttons: @Composable () -> Unit,
   answersScroll: Boolean,
@@ -156,17 +171,8 @@ private fun CardLayout(
   // Measured rather than counted in sp: Android scales large sizes less, so 2 × 24sp isn't two lines of 24sp text.
   val measurer = rememberTextMeasurer(cacheSize = 0)
   val style = LocalTextStyle.current.merge(TITLE_STYLE)
-  val pillStyle = LocalTextStyle.current.merge(PILL_TEXT_STYLE)
-  val density = LocalDensity.current
   val twoLines = remember(measurer, style) { measurer.measure("\n", style).size.height }
   // The pill above the title would otherwise take most of the header's floor, leaving the question a line or less.
-  val askerRoom = remember(measurer, pillStyle, density, askerShown) {
-    if (!askerShown) return@remember 0
-    with(density) {
-      maxOf(measurer.measure("", pillStyle).size.height, PILL_MIN_HEIGHT.roundToPx()) +
-        PipkinTokens.Spacing.s4.roundToPx()
-    }
-  }
   val policy = remember(twoLines, askerRoom, answersScroll) {
     CardMeasurePolicy(twoLines, twoLines + askerRoom, answersScroll)
   }
@@ -362,7 +368,7 @@ private fun HeaderPill(
 @Composable
 private fun ChoiceCard(
   header: @Composable () -> Unit,
-  askerShown: Boolean,
+  askerRoom: Int,
   choices: List<String>,
   onSubmit: (Int) -> Unit,
   onDismiss: (() -> Unit)?,
@@ -371,7 +377,7 @@ private fun ChoiceCard(
   var picked by remember { mutableIntStateOf(-1) }
   CardLayout(
     header = header,
-    askerShown = askerShown,
+    askerRoom = askerRoom,
     answers = {
       Column(
         modifier = Modifier.verticalScroll(rememberScrollState()).selectableGroup(),
@@ -422,7 +428,7 @@ private fun ChoiceRow(label: String, picked: Boolean, onPick: () -> Unit) {
 private fun TextCard(
   request: ExtensionUiRequest,
   header: @Composable () -> Unit,
-  askerShown: Boolean,
+  askerRoom: Int,
   onAnswer: (UiAnswer) -> Unit,
   modifier: Modifier,
 ) {
@@ -436,7 +442,7 @@ private fun TextCard(
   val style = LocalTextStyle.current.merge(TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base))
   CardLayout(
     header = header,
-    askerShown = askerShown,
+    askerRoom = askerRoom,
     answers = {
       BasicTextField(
         state = state,

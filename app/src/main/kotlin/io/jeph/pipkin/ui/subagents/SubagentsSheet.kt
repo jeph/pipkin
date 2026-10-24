@@ -142,15 +142,23 @@ private fun SheetHeader(subagents: ChatSubagents) {
       size = PipkinTokens.IconSize.md,
       tint = colors.accent,
     )
-    Column {
+    Column(modifier = Modifier.weight(1f)) {
       Text(
         text = stringResource(R.string.subagents_title),
         color = colors.foreground,
         fontSize = PipkinTokens.FontSize.lg,
         fontWeight = FontWeight.Bold,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
       )
-      Text(text = summary, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm, maxLines = 1)
+      // Wraps under large fonts, as the tool call sheet's subtitle does.
+      Text(
+        text = summary,
+        color = colors.foregroundMuted,
+        fontSize = PipkinTokens.FontSize.sm,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+      )
     }
   }
 }
