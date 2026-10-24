@@ -52,6 +52,10 @@ The Termux host writes its messages in English, and each one the app may show al
 
 Debug builds include pseudo-locales. Set Pipkin's language to English (XA) to find text that skips resources, which stays plain English while everything else turns accented, or to Arabic (XB) to check right-to-left layouts, for example with `adb -s emulator-<port> shell cmd locale set-app-locales io.jeph.pipkin.debug --locales en-XA`.
 
+## Privacy policy
+
+`docs/privacy.md` is Pipkin's privacy policy, which the website serves at `/docs/privacy/` and Settings › About links to. Google Play requires it to be accurate, so when you add a feature or change behavior, check whether the policy still describes what Pipkin does. Update it when a change affects what data Pipkin or its bundled extensions store, where they store it, or what they send off the phone and to whom, or when Pipkin asks for a new Android permission or uses one for something new. Examples are a new network request, a new default service in the bundled web access extension, a new kind of attachment, or telemetry. When you update the policy, change the date at its top in the same commit.
+
 ## Commits
 
 Write commit messages in the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) format: `<type>(<optional scope>): <description>`, for example `feat(composer): add a context window meter next to the send button`. Use `feat` for new behavior, `fix` for bug fixes, `docs` for documentation-only changes, and `refactor`, `perf`, `test`, `build`, `ci`, or `chore` where they fit. Mark breaking changes with `!` after the type or scope and a `BREAKING CHANGE:` footer.
