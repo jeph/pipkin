@@ -9,7 +9,7 @@ import { pathToFileURL } from "node:url";
 import { inject, onTestFinished } from "vitest";
 import { encodeLine, isObject, LineSplitter, type JsonObject } from "../src/framing.js";
 
-export const PI_VERSION = "1.3.0";
+export const PI_VERSION = "1.4.0";
 /** The runtime `pi/package.json` that `ensure` would have installed: Pi alone, no packages for extensions. */
 export const PACKAGE_JSON = runtimeManifest([]);
 const FAKE_PI = path.join(import.meta.dirname, "fixtures/fake-pi.mjs");
