@@ -309,8 +309,12 @@ internal class AgentProcess(
   suspend fun steer(message: String, images: List<ImagePart> = emptyList()): String =
     call("steer", messageParams(message, images), timeoutMillis = null).optString("disposition")
 
+  /**
+   * Stops Pi's run, which stops every subagent with it, and cancels the questions only they could have asked, as
+   * [stopAllSubagents] does. A question the parent may have asked stays for the user.
+   */
   override suspend fun abort() {
-    call("abort")
+    stoppingSubagents(runId = null) { call("abort") }
   }
 
   /** Asks Pi's `pipkin-background` extension to stop every task it runs; each one's result still reaches the chat. */
@@ -330,25 +334,26 @@ internal class AgentProcess(
 
   /** Stops subagent [runId]; its `subagent` tool call returns, saying the user stopped it, and the parent carries on. */
   suspend fun stopSubagent(runId: String) {
-    stopSubagents(JSONObject().put("action", "stop").put("id", runId), runId)
+    stoppingSubagents(runId) { sendSubagents(JSONObject().put("action", "stop").put("id", runId)) }
   }
 
   /** Stops every subagent the chat runs or has queued. */
   suspend fun stopAllSubagents() {
-    stopSubagents(JSONObject().put("action", "stopAll"), runId = null)
+    stoppingSubagents(runId = null) { sendSubagents(JSONObject().put("action", "stopAll")) }
   }
 
   /**
-   * Sends the stop, then cancels the questions only the stopped runs could have asked; see [questionsStopCancels].
-   * The asker and the questions come from one published timeline, taken before sending, so a question that arrives
-   * meanwhile isn't cancelled. The runs are read after it: the reader updates both in stream order, so each run that
-   * asked one of those questions still has its call in flight there until the question is answered.
+   * Runs [stop], which stops subagent [runId] or every one when it's null, then cancels the questions only the stopped
+   * runs could have asked; see [questionsStopCancels]. The asker and the questions come from one published timeline,
+   * taken before [stop], so a question that arrives meanwhile isn't cancelled. The runs are read after the timeline:
+   * the reader updates both in stream order, so each run that asked one of those questions still has its call in
+   * flight there until the question is answered.
    */
-  private suspend fun stopSubagents(data: JSONObject, runId: String?) {
+  private suspend inline fun stoppingSubagents(runId: String?, stop: () -> Unit) {
     val shown = timeline.state.value
     val asker = askingSubagent(shown, subagentRunsState.value)
     val cancelled = questionsStopCancels(asker, runId, shown.pendingUiIds)
-    sendSubagents(data)
+    stop()
     cancelled.forEach { respondUi(it, UiAnswer.Cancelled) }
   }
 
