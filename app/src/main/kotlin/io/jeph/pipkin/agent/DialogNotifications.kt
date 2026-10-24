@@ -72,7 +72,7 @@ internal class DialogNotifications(
     launch {
       visibility.onScreen.collect { onScreen ->
         if (onScreen) return@collect
-        toldInApp.forEach { (process, dialog) -> notify(process, dialog, alertAgain = true) }
+        toldInApp.forEach { (process, dialog) -> notify(process, dialog) }
         toldInApp.clear()
       }
     }
@@ -88,12 +88,12 @@ internal class DialogNotifications(
 
   private fun post(process: AgentProcess, dialog: FrontDialog) {
     ChatNotification.inboxEntry(process, InboxReason.Waiting, question(dialog.request), dialog.asker)?.let(inbox::add)
-    if (visibility.onScreen.value) toldInApp[process] = dialog else notify(process, dialog, alertAgain = true)
+    if (visibility.onScreen.value) toldInApp[process] = dialog else notify(process, dialog)
   }
 
   /**
    * Names the subagent that asked [process]'s told dialog, known only now: in its inbox entry, and in its notification
-   * if that's still showing, posted again under its tag without a second alert.
+   * if that's still showing, posted again under the tag it went out with, so it updates in place without alerting.
    */
   private fun retell(process: AgentProcess, dialog: FrontDialog) {
     val asker = dialog.asker ?: return
@@ -105,23 +105,27 @@ internal class DialogNotifications(
     val tag = postedTags[process] ?: return
     // Posting again would bring back a notification the user swiped away.
     if (manager.activeNotifications.none { it.tag == tag && it.id == NOTIFICATION_ID }) return
-    notify(process, dialog, alertAgain = false)
+    manager.notify(tag, NOTIFICATION_ID, notification(process, dialog, alertAgain = false))
   }
 
-  /** Posts [dialog]'s notification; one posted again under the same tag only alerts when [alertAgain]. */
-  private fun notify(process: AgentProcess, dialog: FrontDialog, alertAgain: Boolean) {
+  /** Posts [dialog]'s notification under the chat's tag now, taking down one posted under an earlier tag. */
+  private fun notify(process: AgentProcess, dialog: FrontDialog) {
+    val tag = ChatNotification.tag(process)
+    postedTags.put(process, tag)?.takeIf { it != tag }?.let { manager.cancel(it, NOTIFICATION_ID) }
+    manager.notify(tag, NOTIFICATION_ID, notification(process, dialog, alertAgain = true))
+  }
+
+  /** [dialog]'s notification; posted again over one still showing, it only alerts when [alertAgain]. */
+  private fun notification(process: AgentProcess, dialog: FrontDialog, alertAgain: Boolean): Notification {
     val question = question(dialog.request).ifEmpty { context.getString(R.string.dialog_notification_text) }
     val headline = dialog.asker?.let { context.getString(R.string.dialog_notification_waiting_subagent, it) }
       ?: context.getString(R.string.dialog_notification_waiting)
-    val notification = ChatNotification.builder(context, CHANNEL, process, home().orEmpty())
+    return ChatNotification.builder(context, CHANNEL, process, home().orEmpty())
       .setContentTitle(ChatNotification.title(context, process, headline))
       .setContentText(question)
       .setStyle(Notification.BigTextStyle().bigText(question))
       .setOnlyAlertOnce(!alertAgain)
       .build()
-    val tag = ChatNotification.tag(process)
-    postedTags.put(process, tag)?.takeIf { it != tag }?.let { manager.cancel(it, NOTIFICATION_ID) }
-    manager.notify(tag, NOTIFICATION_ID, notification)
   }
 
   /** The dialog's title and message, each on its own line; empty for a dialog with neither. */
