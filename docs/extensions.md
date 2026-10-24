@@ -76,7 +76,7 @@ Pi doesn't say which tool call raised a question, so Pipkin names a subagent onl
 
 If a question arrives in a chat that isn't on screen, the chat appears in the inbox pill and Pipkin sends a notification. When Pipkin can name the subagent, the pill says, for example, **Explore needs you**, and the notification **Explore needs your answer**. Otherwise they say only that the chat needs you. While a subagent's screen is open, its chat counts as on screen.
 
-Stopping a subagent that is waiting for your answer cancels its question. **Stop all** cancels the chat's questions too when only subagents could have asked them.
+Stopping a subagent cancels its question when Pipkin can tell the question is its own, that is, when the card names it. **Stop all** cancels the chat's questions when only subagents could have asked them.
 
 ### Subagents in the archive
 
