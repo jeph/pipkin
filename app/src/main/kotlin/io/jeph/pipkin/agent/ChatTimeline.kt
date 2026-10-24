@@ -313,9 +313,6 @@ class ChatTimeline(
     }
   }
 
-  /** The ids of the dialogs Pi waits on, oldest first. */
-  fun pendingDialogIds(): List<String> = synchronized(lock) { dialogs.map { it.id } }
-
   /** Drops dialog [id] once it is answered, or once Pi stopped waiting on it; other dialogs stay queued. */
   fun dismissDialog(id: String) {
     synchronized(lock) {
@@ -669,6 +666,7 @@ class ChatTimeline(
       busy = busy || compacting,
       queue = queue,
       pendingUi = dialogs.firstOrNull(),
+      pendingUiIds = dialogs.map { it.id },
       pendingUiNumber = if (dialogs.isEmpty()) 0 else dialogsDone + 1,
       pendingUiCount = dialogsDone + dialogs.size,
       model = model,

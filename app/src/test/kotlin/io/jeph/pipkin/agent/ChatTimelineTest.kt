@@ -505,10 +505,13 @@ class ChatTimelineTest {
     apply("""{"type":"extension_ui_request","id":"b","method":"select","title":"Second?","options":["x"]}""")
     apply("""{"type":"extension_ui_request","id":"c","method":"input","title":"Third?"}""")
     assertEquals("a", timeline.state.value.pendingUi?.id)
+    // A stop reads the queue from a state taken earlier; a dialog asked after that isn't in it.
+    val beforeD = timeline.state.value
 
     // Pi can stop waiting on a later dialog first, as when its timeout runs out; the shown one stays.
     timeline.dismissDialog("b")
     assertEquals("a", timeline.state.value.pendingUi?.id)
+    assertEquals(listOf("a", "c"), timeline.state.value.pendingUiIds)
     timeline.dismissDialog("a")
     assertEquals("c", timeline.state.value.pendingUi?.id)
     // An answer that comes after the dialog already went changes nothing.
@@ -516,8 +519,11 @@ class ChatTimelineTest {
     assertEquals("c", timeline.state.value.pendingUi?.id)
 
     apply("""{"type":"extension_ui_request","id":"d","method":"confirm","title":"Fourth?"}""")
+    assertEquals(listOf("c", "d"), timeline.state.value.pendingUiIds)
+    assertEquals(listOf("a", "b", "c"), beforeD.pendingUiIds)
     timeline.clearDialogs()
     assertNull(timeline.state.value.pendingUi)
+    assertEquals(emptyList<String>(), timeline.state.value.pendingUiIds)
   }
 
   @Test

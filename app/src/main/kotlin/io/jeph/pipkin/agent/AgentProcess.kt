@@ -340,11 +340,14 @@ internal class AgentProcess(
 
   /**
    * Sends the stop, then cancels the questions only the stopped runs could have asked; see [questionsStopCancels].
-   * The questions are taken with the asker, before sending: one arriving meanwhile wasn't part of that reckoning.
+   * The asker and the questions come from one published timeline, taken before sending, so a question that arrives
+   * meanwhile isn't cancelled. The runs are read after it: the reader updates both in stream order, so each run that
+   * asked one of those questions still has its call in flight there until the question is answered.
    */
   private suspend fun stopSubagents(data: JSONObject, runId: String?) {
-    val asker = askingSubagent(timeline.state.value, subagentRunsState.value)
-    val cancelled = questionsStopCancels(asker, runId, timeline.pendingDialogIds())
+    val shown = timeline.state.value
+    val asker = askingSubagent(shown, subagentRunsState.value)
+    val cancelled = questionsStopCancels(asker, runId, shown.pendingUiIds)
     sendSubagents(data)
     cancelled.forEach { respondUi(it, UiAnswer.Cancelled) }
   }
