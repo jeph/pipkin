@@ -31,7 +31,7 @@ Pipkin subagents comes with two agents:
 
 ### Write your own agents
 
-An agent is a Markdown file with frontmatter. Put your agents in `~/.pipkin/pi/agents/`. Agents in a project's `.pi/agents/` load only from [trusted projects](/docs/configure/#project-settings). A project's agent replaces one of yours with the same name, and either can replace Explore or General. Save `~/.pipkin/pi/agents/reviewer.md`:
+An agent is a Markdown file with frontmatter. Put your agents in `~/.pipkin/pi/agents/`. Agents in a project's `.pi/agents/` follow Pi's project trust: they load from [trusted projects](/docs/configure/#project-settings), and also from any project whose `.pi` folder has nothing Pi asks trust for, such as settings, extensions, skills, or prompts. A repository you clone with only `.pi/agents/` loads its agents, so read them before you ask for a subagent there. A project's agent replaces one of yours with the same name, and either can replace Explore or General. Save `~/.pipkin/pi/agents/reviewer.md`:
 
 ```markdown
 ---
@@ -55,6 +55,8 @@ The body is added to the subagent's system prompt. Every field is optional:
 Pipkin reads the agent files each time a subagent starts, so a new or changed agent works at once if the chat's agent asks for it by name. The list of agents the chat's agent is told about updates when you reload the chat. If a file can't be read, the chat's agent is told why when it asks for that agent.
 
 Subagents never get the `subagent`, `todo`, or `background` tools, since those act on the chat's own subagents, to-do list, and background tasks. Subagents can't start subagents, use the to-do list, or run background tasks.
+
+Subagents also don't get tools an extension registers for the model only, such as the `ask_user_question` tool of rpiv-ask-user-question. Pi lets only the chat's model call those, not a subagent working through the chat's agent.
 
 ### Follow, steer, and stop subagents
 
