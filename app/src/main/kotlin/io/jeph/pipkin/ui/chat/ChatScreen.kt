@@ -97,7 +97,11 @@ internal fun ChatScreen(
     LaunchedEffect(controller) { controller.steering.collectQueue() }
     // The pane's own: a subagent shows in place of its chat and never in the other pane or as a tab of its own.
     var subagent by rememberSaveable { mutableStateOf<String?>(null) }
-    val shownSubagent = subagent
+    // Pipkin subagents standing aside after a reload or a reconnect, the `subagent` call is another extension's and
+    // starts nothing to show; forgotten, so the screen doesn't come back when the next connection starts.
+    val standingAside by process.subagentsStandingAside.collectAsStateWithLifecycle()
+    LaunchedEffect(standingAside) { if (standingAside) subagent = null }
+    val shownSubagent = subagent.takeUnless { standingAside }
     if (shownSubagent != null) {
       BackHandler { subagent = null }
       ChatSubagentScreen(
