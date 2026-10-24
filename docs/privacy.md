@@ -19,7 +19,7 @@ Pipkin keeps its own settings, such as the theme and the folders you've opened a
 
 Everything else lives in Termux's storage on your phone, which you can also open from Android's Files app:
 
-- your chats and their history
+- your chats and their history, including the transcripts of the subagents a chat runs
 - the agent's configuration, including your subscription sign-ins and API keys
 - extensions, skills, and prompt templates you add
 - backups you make in **Settings → Backups**, which are written to a folder in Termux and aren't uploaded anywhere
