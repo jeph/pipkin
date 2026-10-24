@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import { normalizeDomain } from "./domain-filter-normalization.ts";
@@ -6,9 +6,9 @@ import type { SearchOptions, SearchResponse } from "./perplexity.ts";
 import { formatSearchResultsAsAnswer } from "./search-answer-formatting.ts";
 import { normalizeSearchResultCount } from "./search-result-count-normalization.ts";
 import { hasCredentialSource, redactCredential, resolveCredential } from "./credential-source.ts";
-import { getWebSearchConfigPath } from "./utils.ts";
+import { fetchWithCredentialRedirects, getWebSearchConfigPath, resolveProviderApiUrl } from "./utils.ts";
 
-const SERPAPI_SEARCH_URL = "https://serpapi.com/search.json";
+const SERPAPI_API_BASE_URL = "https://serpapi.com";
 const CONFIG_PATH = getWebSearchConfigPath();
 const SEARCH_TIMEOUT_MS = 60_000;
 const RECENCY_TBS: Record<NonNullable<SearchOptions["recencyFilter"]>, string> = {
@@ -20,6 +20,7 @@ const RECENCY_TBS: Record<NonNullable<SearchOptions["recencyFilter"]>, string> =
 
 interface WebSearchConfig {
 	serpapiApiKey?: unknown;
+	serpapiBaseUrl?: unknown;
 }
 
 interface SerpApiOrganicResult {
@@ -131,11 +132,12 @@ export function isSerpApiAvailable(): boolean {
 }
 
 export async function searchWithSerpApi(query: string, options: SearchOptions = {}): Promise<SearchResponse> {
+	const apiUrl = resolveProviderApiUrl("serpapi", `${SERPAPI_API_BASE_URL}/search.json`, loadConfig().serpapiBaseUrl);
 	const apiKey = await requireApiKey(options.signal);
 	const numResults = normalizeSearchResultCount(options.numResults);
 	const filters = parseDomainFilter(options.domainFilter);
 	const requestCount = options.domainFilter?.length ? Math.min(20, numResults + 5) : numResults;
-	const url = new URL(SERPAPI_SEARCH_URL);
+	const url = new URL(apiUrl);
 	url.searchParams.set("engine", "google");
 	url.searchParams.set("q", buildQuery(query, filters));
 	url.searchParams.set("api_key", apiKey);
@@ -146,10 +148,10 @@ export async function searchWithSerpApi(query: string, options: SearchOptions = 
 	let response: Response;
 	let entries: SerpApiOrganicResult[];
 	try {
-		response = await fetch(url, {
+		response = await fetchWithCredentialRedirects(url.toString(), {
 			headers: { Accept: "application/json" },
 			signal: options.signal ? AbortSignal.any([timeoutSignal, options.signal]) : timeoutSignal,
-		});
+		}, [], ["api_key"]);
 		if (!response.ok) {
 			const errorText = await response.text();
 			throw new Error(`SerpApi error ${response.status}: ${redactCredential(errorText, apiKey).slice(0, 300)}`);

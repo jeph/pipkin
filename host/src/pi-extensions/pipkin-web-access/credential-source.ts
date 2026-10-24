@@ -1,12 +1,16 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
-import { exec } from "node:child_process";
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+import { exec, execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import { promisify } from "node:util";
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 const COMMAND_TIMEOUT_MS = 5_000;
 const MAX_CREDENTIAL_BYTES = 16_384;
 const ENV_SOURCE = /^\$(?:([A-Za-z_][A-Za-z0-9_]*)|\{([A-Za-z_][A-Za-z0-9_]*)\})$/;
 const OP_SESSION_NAME = /^OP_SESSION_[A-Za-z0-9_]+$/;
+// Pi drives the legacy WSL launcher through stdin; credential commands fall back to cmd.exe instead.
+const LEGACY_WSL_BASH = /^[a-z]:\\windows\\(?:system32|sysnative)\\bash\.exe$/i;
 const COMMAND_ENVIRONMENT_NAMES = [
 	"HOME",
 	"USER",
@@ -24,6 +28,21 @@ const COMMAND_ENVIRONMENT_NAMES = [
 	"SSH_AUTH_SOCK",
 	"WSL_DISTRO_NAME",
 	"WSL_INTEROP",
+	// Git Bash derives $HOME from USERPROFILE, and Windows children need SystemRoot for networking and crypto.
+	"SystemRoot",
+	"windir",
+	"ComSpec",
+	"PATHEXT",
+	"USERPROFILE",
+	"HOMEDRIVE",
+	"HOMEPATH",
+	"APPDATA",
+	"LOCALAPPDATA",
+	"TEMP",
+	"TMP",
+	"ProgramData",
+	"ProgramFiles",
+	"ProgramFiles(x86)",
 ] as const;
 
 export type CredentialFailureCategory =
@@ -118,18 +137,49 @@ function isMalformedExplicitSource(source: string): boolean {
 	return source.startsWith("$") && escapedSource(source) === null && explicitEnvironmentName(source) === null;
 }
 
+async function bashOnPath(signal: AbortSignal | undefined, timeoutMs: number): Promise<string | null> {
+	try {
+		const { stdout } = await execFileAsync("where", ["bash.exe"], { encoding: "utf8", signal, timeout: timeoutMs, windowsHide: true });
+		return stdout.trim().split(/\r?\n/)[0] || null;
+	} catch {
+		return null;
+	}
+}
+
+/** Resolves bash on Windows in Pi's own `!command` order: Git Bash install locations, then bash.exe on PATH. */
+export async function findWindowsBash(
+	environment: Record<string, string | undefined>,
+	exists: (path: string) => boolean,
+	findOnPath: () => Promise<string | null>,
+): Promise<string | null> {
+	for (const root of [environment.ProgramFiles, environment["ProgramFiles(x86)"]]) {
+		const candidate = root ? `${root}\\Git\\bin\\bash.exe` : null;
+		if (candidate && exists(candidate)) return candidate;
+	}
+	const found = await findOnPath();
+	return found && exists(found) && !LEGACY_WSL_BASH.test(found.replace(/\//g, "\\")) ? found : null;
+}
+
 async function defaultRunCommand(
 	command: string,
 	options: CredentialCommandOptions,
 ): Promise<CredentialCommandResult> {
-	const result = await execAsync(command, {
+	// The bash lookup and the command share one timeout budget and the caller's abort signal.
+	const deadline = Date.now() + options.timeoutMs;
+	const bash = process.platform === "win32"
+		? await findWindowsBash(process.env, existsSync, () => bashOnPath(options.signal, options.timeoutMs))
+		: null;
+	const execOptions = {
 		encoding: "utf8",
 		env: options.environment,
 		maxBuffer: options.maxOutputBytes + 1,
 		signal: options.signal,
-		timeout: options.timeoutMs,
+		timeout: Math.max(1, deadline - Date.now()),
 		windowsHide: true,
-	});
+	} as const;
+	const result = bash
+		? await execFileAsync(bash, ["-c", command], execOptions)
+		: await execAsync(command, execOptions);
 	return { stdout: result.stdout };
 }
 

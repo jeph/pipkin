@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import { normalizeDomain } from "./domain-filter-normalization.ts";
@@ -7,7 +7,7 @@ import type { ExtractedContent, ExtractOptions } from "./extract.ts";
 import type { SearchOptions, SearchResponse } from "./perplexity.ts";
 import { formatSearchResultsAsAnswer } from "./search-answer-formatting.ts";
 import { normalizeSearchResultCount } from "./search-result-count-normalization.ts";
-import { getWebSearchConfigPath } from "./utils.ts";
+import { getWebSearchConfigPath, resolveProviderApiUrl, fetchWithCredentialRedirects } from "./utils.ts";
 
 const SEARCH1API_SEARCH_URL = "https://api.search1api.com/search";
 const SEARCH1API_CRAWL_URL = "https://api.search1api.com/crawl";
@@ -16,6 +16,7 @@ const SEARCH_TIMEOUT_MS = 60_000;
 const CRAWL_TIMEOUT_MS = 60_000;
 
 interface WebSearchConfig {
+	search1apiBaseUrl?: unknown;
 	search1apiApiKey?: unknown;
 }
 
@@ -141,7 +142,7 @@ async function search1APIJsonRequest<T>(
 ): Promise<T> {
 	let response: Response;
 	try {
-		response = await fetch(url, {
+		response = await fetchWithCredentialRedirects(resolveProviderApiUrl("search1api", url, loadConfig().search1apiBaseUrl), {
 			method: "POST",
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
@@ -149,7 +150,7 @@ async function search1APIJsonRequest<T>(
 			},
 			body: JSON.stringify(body),
 			signal: requestSignal(signal, timeoutMs),
-		});
+		}, ["Authorization"]);
 	} catch (err) {
 		const message = errorMessage(err);
 		const redactedMessage = redactCredential(message, apiKey);

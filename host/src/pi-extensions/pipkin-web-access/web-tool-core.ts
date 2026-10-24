@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 // Host-neutral execution core for web_search (non-curator path), fetch_content,
 // get_search_content, and source_check. The Pi extension (index.ts) and the MCP
 // server both run tools through createWebToolCore; everything that differs per
@@ -65,6 +65,9 @@ export interface WebSearchConfig {
 	valyuApiKey?: unknown;
 	keenableApiKey?: unknown;
 	ceramicApiKey?: unknown;
+	linkupApiKey?: unknown;
+	linkupDepth?: unknown;
+	deepseekApiKey?: unknown;
 	degoogBaseUrl?: unknown;
 	degoogApiKey?: unknown;
 	degoogEngines?: unknown;
@@ -90,6 +93,7 @@ export interface WebSearchConfig {
 	};
 	tools?: Partial<Record<keyof ToolNames, { enabled?: boolean }>>;
 	toolActivation?: unknown;
+	toolExposure?: unknown;
 	commands?: Partial<Record<"websearch" | "curator" | "search" | "google-account", { enabled?: boolean }>>;
 	toolNames?: Partial<ToolNames>;
 	shortcuts?: {
@@ -328,7 +332,7 @@ function initialContentSlice(content: string, maxChars: number): {
 	shownBytes: number;
 	shownLines: number;
 } {
-	let endOffset = Math.min(content.length, maxChars);
+	let endOffset = pageEnd(content, 0, Math.min(content.length, maxChars));
 	if (endOffset < content.length) {
 		const lineBreak = content.lastIndexOf("\n", endOffset);
 		if (lineBreak >= Math.floor(maxChars * 0.8)) endOffset = lineBreak + 1;
@@ -571,16 +575,26 @@ export function storedContentSourceNames(settings: WebToolCoreSettings): string 
 	]);
 }
 
+/** Keeps a page end from splitting a surrogate pair: it moves back one code unit,
+ * or past the pair when moving back would leave the page empty. */
+function pageEnd(content: string, offset: number, end: number): number {
+	if (end <= offset || end >= content.length) return end;
+	const high = content.charCodeAt(end - 1);
+	const low = content.charCodeAt(end);
+	if (high < 0xd800 || high > 0xdbff || low < 0xdc00 || low > 0xdfff) return end;
+	return end - 1 > offset ? end - 1 : end + 1;
+}
+
 /** Slices content from offset and appends the next-slice instructions, shrinking
  * the slice so the whole page, instructions included, stays within maxChars. */
 function sliceWithContinuation(content: string, offset: number, limit: number, maxChars: number, continuationAt: (endOffset: number) => string): { endOffset: number; text: string } {
-	let endOffset = offset + Math.min(limit, content.length - offset);
+	let endOffset = pageEnd(content, offset, offset + Math.min(limit, content.length - offset));
 	let continuation = "";
 	while (endOffset < content.length) {
 		continuation = continuationAt(endOffset);
 		const overflow = endOffset - offset + continuation.length - maxChars;
 		if (overflow <= 0) break;
-		endOffset -= overflow;
+		endOffset = pageEnd(content, offset, endOffset - overflow);
 	}
 	return { endOffset, text: content.slice(offset, endOffset) + (endOffset < content.length ? continuation : "") };
 }
@@ -760,6 +774,7 @@ export function createWebToolCore(host: WebToolCoreHost): WebToolCoreInstance {
 			const allUrls: string[] = [];
 			const allInlineContent: ExtractedContent[] = [];
 			const resolvedProvider = resolveRequestedProvider(params.provider);
+			const providerFromConfig = (normalizeProviderInput(params.provider) ?? "auto") === "auto";
 
 			const queryResponses = await runSearchQueries(queryList, async (query) => {
 				signal?.throwIfAborted();
@@ -771,6 +786,7 @@ export function createWebToolCore(host: WebToolCoreHost): WebToolCoreInstance {
 				try {
 					const { answer, results, inlineContent, provider, providerResponses } = await search(query, {
 						provider: resolvedProvider,
+						providerFromConfig,
 						numResults: params.numResults,
 						recencyFilter,
 						domainFilter: params.domainFilter,
@@ -869,6 +885,7 @@ export function createWebToolCore(host: WebToolCoreHost): WebToolCoreInstance {
 				try {
 					const response = await search(query, {
 						provider: resolveRequestedProvider(params.provider),
+						providerFromConfig: (normalizeProviderInput(params.provider) ?? "auto") === "auto",
 						numResults,
 						recencyFilter,
 						domainFilter,
@@ -984,7 +1001,10 @@ export function createWebToolCore(host: WebToolCoreHost): WebToolCoreInstance {
 			const presentedResults = mode === "answer"
 				? await Promise.all(fetchResults.map(async result => {
 					if (result.error) return result;
-					if (result.thumbnail || result.mimeType?.startsWith("image/")) {
+					// Reject image-as-payload results (direct images, video frames — they
+					// set mimeType and/or frames). A text result that merely attaches a
+					// thumbnail (YouTube analysis) stays answerable.
+					if (result.mimeType?.startsWith("image/") || result.frames?.length) {
 						return { ...result, error: "Page answer requires textual fetched content" };
 					}
 					try {
@@ -1372,7 +1392,7 @@ export function createWebToolCore(host: WebToolCoreHost): WebToolCoreInstance {
 				};
 			}
 
-			const endOffset = Math.min(offset + limit, urlData.content.length);
+			const endOffset = pageEnd(urlData.content, offset, Math.min(offset + limit, urlData.content.length));
 			const contentSlice = urlData.content.slice(offset, endOffset);
 			const hasMore = endOffset < urlData.content.length;
 			let text = `# ${urlData.title || urlData.url}\n\n${contentSlice}`;

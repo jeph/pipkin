@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { hasCredentialSource, redactCredential, resolveCredential } from "./credential-source.ts";
 import { getWebSearchConfigPath } from "./utils.ts";
@@ -91,6 +91,21 @@ export function getVersionedApiBase(): string {
 
 export function getUploadBase(): string {
 	return `${getApiHost()}/upload/${API_VERSION}`;
+}
+
+/**
+ * Re-point a provider-returned URL at the configured API host (gateway), keeping
+ * path and query. No-op when host is unset (already the Google origin).
+ */
+export function rewriteUploadUrlOrigin(url: string): string {
+	try {
+		const parsed = new URL(url);
+		const base = getApiHost(); // may carry a path prefix (gateway passthrough route)
+		if (parsed.origin === new URL(base).origin) return url;
+		return `${base}${parsed.pathname}${parsed.search}`;
+	} catch {
+		return url;
+	}
 }
 
 function getLegacyCloudflareApiKey(): string | null {

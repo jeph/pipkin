@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import type { ExtractedContent, ExtractOptions } from "./extract.ts";
@@ -7,7 +7,7 @@ import { formatSearchResultsAsAnswer } from "./search-answer-formatting.ts";
 import { normalizeSearchResultCount } from "./search-result-count-normalization.ts";
 import { hasCredentialSource, redactCredential, resolveCredential } from "./credential-source.ts";
 import { fetchRemoteUrl, loadFetchContentDomainPolicy, loadSsrfConfig, validateRemoteUrl, type SsrfConfig } from "./ssrf-protection.ts";
-import { getWebSearchConfigPath } from "./utils.ts";
+import { getWebSearchConfigPath, resolveProviderApiUrl, fetchWithCredentialRedirects } from "./utils.ts";
 
 const KAGI_SEARCH_URL = "https://kagi.com/api/v1/search";
 const KAGI_EXTRACT_URL = "https://kagi.com/api/v1/extract";
@@ -15,6 +15,7 @@ const CONFIG_PATH = getWebSearchConfigPath();
 const SEARCH_TIMEOUT_MS = 60_000;
 
 interface WebSearchConfig {
+	kagiBaseUrl?: unknown;
 	kagiApiKey?: unknown;
 }
 
@@ -161,12 +162,12 @@ export async function searchWithKagi(query: string, options: KagiSearchOptions =
 	const activityId = activityMonitor.logStart({ type: "api", query });
 	let response: Response;
 	try {
-		response = await fetch(KAGI_SEARCH_URL, {
+		response = await fetchWithCredentialRedirects(resolveProviderApiUrl("kagi", KAGI_SEARCH_URL, loadConfig().kagiBaseUrl), {
 			method: "POST",
 			headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" },
 			body: JSON.stringify({ query, limit: numResults }),
 			signal: options.signal ? AbortSignal.any([AbortSignal.timeout(SEARCH_TIMEOUT_MS), options.signal]) : AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-		});
+		}, ["Authorization"]);
 	} catch (err) {
 		const message = errorMessage(err);
 		const redactedMessage = redactCredential(message, apiKey);
@@ -218,7 +219,7 @@ export async function extractWithKagi(url: string, signal?: AbortSignal, options
 	const activityId = activityMonitor.logStart({ type: "api", query: `kagi extract: ${url}` });
 	let response: Response;
 	try {
-		response = await fetchRemoteUrl(KAGI_EXTRACT_URL, {
+		response = await fetchRemoteUrl(resolveProviderApiUrl("kagi", KAGI_EXTRACT_URL, loadConfig().kagiBaseUrl), {
 			method: "POST",
 			headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "application/json" },
 			body: JSON.stringify({ pages: [{ url }] }),

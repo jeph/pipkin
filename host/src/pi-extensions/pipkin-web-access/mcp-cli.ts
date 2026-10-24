@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 #!/usr/bin/env node
 // pi-web-access-mcp: serves the web tools over MCP stdio. stdout carries only
 // JSON-RPC, so every diagnostic goes to stderr.

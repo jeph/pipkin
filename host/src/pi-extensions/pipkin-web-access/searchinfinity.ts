@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import { normalizeDomain } from "./domain-filter-normalization.ts";
@@ -6,7 +6,7 @@ import { hasCredentialSource, redactCredential, resolveCredential } from "./cred
 import type { SearchOptions, SearchResponse } from "./perplexity.ts";
 import { formatSearchResultsAsAnswer } from "./search-answer-formatting.ts";
 import { normalizeSearchResultCount } from "./search-result-count-normalization.ts";
-import { getWebSearchConfigPath } from "./utils.ts";
+import { getWebSearchConfigPath, resolveProviderApiUrl, fetchWithCredentialRedirects } from "./utils.ts";
 
 const SEARCHINFINITY_SEARCH_URL = "https://torchlight.byteintlapi.com/search_api/web_search";
 const CONFIG_PATH = getWebSearchConfigPath();
@@ -14,6 +14,7 @@ const CONFIG_PATH = getWebSearchConfigPath();
 const SEARCH_TIMEOUT_MS = 30_000;
 
 interface WebSearchConfig {
+	searchinfinityBaseUrl?: unknown;
 	searchinfinityApiKey?: unknown;
 }
 
@@ -163,7 +164,7 @@ async function searchinfinityJsonRequest(
 ): Promise<SearchinfinitySearchResponse> {
 	let response: Response;
 	try {
-		response = await fetch(SEARCHINFINITY_SEARCH_URL, {
+		response = await fetchWithCredentialRedirects(resolveProviderApiUrl("searchinfinity", SEARCHINFINITY_SEARCH_URL, loadConfig().searchinfinityBaseUrl), {
 			method: "POST",
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
@@ -171,7 +172,7 @@ async function searchinfinityJsonRequest(
 			},
 			body: JSON.stringify(body),
 			signal: requestSignal(signal, SEARCH_TIMEOUT_MS),
-		});
+		}, ["Authorization"]);
 	} catch (err) {
 		const message = errorMessage(err);
 		const redactedMessage = redactCredential(message, apiKey);

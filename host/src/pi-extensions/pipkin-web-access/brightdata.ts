@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import { normalizeDomain } from "./domain-filter-normalization.ts";
@@ -6,7 +6,7 @@ import { formatSearchResultsAsAnswer } from "./search-answer-formatting.ts";
 import { normalizeSearchResultCount } from "./search-result-count-normalization.ts";
 import type { SearchOptions, SearchResponse } from "./perplexity.ts";
 import { hasCredentialSource, redactCredential, resolveCredential } from "./credential-source.ts";
-import { getWebSearchConfigPath } from "./utils.ts";
+import { getWebSearchConfigPath, resolveProviderApiUrl, fetchWithCredentialRedirects } from "./utils.ts";
 
 const BRIGHTDATA_API_URL = "https://api.brightdata.com/request";
 const CONFIG_PATH = getWebSearchConfigPath();
@@ -31,6 +31,7 @@ const RECENCY_TBS: Record<string, string> = {
 };
 
 interface WebSearchConfig {
+	brightdataBaseUrl?: unknown;
 	brightdataApiKey?: unknown;
 	brightdataSerpZone?: unknown;
 }
@@ -467,7 +468,7 @@ export async function searchWithBrightData(query: string, options: BrightDataSea
 	const activityId = activityMonitor.logStart({ type: "api", query: searchQuery });
 	let response: Response;
 	try {
-		response = await fetch(BRIGHTDATA_API_URL, {
+		response = await fetchWithCredentialRedirects(resolveProviderApiUrl("brightdata", BRIGHTDATA_API_URL, loadConfig().brightdataBaseUrl), {
 			method: "POST",
 			headers: {
 				"Authorization": `Bearer ${apiKey}`,
@@ -475,7 +476,7 @@ export async function searchWithBrightData(query: string, options: BrightDataSea
 			},
 			body: JSON.stringify(body),
 			signal: requestSignal(options.signal),
-		});
+		}, ["Authorization"]);
 	} catch (err) {
 		const message = errorMessage(err);
 		const redactedMessage = redactCredential(message, apiKey);

@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import { hasCredentialSource, redactCredential, resolveCredential } from "./credential-source.ts";
@@ -6,13 +6,14 @@ import type { ExtractedContent } from "./extract.ts";
 import type { SearchOptions, SearchResponse } from "./perplexity.ts";
 import { formatSearchResultsAsAnswer } from "./search-answer-formatting.ts";
 import { normalizeSearchResultCount } from "./search-result-count-normalization.ts";
-import { getWebSearchConfigPath } from "./utils.ts";
+import { getWebSearchConfigPath, resolveProviderApiUrl, fetchWithCredentialRedirects } from "./utils.ts";
 
 const JINA_SEARCH_BASE_URL = "https://s.jina.ai/";
 const CONFIG_PATH = getWebSearchConfigPath();
 const SEARCH_TIMEOUT_MS = 60_000;
 
 interface WebSearchConfig {
+	jinaSearchBaseUrl?: unknown;
 	jinaApiKey?: unknown;
 }
 
@@ -108,7 +109,8 @@ function buildSearchRequest(query: string, options: JinaSearchOptions, numResult
 	const recency = options.recencyFilter ? ` published in the past ${options.recencyFilter}` : "";
 	const exclusions = filters.excludes.map((domain) => ` -site:${domain}`).join("");
 	const constrainedQuery = `${query.trim()}${exclusions}${recency}`.trim();
-	const url = new URL(encodeURIComponent(constrainedQuery), JINA_SEARCH_BASE_URL);
+	if (/^\.{1,2}$/.test(constrainedQuery)) throw new Error("Jina Search query must not be a dot path segment");
+	const url = new URL(encodeURIComponent(constrainedQuery), resolveProviderApiUrl("jinaSearch", JINA_SEARCH_BASE_URL, loadConfig().jinaSearchBaseUrl));
 	url.searchParams.set("count", String(numResults));
 	for (const domain of filters.includes) url.searchParams.append("site", domain);
 	return { url: url.toString(), filters };
@@ -216,7 +218,7 @@ export async function searchWithJina(query: string, options: JinaSearchOptions =
 	const request = requestSignal(options.signal);
 	let response: Response;
 	try {
-		response = await fetch(url, {
+		response = await fetchWithCredentialRedirects(String(url), {
 			headers: {
 				"Accept": "application/json",
 				"Authorization": `Bearer ${apiKey}`,
@@ -225,7 +227,7 @@ export async function searchWithJina(query: string, options: JinaSearchOptions =
 				"X-Retain-Images": "none",
 			},
 			signal: request.signal,
-		});
+		}, ["Authorization"]);
 	} catch (err) {
 		rethrowRequestError(err, apiKey, activityId, request, options.signal);
 	}

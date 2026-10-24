@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import { normalizeDomain } from "./domain-filter-normalization.ts";
@@ -6,7 +6,7 @@ import type { SearchOptions, SearchResponse } from "./perplexity.ts";
 import { formatSearchResultsAsAnswer } from "./search-answer-formatting.ts";
 import { normalizeSearchResultCount } from "./search-result-count-normalization.ts";
 import { hasCredentialSource, redactCredential, resolveCredential } from "./credential-source.ts";
-import { fetchWithCredentialRedirects, getWebSearchConfigPath } from "./utils.ts";
+import { fetchWithCredentialRedirects, getWebSearchConfigPath, resolveProviderApiUrl } from "./utils.ts";
 
 const SERPLY_SEARCH_URL = "https://api.serply.io/v1/search";
 const CONFIG_PATH = getWebSearchConfigPath();
@@ -19,6 +19,7 @@ const RECENCY_TBS: Record<NonNullable<SearchOptions["recencyFilter"]>, string> =
 };
 
 interface WebSearchConfig {
+	serplyBaseUrl?: unknown;
 	serplyApiKey?: unknown;
 }
 
@@ -130,7 +131,7 @@ export async function searchWithSerply(query: string, options: SearchOptions = {
 	const numResults = normalizeSearchResultCount(options.numResults);
 	const filters = parseDomainFilter(options.domainFilter);
 	const requestCount = options.domainFilter?.length ? Math.min(20, numResults + 5) : numResults;
-	const url = new URL(SERPLY_SEARCH_URL);
+	const url = new URL(resolveProviderApiUrl("serply", SERPLY_SEARCH_URL, loadConfig().serplyBaseUrl));
 	url.searchParams.set("q", buildQuery(query, filters));
 	url.searchParams.set("num", String(requestCount));
 	if (options.recencyFilter) url.searchParams.set("tbs", RECENCY_TBS[options.recencyFilter]);

@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 // MCP-only tool definitions: names, descriptions, and input schemas for the
 // standalone MCP server. Deliberately independent of the Pi tool schemas in
 // index.ts so MCP changes never touch Pi's provider-facing definitions.

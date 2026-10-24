@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import type { ProviderAvailability } from "./gemini-search.ts";
 
 function safeInlineJSON(data: unknown): string {
@@ -54,6 +54,8 @@ function buildProviderButtons(
 		{ value: "valyu", label: "Valyu", available: available.valyu },
 		{ value: "keenable", label: "Keenable", available: available.keenable },
 		{ value: "ceramic", label: "Ceramic", available: available.ceramic },
+		{ value: "linkup", label: "Linkup", available: available.linkup },
+		{ value: "deepseek", label: "DeepSeek", available: available.deepseek },
 	];
 
 	return providers
@@ -1480,7 +1482,7 @@ const SCRIPT = `(function() {
   var token = DATA.sessionToken;
   var timeoutSec = DATA.timeout;
   var queries = Array.isArray(DATA.queries) ? DATA.queries : [];
-  var providers = ["auto", "all", "openai", "exa", "brave", "parallel", "parallel-mcp", "tinyfish", "search1api", "searchinfinity", "querit", "tavily", "firecrawl", "jina", "serpdive", "kagi", "bocha", "ollama", "searxng", "degoog", "duckduckgo", "perplexity", "gemini", "kimi", "anysearch", "xcrawl", "xai", "mistral", "brightdata", "serpbase", "serpapi", "serper", "serply", "valyu", "baizhi", "you", "zai", "keenable", "ceramic"];
+  var providers = ["auto", "all", "openai", "exa", "brave", "parallel", "parallel-mcp", "tinyfish", "search1api", "searchinfinity", "querit", "tavily", "firecrawl", "jina", "serpdive", "kagi", "bocha", "ollama", "searxng", "degoog", "duckduckgo", "perplexity", "gemini", "kimi", "anysearch", "xcrawl", "xai", "mistral", "brightdata", "serpbase", "serpapi", "serper", "serply", "valyu", "baizhi", "you", "zai", "keenable", "ceramic", "deepseek", "linkup"];
   var availProviders = DATA.availableProviders && typeof DATA.availableProviders === "object" ? DATA.availableProviders : {};
   var workflow = "summary-review";
   var initialDefaultProvider = typeof DATA.defaultProvider === "string" ? DATA.defaultProvider : "exa";
@@ -1722,6 +1724,8 @@ const SCRIPT = `(function() {
     if (provider === "valyu") return "Valyu";
     if (provider === "keenable") return "Keenable";
     if (provider === "ceramic") return "Ceramic";
+    if (provider === "linkup") return "Linkup";
+    if (provider === "deepseek") return "DeepSeek";
     return "Unknown";
   }
 

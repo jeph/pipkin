@@ -368,6 +368,7 @@ describe("rpc mode", () => {
       ["no config", null, { toolActivation: "eager" }],
       ["a config without a choice", JSON.stringify({ braveApiKey: "k" }), { braveApiKey: "k", toolActivation: "eager" }],
       ["the user's own choice", JSON.stringify({ toolActivation: "auto" }), { toolActivation: "auto" }],
+      ["deferred tools, which eager would stop loading", JSON.stringify({ toolExposure: "deferred" }), { toolExposure: "deferred" }],
     ])("makes the web tools eager given %s, keeping other settings", async (_, before, after) => {
       if (before !== null) await writeFile(path.join(dirs.configDir, "web-search.json"), before);
       const config = await webSearchConfigAfterLaunch(dirs, ["pipkin-web-access"]);

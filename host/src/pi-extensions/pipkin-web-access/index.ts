@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import type { AgentToolResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Box, Text, truncateToWidth, type KeyId } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
@@ -72,6 +72,8 @@ import { isSerperAvailable } from "./serper.ts";
 import { isSerplyAvailable } from "./serply.ts";
 import { isKeenableAvailable } from "./keenable.ts";
 import { isCeramicAvailable } from "./ceramic.ts";
+import { isLinkupAvailable } from "./linkup.ts";
+import { isDeepSeekAvailable } from "./deepseek.ts";
 import { isBaizhiAvailable } from "./baizhi.ts";
 import { isZaiAvailable } from "./zai.ts";
 import { isValyuAvailable } from "./valyu.ts";
@@ -346,6 +348,8 @@ async function getProviderAvailability(ctx: ExtensionContext): Promise<ProviderA
 		valyu: allowedProviders.has("valyu") && isValyuAvailable(),
 		keenable: allowedProviders.has("keenable") && isKeenableAvailable(),
 		ceramic: allowedProviders.has("ceramic") && isCeramicAvailable(),
+		linkup: allowedProviders.has("linkup") && isLinkupAvailable(),
+		deepseek: allowedProviders.has("deepseek") && isDeepSeekAvailable(),
 	};
 	return {
 		all: ALL_SEARCH_PROVIDERS.some(provider => provider === "gemini" ? geminiApiAvail : providers[provider]),
@@ -457,6 +461,8 @@ interface PendingCurate {
 	availableProviders: ProviderAvailability;
 	defaultProvider: SearchProvider;
 	searchProvider: SearchProviderSelection;
+	// The provider resolved from config when the call named none; searches still using it may fall back to searchRouting.
+	configDefaultProvider?: SearchProviderSelection;
 	summaryModels: Array<{ value: string; label: string }>;
 	defaultSummaryModel: string | null;
 	timeoutSeconds: number;
@@ -723,8 +729,18 @@ export default function (pi: ExtensionAPI) {
 	const initConfig = loadConfigForExtensionInit();
 	const fetchModeConfig = resolveFetchModeConfig(initConfig);
 	const toolActivation = initConfig.toolActivation ?? "auto";
-	if (toolActivation !== "auto" && toolActivation !== "dynamic" && toolActivation !== "eager") {
-		throw new Error(`toolActivation in ${WEB_SEARCH_CONFIG_PATH} must be "auto", "dynamic", or "eager"`);
+	if (toolActivation !== "auto" && toolActivation !== "dynamic" && toolActivation !== "eager" && toolActivation !== "none") {
+		throw new Error(`toolActivation in ${WEB_SEARCH_CONFIG_PATH} must be "auto", "dynamic", "eager", or "none"`);
+	}
+	const toolExposure = initConfig.toolExposure ?? "direct";
+	if (toolExposure !== "direct" && toolExposure !== "deferred") {
+		throw new Error(`toolExposure in ${WEB_SEARCH_CONFIG_PATH} must be "direct" or "deferred"`);
+	}
+	if (toolExposure === "deferred" && toolActivation === "eager") {
+		throw new Error(`toolExposure "deferred" in ${WEB_SEARCH_CONFIG_PATH} cannot be combined with toolActivation "eager"`);
+	}
+	if (toolActivation === "none" && toolExposure !== "deferred") {
+		throw new Error(`toolActivation "none" in ${WEB_SEARCH_CONFIG_PATH} requires toolExposure "deferred"`);
 	}
 	const allowedSearchProviders = initConfig.webSearch?.allowedProviders === undefined ? RESOLVED_SEARCH_PROVIDERS : getAllowedSearchProviders();
 	const allEligibleProviders = allowedSearchProviders.filter(provider => ALL_SEARCH_PROVIDERS.includes(provider));
@@ -1252,6 +1268,7 @@ export default function (pi: ExtensionAPI) {
 							const requestedProvider = resolveCuratorSearchProvider(provider, pc.searchProvider);
 							const response = await search(query, {
 								provider: requestedProvider,
+								providerFromConfig: requestedProvider === pc.configDefaultProvider,
 								numResults: pc.numResults,
 								recencyFilter: pc.recencyFilter,
 								domainFilter: pc.domainFilter,
@@ -1432,6 +1449,7 @@ export default function (pi: ExtensionAPI) {
 			})),
 		}),
 		outputSchema: webSearchOutputSchema,
+		exposure: toolExposure,
 
 		async execute(callId, params, signal, onUpdate, ctx) {
 			// Nested calls neither open the curator unless asked nor fetch content in the background.
@@ -1480,6 +1498,7 @@ export default function (pi: ExtensionAPI) {
 				let cancelled = false;
 
 				const requestedProvider = resolveRequestedProvider(params.provider);
+				const providerFromConfig = (normalizeProviderInput(params.provider) ?? "auto") === "auto";
 				const bootstrap = await loadCuratorBootstrap(requestedProvider, ctx, {
 					numResults: params.numResults,
 					recencyFilter,
@@ -1514,6 +1533,7 @@ export default function (pi: ExtensionAPI) {
 					availableProviders,
 					defaultProvider,
 					searchProvider,
+					configDefaultProvider: providerFromConfig ? searchProvider : undefined,
 					summaryModels: summaryModelChoices.summaryModels,
 					defaultSummaryModel: summaryModelChoices.defaultSummaryModel,
 					timeoutSeconds: curatorTimeoutSeconds,
@@ -1568,6 +1588,8 @@ export default function (pi: ExtensionAPI) {
 					try {
 						const response = await search(query, {
 							provider: requestedProvider,
+							// A provider picked in the curator UI replaces this value and stays strict.
+							providerFromConfig: requestedProvider === pc.configDefaultProvider,
 							numResults: params.numResults,
 							recencyFilter,
 							domainFilter: params.domainFilter,
@@ -1965,6 +1987,7 @@ export default function (pi: ExtensionAPI) {
 				description: "http(s) or socks proxy URL (e.g. http://host:port or socks5h://host:port) used for every outbound request in this call (search APIs and result-page fetches). Empty string forces direct access.",
 			})),
 		}),
+		exposure: toolExposure,
 		async execute(_callId, params, signal, _onUpdate, ctx) {
 			return markToolError(await core.sourceCheck(params, signal, { extensionContext: ctx }));
 		},
@@ -2012,8 +2035,12 @@ export default function (pi: ExtensionAPI) {
 			proxy: Type.Optional(Type.String({
 				description: "http(s) or socks proxy URL (e.g. http://host:port or socks5h://host:port) used for this fetch. Needed when the target is unreachable directly; localhost and NO_PROXY hosts always bypass the proxy. Empty string forces direct access.",
 			})),
+			redirects: Type.Optional(StringEnum(["same-origin"], {
+				description: "Refuse cross-origin redirects: every redirect target must match the requested URL's scheme, hostname and effective port, and extraction paths whose redirect chain cannot be observed are refused instead of used.",
+			})),
 		}),
 		outputSchema: fetchContentOutputSchema,
+		exposure: toolExposure,
 
 		async execute(_toolCallId, params, signal, onUpdate, ctx): Promise<AgentToolResult<Record<string, unknown>>> {
 			return markToolError(await core.fetchContent(params, signal, { extensionContext: ctx, onUpdate }));
@@ -2178,6 +2205,7 @@ export default function (pi: ExtensionAPI) {
 			], { description: "Text or texts to find in the selected stored content. When supplied, offset and limit are ignored." })),
 			findMode: Type.Optional(StringEnum(["exact", "case-insensitive", "fuzzy"], { description: "Matching mode for findText (default: case-insensitive). Requires findText." })),
 		}),
+		exposure: toolExposure,
 
 		async execute(_toolCallId, rawParams): Promise<AgentToolResult<Record<string, unknown>>> {
 			return markToolError(await core.getSearchContent(rawParams));
@@ -2257,12 +2285,15 @@ export default function (pi: ExtensionAPI) {
 	});
 	}
 
-	if (toolActivation !== "eager") registerWebToolActivation(pi, [
+	// Deferred tools are never declared on registration, so web_enable must stay the model's route
+	// to them: auto's eager path would leave a session with neither the tools nor the loader.
+	// "none" skips it on purpose: codemode scripts and tool_search still reach deferred tools.
+	if (toolActivation !== "eager" && toolActivation !== "none") registerWebToolActivation(pi, [
 		...(webSearchEnabled ? [{ name: toolNames.webSearch, capability: "search" as const }] : []),
 		...(sourceCheckEnabled ? [{ name: toolNames.sourceCheck, capability: "source-check" as const }] : []),
 		...(fetchContentEnabled ? [{ name: toolNames.fetchContent, capability: "fetch" as const }] : []),
 		...(getSearchContentEnabled ? [{ name: toolNames.getSearchContent, capability: "stored-content" as const }] : []),
-	], toolActivation);
+	], toolExposure === "deferred" ? "dynamic" : toolActivation);
 
 	if (isCommandEnabled(initConfig, "websearch")) pi.registerCommand("websearch", {
 		description: "Open web search curator",
@@ -2296,6 +2327,8 @@ export default function (pi: ExtensionAPI) {
 			let currentSearchProvider: SearchProviderSelection = Array.isArray(rawSearchProvider)
 				? rawSearchProvider
 				: rawSearchProvider === "auto" ? "auto" : initialProvider;
+			// A curator provider pick replaces currentSearchProvider with a string, which stays strict.
+			const configDefaultProvider = currentSearchProvider;
 			const summaryContext: SummaryGenerationContext = {
 				model: ctx.model,
 				modelRegistry: ctx.modelRegistry,
@@ -2414,6 +2447,7 @@ export default function (pi: ExtensionAPI) {
 								const requestedProvider = resolveCuratorSearchProvider(provider, currentSearchProvider);
 								const response = await search(query, {
 									provider: requestedProvider,
+									providerFromConfig: requestedProvider === configDefaultProvider,
 									signal: searchAbort.signal,
 									extensionContext: ctx,
 								});
@@ -2486,6 +2520,7 @@ export default function (pi: ExtensionAPI) {
 							try {
 								const response = await runWithProxy(undefined, () => search(query, {
 									provider: requestedProvider,
+									providerFromConfig: requestedProvider === configDefaultProvider,
 									signal: searchAbort.signal,
 									extensionContext: ctx,
 								}));

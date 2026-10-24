@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { normalizeProxyUrl } from "./utils.ts";
 
 export interface FetchContentParams {
@@ -13,6 +13,7 @@ export interface FetchContentParams {
 	answerModel?: unknown;
 	auth?: unknown;
 	proxy?: unknown;
+	redirects?: unknown;
 }
 
 export interface NormalizedFetchContentParams {
@@ -27,6 +28,7 @@ export interface NormalizedFetchContentParams {
 		answerModel?: string;
 		auth?: true | string;
 		proxy?: string;
+		redirects?: "same-origin";
 	};
 }
 
@@ -45,6 +47,7 @@ export function normalizeFetchContentParams(params: FetchContentParams): Normali
 	const answerModel = normalizeOptionalString(params.answerModel);
 	const auth = normalizeAuth(params.auth);
 	const proxy = normalizeProxy(params.proxy);
+	const redirects = normalizeRedirects(params.redirects);
 
 	return {
 		urlList,
@@ -58,6 +61,7 @@ export function normalizeFetchContentParams(params: FetchContentParams): Normali
 			...(answerModel !== undefined ? { answerModel } : {}),
 			...(auth !== undefined ? { auth } : {}),
 			...(proxy !== undefined ? { proxy } : {}),
+			...(redirects !== undefined ? { redirects } : {}),
 		},
 	};
 }
@@ -83,6 +87,12 @@ function normalizeMode(value: unknown): "readable" | "raw" | "answer" | undefine
 	if (value === undefined) return undefined;
 	if (value === "readable" || value === "raw" || value === "answer") return value;
 	throw new Error('mode must be "readable", "raw", or "answer"');
+}
+
+function normalizeRedirects(value: unknown): "same-origin" | undefined {
+	if (value === undefined) return undefined;
+	if (value === "same-origin") return value;
+	throw new Error('redirects must be "same-origin"');
 }
 
 function normalizeAuth(value: unknown): true | string | undefined {

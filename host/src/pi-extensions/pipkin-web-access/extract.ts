@@ -1,18 +1,19 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import type TurndownService from "turndown";
 import pLimit from "p-limit";
 import { activityMonitor } from "./activity.ts";
 import { extractRSCContent } from "./rsc-extract.ts";
 import { extractPDFToMarkdown, isPDF, loadPDFConfig } from "./pdf-extract.ts";
-import { extractGitHub } from "./github-extract.ts";
-import { extractGitHubIssuePr } from "./github-issue-pr.ts";
+import { extractGitHub, parseGitHubUrl } from "./github-extract.ts";
+import { extractGitHubIssuePr, parseGitHubIssuePrUrl } from "./github-issue-pr.ts";
 import { isYouTubeURL, isYouTubeEnabled, extractYouTube, extractYouTubeFrame, extractYouTubeFrames, getYouTubeStreamInfo } from "./youtube-extract.ts";
 import { CredentialResolutionError } from "./credential-source.ts";
 import { extractWithUrlContext, extractWithGeminiWeb } from "./gemini-url-context.ts";
 import { extractWithParallel, isParallelAvailable } from "./parallel.ts";
 import { extractWithParallelMcp } from "./parallel-mcp.ts";
 import { extractWithTinyFish, isTinyFishAvailable } from "./tinyfish.ts";
+import { extractWithDeepSeek, isDeepSeekAvailable } from "./deepseek.ts";
 import { extractWithSearch1API, isSearch1APIAvailable } from "./search1api.ts";
 import { extractWithQuerit, isQueritAvailable } from "./querit.ts";
 import { extractWithKagi, isKagiExtractAvailable } from "./kagi.ts";
@@ -22,7 +23,7 @@ import { extractWithCrawl4ai, isCrawl4aiAvailable } from "./crawl4ai.ts";
 import { extractWithBrightDataUnlocker, isBrightDataUnlockerAvailable } from "./brightdata-unlocker.ts";
 import { isVideoFile, extractVideo, extractVideoFrame, getLocalVideoDuration } from "./video-extract.ts";
 import { appendDeclaredWebLinks, discoverDeclaredWebLinks, type DeclaredWebLink } from "./declared-web-links.ts";
-import { fetchRemoteUrl, loadFetchContentDomainPolicy, loadSsrfConfig, validateRemoteUrl, type DomainPolicy, type Lookup, type SsrfConfig } from "./ssrf-protection.ts";
+import { fetchRemoteUrl, loadFetchContentDomainPolicy, loadFetchContentRedirectPolicy, loadFetchContentUserAgent, loadSsrfConfig, validateRemoteUrl, type DomainPolicy, type Lookup, type RedirectPolicy, type SsrfConfig } from "./ssrf-protection.ts";
 import { formatSeconds, getWebSearchConfigPath, type ProxiedRequestInit } from "./utils.ts";
 import { isImageEnabled } from "./feature-config.ts";
 import { assertAuthFetchUrl, authFetchRedirectGuard, type AuthFetchProfile } from "./auth-fetch.ts";
@@ -69,11 +70,11 @@ function loadFetchTimeoutMs(): number {
 const NON_RECOVERABLE_ERRORS = ["Unsupported content type", "Response too large", "PDF extraction is disabled", "Image fetching is disabled"];
 const MIN_USEFUL_CONTENT = 500;
 const SUPPORTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
-const FETCH_PROVIDERS = ["http", "firecrawl", "crawl4ai", "jina", "tinyfish", "search1api", "querit", "kagi", "ollama", "parallel", "parallel-mcp", "brightdata", "gemini"] as const;
+const FETCH_PROVIDERS = ["http", "firecrawl", "crawl4ai", "jina", "tinyfish", "search1api", "querit", "kagi", "ollama", "parallel", "parallel-mcp", "brightdata", "gemini", "deepseek"] as const;
 type FetchProvider = typeof FETCH_PROVIDERS[number];
 type FetchRouting = { providers: FetchProvider[]; allowRemoteHostedProviders: boolean };
 const DEFAULT_FETCH_PROVIDER_ORDER: FetchProvider[] = ["http", "firecrawl", "crawl4ai", "jina", "tinyfish", "search1api", "querit", "kagi", "ollama", "parallel", "brightdata", "gemini"];
-const REMOTE_HOSTED_FETCH_PROVIDERS = new Set<FetchProvider>(["jina", "tinyfish", "search1api", "querit", "kagi", "ollama", "parallel", "parallel-mcp", "brightdata", "gemini"]);
+const REMOTE_HOSTED_FETCH_PROVIDERS = new Set<FetchProvider>(["jina", "tinyfish", "search1api", "querit", "kagi", "ollama", "parallel", "parallel-mcp", "brightdata", "gemini", "deepseek"]);
 
 function isDefuddleConsoleError(args: Parameters<typeof console.error>): boolean {
 	const prefix = args[0];
@@ -141,6 +142,7 @@ function isAbortException(err: unknown): boolean {
 
 function isRedirectPolicyError(message: string): boolean {
 	return message.startsWith("Authenticated fetch refused cross-origin redirect") ||
+		message.startsWith("Refused cross-origin redirect by fetch_content redirect policy") ||
 		message.startsWith("Blocked internal ") ||
 		message.startsWith("Blocked hostname by fetch_content domain policy") ||
 		message.startsWith("Hostname not allowed by fetch_content domain policy") ||
@@ -164,6 +166,10 @@ function imageGateError(): string | null {
 	}
 }
 
+function redirectPolicyRouteRefusal(url: string, path: string): ExtractedContent {
+	return { url, title: "", content: "", error: `Extraction path ${path} is disabled by the fetch_content same-origin redirect policy because its redirect chain cannot be observed` };
+}
+
 async function resolveAuthCookieHeader(url: string | URL, profile: AuthFetchProfile): Promise<string> {
 	const parsed = assertAuthFetchUrl(profile, url.toString());
 	const result = await getBrowserCookiesForHosts({ hosts: [parsed.hostname], profile: profile.chromeProfile, requestUrl: parsed });
@@ -180,7 +186,7 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 async function fetchAuthenticatedRemoteUrl(
 	url: string,
 	init: RequestInit,
-	validationOptions: { ssrf: SsrfConfig; domainPolicy: DomainPolicy; lookup?: Lookup; proxy?: string },
+	validationOptions: { ssrf: SsrfConfig; domainPolicy: DomainPolicy; lookup?: Lookup; proxy?: string; redirects?: RedirectPolicy },
 	profile: AuthFetchProfile,
 ): Promise<Response> {
 	let current = await validateRemoteUrl(url, {
@@ -190,6 +196,7 @@ async function fetchAuthenticatedRemoteUrl(
 		proxy: validationOptions.proxy,
 		...(validationOptions.lookup ? { lookup: validationOptions.lookup } : {}),
 	});
+	const originalOrigin = current.origin;
 	let requestInit = init;
 	for (let redirects = 0; redirects <= 5; redirects++) {
 		const cookieHeader = await resolveAuthCookieHeader(current, profile);
@@ -200,7 +207,11 @@ async function fetchAuthenticatedRemoteUrl(
 		if (!location) return response;
 		if (redirects === 5) throw new Error(`Too many redirects fetching ${current.toString()}`);
 		const from = current;
-		current = await validateRemoteUrl(new URL(location, current), {
+		const next = new URL(location, current);
+		if (validationOptions.redirects === "same-origin" && next.origin !== originalOrigin) {
+			throw new Error(`Refused cross-origin redirect by fetch_content redirect policy: ${originalOrigin} -> ${next.origin}`);
+		}
+		current = await validateRemoteUrl(next, {
 			allowRanges: validationOptions.ssrf.allowRanges,
 			trustEnvProxy: validationOptions.ssrf.trustEnvProxy,
 			domainPolicy: validationOptions.domainPolicy,
@@ -373,6 +384,9 @@ export interface ExtractOptions {
 	rejectDirectImages?: string;
 	/** Custom DNS resolver used for SSRF validation. Primarily a test seam. */
 	lookup?: Lookup;
+	/** "same-origin" refuses cross-origin redirects and extraction paths whose redirect
+	 * chain cannot be observed. fetchContent.redirects in config is a floor. */
+	redirects?: RedirectPolicy;
 }
 
 /** Resolve the direct HTTP/Jina fetch budget, with a per-call override taking precedence. */
@@ -541,6 +555,12 @@ export async function extractContent(
 		return { url, title: "", content: "", error: "Aborted" };
 	}
 
+	let redirectPolicy: RedirectPolicy | undefined;
+	try {
+		redirectPolicy = options?.redirects ?? loadFetchContentRedirectPolicy();
+	} catch (err) {
+		return { url, title: "", content: "", error: errorMessage(err) };
+	}
 	let remoteUrl: URL | null = null;
 	try {
 		const parsed = new URL(url);
@@ -551,6 +571,8 @@ export async function extractContent(
 		try {
 			const ssrf = loadSsrfConfig();
 			const domainPolicy = loadFetchContentDomainPolicy();
+			// An invalid configured User-Agent fails here, before any provider fallback runs.
+			loadFetchContentUserAgent();
 			await validateRemoteUrl(remoteUrl, {
 				allowRanges: ssrf.allowRanges,
 				trustEnvProxy: ssrf.trustEnvProxy,
@@ -569,6 +591,12 @@ export async function extractContent(
 		} catch (err) {
 			return { url, title: "", content: "", error: errorMessage(err) };
 		}
+	}
+
+	if (redirectPolicy) {
+		if (parseGitHubIssuePrUrl(url)) return redirectPolicyRouteRefusal(url, "GitHub issue/PR");
+		if (parseGitHubUrl(url)) return redirectPolicyRouteRefusal(url, "GitHub repository");
+		if (isYouTubeURL(url).isYouTube) return redirectPolicyRouteRefusal(url, "YouTube");
 	}
 
 	if (options?.frames || options?.timestamp) {
@@ -675,7 +703,9 @@ export async function extractContent(
 			if ("error" in frame) {
 				return { url, title: `Frame at ${options.timestamp}`, content: frame.error, error: frame.error };
 			}
-			return { url, title: `Frame at ${options.timestamp}`, content: `Video frame at ${options.timestamp}`, error: null, thumbnail: frame };
+			// mimeType marks the image as the payload (like direct-image fetches); a
+			// text result with a bonus thumbnail stays without one.
+			return { url, title: `Frame at ${options.timestamp}`, content: `Video frame at ${options.timestamp}`, error: null, thumbnail: frame, mimeType: frame.mimeType };
 		}
 
 		const localVideo = safeVideoInfo(url);
@@ -704,7 +734,7 @@ export async function extractContent(
 			if ("error" in frame) {
 				return { url, title: `Frame at ${options.timestamp}`, content: frame.error, error: frame.error };
 			}
-			return { url, title: `Frame at ${options.timestamp}`, content: `Video frame at ${options.timestamp}`, error: null, thumbnail: frame };
+			return { url, title: `Frame at ${options.timestamp}`, content: `Video frame at ${options.timestamp}`, error: null, thumbnail: frame, mimeType: frame.mimeType };
 		}
 
 		return { url, title: "", content: "", error: "Timestamp extraction only works with YouTube and local video files" };
@@ -795,9 +825,14 @@ export async function extractContent(
 	} catch (err) {
 		return { url, title: "", content: "", error: errorMessage(err) };
 	}
-	const providerOrder = remoteUrl && !fetchRouting.allowRemoteHostedProviders
-		? fetchRouting.providers.filter(provider => !REMOTE_HOSTED_FETCH_PROVIDERS.has(provider))
-		: fetchRouting.providers;
+	if (redirectPolicy && !fetchRouting.providers.includes("http")) {
+		return redirectPolicyRouteRefusal(url, fetchRouting.providers[0]!);
+	}
+	const providerOrder: FetchProvider[] = redirectPolicy
+		? ["http"]
+		: remoteUrl && !fetchRouting.allowRemoteHostedProviders
+			? fetchRouting.providers.filter(provider => !REMOTE_HOSTED_FETCH_PROVIDERS.has(provider))
+			: fetchRouting.providers;
 	if (providerOrder.length === 0) {
 		return {
 			url,
@@ -838,6 +873,7 @@ export async function extractContent(
 	let parallelError: string | null = null;
 	let parallelMcpError: string | null = null;
 	let brightdataError: string | null = null;
+	let deepseekError: string | null = null;
 
 	if (remoteUrl && providerOrder[0] !== "http") {
 		const httpGateResult = await runHttpProvider();
@@ -1035,6 +1071,23 @@ export async function extractContent(
 			}
 			if (geminiResult) return withDeclaredLinks(geminiResult);
 		}
+
+		if (provider === "deepseek") {
+			try {
+				if (isDeepSeekAvailable()) {
+					const deepseekResult = await extractWithDeepSeek(url, signal, {
+						timeoutMs: options?.timeoutMs,
+						...(options?.lookup ? { lookup: options.lookup } : {}),
+					});
+					if (deepseekResult) return withDeclaredLinks(deepseekResult);
+				}
+			} catch (err) {
+				if (isAbortError(err)) return abortedResult(url);
+				deepseekError = errorMessage(err);
+				if (isConfigParseError(err)) return parseErrorResult(deepseekError);
+			}
+			continue;
+		}
 	}
 
 	if (signal?.aborted) return abortedResult(url);
@@ -1047,6 +1100,8 @@ export async function extractContent(
 	if (finalHttpResult?.status === 404 || finalHttpResult?.status === 410) {
 		return { ...finalHttpResult, error: notFoundGuidance(finalHttpResult, options?.toolNames) };
 	}
+	// Under the redirect policy no other provider may run, so provider setup hints do not apply.
+	if (redirectPolicy && finalHttpResult) return finalHttpResult;
 
 	const searchToolName = options?.toolNames?.webSearch;
 	const jinaHint = jinaReaderGuidance(fetchRouting, providerOrder, Boolean(remoteUrl) && !fetchRouting.allowRemoteHostedProviders);
@@ -1062,6 +1117,7 @@ export async function extractContent(
 		...(parallelError ? [`Parallel fallback failed: ${parallelError}`] : []),
 		...(parallelMcpError ? [`Parallel MCP fallback failed: ${parallelMcpError}`] : []),
 		...(brightdataError ? [`Bright Data fallback failed: ${brightdataError}`] : []),
+		...(deepseekError ? [`DeepSeek fallback failed: ${deepseekError}`] : []),
 		"",
 		"Fallback options:",
 		...(jinaHint ? [jinaHint] : []),
@@ -1074,6 +1130,7 @@ export async function extractContent(
 		`  • Set ollamaApiKey in ${WEB_SEARCH_CONFIG_PATH} or OLLAMA_API_KEY`,
 		`  • Set parallelApiKey in ${WEB_SEARCH_CONFIG_PATH} or PARALLEL_API_KEY`,
 		`  • Set brightdataApiKey and brightdataUnlockerZone in ${WEB_SEARCH_CONFIG_PATH} or BRIGHTDATA_API_KEY and BRIGHTDATA_UNLOCKER_ZONE`,
+		`  • Set deepseekApiKey in ${WEB_SEARCH_CONFIG_PATH} or DEEPSEEK_API_KEY and add "deepseek" to fetchRouting.providers`,
 		`  • Set GEMINI_API_KEY in ${WEB_SEARCH_CONFIG_PATH}`,
 		"  • Sign into gemini.google.com in Chrome",
 		...(searchToolName ? [`  • Use ${searchToolName} to find content about this topic`] : []),
@@ -1093,6 +1150,20 @@ function isCloudflareChallenge(response: Response, text: string, isHTML: boolean
 		text.includes("/cdn-cgi/challenge-platform/");
 }
 
+// The HTML spec's JavaScript MIME type essences; any other type (JSON-LD,
+// text/template, ...) is a data block that never runs.
+const JAVASCRIPT_MIME_TYPES = new Set([
+	"application/ecmascript", "application/javascript", "application/x-ecmascript", "application/x-javascript",
+	"text/ecmascript", "text/javascript", "text/javascript1.0", "text/javascript1.1", "text/javascript1.2",
+	"text/javascript1.3", "text/javascript1.4", "text/javascript1.5", "text/jscript", "text/livescript",
+	"text/x-ecmascript", "text/x-javascript",
+]);
+
+function isExecutableScriptType(type: string | null): boolean {
+	const mime = (type ?? "").split(";")[0].trim().toLowerCase();
+	return mime === "" || mime === "module" || JAVASCRIPT_MIME_TYPES.has(mime);
+}
+
 function isLikelyJSRendered(html: string): boolean {
 	const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
 	if (!bodyMatch) return false;
@@ -1106,7 +1177,9 @@ function isLikelyJSRendered(html: string): boolean {
 		.replace(/\s+/g, " ")
 		.trim();
 
-	const scriptCount = (html.match(/<script/gi) || []).length;
+	const scriptCount = [...html.matchAll(/<script\b([^>]*)>/gi)]
+		.filter(([, attrs]) => isExecutableScriptType(attrs.match(/\btype\s*=\s*["']?([^"'\s>]+)/i)?.[1] ?? null))
+		.length;
 
 	return textContent.length < 500 && scriptCount > 3;
 }
@@ -1212,12 +1285,13 @@ async function extractViaHttp(
 	try {
 		const ssrf = loadSsrfConfig();
 		const domainPolicy = loadFetchContentDomainPolicy();
+		const redirects = options?.redirects ?? loadFetchContentRedirectPolicy();
 		const authProfile = options?.authFetchProfile;
 		const requestInit: ProxiedRequestInit = {
 			signal: controller.signal,
 			__proxy: options?.proxy,
 			headers: {
-				"User-Agent": "OpenAI File Downloader, XaiImageApiFetch/1.0",
+				"User-Agent": loadFetchContentUserAgent(),
 				"Accept": preferMarkdown ? MARKDOWN_FIRST_ACCEPT : BROWSER_ACCEPT,
 				"Accept-Language": "en-US,en;q=0.9",
 				"Cache-Control": "no-cache",
@@ -1229,7 +1303,7 @@ async function extractViaHttp(
 			},
 		};
 		const response = authProfile
-			? await fetchAuthenticatedRemoteUrl(url, requestInit, { ssrf, domainPolicy, proxy: options?.proxy, ...(options?.lookup ? { lookup: options.lookup } : {}) }, authProfile)
+			? await fetchAuthenticatedRemoteUrl(url, requestInit, { ssrf, domainPolicy, redirects, proxy: options?.proxy, ...(options?.lookup ? { lookup: options.lookup } : {}) }, authProfile)
 			: await fetchRemoteUrl(
 				url,
 				requestInit,
@@ -1237,6 +1311,7 @@ async function extractViaHttp(
 					allowRanges: ssrf.allowRanges,
 					trustEnvProxy: ssrf.trustEnvProxy,
 					domainPolicy,
+					redirects,
 					proxy: options?.proxy,
 					...(options?.lookup ? { lookup: options.lookup } : {}),
 				},
@@ -1476,13 +1551,28 @@ async function extractViaHttp(
 					declaredLinks,
 				};
 			}
+			let error: string | null = "Page appears to be JavaScript-rendered (content loads dynamically)";
+			if (!isLikelyJSRendered(text)) {
+				// Readability mutated `document`, so measure the page's own visible text
+				// from a fresh parse. A static page whose whole body is under the floor
+				// is complete once something was extracted from it; any executable
+				// script means the text may be a placeholder for client rendering.
+				const { document: original } = parseHTML(text);
+				const hasExecutableScript = [...original.querySelectorAll("script")]
+					.some((script) => isExecutableScriptType(script.getAttribute("type")));
+				for (const node of original.querySelectorAll("script, style, noscript, template")) node.remove();
+				const visibleChars = (original.body?.textContent ?? "").replace(/\s+/g, " ").trim().length;
+				const extractedChars = markdown.trim().length;
+				const counts = `Extracted content appears incomplete: extracted ${extractedChars} characters from a page with ${visibleChars} characters of visible text`;
+				if (visibleChars >= MIN_USEFUL_CONTENT) error = counts;
+				else if (hasExecutableScript) error = `Extracted content appears incomplete: the page has only ${visibleChars} characters of visible text and runs scripts, so content may load dynamically`;
+				else error = extractedChars > 0 ? null : counts;
+			}
 			return {
 				url,
 				title: article.title || documentTitle,
 				content: appendDeclaredWebLinks(markdown, declaredLinks),
-				error: isLikelyJSRendered(text)
-					? "Page appears to be JavaScript-rendered (content loads dynamically)"
-					: "Extracted content appears incomplete",
+				error,
 				declaredLinks,
 			};
 		}

@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 const MAX_DECLARED_LINKS = 20;
 const MAX_DECLARED_URL_LENGTH = 4096;
 const DECLARATION_RELATIONS = new Set([

@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 export type FindMode = "exact" | "case-insensitive" | "fuzzy";
 
 const CONTEXT_CHARS = 400;
@@ -196,7 +196,8 @@ export function findContent(
 			if (contained.length === 0) continue;
 			const prefix = range.start > 0 ? "…" : "";
 			const suffix = range.end < text.length ? "…" : "";
-			const snippet = `${prefix}${text.slice(range.start, range.end).replace(/\s+/g, " ").trim()}${suffix}`;
+			const snippet = `${prefix}${text.slice(range.start, range.end)
+				.replace(/[\uD800-\uDFFF]/gu, "\uFFFD").replace(/\s+/g, " ").trim()}${suffix}`;
 			const counts = contained
 				.map(result => `${overflow ? result.id : `\"${result.query}\"`} ×${result.count}`)
 				.join(", ");

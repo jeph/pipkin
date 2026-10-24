@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 // Host-neutral contract for the web tools. The Pi extension (index.ts) and the
 // MCP server (mcp-server.ts) both drive tools through WebToolCore so tool
 // behavior lives in one place; each host keeps its own schemas and transport.

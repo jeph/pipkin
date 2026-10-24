@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import { normalizeDomain } from "./domain-filter-normalization.ts";
@@ -6,7 +6,7 @@ import type { SearchOptions, SearchResponse } from "./perplexity.ts";
 import { formatSearchResultsAsAnswer } from "./search-answer-formatting.ts";
 import { normalizeSearchResultCount } from "./search-result-count-normalization.ts";
 import { redactCredential, resolveCredential } from "./credential-source.ts";
-import { fetchWithCredentialRedirects, getWebSearchConfigPath } from "./utils.ts";
+import { fetchWithCredentialRedirects, getWebSearchConfigPath, resolveProviderApiUrl } from "./utils.ts";
 
 const KEENABLE_SEARCH_URL = "https://api.keenable.ai/v1/search";
 // Without a key the request goes to the public endpoint, which identifies the caller
@@ -25,6 +25,7 @@ const RECENCY_DAYS: Record<NonNullable<SearchOptions["recencyFilter"]>, number> 
 };
 
 interface WebSearchConfig {
+	keenableBaseUrl?: unknown;
 	keenableApiKey?: unknown;
 }
 
@@ -153,7 +154,7 @@ export async function searchWithKeenable(query: string, options: SearchOptions =
 	let response: Response;
 	let entries: KeenableResult[];
 	try {
-		response = await fetchWithCredentialRedirects(apiKey ? KEENABLE_SEARCH_URL : KEENABLE_PUBLIC_SEARCH_URL, {
+		response = await fetchWithCredentialRedirects(resolveProviderApiUrl("keenable", apiKey ? KEENABLE_SEARCH_URL : KEENABLE_PUBLIC_SEARCH_URL, loadConfig().keenableBaseUrl), {
 			method: "POST",
 			headers,
 			body: JSON.stringify(body),

@@ -2,7 +2,7 @@
 
 This folder is [pi-web-access](https://github.com/nicobailon/pi-web-access) by Nico Bailon, MIT License (see `LICENSE`), copied into Pipkin so that Pipkin can fix it without waiting for upstream. Pipkin ships it as the extension `pipkin-web-access`.
 
-- Upstream version: 0.39.0, tag `v0.39.0`, commit `8e812826269624406458531f9231b679547f5a3a`.
+- Upstream version: 0.44.0, tag `v0.44.0`, commit `d0e323ac935e8753d11e1853b81c057e39dee4dc`.
 
 ## What differs from upstream
 
@@ -24,7 +24,7 @@ Everything below is a deliberate Pipkin change. Keep each one when folding in a 
 - `host/build.ts` bundles `index.ts` into the APK asset `pipkin-extensions/pipkin-web-access.js`. It bundles `typebox` in, because loading a separate typebox from `node_modules` costs more at startup than the rest of the extension, and leaves out `@earendil-works/*` and every package in `app/src/main/assets/pi/package.json`. The bundle starts with the MIT notices of pi-web-access and typebox, which the license requires in every copy; if upstream starts bundling more packages, add their notices there too.
 - `app/src/main/assets/pi/package.json` lists upstream's runtime `dependencies`, pinned to exact versions, so that `npm ci` installs them in Pipkin's Pi runtime.
 - `BundledExtension.WebAccess` in `app/src/main/kotlin/io/jeph/pipkin/data/BundledExtension.kt` sets `usesRuntimePackages`, so `ensure` installs it as `<root>/pi/extensions/pipkin-web-access/index.js`. There Node finds those packages, and because the runtime's `package.json` says `"type": "module"`, Pi's loader imports the file natively. Outside that folder Pi's loader would transpile it instead and cache the result in Termux's `$TMPDIR`, which Termux wipes when its service stops, so the first chat after that would transpile 1.3 MB again.
-- `host/src/modes/rpc.ts` sets `toolActivation` to `eager` in `web-search.json` unless the user chose a mode, and leaves `pipkin-web-access` out when the user installs `npm:pi-web-access` in Pi's global settings, because Pi exits when two extensions register the same tools.
+- `host/src/modes/rpc.ts` sets `toolActivation` to `eager` in `web-search.json` unless the user chose a mode or set `toolExposure` to `deferred` (the extension refuses to load with both), and leaves `pipkin-web-access` out when the user installs `npm:pi-web-access` in Pi's global settings, because Pi exits when two extensions register the same tools.
 - `host/tsconfig.json` and `host/.oxlintrc.json` leave this folder out, because upstream's `tsconfig.json` is looser than the host's. Only esbuild checks it, when it bundles the extension.
 
 ## Updating to a new upstream release

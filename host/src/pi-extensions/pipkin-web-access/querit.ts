@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import { normalizeDomain } from "./domain-filter-normalization.ts";
@@ -7,7 +7,7 @@ import type { ExtractedContent, ExtractOptions } from "./extract.ts";
 import type { SearchOptions, SearchResponse } from "./perplexity.ts";
 import { formatSearchResultsAsAnswer } from "./search-answer-formatting.ts";
 import { normalizeSearchResultCount } from "./search-result-count-normalization.ts";
-import { getWebSearchConfigPath } from "./utils.ts";
+import { getWebSearchConfigPath, resolveProviderApiUrl, fetchWithCredentialRedirects } from "./utils.ts";
 
 const QUERIT_SEARCH_URL = "https://api.querit.ai/v1/search";
 const QUERIT_CONTENTS_URL = "https://api.querit.ai/v1/contents";
@@ -17,6 +17,7 @@ const CONTENTS_TIMEOUT_MS = 60_000;
 const MAX_CONTENT_URLS = 10;
 
 interface WebSearchConfig {
+	queritBaseUrl?: unknown;
 	queritApiKey?: unknown;
 }
 
@@ -194,7 +195,7 @@ async function queritJsonRequest<T>(
 ): Promise<T> {
 	let response: Response;
 	try {
-		response = await fetch(url, {
+		response = await fetchWithCredentialRedirects(resolveProviderApiUrl("querit", url, loadConfig().queritBaseUrl), {
 			method: "POST",
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
@@ -203,7 +204,7 @@ async function queritJsonRequest<T>(
 			},
 			body: JSON.stringify(body),
 			signal: requestSignal(signal, timeoutMs),
-		});
+		}, ["Authorization"]);
 	} catch (err) {
 		const message = errorMessage(err);
 		const isRequestAbort = err instanceof Error

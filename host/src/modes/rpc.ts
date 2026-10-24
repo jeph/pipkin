@@ -80,7 +80,8 @@ function forwardOutput(output: Readable, socket: Socket, merger: OutputMerger): 
 /**
  * Sets pipkin-web-access's `toolActivation` to `eager` in its `web-search.json` unless the user chose one, so every
  * chat has the web tools from its first request instead of behind a `web_enable` call some models only make
- * sometimes. A file that is not a JSON object is left alone; the extension reports it itself.
+ * sometimes. A file that is not a JSON object is left alone; the extension reports it itself. So is one with
+ * `toolExposure: "deferred"`, which the extension refuses to load beside `eager`.
  */
 async function defaultWebToolsToEager(configDir: string): Promise<void> {
   const path = join(configDir, "web-search.json");
@@ -91,7 +92,7 @@ async function defaultWebToolsToEager(configDir: string): Promise<void> {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") return;
     config = {};
   }
-  if (!isObject(config) || "toolActivation" in config) return;
+  if (!isObject(config) || "toolActivation" in config || config.toolExposure === "deferred") return;
   await writeFile(path, `${JSON.stringify({ ...config, toolActivation: "eager" }, null, 2)}\n`);
 }
 
