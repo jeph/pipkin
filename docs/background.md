@@ -7,7 +7,7 @@ The agent runs in Termux, a separate app from Pipkin. Android pauses and stops a
 
 ## While something is working
 
-Pipkin counts as working while a chat is running, while the agent waits on a [background task](#background-tasks), while a command runs in a Pipkin terminal, and during sign-in, installing the agent, Termux setup, backups, and restores. For as long as any of these lasts, Pipkin:
+Pipkin counts as working while a chat is running, including while it waits on its [subagents](/docs/extensions/#subagents), which run inside the chat's turn, while the agent waits on a [background task](#background-tasks), while a command runs in a Pipkin terminal, and during sign-in, installing the agent, Termux setup, backups, and restores. For as long as any of these lasts, Pipkin:
 
 - **Runs as a foreground service.** Android shows Pipkin's notification: **Pipkin agent is working**, **A background task is running** when only background tasks are, or **A terminal command is running** when only a terminal is busy. Android stops a foreground service far less readily than an app in the background.
 - **Holds a wake lock.** This keeps the phone's processor running while the screen is off, so the agent keeps working, and so does Termux. The screen still turns off and locks as usual.
