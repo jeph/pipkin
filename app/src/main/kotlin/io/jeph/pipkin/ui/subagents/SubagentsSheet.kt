@@ -64,9 +64,10 @@ internal fun rememberChatSubagents(process: AgentProcess, timeline: TimelineStat
   val runs by process.subagentRuns.collectAsStateWithLifecycle()
   val busy by process.busy.collectAsStateWithLifecycle()
   val standingAside by process.subagentsStandingAside.collectAsStateWithLifecycle()
-  return remember(runs, timeline, busy, standingAside) {
+  val cutOff by process.subagentsCutOff.collectAsStateWithLifecycle()
+  return remember(runs, timeline, busy, standingAside, cutOff) {
     val tool = if (standingAside) SubagentTool.Other else SubagentTool.Pipkin
-    ChatSubagents(runs, askingSubagent(timeline, runs), busy, tool)
+    ChatSubagents(runs, askingSubagent(timeline, runs), busy, tool, cutOff)
   }
 }
 

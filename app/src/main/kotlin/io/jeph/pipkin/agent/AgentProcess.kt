@@ -131,6 +131,12 @@ internal class AgentProcess(
   private val subagentRunsState = MutableStateFlow<List<SubagentRun>>(emptyList())
 
   /**
+   * When each subagent still active as its Pi went away was cut off, by its tool call id: the time an interrupted run
+   * ran until, which its transcript can't tell when it was cut off in a tool call. Kept while this chat's process is.
+   */
+  private val subagentsCutOffState = MutableStateFlow<Map<String, Long>>(emptyMap())
+
+  /**
    * Whether the `pipkin-subagents` extension stands aside for another extension's `subagent` tool, as it last said;
    * reset with the runs, since each connection's Pi says so again.
    */
@@ -226,6 +232,9 @@ internal class AgentProcess(
 
   /** The chat's subagents since the user's last message, running or finished; see [SubagentRun]. */
   val subagentRuns: StateFlow<List<SubagentRun>> = subagentRunsState.asStateFlow()
+
+  /** When each subagent active as the chat's Pi went away was cut off, by tool call id, in epoch milliseconds. */
+  val subagentsCutOff: StateFlow<Map<String, Long>> = subagentsCutOffState.asStateFlow()
 
   /** Whether the chat's `subagent` tool is another extension's, whose calls are ordinary tool calls to Pipkin. */
   val subagentsStandingAside: StateFlow<Boolean> = subagentsStandingAsideState.asStateFlow()
@@ -652,8 +661,13 @@ internal class AgentProcess(
     }
   }
 
-  /** Forgets what the last connection's Pi said about its subagents. */
+  /** Forgets what the last connection's Pi said about its subagents, noting when the active ones were cut off. */
   private fun clearSubagents() {
+    val active = subagentRunsState.value.filter { it.status.active }
+    if (active.isNotEmpty()) {
+      val now = System.currentTimeMillis()
+      subagentsCutOffState.update { cutOff -> cutOff + active.associate { it.toolCallId to now } }
+    }
     subagentRunsState.value = emptyList()
     subagentsStandingAsideState.value = false
   }

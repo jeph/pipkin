@@ -304,7 +304,7 @@ private fun StatusLine(facts: SubagentFacts, stats: TranscriptStats?) {
         it > 0
       }?.let { add(pluralStringResource(R.plurals.subagent_turns, it, numbers.format(it))) }
       (facts.resultTokens ?: stats?.tokens)?.takeIf { it > 0 }?.let { add(tokensText(it)) }
-      stats?.durationMillis?.let { add(elapsedText(it)) }
+      stats?.durationMillis(facts.cutOffAt)?.let { add(elapsedText(it)) }
     }
   }
   val phaseColor = phaseColor(facts.phase)

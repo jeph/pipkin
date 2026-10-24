@@ -50,7 +50,8 @@ internal enum class SubagentTool {
 /**
  * What a chat knows of its subagents now: the [runs] its extension lists, whose question the chat's card shows
  * ([asker]), whether the chat is [working], which tells a call still waiting to start from one Pi left behind, and
- * whose [tool] its `subagent` calls went to.
+ * whose [tool] its `subagent` calls went to. [cutOff] holds when the runs active as the chat's Pi went away were cut
+ * off, by tool call id.
  */
 @Immutable
 internal class ChatSubagents(
@@ -58,6 +59,7 @@ internal class ChatSubagents(
   val asker: SubagentAsker,
   val working: Boolean,
   val tool: SubagentTool = SubagentTool.Pipkin,
+  val cutOff: Map<String, Long> = emptyMap(),
 ) {
   /** The run [toolCallId] started, while the extension still lists it. */
   fun run(toolCallId: String): SubagentRun? = runs.firstOrNull { it.toolCallId == toolCallId }
@@ -145,7 +147,7 @@ internal fun ChatSubagents.groups(): SubagentGroups = SubagentGroups(
 /**
  * What the subagent screen and the tool row know of the subagent [toolCallId] started, before reading its transcript:
  * its [agent] and [description], its [phase], its [run] while the extension lists it, the tokens its result counted,
- * and where to find its transcript.
+ * where to find its transcript, and, for one interrupted while the chat's process ran, when it was cut off.
  */
 internal data class SubagentFacts(
   val toolCallId: String,
@@ -155,6 +157,7 @@ internal data class SubagentFacts(
   val run: SubagentRun?,
   val resultTokens: Long?,
   val source: TranscriptSource,
+  val cutOffAt: Long? = null,
 )
 
 /** Where a subagent's transcript is. */
@@ -207,23 +210,34 @@ internal fun subagentFacts(
 
     else -> TranscriptSource.None
   }
+  val phase = subagentPhase(call, run, subagents.asker, subagents.working)
   return SubagentFacts(
     toolCallId = toolCallId,
     agent = run?.agent?.ifEmpty { null } ?: result?.agent ?: call?.args?.stringOrNull("agent").orEmpty(),
     description = run?.description?.ifEmpty { null } ?: result?.description
       ?: call?.args?.stringOrNull("description").orEmpty(),
-    phase = subagentPhase(call, run, subagents.asker, subagents.working),
+    phase = phase,
     run = run,
     resultTokens = result?.tokens,
     source = source,
+    cutOffAt = subagents.cutOff[toolCallId]?.takeIf { phase == SubagentPhase.Interrupted },
   )
 }
 
 /**
- * A transcript's turns, the tokens its replies used, and how long it took from its first message to its last, for a
+ * A transcript's turns, the tokens its replies used, and when its first message came and its last reply ended, for a
  * subagent the extension no longer lists.
  */
-internal data class TranscriptStats(val turns: Int, val tokens: Long, val durationMillis: Long?)
+internal data class TranscriptStats(val turns: Int, val tokens: Long, val firstAt: Long?, val lastAt: Long?) {
+  /**
+   * How long the subagent took: from the first message to the last reply's end, or to [cutOffAt] when it was cut off
+   * later, as in a tool call, whose end the transcript never got.
+   */
+  fun durationMillis(cutOffAt: Long? = null): Long? {
+    val start = firstAt ?: return null
+    return maxOf(lastAt ?: start, cutOffAt ?: start) - start
+  }
+}
 
 internal fun transcriptStats(messages: JSONArray): TranscriptStats {
   var turns = 0
@@ -241,7 +255,5 @@ internal fun transcriptStats(messages: JSONArray): TranscriptStats {
       tokens += message.optJSONObject("usage")?.optLong("totalTokens") ?: 0
     }
   }
-  val start = first
-  val end = last
-  return TranscriptStats(turns, tokens, if (start != null && end != null) end - start else null)
+  return TranscriptStats(turns, tokens, first, last)
 }

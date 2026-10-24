@@ -131,8 +131,24 @@ class SubagentCallsTest {
         {"role":"assistant","timestamp":4000,"durationMs":1000,"usage":{"totalTokens":250}}]""",
     )
 
-    assertEquals(TranscriptStats(turns = 2, tokens = 350, durationMillis = 4000), transcriptStats(messages))
-    assertNull(transcriptStats(JSONArray()).durationMillis)
+    val stats = transcriptStats(messages)
+    assertEquals(TranscriptStats(turns = 2, tokens = 350, firstAt = 1000, lastAt = 5000), stats)
+    assertEquals(4000L, stats.durationMillis())
+    assertNull(transcriptStats(JSONArray()).durationMillis())
+  }
+
+  @Test
+  fun anInterruptedRunTakesUntilItWasCutOffWhenThatsLaterThanItsLastReply() {
+    // Cut off in a tool call 8 s after it began; its transcript ends with the reply that made the call.
+    val stats = TranscriptStats(turns = 1, tokens = 10, firstAt = 1000, lastAt = 1200)
+    assertEquals(200L, stats.durationMillis())
+    assertEquals(8000L, stats.durationMillis(cutOffAt = 9000))
+    assertEquals(200L, stats.durationMillis(cutOffAt = 500))
+
+    val cutOff = ChatSubagents(emptyList(), SubagentAsker.Unknown, working = false, cutOff = mapOf("c1" to 9000L))
+    assertEquals(9000L, subagentFacts("c1", call("c1"), cutOff, "/s/p.jsonl").cutOffAt)
+    // Only an interrupted one: a result says how it ended.
+    assertNull(subagentFacts("c1", call("c1", output = "done"), cutOff, "/s/p.jsonl").cutOffAt)
   }
 
   @Test
