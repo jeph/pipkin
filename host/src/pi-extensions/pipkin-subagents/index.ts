@@ -24,7 +24,10 @@ const SubagentParams = Type.Object({
   }),
   description: Type.String({ description: 'Two to six words naming the task for the user, such as "auth redirect flow"' }),
   model: Type.Optional(
-    Type.String({ description: "A model as provider/id, only when the task needs another model than the agent's" }),
+    Type.String({
+      description:
+        "A model as provider/id, only when the task needs another model than the agent's. Omit it to use the agent's model, or the chat's",
+    }),
   ),
   thinking: Type.Optional(StringEnum(THINKING_LEVELS, { description: "Thinking level, only to override the agent's" })),
 });
@@ -80,7 +83,8 @@ export default function pipkinSubagents(pi: ExtensionAPI): void {
         const agents = loadAgents(getAgentDir(), toolCtx.cwd, toolCtx.isProjectTrusted());
         const agent = agents.byName.get(params.agent);
         if (!agent) throw new Error(unknownAgentText(agents, params.agent));
-        const model = resolveModel(toolCtx, params.model ?? agent.model);
+        // A blank model is no model: models sometimes send an empty string for an argument they mean to leave out.
+        const model = resolveModel(toolCtx, params.model?.trim() || agent.model);
         const thinking = params.thinking ?? agent.thinking ?? toolCtx.thinkingLevel ?? pi.getThinkingLevel();
         const toolInfo = pi.getAllTools();
         const readOnly = new Set(toolInfo.filter((tool) => tool.annotations?.readOnlyHint).map((tool) => tool.name));

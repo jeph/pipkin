@@ -59,7 +59,7 @@ function parentCalling(calls: Call[], child: Script): Script {
     if (turn.step > 0) return echoResults(turn);
     return fauxAssistantMessage(
       calls.map(({ id, agent = "General", task, description = "a task", model }) =>
-        fauxToolCall("subagent", { agent, task, description, ...(model ? { model } : {}) }, { id }),
+        fauxToolCall("subagent", { agent, task, description, ...(model === undefined ? {} : { model }) }, { id }),
       ),
       { stopReason: "toolUse" },
     );
@@ -729,6 +729,23 @@ describe("agents", () => {
     expect(messageText(results.get("sub1"))).toBe("model faux-2");
     expect(results.get("sub2")?.isError).toBe(true);
     expect(messageText(results.get("sub2"))).toContain('Unknown model "faux/nope"');
+    session.dispose();
+  });
+
+  it("treat a blank model as none, using the agent's model or else the chat's", async () => {
+    await mkdir(path.join(dir.agentDir, "agents"), { recursive: true });
+    await writeFile(path.join(dir.agentDir, "agents", "second.md"), "---\nname: Second\nmodel: faux/faux-2\n---\n");
+    const calls = [
+      { id: "sub1", task: "CHILD empty", model: "" },
+      { id: "sub2", task: "CHILD spaces", model: "  " },
+      { id: "sub3", agent: "Second", task: "CHILD agent's", model: " " },
+    ];
+    const { session } = await start(parentCalling(calls, (turn) => fauxAssistantMessage(`model ${turn.model}`)));
+    await session.prompt("PARENT go");
+    const results = subagentResults(session);
+    expect(messageText(results.get("sub1"))).toBe("model faux-1");
+    expect(messageText(results.get("sub2"))).toBe("model faux-1");
+    expect(messageText(results.get("sub3"))).toBe("model faux-2");
     session.dispose();
   });
 
