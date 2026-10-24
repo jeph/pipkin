@@ -97,7 +97,6 @@ function readFolder(dir: string, agents: Agents): void {
 export function parseAgent(file: string, content: string): AgentDefinition {
   const { frontmatter, body } = parseFrontmatter(content);
   const name = optionalText(frontmatter, "name") ?? basename(file, ".md");
-  if (!/^[\w.-]+$/.test(name)) throw new Error(`name "${name}" may only hold letters, digits, ".", "_" and "-"`);
   const agent: AgentDefinition = {
     name,
     description: optionalText(frontmatter, "description") ?? "",

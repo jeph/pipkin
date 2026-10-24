@@ -2,8 +2,9 @@
  * A chat's subagent transcripts, which the Pipkin subagents extension saves in `subagents/<session id>/` beside the
  * chat's own file. Pi's session list reads only the files directly in a sessions folder, so they never show as chats.
  */
-import { type FileHandle, open, readdir } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { type FileHandle, open, readdir, realpath } from "node:fs/promises";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
+import { HostError } from "./env.js";
 import { isObject } from "./framing.js";
 
 /** Session ids as Pi writes them; anything else could name a path outside the chat's folder. */
@@ -12,6 +13,25 @@ const SESSION_ID = /^[\w-]+$/;
 /** The folder holding the subagent transcripts of the session [id] saved in [sessionPath]. */
 export function subagentFolder(sessionPath: string, id: string): string | undefined {
   return SESSION_ID.test(id) ? join(dirname(sessionPath), "subagents", id) : undefined;
+}
+
+/**
+ * The real path of [folder], refusing one that resolves outside the sessions folder, as a symlinked `subagents`
+ * folder could (`outside_sessions`); undefined when it's missing.
+ */
+export async function containedFolder(configDir: string, folder: string): Promise<string | undefined> {
+  let target: string;
+  try {
+    target = await realpath(folder);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+    throw error;
+  }
+  const inside = relative(await realpath(join(configDir, "sessions")), target);
+  if (inside === "" || inside === ".." || inside.startsWith(`..${sep}`) || isAbsolute(inside)) {
+    throw new HostError("outside_sessions", "That folder is not inside Pipkin's sessions folder");
+  }
+  return target;
 }
 
 /** How many subagent transcripts the session [id] in [sessionPath] has. */

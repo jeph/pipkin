@@ -103,4 +103,17 @@ describe("delete_sessions mode", () => {
     expect(await runMode("delete_sessions", dirs, { paths: [file, escape] })).toMatchObject({ ok: false, code: "outside_sessions" });
     await expect(access(folder)).resolves.toBeUndefined();
   });
+
+  it("deletes nothing when a subagents folder links outside the sessions folder", async () => {
+    const outsideFolder = path.join(dirs.configDir, "elsewhere");
+    const sentinel = path.join(outsideFolder, "aaa", "keep.txt");
+    await mkdir(path.dirname(sentinel), { recursive: true });
+    await writeFile(sentinel, "keep");
+    await symlink(outsideFolder, path.join(sessions, "--project--", "subagents"));
+    const file = path.join(sessions, "--project--", "a.jsonl");
+    await writeFile(file, `${JSON.stringify({ type: "session", version: 3, id: "aaa", timestamp: "", cwd: "/" })}\n`);
+    expect(await runMode("delete_sessions", dirs, { paths: [file] })).toMatchObject({ ok: false, code: "outside_sessions" });
+    await expect(access(sentinel)).resolves.toBeUndefined();
+    await expect(access(file)).resolves.toBeUndefined();
+  });
 });
