@@ -53,6 +53,7 @@ import io.jeph.pipkin.ui.chat.ChatStream
 import io.jeph.pipkin.ui.chat.ChatView
 import io.jeph.pipkin.ui.chat.StreamSubagents
 import io.jeph.pipkin.ui.chat.ToolCallSheet
+import io.jeph.pipkin.ui.chat.elapsedText
 import io.jeph.pipkin.ui.components.HeaderBarHeight
 import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.ui.components.LucideIcon

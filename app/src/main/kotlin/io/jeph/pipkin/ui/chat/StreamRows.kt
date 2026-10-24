@@ -65,6 +65,7 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.text.NumberFormat
 import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 
 /**
@@ -280,8 +281,13 @@ private fun RunningElapsed(startedAt: Long) {
       delay(1_000L - (value - startedAt).mod(1_000L))
     }
   }
-  val seconds = ((now - startedAt) / 1_000L).coerceAtLeast(0)
-  FooterText("${seconds / 60}:${(seconds % 60).toString().padStart(2, '0')}")
+  FooterText(elapsedText(now - startedAt))
+}
+
+/** A running time as `0:42`, or `75:03` past an hour, with the locale's digits. */
+internal fun elapsedText(millis: Long): String {
+  val seconds = (millis / 1_000L).coerceAtLeast(0)
+  return String.format(Locale.getDefault(), "%d:%02d", seconds / 60, seconds % 60)
 }
 
 @Composable

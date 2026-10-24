@@ -1,6 +1,5 @@
 package io.jeph.pipkin.ui.subagents
 
-import android.text.format.DateUtils
 import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -9,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.SubagentRun
+import io.jeph.pipkin.ui.chat.elapsedText
 import io.jeph.pipkin.ui.settings.formatTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.delay
@@ -51,9 +51,6 @@ internal fun phaseColor(phase: SubagentPhase): Color {
     SubagentPhase.Queued, SubagentPhase.Stopped, SubagentPhase.Interrupted -> colors.foregroundMuted
   }
 }
-
-/** A time span as `0:42` or `1:02:03`, with the locale's digits. */
-internal fun elapsedText(millis: Long): String = DateUtils.formatElapsedTime((millis / 1_000L).coerceAtLeast(0))
 
 /**
  * How long [run] has run: up to now while it runs, ticking each second, or until it ended; null before it started,
