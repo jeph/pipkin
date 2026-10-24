@@ -148,8 +148,9 @@ internal const val SUBAGENT_DETAILS_EXTENSION = "pipkin-subagents"
 /**
  * What a finished `subagent` tool call's result `details` say about its run: the run's [id], [agent] and
  * [description], the transcript at [sessionFile] (null for a subagent that ran in memory), how it ended, and the
- * [tokens] it used. They outlive the run's place in [SubagentRun]'s list, so the tool row leads back to it. [marked]
- * says they carry [SUBAGENT_DETAILS_EXTENSION].
+ * [tokens] it used. They outlive the run's place in [SubagentRun]'s list, so the tool row leads back to it.
+ * [pipkins] says they carry [SUBAGENT_DETAILS_EXTENSION], which tells them from another extension's `subagent` tool,
+ * whose details may name an `id` or a `sessionFile` of their own.
  */
 internal data class SubagentResult(
   val id: String?,
@@ -158,14 +159,8 @@ internal data class SubagentResult(
   val sessionFile: String?,
   val status: SubagentStatus?,
   val tokens: Long?,
-  val marked: Boolean = false,
+  val pipkins: Boolean = false,
 ) {
-  /**
-   * Whether these are Pipkin subagents' details: they carry its marker or, as an older build's runs did, name the run
-   * or its transcript. Another extension's `subagent` tool may return details of its own, which do neither.
-   */
-  val pipkins: Boolean get() = marked || id != null || sessionFile != null
-
   companion object {
     /** The result of a call whose `details` are [details]; null when they hold none of a subagent's. */
     fun from(details: JSONObject?): SubagentResult? {
@@ -177,7 +172,7 @@ internal data class SubagentResult(
         sessionFile = details.textOrNull("sessionFile"),
         status = details.textOrNull("status")?.let(SubagentStatus::from),
         tokens = details.optJSONObject("usage")?.optLong("totalTokens")?.takeIf { it > 0 },
-        marked = details.textOrNull("extension") == SUBAGENT_DETAILS_EXTENSION,
+        pipkins = details.textOrNull("extension") == SUBAGENT_DETAILS_EXTENSION,
       )
       return result.takeUnless { it == EMPTY }
     }

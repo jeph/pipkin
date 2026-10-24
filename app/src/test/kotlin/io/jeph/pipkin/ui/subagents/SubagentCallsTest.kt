@@ -213,15 +213,18 @@ class SubagentCallsTest {
       assertTrue(subagents.startsSubagent(call("c1", output = "found it", details = marked)))
       val failed = JSONObject().put("extension", "pipkin-subagents").put("status", "failed")
       assertTrue(subagents.startsSubagent(call("c1", output = "Unknown agent", isError = true, details = failed)))
-      // An older build's results name the run or its transcript.
-      assertTrue(subagents.startsSubagent(call("c1", output = "done", details = JSONObject().put("id", "r1"))))
-      val inMemory = JSONObject().put("sessionFile", "/s/sub.jsonl")
-      assertTrue(subagents.startsSubagent(call("c1", output = "done", details = inMemory)))
-      // Another extension's result, as one made before the user replaced Pipkin's tool and reloaded: no details, or
-      // details of its own; a call refused before any extension ran has none either.
+      // Another extension's result, as one made before the user replaced Pipkin's tool and reloaded or one made while
+      // Pipkin stands aside: no details, or details of its own, even ones naming a run or a transcript; a call refused
+      // before any extension ran has none either.
       assertFalse(subagents.startsSubagent(call("c1", output = "theirs")))
       assertFalse(subagents.startsSubagent(call("c1", output = "blocked", isError = true)))
       assertFalse(subagents.startsSubagent(call("c1", output = "theirs", details = JSONObject().put("agent", "x"))))
+      val theirRun = JSONObject().put("id", "foreign-run").put("status", "done")
+      assertFalse(subagents.startsSubagent(call("c1", output = "theirs", details = theirRun)))
+      val theirFile = JSONObject().put("sessionFile", "/s/theirs.jsonl")
+      assertFalse(subagents.startsSubagent(call("c1", output = "theirs", details = theirFile)))
+      val otherMarker = JSONObject().put("extension", "their-subagents").put("id", "r1")
+      assertFalse(subagents.startsSubagent(call("c1", output = "theirs", details = otherMarker)))
     }
   }
 
