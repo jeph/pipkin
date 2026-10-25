@@ -26,7 +26,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.plus
@@ -179,16 +178,10 @@ internal class AgentProcess(
     onNoticesChanged = { notices -> sessionFileState.value?.let { sessions.notices.put(it, notices) } },
   )
 
-  /**
-   * [ChatTimeline.state] for the screen, at most once per [STREAM_UPDATE_MILLIS] and always ending on the latest
-   * state. A change after a quiet spell shows at once; while Pi streams, the deltas in between are combined. Each
-   * state's [TimelineState.stream] is built here, off the main thread.
-   */
+  /** [ChatTimeline.state] for the screen; see [forScreen]. */
   val screenTimeline: StateFlow<TimelineState> = timeline.state
-    .transform { state ->
-      emit(state.withStream())
-      delay(STREAM_UPDATE_MILLIS)
-    }.stateIn(processScope + Dispatchers.Default, SharingStarted.Eagerly, timeline.state.value)
+    .forScreen()
+    .stateIn(processScope + Dispatchers.Default, SharingStarted.Eagerly, timeline.state.value)
 
   val state: StateFlow<AgentProcessState> = stateFlow.asStateFlow()
 
@@ -238,6 +231,9 @@ internal class AgentProcess(
 
   /** Whether the chat's `subagent` tool is another extension's, whose calls are ordinary tool calls to Pipkin. */
   val subagentsStandingAside: StateFlow<Boolean> = subagentsStandingAsideState.asStateFlow()
+
+  /** The runs subagent screens follow, with their transcripts as they run. */
+  val liveSubagents = LiveSubagents(processScope, ::sendSubagents)
 
   /** Whether the chat shows as working: a run is [busy], or the agent waits on [backgroundTasks]. */
   val working: StateFlow<Boolean> = combine(busy, backgroundTasksState) { running, tasks -> running || tasks > 0 }
@@ -654,9 +650,13 @@ internal class AgentProcess(
     when (line.optString("topic")) {
       BACKGROUND_TOPIC -> backgroundTasksState.value = data.optInt("active")
 
-      SUBAGENTS_TOPIC -> if (data.has("runs")) {
-        subagentsStandingAsideState.value = data.optBoolean("standingAside")
-        subagentRunsState.value = SubagentRun.listFrom(data)
+      SUBAGENTS_TOPIC -> when {
+        data.has("runs") -> {
+          subagentsStandingAsideState.value = data.optBoolean("standingAside")
+          subagentRunsState.value = SubagentRun.listFrom(data)
+        }
+
+        else -> liveSubagents.onMessage(data)
       }
     }
   }
@@ -670,6 +670,7 @@ internal class AgentProcess(
     }
     subagentRunsState.value = emptyList()
     subagentsStandingAsideState.value = false
+    liveSubagents.clear()
   }
 
   private fun onEvent(event: JSONObject) {

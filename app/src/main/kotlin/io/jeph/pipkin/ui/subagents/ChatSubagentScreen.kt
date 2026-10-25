@@ -29,7 +29,9 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -41,6 +43,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
+import io.jeph.pipkin.agent.LiveSubagents
 import io.jeph.pipkin.agent.SubagentRun
 import io.jeph.pipkin.agent.SubagentStatus
 import io.jeph.pipkin.agent.TimelineItem
@@ -56,6 +59,7 @@ import io.jeph.pipkin.ui.workspace.CloseSplitButton
 import io.jeph.pipkin.ui.workspace.PaneControls
 import io.jeph.pipkin.ui.workspace.TabsButton
 import io.jeph.pipkin.ui.workspace.rememberWorkspaceTabs
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
 private val TRAY_SHAPE = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
@@ -92,13 +96,18 @@ internal fun ChatSubagentScreen(
   val latestOnBack by rememberUpdatedState(onBack)
   LaunchedEffect(gone) { if (gone) latestOnBack() }
   val facts = subagentFacts(toolCallId, call, subagents, sessionFile)
-  val transcript by rememberSubagentTranscript(facts.source, facts.phase.active, facts.run?.messages ?: 0)
-  val tabs = rememberWorkspaceTabs(controls.pane, process.cwd).count
   val run = facts.run
+  val live by rememberLiveTranscript(process.liveSubagents, run?.id)
+  // While the extension lists the run, its events build the transcript; the file is read only once it isn't listed.
+  val fileSource = facts.source.takeUnless {
+    run != null && (it is TranscriptSource.File || it is TranscriptSource.Lookup)
+  }
+  val fromFile by rememberSubagentTranscript(fileSource, facts.phase.active, run?.messages ?: 0)
+  val tabs = rememberWorkspaceTabs(controls.pane, process.cwd).count
   SubagentScreen(
     chatTitle = chatTitle,
     facts = facts,
-    transcript = transcript,
+    transcript = live ?: fromFile,
     onBack = onBack,
     modifier = modifier,
     trailing = {
@@ -125,6 +134,31 @@ internal fun ChatSubagentScreen(
     }
   }
 }
+
+/**
+ * Subagent [runId]'s transcript as it runs, followed over the chat's channel while the screen shows it; null while
+ * the extension doesn't list the run, until it sent the log so far, and while the log holds no rows yet.
+ */
+@Composable
+private fun rememberLiveTranscript(subagents: LiveSubagents, runId: String?): State<SubagentTranscript.Live?> =
+  produceState<SubagentTranscript.Live?>(null, subagents, runId) {
+    value = null
+    if (runId == null) return@produceState
+    try {
+      subagents.follow(runId)
+      subagents.of(runId).collectLatest { live ->
+        value = null
+        live?.screenStates?.collect { state ->
+          value = state.takeIf { it.items.isNotEmpty() }?.let {
+            val task = it.items.firstOrNull { item -> item is TimelineItem.User }
+            SubagentTranscript.Live(it, task?.key, live.timeline::streamingArguments)
+          }
+        }
+      }
+    } finally {
+      subagents.unfollow(runId)
+    }
+  }
 
 /**
  * The steers [run] hasn't read yet, one per line, while there are any. The box has no Edit or Send now: the

@@ -91,6 +91,13 @@ internal sealed interface SubagentTranscript {
     val history: TranscriptHistory,
   ) : SubagentTranscript
 
+  /**
+   * The rows of a subagent the extension still lists, in [state], built from its events as they come; [taskKey] keys
+   * the task, and [streamingArguments] gives a tool call's arguments while they stream.
+   */
+  class Live(val state: TimelineState, val taskKey: String?, val streamingArguments: (String) -> String?) :
+    SubagentTranscript
+
   /** Its file is gone, as after the chat it belongs to was forked and the original deleted. */
   data object Gone : SubagentTranscript
 
@@ -240,6 +247,7 @@ internal fun SubagentScreen(
   val view = remember(facts.toolCallId) { ChatView() }
   var toolKey by remember(facts.toolCallId) { mutableStateOf<String?>(null) }
   val loaded = transcript as? SubagentTranscript.Loaded
+  val live = transcript as? SubagentTranscript.Live
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
     SubagentHeader(chatTitle, facts, loaded?.stats, onBack, trailing)
     ChatStack(
@@ -250,9 +258,12 @@ internal fun SubagentScreen(
       composer = bottom,
     )
   }
-  val tool = toolKey?.let { key -> loaded?.state?.items?.firstOrNull { it.key == key } }
-  // A transcript is read from its file, so no tool call has arguments still streaming.
-  tool?.let { ToolCallSheet(it, streamingArguments = { null }, onDismiss = { toolKey = null }) }
+  val items = loaded?.state?.items ?: live?.state?.items
+  val tool = toolKey?.let { key -> items?.firstOrNull { it.key == key } }
+  // Only a live transcript has tool calls whose arguments still stream; one read from its file has none.
+  tool?.let {
+    ToolCallSheet(it, streamingArguments = live?.streamingArguments ?: { null }, onDismiss = { toolKey = null })
+  }
 }
 
 /** Back, the chat's title as a breadcrumb over the subagent's agent and task, and its status line under them. */
@@ -397,25 +408,31 @@ private fun TranscriptBody(
       PillButton(label = stringResource(R.string.subagent_retry), onClick = transcript.retry)
     }
 
-    is SubagentTranscript.Loaded -> {
-      if (transcript.state.items.isEmpty()) {
-        Waiting(R.string.subagent_transcript_starting)
-        return
-      }
-      ChatStream(
-        timeline = transcript.state,
-        processState = AgentProcessState.Ready,
-        view = view,
-        onOpenTool = onOpenTool,
-        onOpenProviders = {},
-        onOpenOnboarding = {},
-        onRestart = {},
-        backgroundTasks = 0,
-        // A subagent starts no subagents of its own.
-        subagents = StreamSubagents(ChatSubagents.None, onOpen = {}, taskKey = transcript.taskKey),
-      )
-    }
+    is SubagentTranscript.Loaded -> TranscriptRows(transcript.state, transcript.taskKey, view, onOpenTool)
+
+    is SubagentTranscript.Live -> TranscriptRows(transcript.state, transcript.taskKey, view, onOpenTool)
   }
+}
+
+/** A transcript's rows in [state] as the chat shows its own, the task, keyed [taskKey], first. */
+@Composable
+private fun TranscriptRows(state: TimelineState, taskKey: String?, view: ChatView, onOpenTool: (String) -> Unit) {
+  if (state.items.isEmpty()) {
+    Waiting(R.string.subagent_transcript_starting)
+    return
+  }
+  ChatStream(
+    timeline = state,
+    processState = AgentProcessState.Ready,
+    view = view,
+    onOpenTool = onOpenTool,
+    onOpenProviders = {},
+    onOpenOnboarding = {},
+    onRestart = {},
+    backgroundTasks = 0,
+    // A subagent starts no subagents of its own.
+    subagents = StreamSubagents(ChatSubagents.None, onOpen = {}, taskKey = taskKey),
+  )
 }
 
 /** A simmering pot, over [text] when there is one. */
