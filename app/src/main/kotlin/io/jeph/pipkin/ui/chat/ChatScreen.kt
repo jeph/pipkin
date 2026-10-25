@@ -316,7 +316,13 @@ private fun PlaceholderChat(controls: PaneControls, modifier: Modifier) {
       trailing = { CloseSplitButton(controls) },
     )
     Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-      StatusBanner(AgentProcessState.Starting, onRetry = {}, onOpenOnboarding = {})
+      // The stream's margin, so the banner sits as it will once the chat starts.
+      StatusBanner(
+        AgentProcessState.Starting,
+        onRetry = {},
+        onOpenOnboarding = {},
+        modifier = Modifier.padding(horizontal = PipkinTokens.Spacing.s16),
+      )
     }
   }
 }

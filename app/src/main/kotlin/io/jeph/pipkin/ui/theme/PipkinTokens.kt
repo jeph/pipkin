@@ -51,4 +51,10 @@ object PipkinTokens {
   }
 
   val contentMaxWidth = 820.dp
+
+  /**
+   * The widest a note card gets, such as the chat's Starting banner or the git viewer's empty diff. About a phone's
+   * width, so a phone shows it edge to edge as before, and a tablet or an unfolded phone centres it.
+   */
+  val noteMaxWidth = 480.dp
 }

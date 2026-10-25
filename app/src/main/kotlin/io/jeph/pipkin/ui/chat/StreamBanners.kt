@@ -4,6 +4,7 @@ import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.FlowRow
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -48,7 +50,8 @@ import kotlinx.coroutines.launch
 
 /**
  * The process banner at the top of the stream: starting, installing Pi, or failed with Retry. [onOpenOnboarding] opens
- * setup at the step a failure needs.
+ * setup at the step a failure needs. It is the chat's only content then, so it is a note no wider than a phone,
+ * centred on a wide screen; Pi's exit banner, among the chat's messages, keeps their width.
  */
 @Composable
 internal fun StatusBanner(
@@ -57,10 +60,20 @@ internal fun StatusBanner(
   onOpenOnboarding: () -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  when (state) {
-    AgentProcessState.Starting -> StartingBanner(modifier)
+  if (state == AgentProcessState.Ready || state is AgentProcessState.Exited) return
+  // The caller may fill the width, which widthIn can't narrow, so the card is capped in a box that takes it.
+  Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+    val note = Modifier.widthIn(max = PipkinTokens.noteMaxWidth)
+    StatusCard(state, onRetry, onOpenOnboarding, note)
+  }
+}
 
-    is AgentProcessState.Installing -> BannerCard(modifier) {
+@Composable
+private fun StatusCard(state: AgentProcessState, onRetry: () -> Unit, onOpenOnboarding: () -> Unit, note: Modifier) {
+  when (state) {
+    AgentProcessState.Starting -> StartingBanner(note)
+
+    is AgentProcessState.Installing -> BannerCard(note) {
       Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         SimmeringPot(size = PipkinTokens.IconSize.lg)
         BannerTitle(stringResource(R.string.chat_installing))
@@ -79,7 +92,7 @@ internal fun StatusBanner(
       }
     }
 
-    is AgentProcessState.Failed -> FailedBanner(state, onRetry, onOpenOnboarding, modifier)
+    is AgentProcessState.Failed -> FailedBanner(state, onRetry, onOpenOnboarding, note)
 
     AgentProcessState.Ready, is AgentProcessState.Exited -> Unit
   }

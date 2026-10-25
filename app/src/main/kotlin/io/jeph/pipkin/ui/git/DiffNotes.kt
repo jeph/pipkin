@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -79,7 +80,10 @@ internal fun DiffTooLarge(modifier: Modifier = Modifier) {
   }
 }
 
-/** A diff card holding a note's [content] centred, the card placed at [alignment] in the space a diff would fill. */
+/**
+ * A diff card holding a note's [content] centred, the card placed at [alignment] in the space a diff would fill and no
+ * wider than a note, so a wide screen centres it.
+ */
 @Composable
 private fun NoteCard(
   modifier: Modifier,
@@ -93,6 +97,7 @@ private fun NoteCard(
   ) {
     Column(
       modifier = Modifier
+        .widthIn(max = PipkinTokens.noteMaxWidth)
         .fillMaxWidth()
         .background(pipkinColors.surface1, CardShape)
         .padding(PipkinTokens.Spacing.s24),
