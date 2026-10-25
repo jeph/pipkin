@@ -462,6 +462,46 @@ describe("steer", () => {
     expect(channel.latest()).toEqual([expect.objectContaining({ status: "done", steering: [] })]);
     session.dispose();
   });
+
+  it("taken back, go to the app and never reach the subagent", async () => {
+    const release = latch();
+    const child: Script = async (turn) => {
+      if (turn.latest.startsWith("STEER")) return fauxAssistantMessage(`steered: ${turn.latest}`);
+      if (turn.step > 0) return fauxAssistantMessage("never steered");
+      await release.promise;
+      return fauxAssistantMessage(fauxToolCall("bash", { command: "echo working" }), { stopReason: "toolUse" });
+    };
+    const { session } = await start(parentCalling([{ id: "sub1", task: "CHILD work" }], child));
+    const prompt = session.prompt("PARENT go");
+    await eventually(() => channel.latest()[0]?.turn === 1);
+    const id = channel.latest()[0]?.id ?? "";
+    channel.fromApp({ action: "steer", id, text: "STEER one" });
+    channel.fromApp({ action: "steer", id, text: "STEER two" });
+    await eventually(() => channel.latest()[0]?.steering.length === 2);
+    channel.fromApp({ action: "unsteer", id });
+    await eventually(() => channel.live.some((message) => message.unsteered));
+    expect(channel.live.find((message) => message.unsteered)?.unsteered).toEqual({
+      id,
+      steering: ["STEER one", "STEER two"],
+    });
+    await eventually(() => channel.latest()[0]?.steering.length === 0);
+    release.open();
+    await prompt;
+    expect(messageText(subagentResults(session).get("sub1"))).toBe("never steered");
+    session.dispose();
+  });
+
+  it("taken back from a run that has ended answer with none", async () => {
+    const { session } = await start(
+      parentCalling([{ id: "sub1", task: "CHILD hi" }], async () => fauxAssistantMessage("hi")),
+    );
+    await session.prompt("PARENT go");
+    const id = channel.latest()[0]?.id ?? "";
+    channel.fromApp({ action: "unsteer", id });
+    await eventually(() => channel.live.some((message) => message.unsteered));
+    expect(channel.live.at(-1)?.unsteered).toEqual({ id, steering: [] });
+    session.dispose();
+  });
 });
 
 describe("transcripts", () => {

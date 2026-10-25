@@ -9,8 +9,8 @@ import { type PipkinChannel, pipkinChannel } from "../pipkin-channel.js";
 import { append, forApp, type LiveLog } from "./live.js";
 
 /**
- * The channel topic. To the app: `runs` lists, a followed run's `live` log, then each of its `event`s. From the app:
- * `steer`, `stop`, `stopAll`, and `follow` and `unfollow` a run.
+ * The channel topic. To the app: `runs` lists, a followed run's `live` log, then each of its `event`s, and the steers
+ * `unsteered` from a run. From the app: `steer`, `unsteer`, `stop`, `stopAll`, and `follow` and `unfollow` a run.
  */
 export const TOPIC = "subagents";
 export const PROTOCOL_VERSION = 1;
@@ -111,8 +111,11 @@ function fromApp(state: Registry, data: unknown): void {
     for (const run of state.runs.values()) if (run.sessionId === state.current) stopRun(run);
     return;
   }
-  const run = typeof data.id === "string" ? state.runs.get(data.id) : undefined;
-  if (data.action === "unfollow" && typeof data.id === "string") state.followed.delete(data.id);
+  if (typeof data.id !== "string") return;
+  const run = state.runs.get(data.id);
+  if (data.action === "unfollow") state.followed.delete(data.id);
+  // The app waits for this answer, so a run that's gone gets one too.
+  if (data.action === "unsteer") unsteer(state, data.id, run);
   if (!run) return;
   if (data.action === "stop") stopRun(run);
   else if (data.action === "steer" && typeof data.text === "string" && data.text.trim() !== "") steer(run, data.text);
@@ -149,6 +152,16 @@ function steer(run: Run, text: string): void {
   // A steer arriving as the run ends has nothing left to reach; Pi refuses extension commands, which a subagent
   // without extensions can't run anyway.
   run.child.steer(text).catch(() => undefined);
+}
+
+/**
+ * Takes back the steers run [id]'s subagent hasn't read yet and sends them to the app, which puts them back in the
+ * steer box; none when the run isn't running. Pi may already have taken them for the subagent's next turn and still
+ * delivers those, so the app leaves out the ones the subagent starts reading.
+ */
+function unsteer(state: Registry, id: string, run: Run | undefined): void {
+  const steering = run?.status === "running" && run.child ? run.child.clearQueue().steering : [];
+  state.channel.send(TOPIC, { version: PROTOCOL_VERSION, unsteered: { id, steering } });
 }
 
 export function view(run: Run): RunView {

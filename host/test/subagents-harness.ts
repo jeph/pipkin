@@ -38,11 +38,15 @@ export interface RunsMessage {
   runs: RunView[];
 }
 
-/** A followed run's log so far, or one of its events, as the extension sends them on `subagents`. */
+/**
+ * A followed run's log so far, one of its events, or the steers taken back from a run, as the extension sends them on
+ * `subagents`.
+ */
 export interface LiveMessage {
   version: number;
   live?: { id: string; entries: { at: number; event: Record<string, unknown> }[] };
   event?: { id: string; at: number; event: Record<string, unknown> };
+  unsteered?: { id: string; steering: string[] };
 }
 
 /** Stands in for Pipkin's channel: records what the extension sends on `subagents` and passes on the app's messages. */

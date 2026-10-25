@@ -4,6 +4,8 @@ import io.jeph.pipkin.agent.TimelineItem.AssistantText
 import io.jeph.pipkin.agent.TimelineItem.ToolCall
 import io.jeph.pipkin.agent.TimelineItem.TurnFooter
 import io.jeph.pipkin.agent.TimelineItem.User
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
@@ -128,5 +130,50 @@ class LiveSubagentTest {
     assertNull(subagents.of("r1").first())
     yield()
     assertEquals(listOf("follow", "unfollow"), sent)
+  }
+
+  /** Followed run r1, with its log so far ended by [last], whose `unsteer` answers the extension sends [steering]. */
+  private suspend fun followedAnswering(scope: CoroutineScope, steering: String, last: String): LiveSubagents {
+    lateinit var subagents: LiveSubagents
+    subagents = LiveSubagents(scope) { message ->
+      if (message.optString("action") == "unsteer") {
+        subagents.onMessage(JSONObject("""{"unsteered":{"id":"r1","steering":$steering}}"""))
+      }
+    }
+    subagents.follow("r1")
+    val log = """[{"at":1,"event":{"type":"agent_start"}},{"at":2,"event":$last}]"""
+    subagents.onMessage(JSONObject("""{"live":{"id":"r1","entries":$log}}"""))
+    return subagents
+  }
+
+  @Test
+  fun steersTakenBackComeBackOldestFirst() = runBlocking {
+    val tool = """{"type":"tool_execution_start","toolCallId":"t1","toolName":"bash","args":{}}"""
+    val subagents = followedAnswering(this, """["one","two"]""", tool)
+    assertEquals(listOf("one", "two"), subagents.takeSteers("r1"))
+  }
+
+  @Test
+  fun steersPiTookForTheNextTurnAreLeftOut() = runBlocking {
+    // A turn ended, so Pi may be handing the queue to the subagent's next turn as the steers are taken back.
+    val subagents = followedAnswering(this, """["one","two"]""", """{"type":"turn_end"}""")
+    val taken = async { subagents.takeSteers("r1") }
+    yield()
+    assertFalse(taken.isCompleted)
+    val user = """{"role":"user","content":[{"type":"text","text":"one"}]}"""
+    subagents.onMessage(JSONObject("""{"event":{"id":"r1","at":3,"event":{"type":"message_start","message":$user}}}"""))
+    val reply = """{"role":"assistant","content":[]}"""
+    subagents.onMessage(
+      JSONObject("""{"event":{"id":"r1","at":4,"event":{"type":"message_start","message":$reply}}}"""),
+    )
+    assertEquals(listOf("two"), taken.await())
+  }
+
+  @Test
+  fun aRunNoScreenFollowsHasNoSteersToTake() = runBlocking {
+    val sent = mutableListOf<String>()
+    val subagents = LiveSubagents(this) { sent += it.optString("action") }
+    assertEquals(emptyList<String>(), subagents.takeSteers("r1"))
+    assertEquals(emptyList<String>(), sent)
   }
 }

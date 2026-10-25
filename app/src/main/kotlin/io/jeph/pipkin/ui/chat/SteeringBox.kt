@@ -71,8 +71,8 @@ internal fun PendingSteeringBox(controller: ChatController, timeline: TimelineSt
  * The messages Pi has queued but not taken yet, one per line as typed, under a cobalt "Steering" label, so the user
  * sees what is about to steer the run; attachments show only as a count. [actions] end the label's line: the chat's
  * Edit takes them back into the composer and Send now stops the run and sends them at once, each as its own message;
- * a subagent's box has none. A [compact] box leaves room for the keyboard or a dialog: one line with the first message
- * and how many lines follow it.
+ * a subagent's box has only Edit. A [compact] box leaves room for the keyboard or a dialog: one line with the first
+ * message and how many lines follow it.
  */
 @Composable
 internal fun SteeringBox(
@@ -125,7 +125,7 @@ internal fun SteeringBox(
 
 /** A steering action: cobalt text, on a cobalt-tinted pill when [filled]. */
 @Composable
-private fun SteerButton(label: String, enabled: Boolean, filled: Boolean, onClick: () -> Unit) {
+internal fun SteerButton(label: String, enabled: Boolean, filled: Boolean, onClick: () -> Unit) {
   val colors = pipkinColors
   Text(
     text = label,

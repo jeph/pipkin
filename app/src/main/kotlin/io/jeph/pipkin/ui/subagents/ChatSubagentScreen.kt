@@ -25,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldDecorator
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +39,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,7 @@ import io.jeph.pipkin.agent.SubagentStatus
 import io.jeph.pipkin.agent.TimelineItem
 import io.jeph.pipkin.ui.chat.ChatController
 import io.jeph.pipkin.ui.chat.PendingDialogCard
+import io.jeph.pipkin.ui.chat.SteerButton
 import io.jeph.pipkin.ui.chat.SteeringBox
 import io.jeph.pipkin.ui.chat.SteeringSummary
 import io.jeph.pipkin.ui.components.RoundIconButton
@@ -120,11 +124,19 @@ internal fun ChatSubagentScreen(
       Column {
         // The keyboard and a dialog take the room the steers would use, as in the chat.
         val compact = WindowInsets.isImeVisible || timeline.pendingUi != null
+        val draft = controller.view.steerDraft(run.toolCallId)
         // Weighted, so the steer box is measured first and keeps its height when the room runs short.
-        PendingSubagentSteering(run, compact, Modifier.weight(1f, fill = false))
+        PendingSubagentSteering(
+          run = run,
+          compact = compact,
+          // As in the chat, not while Pi may be taking the steers for the subagent's next turn.
+          canEdit = live?.state?.queueInFlight == false,
+          onEdit = { controller.scope.launch { draft.putBack(process.liveSubagents.takeSteers(run.id)) } },
+          modifier = Modifier.weight(1f, fill = false),
+        )
         SteerBar(
           run = run,
-          draft = controller.view.steerDraft(run.toolCallId),
+          draft = draft,
           onSteer = { text -> controller.scope.launch { process.steerSubagent(run.id, text) } },
           onStop = { controller.scope.launch { process.stopSubagent(run.id) } },
         )
@@ -161,29 +173,43 @@ private fun rememberLiveTranscript(subagents: LiveSubagents, runId: String?): St
   }
 
 /**
- * The steers [run] hasn't read yet, one per line, while there are any. The box has no Edit or Send now: the
- * extension takes no steer back from the subagent's queue.
+ * The steers [run] hasn't read yet, one per line, while there are any. Edit takes them back into the steer box when
+ * [canEdit]; there is no Send now, since stopping a subagent's reply ends its run.
  */
 @Composable
-private fun PendingSubagentSteering(run: SubagentRun, compact: Boolean, modifier: Modifier) {
+private fun PendingSubagentSteering(
+  run: SubagentRun,
+  compact: Boolean,
+  canEdit: Boolean,
+  onEdit: () -> Unit,
+  modifier: Modifier,
+) {
   if (run.steering.isEmpty()) return
   SteeringBox(
     summary = SteeringSummary(run.steering.joinToString("\n"), attachments = 0),
     compact = compact,
     modifier = modifier.padding(bottom = PipkinTokens.Spacing.s8),
-  )
+  ) {
+    SteerButton(stringResource(R.string.chat_steering_edit), canEdit, filled = false, onClick = onEdit)
+  }
+}
+
+/** Puts [steers] back in the steer box, one per line, ahead of anything typed since, as the chat's Edit does. */
+private fun TextFieldState.putBack(steers: List<String>) {
+  val taken = steers.filter { it.isNotBlank() }.joinToString("\n")
+  if (taken.isEmpty()) return
+  val typed = text
+  setTextAndPlaceCursorAtEnd(if (typed.isBlank()) taken else "$taken\n$typed")
 }
 
 /**
  * The box that steers a running subagent, docked like the chat's composer: the [draft], kept with the chat's view as
  * the composer's is, so it outlives rotation, Stop, and Send, which the subagent reads after its current tool call.
- * Send waits until the subagent leaves the queue, since a queued one has nothing to read it yet.
  */
 @Composable
 private fun SteerBar(run: SubagentRun, draft: TextFieldState, onSteer: (String) -> Unit, onStop: () -> Unit) {
   val colors = pipkinColors
   val style = LocalTextStyle.current.copy(color = colors.foreground, fontSize = PipkinTokens.FontSize.content)
-  val canSend = run.status == SubagentStatus.Running && draft.text.isNotBlank()
   Box(
     modifier = Modifier
       .fillMaxWidth()
@@ -220,21 +246,35 @@ private fun SteerBar(run: SubagentRun, draft: TextFieldState, onSteer: (String) 
       Row(verticalAlignment = Alignment.CenterVertically) {
         StopButton(label = stringResource(R.string.subagent_stop), onClick = onStop)
         Spacer(modifier = Modifier.weight(1f))
-        RoundIconButton(
-          icon = R.drawable.ic_lucide_arrow_up,
-          contentDescription = stringResource(R.string.subagent_steer_send, run.agent),
-          onClick = {
-            val text = draft.text.toString().trim()
-            draft.clearText()
-            onSteer(text)
-          },
-          enabled = canSend,
-          background = colors.accent,
-          tint = colors.accentForeground,
-          iconSize = SEND_ICON_SIZE,
-          modifier = Modifier.size(SEND_SIZE),
-        )
+        SteerSendButton(run, draft, onSteer)
       }
     }
   }
+}
+
+/**
+ * Sends the [draft] to [run]. It waits until the subagent leaves the queue, since a queued one has nothing to read it
+ * yet, and hides the keyboard as the chat's Send does, so the steers show in full over the box.
+ */
+@Composable
+private fun SteerSendButton(run: SubagentRun, draft: TextFieldState, onSteer: (String) -> Unit) {
+  val colors = pipkinColors
+  val keyboard = LocalSoftwareKeyboardController.current
+  val focus = LocalFocusManager.current
+  RoundIconButton(
+    icon = R.drawable.ic_lucide_arrow_up,
+    contentDescription = stringResource(R.string.subagent_steer_send, run.agent),
+    onClick = {
+      val text = draft.text.toString().trim()
+      draft.clearText()
+      onSteer(text)
+      keyboard?.hide()
+      focus.clearFocus()
+    },
+    enabled = run.status == SubagentStatus.Running && draft.text.isNotBlank(),
+    background = colors.accent,
+    tint = colors.accentForeground,
+    iconSize = SEND_ICON_SIZE,
+    modifier = Modifier.size(SEND_SIZE),
+  )
 }
