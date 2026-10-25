@@ -9,7 +9,8 @@ name: Release
 #   publish      creates the GitHub release, the only job allowed to write to the repository
 #   play-sign    signs the bundle with the Play upload key from the `play` environment, which only main can deploy to
 #   play-upload  uploads the bundle to Google Play and releases it on the PLAY_TRACK track, the only job allowed to
-#                sign in to Google Cloud
+#                sign in to Google Cloud. It waits for the GitHub release, whose tag takes the version: Play keeping a
+#                version code the tag never took would let the next commit reuse it, and Play skip that commit's bundle
 #
 # Google Play signs the app for users with the same release key as the GitHub APK, so either installs over the other.
 #
@@ -249,7 +250,7 @@ jobs:
 
   play-upload:
     name: Release on Google Play
-    needs: [build, play-sign]
+    needs: [build, play-sign, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     environment: play
