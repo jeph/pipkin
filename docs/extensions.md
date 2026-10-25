@@ -64,7 +64,7 @@ Each subagent shows in the chat as a tool row with its agent's name, its task, a
 
 The **Subagents** tab on the message box opens a sheet that lists the chat's subagents under **Waiting for you**, **Running**, and **Finished**. A failed subagent says why. **Stop all** stops every subagent of the chat.
 
-Tap a subagent's row in the chat or in the sheet to open its screen. It opens in place of the chat, with **Subagent of** and the chat's title above it, and shows the subagent's status, turn, tokens, and time, its task, and its transcript. Back returns to the chat. While the subagent runs, the screen has a **Steer** box and **Stop**. A steering message reaches the subagent after its current tool call. Once the subagent finishes, the screen is read only.
+Tap a subagent's row in the chat or in the sheet to open its screen. It opens in place of the chat, with **Subagent of** and the chat's title above it, and shows the subagent's status, turn, tokens, and time, its task, and its transcript. Back returns to the chat. While the subagent runs, its transcript updates as it works, as a chat's does: replies appear as they're written, and a running command shows its output so far. The screen also has a **Steer** box and **Stop**. A steering message reaches the subagent after its current tool call. Once the subagent finishes, the screen is read only.
 
 ### Questions from subagents
 
