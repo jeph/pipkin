@@ -176,4 +176,21 @@ class LiveSubagentTest {
     assertEquals(emptyList<String>(), subagents.takeSteers("r1"))
     assertEquals(emptyList<String>(), sent)
   }
+
+  @Test
+  fun aSecondEditWhileTheFirstWaitsTakesNothing() = runBlocking {
+    val requests = mutableListOf<String>()
+    val subagents = LiveSubagents(this) { if (it.optString("action") == "unsteer") requests += it.optString("id") }
+    subagents.follow("r1")
+    val tool = """{"type":"tool_execution_start","toolCallId":"t1","toolName":"bash","args":{}}"""
+    subagents.onMessage(JSONObject("""{"live":{"id":"r1","entries":[{"at":1,"event":$tool}]}}"""))
+    val first = async { subagents.takeSteers("r1") }
+    val second = async { subagents.takeSteers("r1") }
+    yield()
+    // The extension hands the steers to the first request it gets; any later one finds the queue empty.
+    subagents.onMessage(JSONObject("""{"unsteered":{"id":"r1","steering":["one","two"]}}"""))
+    if (requests.size > 1) subagents.onMessage(JSONObject("""{"unsteered":{"id":"r1","steering":[]}}"""))
+    assertEquals(listOf("one", "two"), first.await() + second.await())
+    assertEquals(listOf("r1"), requests)
+  }
 }

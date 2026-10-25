@@ -2,6 +2,7 @@ package io.jeph.pipkin.agent
 
 import io.jeph.pipkin.host.objects
 import io.jeph.pipkin.host.strings
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -53,6 +54,9 @@ internal class LiveSubagents(private val scope: CoroutineScope, private val send
   /** The extension's answers to [takeSteers]: a run's id and the steers it took back. */
   private val unsteered = MutableSharedFlow<JSONObject>(extraBufferCapacity = UNSTEERED_BUFFER)
 
+  /** Runs a [takeSteers] waits on: answers carry only the run's id, so a second wait would take the first's answer too. */
+  private val taking = ConcurrentHashMap.newKeySet<String>()
+
   /** Run [runId]'s transcript once the extension sent its log after [follow]; null until then, and after [clear]. */
   fun of(runId: String): Flow<LiveSubagent?> = runs.map { it[runId] }.distinctUntilChanged()
 
@@ -70,23 +74,28 @@ internal class LiveSubagents(private val scope: CoroutineScope, private val send
 
   /**
    * Takes back the steers followed run [runId] hasn't read, oldest first, so they never reach it; empty when it read
-   * them all, or the extension didn't answer. Pi may have taken them for the subagent's next turn just before and still
-   * delivers those, so, as the chat's Edit does, this waits for that turn to start and leaves out every message the
-   * subagent started meanwhile.
+   * them all, the extension didn't answer, or an earlier call for the run still waits. Pi may have taken them for the
+   * subagent's next turn just before and still delivers those, so, as the chat's Edit does, this waits for that turn
+   * to start and leaves out every message the subagent started meanwhile.
    */
   suspend fun takeSteers(runId: String): List<String> {
     val timeline = runs.value[runId]?.timeline ?: return emptyList()
-    val mark = timeline.startedUserMessages.mark()
-    val answer = withTimeoutOrNull(ANSWER_TIMEOUT_MILLIS) {
-      unsteered
-        .onSubscription { send(JSONObject().put("action", "unsteer").put("id", runId)) }
-        .first { it.optString("id") == runId }
-    } ?: return emptyList()
-    // A screen closing meanwhile stops the events that end the wait; what started by then is still left out.
-    withTimeoutOrNull(ANSWER_TIMEOUT_MILLIS) { timeline.state.first { !it.queueInFlight } }
-    val kept = answer.optJSONArray("steering").strings().toMutableList()
-    timeline.startedUserMessages.textsSince(mark).forEach(kept::remove)
-    return kept
+    if (!taking.add(runId)) return emptyList()
+    try {
+      val mark = timeline.startedUserMessages.mark()
+      val answer = withTimeoutOrNull(ANSWER_TIMEOUT_MILLIS) {
+        unsteered
+          .onSubscription { send(JSONObject().put("action", "unsteer").put("id", runId)) }
+          .first { it.optString("id") == runId }
+      } ?: return emptyList()
+      // A screen closing meanwhile stops the events that end the wait; what started by then is still left out.
+      withTimeoutOrNull(ANSWER_TIMEOUT_MILLIS) { timeline.state.first { !it.queueInFlight } }
+      val kept = answer.optJSONArray("steering").strings().toMutableList()
+      timeline.startedUserMessages.textsSince(mark).forEach(kept::remove)
+      return kept
+    } finally {
+      taking.remove(runId)
+    }
   }
 
   /**
