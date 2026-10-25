@@ -94,11 +94,20 @@ internal sealed interface SubagentTranscript {
   /** Its file is gone, as after the chat it belongs to was forked and the original deleted. */
   data object Gone : SubagentTranscript
 
-  /** The subagent kept no file, as one of a chat not saved. */
+  /** It ran and ended before it saved anything, or kept no file, as one of a chat not saved. */
   data object NotSaved : SubagentTranscript
 
+  /** It hasn't started yet: it's queued. */
+  data object Queued : SubagentTranscript
+
+  /** It was stopped while queued, so it never ran. */
+  data object NeverStarted : SubagentTranscript
+
+  /** Its call was cut off, as when Android stopped Termux, before the subagent saved anything. */
+  data object CutOff : SubagentTranscript
+
   /** It never began, for [reason]: Pi or an extension refused its call, or the call failed first. */
-  data class NotStarted(val reason: String) : SubagentTranscript
+  data class StartFailed(val reason: String) : SubagentTranscript
 
   /** It couldn't be read, for [message]; [retry] reads it again. */
   class Failed(val message: String, val retry: () -> Unit) : SubagentTranscript
@@ -124,8 +133,8 @@ internal fun rememberSubagentTranscript(
   return produceState<SubagentTranscript>(SubagentTranscript.Loading, source, attempt.intValue) {
     value = SubagentTranscript.Loading
     if (source == null) return@produceState
-    if (source is TranscriptSource.NotStarted) {
-      value = SubagentTranscript.NotStarted(source.reason)
+    withoutFile(source)?.let {
+      value = it
       return@produceState
     }
     val path = try {
@@ -138,7 +147,7 @@ internal fun rememberSubagentTranscript(
       return@produceState
     }
     if (path == null) {
-      value = if (source is TranscriptSource.None) SubagentTranscript.NotSaved else SubagentTranscript.Gone
+      value = SubagentTranscript.CutOff
       return@produceState
     }
     snapshotFlow { currentMessages }.conflate().collect {
@@ -148,14 +157,24 @@ internal fun rememberSubagentTranscript(
   }
 }
 
-/** The transcript file [source] names, or finds among the chat's subagent files; null when there is none. */
+/** What the screen shows for a [source] with no file to read, or null when it names or finds one. */
+private fun withoutFile(source: TranscriptSource): SubagentTranscript? = when (source) {
+  TranscriptSource.Starting -> SubagentTranscript.Loading
+  TranscriptSource.Queued -> SubagentTranscript.Queued
+  TranscriptSource.NeverStarted -> SubagentTranscript.NeverStarted
+  TranscriptSource.None -> SubagentTranscript.NotSaved
+  is TranscriptSource.StartFailed -> SubagentTranscript.StartFailed(source.reason)
+  is TranscriptSource.File, is TranscriptSource.Lookup -> null
+}
+
+/** The transcript file [source] names, or finds among the chat's subagent files; null when it finds none. */
 private suspend fun transcriptPath(hostClient: HostClient, source: TranscriptSource): String? = when (source) {
   is TranscriptSource.File -> source.path
 
   is TranscriptSource.Lookup ->
     hostClient.subagentSessions(source.parentPath).firstOrNull { it.toolCallId == source.toolCallId }?.path
 
-  is TranscriptSource.NotStarted, TranscriptSource.None -> null
+  else -> null
 }
 
 /**
@@ -356,7 +375,13 @@ private fun TranscriptBody(
 
     SubagentTranscript.NotSaved -> Note(stringResource(R.string.subagent_transcript_none))
 
-    is SubagentTranscript.NotStarted -> Note(stringResource(R.string.subagent_not_started), transcript.reason)
+    SubagentTranscript.Queued -> Note(stringResource(R.string.subagent_transcript_queued))
+
+    SubagentTranscript.NeverStarted -> Note(stringResource(R.string.subagent_transcript_never_started))
+
+    SubagentTranscript.CutOff -> Note(stringResource(R.string.subagent_transcript_cut_off))
+
+    is SubagentTranscript.StartFailed -> Note(stringResource(R.string.subagent_not_started), transcript.reason)
 
     is SubagentTranscript.Failed -> Column(
       modifier = Modifier.fillMaxSize().padding(PipkinTokens.Spacing.s24),

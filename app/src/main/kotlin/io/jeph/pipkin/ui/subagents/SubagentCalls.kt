@@ -165,25 +165,38 @@ internal data class SubagentFacts(
   val cutOffAt: Long? = null,
 )
 
-/** Where a subagent's transcript is. */
+/** Where a subagent's transcript is, or why it has none. */
 internal sealed interface TranscriptSource {
   /** The session file at [path]. */
   data class File(val path: String) : TranscriptSource
 
   /**
    * Not known from the run or a result, as for a call Pi never finished: the host lists the chat's subagent files,
-   * and the one the chat saved at [parentPath] started with the call is it.
+   * and the one the chat saved at [parentPath] started with the call is it. Pi writes a transcript with the
+   * subagent's first reply, so none there means the subagent was cut off before it saved anything.
    */
   data class Lookup(val parentPath: String, val toolCallId: String) : TranscriptSource
 
-  /** The subagent ran in memory, as for a chat not yet saved, or its chat has no file to look under. */
+  /** It hasn't started: it waits for one of the chat's parallel slots, or for its tool call's checks to let it. */
+  data object Queued : TranscriptSource
+
+  /** It started, and its run names no file yet: the extension names one as soon as Pi creates the subagent. */
+  data object Starting : TranscriptSource
+
+  /** It was stopped while queued, so it never ran. */
+  data object NeverStarted : TranscriptSource
+
+  /**
+   * It ran and ended before it saved anything, or ran in memory, as for a chat not yet saved, or its chat has no file
+   * to look under.
+   */
   data object None : TranscriptSource
 
   /**
    * The call failed before its subagent began, as for an unknown agent, or before it saved anything, as for a model
    * without an API key, for [reason], its error.
    */
-  data class NotStarted(val reason: String) : TranscriptSource
+  data class StartFailed(val reason: String) : TranscriptSource
 }
 
 /**
@@ -198,22 +211,19 @@ internal fun subagentFacts(
 ): SubagentFacts {
   val run = subagents.run(toolCallId)
   val result = SubagentResult.from(call?.details)
-  // A run that failed before Pi saved anything has no file to name; its error says why.
+  val phase = subagentPhase(call, run, subagents.asker, subagents.working)
   val source = when {
-    run != null -> run.sessionFile?.let(TranscriptSource::File)
-      ?: run.error?.takeIf { run.status == SubagentStatus.Failed && run.messages == 0 }
-        ?.let(TranscriptSource::NotStarted)
-      ?: TranscriptSource.None
+    run != null -> runSource(run)
 
-    result != null -> result.sessionFile?.let(TranscriptSource::File)
-      ?: call?.takeIf { it.isError }?.output?.let(TranscriptSource::NotStarted)
-      ?: TranscriptSource.None
+    result != null -> resultSource(result, call)
+
+    // A call the extension doesn't list yet is still being checked, as by a permission extension, before it starts.
+    phase == SubagentPhase.Queued -> TranscriptSource.Queued
 
     parentPath != null -> TranscriptSource.Lookup(parentPath, toolCallId)
 
     else -> TranscriptSource.None
   }
-  val phase = subagentPhase(call, run, subagents.asker, subagents.working)
   return SubagentFacts(
     toolCallId = toolCallId,
     agent = run?.agent?.ifEmpty { null } ?: result?.agent ?: call?.args?.stringOrNull("agent").orEmpty(),
@@ -225,6 +235,29 @@ internal fun subagentFacts(
     source = source,
     cutOffAt = subagents.cutOff[toolCallId]?.takeIf { phase == SubagentPhase.Interrupted },
   )
+}
+
+private fun runSource(run: SubagentRun): TranscriptSource {
+  run.sessionFile?.let { return TranscriptSource.File(it) }
+  return when {
+    run.status == SubagentStatus.Queued -> TranscriptSource.Queued
+
+    run.status == SubagentStatus.Running -> TranscriptSource.Starting
+
+    run.startedAt == null -> TranscriptSource.NeverStarted
+
+    // A run that failed before Pi saved anything has no file to name; its error says why.
+    run.status == SubagentStatus.Failed && run.messages == 0 && run.error != null ->
+      TranscriptSource.StartFailed(run.error)
+
+    else -> TranscriptSource.None
+  }
+}
+
+private fun resultSource(result: SubagentResult, call: TimelineItem.ToolCall?): TranscriptSource {
+  result.sessionFile?.let { return TranscriptSource.File(it) }
+  if (result.neverStarted) return TranscriptSource.NeverStarted
+  return call?.takeIf { it.isError }?.output?.let(TranscriptSource::StartFailed) ?: TranscriptSource.None
 }
 
 /**

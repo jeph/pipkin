@@ -71,6 +71,8 @@ export interface SubagentDetails {
   /** Left out when the run ended before Pi wrote its transcript, as when the model had no API key. */
   sessionFile?: string | null;
   status: RunStatus;
+  /** When the run left the queue; null for one stopped while queued, which never started. */
+  startedAt: number | null;
   usage: SubagentUsage;
 }
 
@@ -391,6 +393,7 @@ function finish(
     description: run.description,
     ...(run.sessionFile === undefined ? {} : { sessionFile: run.sessionFile }),
     status: run.status,
+    startedAt: run.startedAt,
     usage: {
       input: usage.input,
       output: usage.output,

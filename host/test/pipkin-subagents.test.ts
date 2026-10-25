@@ -351,6 +351,7 @@ describe("stop", () => {
     await prompt;
     const result = subagentResults(session).get("sub5");
     expect(messageText(result)).toBe("The user stopped the subagent before it started.");
+    expect(result?.details).toMatchObject({ status: "stopped", startedAt: null });
     expect(channel.latest().find((run) => run.toolCallId === "sub5")).toMatchObject({ status: "stopped", startedAt: null });
     session.dispose();
   });
@@ -475,7 +476,13 @@ describe("transcripts", () => {
     expect(files).toHaveLength(1);
     const file = path.join(folder, files[0] ?? "");
     const details = subagentResults(session).get("sub1")?.details;
-    expect(details).toMatchObject({ sessionFile: file, agent: "Explore", description: "read hello", status: "done" });
+    expect(details).toMatchObject({
+      sessionFile: file,
+      agent: "Explore",
+      description: "read hello",
+      status: "done",
+      startedAt: expect.any(Number),
+    });
     const lines = readFileSync(file, "utf8")
       .trim()
       .split("\n")

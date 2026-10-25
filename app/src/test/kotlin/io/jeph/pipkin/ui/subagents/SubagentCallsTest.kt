@@ -132,16 +132,40 @@ class SubagentCallsTest {
     // A start failure's result names no run: its subagent never began, so there's no file.
     val startFailed = JSONObject().put("extension", "pipkin-subagents").put("status", "failed")
     val refused = subagentFacts("c6", call("c6", "Unknown agent", true, startFailed), ChatSubagents.None, "/s/p.jsonl")
-    assertEquals(TranscriptSource.NotStarted("Unknown agent"), refused.source)
+    assertEquals(TranscriptSource.StartFailed("Unknown agent"), refused.source)
     assertEquals(SubagentPhase.Failed, refused.phase)
     // Only an error says the subagent didn't start.
     val noDetails = subagentFacts("c7", call("c7", "ran"), ChatSubagents.None, "/s/p.jsonl")
     assertEquals(TranscriptSource.Lookup("/s/p.jsonl", "c7"), noDetails.source)
 
-    // A run in memory, or a chat with no file, has no transcript to find.
-    val inMemory = ChatSubagents(listOf(run("r4", "c4", SubagentStatus.Running)), SubagentAsker.Unknown, true)
-    assertEquals(TranscriptSource.None, subagentFacts("c4", call("c4"), inMemory, "/s/p.jsonl").source)
+    // A chat with no file has no transcripts to find.
     assertEquals(TranscriptSource.None, subagentFacts("c5", null, ChatSubagents.None, null).source)
+  }
+
+  @Test
+  fun aSubagentThatHasntStartedIsToldFromOneThatEndedWithoutATranscript() {
+    fun source(subagents: ChatSubagents, call: ToolCall = call("c1")) =
+      subagentFacts("c1", call, subagents, "/s/p.jsonl").source
+    fun listing(run: SubagentRun, working: Boolean = true) = ChatSubagents(listOf(run), SubagentAsker.Unknown, working)
+    val queued = run("r1", "c1", SubagentStatus.Queued).copy(startedAt = null, messages = 0)
+    assertEquals(TranscriptSource.Queued, source(listing(queued)))
+    // A call the extension doesn't list yet, as while a permission extension checks it, hasn't started either.
+    assertEquals(TranscriptSource.Queued, source(ChatSubagents(emptyList(), SubagentAsker.Unknown, working = true)))
+    // Started, and Pi is still creating the subagent: its file comes next.
+    assertEquals(TranscriptSource.Starting, source(listing(run("r1", "c1", SubagentStatus.Running))))
+
+    val stoppedQueued = queued.copy(status = SubagentStatus.Stopped)
+    assertEquals(TranscriptSource.NeverStarted, source(listing(stoppedQueued, working = false)))
+    // Once the run is dropped, its result says the same.
+    val neverRan = JSONObject().put("extension", "pipkin-subagents").put("id", "r1").put("status", "stopped")
+      .put("startedAt", JSONObject.NULL)
+    assertEquals(TranscriptSource.NeverStarted, source(ChatSubagents.None, call("c1", "stopped", details = neverRan)))
+
+    // One that started and ended before Pi saved its first reply ran without a transcript.
+    val stoppedEarly = run("r1", "c1", SubagentStatus.Stopped)
+    assertEquals(TranscriptSource.None, source(listing(stoppedEarly, working = false)))
+    val ranBriefly = JSONObject(neverRan.toString()).put("startedAt", 5L)
+    assertEquals(TranscriptSource.None, source(ChatSubagents.None, call("c1", "stopped", details = ranBriefly)))
   }
 
   @Test
@@ -151,9 +175,9 @@ class SubagentCallsTest {
     val output = "The subagent failed: No API key for x"
     val call = call("c1", output, isError = true, details = JSONObject().put("id", "r1").put("status", "failed"))
     fun source(subagents: ChatSubagents) = subagentFacts("c1", call, subagents, "/s/p.jsonl").source
-    assertEquals(TranscriptSource.NotStarted("No API key for x"), source(listed))
+    assertEquals(TranscriptSource.StartFailed("No API key for x"), source(listed))
     // Once the run is dropped, its result says the same.
-    assertEquals(TranscriptSource.NotStarted(output), source(ChatSubagents.None))
+    assertEquals(TranscriptSource.StartFailed(output), source(ChatSubagents.None))
     // One that failed later ran in memory: nothing to show but that.
     val later = ChatSubagents(listOf(failed.copy(messages = 3)), SubagentAsker.Unknown, working = false)
     assertEquals(TranscriptSource.None, source(later))
