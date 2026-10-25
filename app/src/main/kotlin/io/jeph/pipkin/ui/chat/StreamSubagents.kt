@@ -6,8 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.TimelineItem
@@ -58,8 +56,9 @@ internal fun SubagentToolRow(call: TimelineItem.ToolCall, subagents: StreamSubag
       code = false,
     ),
     onClick = { subagents.onOpen(call.id) },
-    modifier = modifier.semantics { contentDescription = description },
+    modifier = modifier,
     onClickLabel = stringResource(R.string.subagent_open),
+    description = description,
   ) {
     Text(
       text = statusText,

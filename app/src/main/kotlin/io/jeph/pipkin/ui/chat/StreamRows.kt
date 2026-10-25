@@ -35,6 +35,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -71,7 +73,8 @@ import kotlinx.coroutines.delay
 /**
  * A tool call's or thinking block's one-line row: the tool's icon, the bold title and a muted summary, in monospace for
  * a tool's arguments, then [trailing], such as a subagent's status. The icon is cobalt while the step runs, red once
- * it failed, and muted once it's done. [onClickLabel] says what a tap does, for TalkBack.
+ * it failed, and muted once it's done. [onClickLabel] says what a tap does, for TalkBack; [description], when set, is
+ * what TalkBack reads for the whole row in place of its texts.
  */
 @Composable
 internal fun ToolRow(
@@ -79,6 +82,7 @@ internal fun ToolRow(
   onClick: () -> Unit,
   modifier: Modifier = Modifier,
   onClickLabel: String? = null,
+  description: String? = null,
   trailing: @Composable RowScope.() -> Unit = {},
 ) {
   val colors = pipkinColors
@@ -89,6 +93,7 @@ internal fun ToolRow(
         .heightIn(min = 30.dp)
         .clip(RoundedCornerShape(PipkinTokens.Radius.md))
         .clickable(onClickLabel = onClickLabel, onClick = onClick)
+        .then(description?.let { Modifier.clearAndSetSemantics { contentDescription = it } } ?: Modifier)
         .padding(horizontal = PipkinTokens.Spacing.s4),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
