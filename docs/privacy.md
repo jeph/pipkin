@@ -27,7 +27,7 @@ Everything else lives in Termux's storage on your phone, which you can also open
 
 [Configure the agent](/docs/configure/) lists where each of these is kept.
 
-If you've turned on Android's backup to your Google account, Android may include Pipkin's settings in it, as it does for other apps. Pipkin's private connection key to its helper in Termux is left out of those backups. Chats, sign-ins, and API keys are in Termux, not in Pipkin's app storage, so Android's backup of Pipkin doesn't contain them.
+Pipkin opts out of Android's backup to your Google account and of the transfer to a new phone, so neither copies its settings. Chats, sign-ins, and API keys are in Termux, not in Pipkin's app storage, so Pipkin's settings don't include them either way.
 
 ## What leaves your phone
 
