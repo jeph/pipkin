@@ -16,7 +16,7 @@ export const TOPIC = "subagents";
 export const PROTOCOL_VERSION = 1;
 
 /** Subagents running at once per parent session; further calls wait their turn. */
-export const MAX_RUNNING = 4;
+export const MAX_RUNNING = 6;
 
 /** The shortest gap between two `runs` messages sent only for a turn, token or activity change. */
 export const THROTTLE_MS = 250;

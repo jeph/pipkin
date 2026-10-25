@@ -20,7 +20,7 @@ If you install `npm:pi-web-access` yourself, Pipkin drops its bundled copy. Like
 
 ## Subagents
 
-A subagent is a second agent that the chat's agent hands a task to. It works in the same Pi process as the chat, then reports back, and the chat's agent waits for its subagents before it carries on. To work on several tasks in parallel, the agent starts several subagents in one reply. At most 4 run at once in a chat; further ones wait as **Queued** until one finishes. A subagent's final reply is all the chat's agent sees of its work; a reply longer than 50 KB is cut, with a note saying where the full transcript is.
+A subagent is a second agent that the chat's agent hands a task to. It works in the same Pi process as the chat, then reports back, and the chat's agent waits for its subagents before it carries on. To work on several tasks in parallel, the agent starts several subagents in one reply. At most 6 run at once in a chat; further ones wait as **Queued** until one finishes. A subagent's final reply is all the chat's agent sees of its work; a reply longer than 50 KB is cut, with a note saying where the full transcript is.
 
 ### Explore and General
 

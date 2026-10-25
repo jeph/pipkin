@@ -10,7 +10,7 @@
  *
  *   sa-one-explore            one `subagent` call to Explore, which reads README.md (or reports it missing) and answers.
  *   sa-two-general-bash       two `subagent` calls in one reply; each General runs `bash` `sleep N; echo x` (N = 4, 6).
- *   sa-six                    six General calls in one reply, each running `sleep N; echo done-K` (N = 4 + K): four
+ *   sa-eight                  eight General calls in one reply, each running `sleep N; echo done-K` (N = 4 + K): six
  *                             run and two wait as Queued.
  *   sa-eight-fail             eight General calls; number 5 hits a provider error, the others sleep and echo.
  *   sa-parent-bash-while-sub  the parent calls `bash` (`sleep 5; echo parent`) and one General `subagent` (which runs
@@ -57,7 +57,7 @@ function sleep(seconds: number): string {
 const KEYWORDS = [
   "sa-one-explore",
   "sa-two-general-bash",
-  "sa-six",
+  "sa-eight",
   "sa-eight-fail",
   "sa-parent-bash-while-sub",
   "sa-long-output",
@@ -103,8 +103,8 @@ function subagentCalls(word: string, argument: string): Call[] {
       return [{ agent: "Explore", description: "read the README" }];
     case "sa-two-general-bash":
       return [general("first sleeper"), general("second sleeper")];
-    case "sa-six":
-      return Array.from({ length: 6 }, (_, index) => general(`sleeper ${index + 1} of 6`));
+    case "sa-eight":
+      return Array.from({ length: 8 }, (_, index) => general(`sleeper ${index + 1} of 8`));
     case "sa-eight-fail":
       return Array.from({ length: 8 }, (_, index) => general(index === 4 ? "failing run" : `sleeper ${index + 1} of 8`));
     case "sa-parent-bash-while-sub":
@@ -192,7 +192,7 @@ function subagentTurn(task: string, messages: Message[]): AssistantMessage {
       return call("read", { path: "README.md" });
     case "sa-two-general-bash":
       return call("bash", { command: `${sleep(2 + 2 * number)}; echo x` });
-    case "sa-six":
+    case "sa-eight":
       return call("bash", { command: `${sleep(4 + number)}; echo done-${number}` });
     case "sa-eight-fail":
       if (number === 5) throw new Error("Pipkin test model: scripted provider failure");

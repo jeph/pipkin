@@ -294,23 +294,23 @@ describe("parallel runs", () => {
     session.dispose();
   });
 
-  it("run four of six calls at once and queue the other two", async () => {
+  it("run six of eight calls at once and queue the other two", async () => {
     const release = latch();
-    const calls = Array.from({ length: 6 }, (_, index) => ({ id: `sub${index + 1}`, task: `CHILD ${index + 1}` }));
+    const calls = Array.from({ length: 8 }, (_, index) => ({ id: `sub${index + 1}`, task: `CHILD ${index + 1}` }));
     const child: Script = async (turn) => {
       await release.promise;
       return fauxAssistantMessage(`done ${turn.first}`);
     };
     const { session } = await start(parentCalling(calls, child));
     const prompt = session.prompt("PARENT go");
-    await eventually(() => channel.latest().length === 6);
-    await eventually(() => channel.latest().filter((run) => run.status === "running").length === 4);
+    await eventually(() => channel.latest().length === 8);
+    await eventually(() => channel.latest().filter((run) => run.status === "running").length === 6);
     const queued = channel.latest().filter((run) => run.status === "queued");
-    expect(queued.map((run) => run.toolCallId)).toEqual(["sub5", "sub6"]);
+    expect(queued.map((run) => run.toolCallId)).toEqual(["sub7", "sub8"]);
     expect(queued.every((run) => run.startedAt === null)).toBe(true);
     release.open();
     await prompt;
-    expect(channel.latest().map((run) => run.status)).toEqual(Array(6).fill("done"));
+    expect(channel.latest().map((run) => run.status)).toEqual(Array(8).fill("done"));
     const results = subagentResults(session);
     for (const call of calls) expect(messageText(results.get(call.id))).toBe(`done ${call.task}`);
     session.dispose();
@@ -337,7 +337,7 @@ describe("stop", () => {
 
   it("of a queued run means it never starts", async () => {
     const release = latch();
-    const calls = Array.from({ length: 5 }, (_, index) => ({ id: `sub${index + 1}`, task: `CHILD ${index + 1}` }));
+    const calls = Array.from({ length: 7 }, (_, index) => ({ id: `sub${index + 1}`, task: `CHILD ${index + 1}` }));
     const child: Script = async () => {
       await release.promise;
       return fauxAssistantMessage("done");
@@ -350,10 +350,10 @@ describe("stop", () => {
     await eventually(() => channel.latest().some((run) => run.status === "stopped"));
     release.open();
     await prompt;
-    const result = subagentResults(session).get("sub5");
+    const result = subagentResults(session).get("sub7");
     expect(messageText(result)).toBe("The user stopped the subagent before it started.");
     expect(result?.details).toMatchObject({ status: "stopped", startedAt: null });
-    expect(channel.latest().find((run) => run.toolCallId === "sub5")).toMatchObject({ status: "stopped", startedAt: null });
+    expect(channel.latest().find((run) => run.toolCallId === "sub7")).toMatchObject({ status: "stopped", startedAt: null });
     session.dispose();
   });
 

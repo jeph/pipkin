@@ -115,12 +115,12 @@ describe("pipkin-test-model", () => {
     session.dispose();
   });
 
-  it("queues two of six subagents", async () => {
+  it("queues two of eight subagents", async () => {
     const session = await scripted(fakeUi(channel), [MODEL]);
-    await session.prompt("sa-six");
+    await session.prompt("sa-eight");
     const statuses = channel.sent.map((message) => message.runs.map((run) => run.status).join(","));
-    expect(statuses).toContain("running,running,running,running,queued,queued");
-    expect(channel.latest().map((run) => run.status)).toEqual(Array(6).fill("done"));
+    expect(statuses).toContain([...Array(6).fill("running"), "queued", "queued"].join(","));
+    expect(channel.latest().map((run) => run.status)).toEqual(Array(8).fill("done"));
     session.dispose();
   });
 
