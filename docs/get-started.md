@@ -68,6 +68,7 @@ A few things to know while it works:
 - **Changes**: in a git repository, see exactly what the agent changed, file by file. Pipkin asks you to trust a repository before it runs git there, because a repository's own settings can run programs.
 - **Terminal**: tap the tabs button, the square with the tab count at the top of the chat, and choose **New terminal** to open a Termux shell right next to your chat.
 - **The tabs button** opens a sheet with the workspace's tabs, the one on screen first, and under them what that tab can do. For a chat: start another chat, rename it, reload the agent after changing its configuration, copy the session's file path, or archive it. Terminals, files, and commits have the same button.
+- **Auto-archive**: turn on **Settings → Advanced → Auto-archive chats** to archive chats you haven't used for 1 to 30 days (7 by default). A chat counts as used when it gets a new message or you open it. Pipkin never archives a chat that's working, running background tasks, or on screen, and you can restore any chat from the archive.
 
 On a foldable or tablet, open chats, files, changes, and terminals side by side with **Open in split screen**.
 

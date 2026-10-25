@@ -8,9 +8,13 @@ import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.SessionInfo
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -30,6 +34,10 @@ internal class SessionRepository(
 ) {
   private val sessionsState = MutableStateFlow<List<SessionInfo>>(emptyList())
   private val loadedState = MutableStateFlow(false)
+  private val listingsFlow = MutableSharedFlow<List<SessionInfo>>(
+    extraBufferCapacity = 1,
+    onBufferOverflow = BufferOverflow.DROP_OLDEST,
+  )
   private val requests = Channel<Unit>(Channel.CONFLATED)
 
   /** The extension titles of sessions whose Pi stopped, which a later Pi on the session starts with. */
@@ -52,6 +60,9 @@ internal class SessionRepository(
 
   /** True once the first refresh finished, successfully or not. */
   val loaded: StateFlow<Boolean> = loadedState.asStateFlow()
+
+  /** Each list a refresh reads from the host, as it arrives; a failed refresh sends none, and none are replayed. */
+  val listings: SharedFlow<List<SessionInfo>> = listingsFlow.asSharedFlow()
 
   init {
     scope.launch { requests.receiveAsFlow().collect { load() } }
@@ -83,7 +94,9 @@ internal class SessionRepository(
 
   private suspend fun load() {
     try {
-      sessionsState.value = hostClient.sessions()
+      val listed = hostClient.sessions()
+      sessionsState.value = listed
+      listingsFlow.tryEmit(listed)
     } catch (error: IOException) {
       Log.w(TAG, "Refreshing sessions failed", error)
     } catch (error: HostRejected) {

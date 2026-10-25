@@ -7,6 +7,7 @@ import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.agent.ChatKey
 import io.jeph.pipkin.agent.RpcError
 import io.jeph.pipkin.agent.TooManyRunning
+import io.jeph.pipkin.data.AutoArchive
 import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.data.sameFolder
 import io.jeph.pipkin.host.HostRejected
@@ -17,7 +18,11 @@ import io.jeph.pipkin.workspace.WorkspaceTab
 import java.io.IOException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.joinAll
@@ -31,6 +36,9 @@ internal sealed interface ShellNotice {
 
   /** Chats were archived from the tab menu or the chat header; Undo takes [paths] back out of the archive. */
   data class Archived(val paths: List<String>) : ShellNotice
+
+  /** Auto archive archived chats nobody touched for its days; Undo takes [paths] back out of the archive. */
+  data class AutoArchived(val paths: List<String>) : ShellNotice
 }
 
 /**
@@ -190,6 +198,45 @@ internal class ShellActions(private val graph: AppGraph) {
 
   /** Undo of [archive]. */
   fun unarchive(paths: List<String>) = sessionArchive.unarchive(paths)
+
+  /**
+   * While auto archive is on, archives the chats nobody touched for its days, other than those on screen or holding
+   * their Pi, and offers Undo. Judges each list of chats a refresh reads, never one kept from before, which can miss
+   * messages saved since; asks for one as the setting changes and every [AutoArchive.SWEEP_INTERVAL_MILLIS]. Runs
+   * until cancelled.
+   */
+  suspend fun autoArchive(): Unit = coroutineScope {
+    val preferences = graph.preferences
+    launch {
+      combine(preferences.autoArchive, preferences.autoArchiveDays, ::Pair).collectLatest { (on, _) ->
+        if (!on) return@collectLatest
+        while (true) {
+          // Before setup, Termux may not be able to run the host yet.
+          if (preferences.setupComplete.value) sessions.refresh()
+          delay(AutoArchive.SWEEP_INTERVAL_MILLIS)
+        }
+      }
+    }
+    sessions.listings.collect { listed ->
+      if (preferences.autoArchive.value) archiveStale(listed, preferences.autoArchiveDays.value)
+    }
+  }
+
+  /** Archives the chats in [listed], a fresh list of chats, that went [days] untouched; see [autoArchive]. */
+  private fun archiveStale(listed: List<SessionInfo>, days: Int) {
+    val shown = registry.shown.value.values
+    val kept = registry.processes.value.values
+      .filter { it.holdsPi.value || it in shown }
+      .mapNotNullTo(HashSet()) { it.sessionFile.value }
+    val stale = sessionArchive.stale(listed, days, kept)
+    if (stale.isEmpty()) return
+    val paths = stale.map { it.path }
+    sessionArchive.archive(paths, stale.map { it.cwd }.distinct())
+    registry.discardParked(paths)
+    graph.panes.forgetChats(paths)
+    stop(registry.processes.value.values.filter { it.sessionFile.value in paths }, replaceIn = null)
+    notify(ShellNotice.AutoArchived(paths))
+  }
 
   /**
    * Removes the workspace [cwd] from the sidebar, archives every chat in it, including ones open in Pi that have no

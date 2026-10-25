@@ -3,7 +3,7 @@ title: Privacy policy
 description: What data Pipkin keeps on your phone, what leaves it, and where it goes.
 ---
 
-_Last updated: October 24, 2026_
+_Last updated: October 25, 2026_
 
 Pipkin is an app for running the [Pi](https://pi.dev) coding agent in [Termux](https://termux.dev) on your Android phone. It's made by Jeph, an independent developer, and is open source, so you can check everything on this page in [its code](https://github.com/jeph/pipkin).
 
@@ -15,7 +15,7 @@ Pipkin is an app for running the [Pi](https://pi.dev) coding agent in [Termux](h
 
 ## What stays on your phone
 
-Pipkin keeps its own settings, such as the theme and the folders you've opened as workspaces, in its private app storage.
+Pipkin keeps its own settings, such as the theme and the folders you've opened as workspaces, in its private app storage. It also keeps there which chats you've archived, and when you last opened each chat, which auto-archive uses to find chats you haven't used in a while.
 
 Everything else lives in Termux's storage on your phone, which you can also open from Android's Files app:
 

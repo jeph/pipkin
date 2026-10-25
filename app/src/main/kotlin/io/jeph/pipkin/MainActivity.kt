@@ -34,7 +34,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import io.jeph.pipkin.agent.ChatLocation
 import io.jeph.pipkin.agent.ChatNotification
 import io.jeph.pipkin.host.TermuxWaker
@@ -135,6 +138,9 @@ private fun PipkinApp(graph: AppGraph, requestedChat: MutableStateFlow<ChatLocat
   val chat by requestedChat.collectAsStateWithLifecycle()
   ForgetPopped(stack, holder)
   LaunchedEffect(stack) { if (stack.none(::ownsDraft)) drafts.release() }
+  // Only while Pipkin is on screen: each sweep asks Termux for the chat list, which Android may stop in the background.
+  val lifecycle = LocalLifecycleOwner.current.lifecycle
+  LaunchedEffect(actions, lifecycle) { lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { actions.autoArchive() } }
   // The main screen opens the requested chat once it is on top; before setup there is no main screen yet.
   LaunchedEffect(chat) {
     if (chat != null && Destination.Main in navigator.stack.value) navigator.popTo(Destination.Main)

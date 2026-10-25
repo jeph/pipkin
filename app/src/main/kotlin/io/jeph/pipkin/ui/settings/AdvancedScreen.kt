@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,13 +29,15 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.IdleStop
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.data.AutoArchive
+import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** How many chats keep Pi running, and how long an idle one keeps it. */
+/** How many chats keep Pi running, how long an idle one keeps it, and when untouched chats are archived. */
 @Composable
 internal fun AdvancedScreen(onBack: () -> Unit) {
   val preferences = LocalContext.current.appGraph.preferences
@@ -43,7 +46,13 @@ internal fun AdvancedScreen(onBack: () -> Unit) {
   SettingsPage(title = stringResource(R.string.settings_advanced), onBack = onBack) {
     SettingsSection(title = null) {
       SettingsRow(title = stringResource(R.string.settings_running_chats)) {
-        Stepper(value = maxRunning, range = AgentRegistry.RUNNING_LIMITS, onChange = preferences::setMaxRunningChats)
+        Stepper(
+          value = maxRunning,
+          range = AgentRegistry.RUNNING_LIMITS,
+          onChange = preferences::setMaxRunningChats,
+          fewer = stringResource(R.string.settings_running_chats_fewer),
+          more = stringResource(R.string.settings_running_chats_more),
+        )
       }
     }
     SettingsCaption(
@@ -69,12 +78,41 @@ internal fun AdvancedScreen(onBack: () -> Unit) {
       }
     }
     SettingsCaption(text = stringResource(R.string.settings_idle_stop_caption))
+    AutoArchiveSection(preferences)
   }
 }
 
-/** A number between minus and plus buttons, kept within [range]. */
+/** Auto archive's switch, and while it is on, how many days a chat may go untouched. */
 @Composable
-private fun Stepper(value: Int, range: IntRange, onChange: (Int) -> Unit) {
+private fun AutoArchiveSection(preferences: Preferences) {
+  val enabled by preferences.autoArchive.collectAsStateWithLifecycle()
+  val days by preferences.autoArchiveDays.collectAsStateWithLifecycle()
+  SettingsSection(title = null) {
+    SettingsRow(
+      title = stringResource(R.string.settings_auto_archive),
+      modifier = Modifier.toggleable(value = enabled, role = Role.Switch, onValueChange = preferences::setAutoArchive),
+    ) {
+      SettingsSwitch(checked = enabled)
+    }
+    if (enabled) {
+      SettingsDivider()
+      SettingsRow(title = stringResource(R.string.settings_auto_archive_days)) {
+        Stepper(
+          value = days,
+          range = AutoArchive.DAYS,
+          onChange = preferences::setAutoArchiveDays,
+          fewer = stringResource(R.string.settings_auto_archive_fewer),
+          more = stringResource(R.string.settings_auto_archive_more),
+        )
+      }
+    }
+  }
+  SettingsCaption(text = stringResource(R.string.settings_auto_archive_caption))
+}
+
+/** A number between minus and plus buttons labelled [fewer] and [more], kept within [range]. */
+@Composable
+private fun Stepper(value: Int, range: IntRange, onChange: (Int) -> Unit, fewer: String, more: String) {
   val colors = pipkinColors
   Row(
     verticalAlignment = Alignment.CenterVertically,
@@ -82,7 +120,7 @@ private fun Stepper(value: Int, range: IntRange, onChange: (Int) -> Unit) {
   ) {
     RoundIconButton(
       icon = R.drawable.ic_lucide_minus,
-      contentDescription = stringResource(R.string.settings_running_chats_fewer),
+      contentDescription = fewer,
       onClick = { onChange(value - 1) },
       modifier = Modifier.size(32.dp),
       enabled = value > range.first,
@@ -101,7 +139,7 @@ private fun Stepper(value: Int, range: IntRange, onChange: (Int) -> Unit) {
     )
     RoundIconButton(
       icon = R.drawable.ic_lucide_plus,
-      contentDescription = stringResource(R.string.settings_running_chats_more),
+      contentDescription = more,
       onClick = { onChange(value + 1) },
       modifier = Modifier.size(32.dp),
       enabled = value < range.last,

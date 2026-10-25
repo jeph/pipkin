@@ -261,6 +261,12 @@ private fun ShellNotices(actions: ShellActions, snackbar: SnackbarStackState) {
             val message = resources.getQuantityString(R.plurals.archive_archived, count, count)
             if (snackbar.show(message, actionLabel = undo)) actions.unarchive(notice.paths)
           }
+
+          is ShellNotice.AutoArchived -> {
+            val count = notice.paths.size
+            val message = resources.getQuantityString(R.plurals.archive_auto_archived, count, count)
+            if (snackbar.show(message, actionLabel = undo)) actions.unarchive(notice.paths)
+          }
         }
       }
     }

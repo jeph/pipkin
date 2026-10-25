@@ -28,7 +28,12 @@ internal class Preferences(context: Context) {
   private val themeState = MutableStateFlow(readTheme())
   private val lastProjectCwdState = MutableStateFlow(prefs.getString(LAST_PROJECT_CWD, null))
   private val workspacesState = MutableStateFlow(readWorkspaces())
-  private val archivedState = MutableStateFlow(readArchived())
+  private val archivedState = MutableStateFlow(readLongMap(ARCHIVED_SESSIONS))
+  private val touchedState = MutableStateFlow(readLongMap(TOUCHED_SESSIONS))
+  private val autoArchiveState = MutableStateFlow(prefs.getBoolean(AUTO_ARCHIVE, false))
+  private val autoArchiveDaysState = MutableStateFlow(
+    prefs.getInt(AUTO_ARCHIVE_DAYS, AutoArchive.DEFAULT_DAYS).coerceIn(AutoArchive.DAYS),
+  )
   private val showHiddenFilesState = MutableStateFlow(prefs.getBoolean(SHOW_HIDDEN_FILES, true))
   private val explorerSortState = MutableStateFlow(readExplorerSort())
   private val explorerTabsState = MutableStateFlow(readEnumMap(EXPLORER_TABS, ExplorerTab.entries))
@@ -68,6 +73,18 @@ internal class Preferences(context: Context) {
 
   /** Archived session files by path, each with when it was archived (epoch milliseconds). */
   val archivedSessions: StateFlow<Map<String, Long>> = archivedState.asStateFlow()
+
+  /**
+   * Session files that are not archived by path, each with when Pipkin last showed it, restored it, or saw its run end
+   * (epoch milliseconds), which keeps it from auto archive as a new message would.
+   */
+  val touchedSessions: StateFlow<Map<String, Long>> = touchedState.asStateFlow()
+
+  /** Whether chats nobody touched for [autoArchiveDays] are archived on their own; off until turned on. */
+  val autoArchive: StateFlow<Boolean> = autoArchiveState.asStateFlow()
+
+  /** How many days without a touch auto archive waits, within [AutoArchive.DAYS]. */
+  val autoArchiveDays: StateFlow<Int> = autoArchiveDaysState.asStateFlow()
 
   /** Whether the file explorer lists dot files and folders; Paseo shows them unless asked not to. */
   val showHiddenFiles: StateFlow<Boolean> = showHiddenFilesState.asStateFlow()
@@ -157,13 +174,36 @@ internal class Preferences(context: Context) {
     trustedRepositoriesState.value = trusted
   }
 
-  /** Marks [paths] archived at [at]; a path already archived keeps its time. */
+  /** Marks [paths] archived at [at]; a path already archived keeps its time. Their touches go with them. */
   fun archiveSessions(paths: Collection<String>, at: Long) {
-    writeArchived(archivedState.value + paths.filterNot(archivedState.value::containsKey).associateWith { at })
+    writeArchived(
+      archived = archivedState.value + paths.filterNot(archivedState.value::containsKey).associateWith { at },
+      touched = touchedState.value - paths.toSet(),
+    )
   }
 
   fun unarchiveSessions(paths: Collection<String>) {
-    writeArchived(archivedState.value - paths.toSet())
+    writeArchived(archived = archivedState.value - paths.toSet(), touched = touchedState.value)
+  }
+
+  /** Records that [paths] were touched at [at]. */
+  fun touchSessions(paths: Collection<String>, at: Long) {
+    if (paths.isEmpty()) return
+    val updated = touchedState.value + paths.associateWith { at }
+    prefs.edit { putString(TOUCHED_SESSIONS, JSONObject(updated).toString()) }
+    touchedState.value = updated
+  }
+
+  fun setAutoArchive(enabled: Boolean) {
+    prefs.edit { putBoolean(AUTO_ARCHIVE, enabled) }
+    autoArchiveState.value = enabled
+  }
+
+  /** Sets [autoArchiveDays], kept within [AutoArchive.DAYS]. */
+  fun setAutoArchiveDays(days: Int) {
+    val allowed = days.coerceIn(AutoArchive.DAYS)
+    prefs.edit { putInt(AUTO_ARCHIVE_DAYS, allowed) }
+    autoArchiveDaysState.value = allowed
   }
 
   fun setShowHiddenFiles(show: Boolean) {
@@ -279,13 +319,18 @@ internal class Preferences(context: Context) {
       .toMap()
   }
 
-  private fun writeArchived(archived: Map<String, Long>) {
-    prefs.edit { putString(ARCHIVED_SESSIONS, JSONObject(archived).toString()) }
+  private fun writeArchived(archived: Map<String, Long>, touched: Map<String, Long>) {
+    prefs.edit {
+      putString(ARCHIVED_SESSIONS, JSONObject(archived).toString())
+      putString(TOUCHED_SESSIONS, JSONObject(touched).toString())
+    }
     archivedState.value = archived
+    touchedState.value = touched
   }
 
-  private fun readArchived(): Map<String, Long> {
-    val json = JSONObject(prefs.getString(ARCHIVED_SESSIONS, null) ?: return emptyMap())
+  /** The JSON object at [key] of strings to epoch milliseconds. */
+  private fun readLongMap(key: String): Map<String, Long> {
+    val json = JSONObject(prefs.getString(key, null) ?: return emptyMap())
     return json.keys().asSequence().associateWith(json::getLong)
   }
 
@@ -298,6 +343,9 @@ internal class Preferences(context: Context) {
     const val LAST_PROJECT_CWD = "lastProjectCwd"
     const val WORKSPACES = "workspaces"
     const val ARCHIVED_SESSIONS = "archivedSessions"
+    const val TOUCHED_SESSIONS = "touchedSessions"
+    const val AUTO_ARCHIVE = "autoArchive"
+    const val AUTO_ARCHIVE_DAYS = "autoArchiveDays"
     const val SHOW_HIDDEN_FILES = "showHiddenFiles"
     const val EXPLORER_SORT_KEY = "explorerSortKey"
     const val EXPLORER_SORT_DESCENDING = "explorerSortDescending"

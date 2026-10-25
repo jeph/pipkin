@@ -70,7 +70,11 @@ internal class AppGraph(private val application: Application) {
       scope,
       maxRunning = preferences.maxRunningChats,
       idleParkMillis = preferences.idleStop.map { it.millis },
-      onWorkEnded = turnNotifications::workEnded,
+      onWorkEnded = { process ->
+        turnNotifications.workEnded(process)
+        // Pi saves the run's messages a moment before the session list hears of them.
+        process.sessionFile.value?.let { sessionArchive.touch(listOf(it)) }
+      },
     ) { cwd, sessionPath ->
       AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository, preferences.disabledExtensions)
     }
@@ -90,10 +94,17 @@ internal class AppGraph(private val application: Application) {
   /** What the chat screens keep of each chat, such as unsent drafts, held here so it survives rotation and folding. */
   val chatViews = ChatViews()
 
+  /** The session files of the chats on screen, which Pi can name late. */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private val sessionFilesOnScreen = chatsOnScreen.flatMapLatest { chats ->
+    if (chats.isEmpty()) flowOf(emptySet()) else combine(chats.map { it.sessionFile }) { it.filterNotNullTo(HashSet()) }
+  }
+
   init {
     holdWhileWorking()
     restartChatsOnceTermuxWorks()
     feedChatInbox()
+    touchChatsOnScreen()
     val dialogNotifications = DialogNotifications(application, registry, chatsOnScreen, visibility, chatInbox) {
       hostClient.lastHello.value?.home
     }
@@ -110,24 +121,21 @@ internal class AppGraph(private val application: Application) {
     )
   }
 
-  /**
-   * Keeps [chatInbox] following the setting, the archived chats, and the session files of the chats on screen, which
-   * Pi can name late.
-   */
-  @OptIn(ExperimentalCoroutinesApi::class)
+  /** Keeps [chatInbox] following the setting, the archived chats, and the chats on screen. */
   private fun feedChatInbox() {
     scope.launch { preferences.inAppNotifications.collect { chatInbox.enabled = it } }
     scope.launch { preferences.archivedSessions.collect { chatInbox.setArchived(it.keys) } }
+    scope.launch { sessionFilesOnScreen.collect(chatInbox::setOnScreen) }
+  }
+
+  /** Touches each chat as it comes on screen and as it leaves, so auto archive counts from when the user last saw it. */
+  private fun touchChatsOnScreen() {
     scope.launch {
-      chatsOnScreen
-        .flatMapLatest { chats ->
-          if (chats.isEmpty()) {
-            flowOf(emptySet())
-          } else {
-            combine(chats.map { it.sessionFile }) { files -> files.filterNotNullTo(HashSet()) }
-          }
-        }
-        .collect(chatInbox::setOnScreen)
+      var previous = emptySet<String>()
+      sessionFilesOnScreen.collect { files ->
+        sessionArchive.touch(previous + files)
+        previous = files
+      }
     }
   }
 

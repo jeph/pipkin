@@ -42,21 +42,39 @@ internal class SessionArchive(
     preferences.archiveSessions(paths, clock())
   }
 
-  /** Takes [paths] out of the archive again, as Undo does right after archiving them. */
+  /** Takes [paths] out of the archive again, as Undo does right after archiving them; they count as touched now. */
   fun unarchive(paths: Collection<String>) {
     preferences.unarchiveSessions(paths)
+    preferences.touchSessions(paths, clock())
+  }
+
+  /** Records that the user saw, restored or ran the chats in [paths] now, which keeps them from auto archive. */
+  fun touch(paths: Collection<String>) {
+    preferences.touchSessions(paths.filterNot(::isArchived), clock())
   }
 
   /**
    * Restores those of [sessions] whose workspace folder still exists, adding a workspace that was removed back to
-   * the sidebar. Returns the restored sessions.
+   * the sidebar; they count as touched now. Returns the restored sessions.
    */
   fun restore(sessions: Collection<SessionInfo>): List<SessionInfo> {
     val restorable = sessions.filter { it.cwdExists }
     restorable.forEach { preferences.addWorkspace(it.cwd) }
-    preferences.unarchiveSessions(restorable.map { it.path })
+    unarchive(restorable.map { it.path })
     return restorable
   }
+
+  /**
+   * Those of [sessions] that are not archived and went [days] untouched, other than those in session files [kept];
+   * see [AutoArchive.stale].
+   */
+  fun stale(sessions: List<SessionInfo>, days: Int, kept: Set<String>): List<SessionInfo> = AutoArchive.stale(
+    activeOf(sessions, preferences.archivedSessions.value),
+    preferences.touchedSessions.value,
+    kept,
+    clock(),
+    days,
+  )
 
   /**
    * Removes the workspace [cwd] from the sidebar and archives its chats [paths]. Adding the folder back later shows

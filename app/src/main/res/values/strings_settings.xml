@@ -91,6 +91,12 @@
     <string name="settings_idle_stop_never">Never</string>
     <string name="settings_idle_stop_caption">A chat that isn\'t working, running background tasks, or on screen stops its agent after this long to free memory. Its history stays, and the agent starts again when you open it. With Never, a chat stops only when another needs its place.</string>
 
+    <string name="settings_auto_archive">Auto-archive chats</string>
+    <string name="settings_auto_archive_days">Days without activity</string>
+    <string name="settings_auto_archive_fewer">Fewer days</string>
+    <string name="settings_auto_archive_more">More days</string>
+    <string name="settings_auto_archive_caption">Archives a chat once it goes a set number of days without a new message and without being opened. A chat that\'s working, running background tasks, or on screen isn\'t archived. You can restore archived chats from the archive.</string>
+
     <string name="settings_theme">Theme</string>
     <!-- Theme names. System follows the phone's dark mode, using Porcelain by day and Stone by night. The others are
          named after materials: porcelain, clay, cobalt (the blue glaze), stone and obsidian (black volcanic glass). -->

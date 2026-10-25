@@ -9,6 +9,11 @@
         <item quantity="one">Chat archived</item>
         <item quantity="other">%1$d chats archived</item>
     </plurals>
+    <!-- %1$d: how many chats auto archive just archived. -->
+    <plurals name="archive_auto_archived">
+        <item quantity="one">Archived %1$d inactive chat</item>
+        <item quantity="other">Archived %1$d inactive chats</item>
+    </plurals>
 
     <string name="archive_stop_title">Stop and archive?</string>
     <string name="archive_stop_text">Pipkin is working in this chat or running its background tasks. Archiving it stops them.</string>
