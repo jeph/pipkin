@@ -21,7 +21,7 @@ A command that keeps running in a Pipkin terminal, such as a development server,
 The agent can run a command in the background, such as a development server, a long build, or a test suite, and stop working while it runs. When the command exits, its result comes back to the chat and the agent picks up where it left off, even if you've left the app.
 
 - **The tasks show on the message box** as a **Background** tab, with each task's state and command.
-- **A chat with background tasks shows as working.** The simmering pot stays on its tab and at the end of the chat, with how many tasks are running. You can still send messages, and **Stop** on the message box stops the tasks when the agent isn't replying.
+- **A chat with background tasks shows as working.** The simmering pot stays on its tab and at the end of the chat, with how many tasks are running, and the run's timer keeps counting until the agent picks up their results. You can still send messages, and **Stop** on the message box stops the tasks when the agent isn't replying.
 - **A chat with background tasks keeps its agent** and counts toward the running chats limit.
 - **You're told once the chat is done.** If you're away, the **Agent finished** notification comes when the agent's last reply is over and no task is left, not each time a reply ends while tasks still run.
 - **Tasks end with their chat's agent.** Reloading or archiving the chat, switching it to another session, or Android stopping Termux ends them; Pipkin asks before a reload or archive does.

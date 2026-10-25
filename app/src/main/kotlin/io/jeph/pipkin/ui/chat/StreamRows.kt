@@ -236,8 +236,8 @@ private val NoticeKind.icon: Int
   }
 
 /**
- * Live `m:ss` while the run works, then how long it took. While the run waits on [subagents] queued or running, it
- * says how many. While the chat waits on [backgroundTasks], the simmering pot stays, saying how many.
+ * Live `m:ss` while the run works or the chat waits on [backgroundTasks], then how long the run took. While the run
+ * waits on [subagents] queued or running, it says how many, and while the chat waits on background tasks, how many.
  */
 @Composable
 internal fun TurnFooterRow(
@@ -252,16 +252,15 @@ internal fun TurnFooterRow(
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
     val duration = item.durationMillis
-    if (duration != null) {
+    if (duration != null && backgroundTasks == 0) {
       FooterText(durationText(duration))
-      if (backgroundTasks > 0) SimmeringPot(size = PipkinTokens.IconSize.sm)
-    } else {
-      SimmeringPot(size = PipkinTokens.IconSize.sm)
-      RunningElapsed(item.startedAt)
-      if (subagents > 0) {
-        val count = NumberFormat.getIntegerInstance().format(subagents)
-        FooterText(pluralStringResource(R.plurals.chat_waiting_on_subagents, subagents, count))
-      }
+      return@Row
+    }
+    SimmeringPot(size = PipkinTokens.IconSize.sm)
+    RunningElapsed(item.startedAt)
+    if (subagents > 0) {
+      val count = NumberFormat.getIntegerInstance().format(subagents)
+      FooterText(pluralStringResource(R.plurals.chat_waiting_on_subagents, subagents, count))
     }
     if (backgroundTasks == 0) return@Row
     FooterText(pluralStringResource(R.plurals.chat_background_tasks_running, backgroundTasks, backgroundTasks))
