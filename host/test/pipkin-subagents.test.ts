@@ -755,6 +755,19 @@ describe("live transcripts", () => {
     expect(eventTypes(log.entries)).toEqual(["tool_execution_start", "queue_update", "tool_execution_end"]);
   });
 
+  it("name a tool call as it starts streaming, from the message so far, as Pi's RPC mode does", () => {
+    const partial = fauxAssistantMessage([fauxToolCall("bash", { command: "ls" }, { id: "call_1" })]);
+    const named = forApp({
+      type: "message_update",
+      message: partial,
+      assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, partial },
+    } as never);
+    expect(named).toEqual({
+      type: "message_update",
+      assistantMessageEvent: { type: "toolcall_start", contentIndex: 0, id: "call_1", toolName: "bash" },
+    });
+  });
+
   it("leave out a stream update's message so far and every image's data", () => {
     const update = forApp({
       type: "message_update",

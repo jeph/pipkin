@@ -56,6 +56,28 @@ class LiveSubagentTest {
   }
 
   @Test
+  fun aToolCallStreamingInIsNamedAndShowsItsCommandBeforeTheMessageEnds() {
+    apply(1_000, """{"type":"agent_start"}""")
+    apply(1_000, """{"type":"message_start","message":{"role":"assistant","content":[]}}""")
+    apply(
+      1_100,
+      """{"type":"message_update","assistantMessageEvent":
+        {"type":"toolcall_start","contentIndex":0,"id":"call_1","toolName":"bash"}}""",
+    )
+    apply(
+      1_200,
+      """{"type":"message_update","assistantMessageEvent":
+        {"type":"toolcall_delta","contentIndex":0,"delta":"{\"command\":\"ls -la\",\"time"}}""",
+    )
+
+    val call = state.items.filterIsInstance<ToolCall>().single()
+    assertEquals("call_1", call.id)
+    assertEquals("bash", call.toolName)
+    assertEquals("ls -la", call.args?.optString("command"))
+    assertTrue(call.argsStreaming)
+  }
+
+  @Test
   fun eventsAfterTheLogStreamTheReplyAndEndTheRunAtItsLastEventsTime() {
     applyLogSoFar()
     apply(

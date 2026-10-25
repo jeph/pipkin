@@ -43,17 +43,26 @@ const DELTAS: Record<string, true> = { text_delta: true, thinking_delta: true, t
 
 /**
  * [event] as the app needs it, or null for one it has no use for. A stream update leaves out the reply so far, which
- * Pi sends with every delta, and events that end a turn or a run leave out the messages they repeat. The system
- * prompt, which Pi's session events carry as a message, is left out, as the app shows none. Images' data is left out
- * too: the app shows none of them, and a tool that reads an image would send megabytes with every event that repeats
- * it.
+ * Pi sends with every delta, as Pi's RPC mode does; like it, a tool call's start takes the call's id and name from
+ * there, which the app's row needs before the call ends. Events that end a turn or a run leave out the messages they
+ * repeat. The system prompt, which Pi's session events carry as a message, is left out, as the app shows none. Images'
+ * data is left out too: the app shows none of them, and a tool that reads an image would send megabytes with every
+ * event that repeats it.
  */
 export function forApp(event: AgentSessionEvent): Record<string, unknown> | null {
   switch (event.type) {
     case "message_update": {
-      const { partial: _partial, ...update } = event.assistantMessageEvent as { partial?: unknown; type: string };
+      const update = event.assistantMessageEvent;
       if (!STREAMED[update.type]) return null;
-      return { type: event.type, assistantMessageEvent: update };
+      if (update.type === "toolcall_start") {
+        const { partial, ...start } = update;
+        const call = partial.content[update.contentIndex];
+        if (call?.type !== "toolCall") return null;
+        return { type: event.type, assistantMessageEvent: { ...start, id: call.id, toolName: call.name } };
+      }
+      if (!("partial" in update)) return { type: event.type, assistantMessageEvent: update };
+      const { partial: _partial, ...delta } = update;
+      return { type: event.type, assistantMessageEvent: delta };
     }
     case "message_start":
     case "message_end":
