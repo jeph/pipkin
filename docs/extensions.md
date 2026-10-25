@@ -10,7 +10,7 @@ Pipkin supports Pi's extensions, skills, and prompt templates. They go in Pipkin
 Pipkin bundles extensions for ease of use, or where the experience it wants isn't possible through Pi's RPC protocol. The current bundled extensions are:
 
 - **Pipkin todo** keeps a to-do list for the agent's current task, shown as a tab on the message box. The list is saved with the chat, and `/todos` shows it. It showcases Pipkin's [widgets](#how-extensions-look-in-pipkin). Its tool matches [rpiv-todo](https://github.com/juicesharp/rpiv-mono)'s.
-- **Pipkin background** (experimental) lets the agent run commands in the background, such as servers and long builds, and picks the chat back up when each one exits. Pipkin keeps the chat's agent and the phone awake while they run. See [Background tasks](/docs/background/#background-tasks).
+- **Pipkin background** lets the agent run commands in the background, such as servers and long builds, and picks the chat back up when each one exits. Pipkin keeps the chat's agent and the phone awake while they run. See [Background tasks](/docs/background/#background-tasks).
 - **Pipkin subagents** lets the agent hand self-contained tasks to subagents, which you can follow, steer, and stop. See [Subagents](#subagents).
 - **Pipkin web access** lets the agent search the web and read pages, docs, and PDFs. `/websearch` opens its search curator. It's a copy of [pi-web-access](https://github.com/nicobailon/pi-web-access), changed to start faster on Android. Its settings, such as search API keys, go in `~/.pipkin/pi/web-search.json`; the [pi-web-access README](https://github.com/nicobailon/pi-web-access#readme) lists them.
 

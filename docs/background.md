@@ -18,7 +18,7 @@ A command that keeps running in a Pipkin terminal, such as a development server,
 
 ## Background tasks
 
-The agent can run a command in the background, such as a development server, a long build, or a test suite, and stop working while it runs. When the command exits, its result comes back to the chat and the agent picks up where it left off, even if you've left the app. Background tasks are experimental.
+The agent can run a command in the background, such as a development server, a long build, or a test suite, and stop working while it runs. When the command exits, its result comes back to the chat and the agent picks up where it left off, even if you've left the app.
 
 - **The tasks show on the message box** as a **Background** tab, with each task's state and command.
 - **A chat with background tasks shows as working.** The simmering pot stays on its tab and at the end of the chat, with how many tasks are running. You can still send messages, and **Stop** on the message box stops the tasks when the agent isn't replying.
