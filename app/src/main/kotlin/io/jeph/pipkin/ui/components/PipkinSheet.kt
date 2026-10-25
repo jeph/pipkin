@@ -2,8 +2,11 @@ package io.jeph.pipkin.ui.components
 
 import android.view.View
 import android.view.ViewTreeObserver
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -83,14 +86,18 @@ fun PipkinSheet(
       )
     },
   ) {
-    val holdSheet = remember { HoldSheetAfterListScroll() }
+    val guard = remember { SheetGestureGuard() }
+    // Drags on the sheet's content that no list takes, as on a header, go through [guard] like a list's, rather
+    // than to the drag Material puts on the sheet itself, which only the drag handle above the content keeps.
+    val unscrolled = rememberScrollableState { 0f }
     Column(
       modifier = Modifier
-        .nestedScroll(holdSheet)
-        .pointerInput(holdSheet) {
+        .nestedScroll(guard)
+        .scrollable(unscrolled, Orientation.Vertical)
+        .pointerInput(guard) {
           awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-            holdSheet.listScrolled = false
+            guard.listScrolled = false
           }
         }
         .then(sizing)
@@ -104,12 +111,14 @@ fun PipkinSheet(
 private val SHEET_SHAPE = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
 
 /**
- * Keeps a touch that scrolled a list in the sheet from also moving the sheet. Material hands a list's leftover scroll
- * and fling to the sheet, so a swipe or fling that reaches the top of a list would carry on and close the sheet. Once
- * a list has scrolled during a touch, the rest of that touch and its fling stay with the list; a touch that starts
- * with the list at its top still drags the sheet. [listScrolled] is reset when a finger goes down.
+ * Keeps a touch from moving the sheet where it can't go. Material hands a list's leftover scroll and fling to the
+ * sheet, so a swipe or fling that reaches the top of a list would carry on and close the sheet: once a list has
+ * scrolled during a touch, the rest of that touch and its fling stay with the list, while a touch that starts with
+ * the list at its top still drags the sheet. [listScrolled] is reset when a finger goes down. And an upward fling
+ * left over once the sheet is open has nowhere to take it, yet Material 1.4 throws the sheet up past its top with
+ * that speed and springs it back, so a fast swipe up makes it jump; the guard keeps that fling.
  */
-private class HoldSheetAfterListScroll : NestedScrollConnection {
+private class SheetGestureGuard : NestedScrollConnection {
   var listScrolled = false
 
   override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
@@ -118,7 +127,7 @@ private class HoldSheetAfterListScroll : NestedScrollConnection {
   }
 
   override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity =
-    if (listScrolled) Velocity(0f, available.y) else Velocity.Zero
+    if (listScrolled || available.y < 0f) Velocity(0f, available.y) else Velocity.Zero
 }
 
 /**
