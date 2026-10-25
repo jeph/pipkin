@@ -38,10 +38,19 @@ export interface RunsMessage {
   runs: RunView[];
 }
 
+/** A followed run's log so far, or one of its events, as the extension sends them on `subagents`. */
+export interface LiveMessage {
+  version: number;
+  live?: { id: string; entries: { at: number; event: Record<string, unknown> }[] };
+  event?: { id: string; at: number; event: Record<string, unknown> };
+}
+
 /** Stands in for Pipkin's channel: records what the extension sends on `subagents` and passes on the app's messages. */
 export interface FakeChannel {
   sent: RunsMessage[];
-  /** Called with each message as it's sent, before the extension carries on. */
+  /** The `live` logs and `event`s sent for followed runs, in order. */
+  live: LiveMessage[];
+  /** Called with each runs message as it's sent, before the extension carries on. */
   onSend: ((message: RunsMessage) => void) | undefined;
   /** The runs in the latest message. */
   latest(): RunView[];
@@ -56,6 +65,7 @@ export function installChannel(): FakeChannel {
   const handlers: ((data: unknown) => void)[] = [];
   const channel: FakeChannel = {
     sent: [],
+    live: [],
     onSend: undefined,
     latest: () => channel.sent.at(-1)?.runs ?? [],
     fromApp: (data) => {
@@ -68,7 +78,11 @@ export function installChannel(): FakeChannel {
     send: (topic: string, data: unknown) => {
       if (topic !== "subagents") return;
       // A copy, since the runs keep changing after they're sent.
-      const message = structuredClone(data) as RunsMessage;
+      const message = structuredClone(data) as RunsMessage | LiveMessage;
+      if (!("runs" in message)) {
+        channel.live.push(message);
+        return;
+      }
       channel.sent.push(message);
       channel.onSend?.(message);
     },

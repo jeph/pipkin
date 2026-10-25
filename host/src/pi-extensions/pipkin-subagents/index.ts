@@ -2,7 +2,8 @@
  * Pipkin subagents: the `subagent` tool, which hands a task to a second agent in the same Pi process and returns its
  * reply. The child's tools are stand-ins for the parent's (`./runs.ts`), so the parent's permission extensions decide
  * every call and their questions appear in the parent chat. The app follows the runs over Pipkin's channel
- * (`./state.ts`) and reads each subagent's transcript from its file, `subagents/<parent id>/` beside the chat's.
+ * (`./state.ts`), and a subagent's transcript live while the run is listed (`./live.ts`); after that, it reads the
+ * transcript from its file, `subagents/<parent id>/` beside the chat's.
  *
  * Runs belong to the Pi process, not to one load of the extension: Pi loads it again for each session and `/reload`,
  * and every load shares one registry. A run lasts as long as the parent's tool call, so the end of the parent's run,

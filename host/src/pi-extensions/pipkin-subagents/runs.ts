@@ -21,9 +21,11 @@ import {
   type ToolInfo,
 } from "@earendil-works/pi-coding-agent";
 import type { AgentDefinition, ThinkingLevel } from "./agents.js";
+import { newLog } from "./live.js";
 import {
   MAX_RUNNING,
   type Registry,
+  recordEvent,
   report,
   reportSoon,
   type Run,
@@ -140,6 +142,7 @@ export async function runSubagent(
     stoppedByUser: false,
     child: undefined,
     wake: undefined,
+    log: newLog(),
   };
   state.runs.set(run.id, run);
   const stop = signal ? AbortSignal.any([signal, run.controller.signal]) : run.controller.signal;
@@ -191,6 +194,7 @@ async function converse(
   const unsubscribe = child.subscribe((event) => {
     // Pi resets a run's abort state as it starts, so a Stop landing between `prompt()` and here would be lost.
     if (event.type === "agent_start" && stop.aborted) void child.abort();
+    recordEvent(state, run, event);
     track(state, run, child, event, usage);
   });
   try {
@@ -336,7 +340,7 @@ function track(state: Registry, run: Run, child: AgentSession, event: AgentSessi
         addUsage(usage, event.message.usage);
         run.tokens = usage.totalTokens;
       }
-      // Pi saves the message right after its listeners return, and the app reads the file when the count changes.
+      // Pi saves the message right after its listeners return; a run that saved none failed before it began.
       queueMicrotask(() => {
         const messages = child.sessionManager.getEntries().filter((entry) => entry.type === "message").length;
         if (messages === run.messages) {

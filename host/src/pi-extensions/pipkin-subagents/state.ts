@@ -1,12 +1,17 @@
 /**
  * The runs one Pi process knows about, shared by every load of the extension (Pi loads it again for each session and
- * `/reload`), and the `runs` messages that tell the app about them over Pipkin's channel.
+ * `/reload`), and the messages that tell the app about them over Pipkin's channel: `runs` lists, and the transcript of
+ * each run a subagent screen follows live (`./live.ts`).
  */
-import type { AgentSession } from "@earendil-works/pi-coding-agent";
+import type { AgentSession, AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 import { isObject } from "../../framing.js";
 import { type PipkinChannel, pipkinChannel } from "../pipkin-channel.js";
+import { append, forApp, type LiveLog } from "./live.js";
 
-/** The channel topic: `runs` lists go to the app; `steer`, `stop` and `stopAll` come back. */
+/**
+ * The channel topic. To the app: `runs` lists, a followed run's `live` log, then each of its `event`s. From the app:
+ * `steer`, `stop`, `stopAll`, and `follow` and `unfollow` a run.
+ */
 export const TOPIC = "subagents";
 export const PROTOCOL_VERSION = 1;
 
@@ -52,6 +57,8 @@ export interface Run extends RunView {
   child: AgentSession | undefined;
   /** Starts the run once it's queued and a slot frees up. */
   wake: (() => void) | undefined;
+  /** The child's events so far, for a screen that starts following the run; kept until the run is dropped. */
+  log: LiveLog;
 }
 
 export interface Registry {
@@ -69,6 +76,8 @@ export interface Registry {
   timer: NodeJS.Timeout | undefined;
   lastSentAt: number;
   lastSent: string | undefined;
+  /** The runs whose events go to the app as they come, while a subagent screen shows them. */
+  followed: Set<string>;
 }
 
 const SHARED = Symbol.for("pipkin.subagents");
@@ -85,6 +94,7 @@ export function registry(): Registry {
     timer: undefined,
     lastSentAt: 0,
     lastSent: undefined,
+    followed: new Set(),
   };
   global[SHARED] = created;
   created.channel.on(TOPIC, (data) => fromApp(created, data));
@@ -102,9 +112,29 @@ function fromApp(state: Registry, data: unknown): void {
     return;
   }
   const run = typeof data.id === "string" ? state.runs.get(data.id) : undefined;
+  if (data.action === "unfollow" && typeof data.id === "string") state.followed.delete(data.id);
   if (!run) return;
   if (data.action === "stop") stopRun(run);
   else if (data.action === "steer" && typeof data.text === "string" && data.text.trim() !== "") steer(run, data.text);
+  else if (data.action === "follow") follow(state, run);
+}
+
+/** Sends [run]'s log so far, then each of its events as it comes until the app unfollows it. */
+function follow(state: Registry, run: Run): void {
+  state.followed.add(run.id);
+  state.channel.send(TOPIC, { version: PROTOCOL_VERSION, live: { id: run.id, entries: run.log.entries } });
+}
+
+/** Keeps one of [run]'s child's events in its log, and sends it on while the app follows the run. */
+export function recordEvent(state: Registry, run: Run, event: AgentSessionEvent): void {
+  const forwarded = forApp(event);
+  if (!forwarded) return;
+  const entry = { at: Date.now(), event: forwarded };
+  // Sent before the log may merge it into an earlier entry.
+  if (state.followed.has(run.id)) {
+    state.channel.send(TOPIC, { version: PROTOCOL_VERSION, event: { id: run.id, ...entry } });
+  }
+  append(run.log, entry);
 }
 
 /** The user's Stop: the run ends and its tool call says the user stopped it. */
@@ -191,5 +221,9 @@ export function wakeQueued(state: Registry, sessionId: string): void {
 
 /** Drops the session's finished runs, when the user sends the parent its next message. */
 export function dropFinished(state: Registry, sessionId: string): void {
-  for (const [id, run] of state.runs) if (run.sessionId === sessionId && !isActive(run)) state.runs.delete(id);
+  for (const [id, run] of state.runs) {
+    if (run.sessionId !== sessionId || isActive(run)) continue;
+    state.runs.delete(id);
+    state.followed.delete(id);
+  }
 }

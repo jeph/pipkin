@@ -5,7 +5,7 @@
  * app sends Pi with that type go to the socket instead of Pi's stdin. Private to Pipkin: the app and the extensions
  * ship together, so topics need no versioning.
  */
-import { isObject, LineSplitter, LineTooLong } from "./framing.js";
+import { isObject, LineSplitter, LineTooLong, MAX_LINE } from "./framing.js";
 
 export const CHANNEL_FD = 3;
 export const CHANNEL_TYPE = "pipkin_channel";
@@ -13,8 +13,14 @@ export const CHANNEL_TYPE = "pipkin_channel";
 /** The topic of the host's first line on the socket, which tells an extension the far end is Pipkin's host. */
 export const HELLO_TOPIC = "pipkin";
 
-/** Channel messages are small state, never transcripts or images. */
+/** The app's messages to the extensions are small state: requests, never transcripts or images. */
 export const MAX_CHANNEL_LINE = 1024 * 1024;
+
+/**
+ * A line on the socket can carry a subagent's transcript, as Pi's own replies carry a chat's history, so it may be as
+ * long as any line the app reads, less the room the host's `type` takes as it passes the line on.
+ */
+export const MAX_SOCKET_LINE = MAX_LINE - 1024;
 
 const TOPIC = /^[a-z0-9][a-z0-9_-]*$/;
 
@@ -49,7 +55,7 @@ export function encodeChannelMessage({ topic, data }: ChannelMessage): string {
 }
 
 /**
- * Splits the socket's bytes into messages. A line over [MAX_CHANNEL_LINE] or one that isn't a message is dropped with
+ * Splits the socket's bytes into messages. A line over [MAX_SOCKET_LINE] or one that isn't a message is dropped with
  * [onDropped], and the lines after it still arrive.
  */
 export class ChannelReader {
@@ -79,7 +85,7 @@ export class ChannelReader {
       const message = parseChannelLine(line);
       if (message === null) this.onDropped("not a channel message");
       else this.onMessage(message);
-    }, MAX_CHANNEL_LINE);
+    }, MAX_SOCKET_LINE);
   }
 }
 

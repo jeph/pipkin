@@ -5,6 +5,7 @@ import { type AssistantMessage, fauxAssistantMessage, fauxProvider, fauxToolCall
 import { type ExtensionFactory, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { append, forApp, type LiveEntry, newLog } from "../src/pi-extensions/pipkin-subagents/live.js";
 import { capped, RESULT_LIMIT_BYTES } from "../src/pi-extensions/pipkin-subagents/runs.js";
 import { registry, report, reportSoon, type Run, THROTTLE_MS } from "../src/pi-extensions/pipkin-subagents/state.js";
 import {
@@ -642,6 +643,141 @@ describe("runs messages", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/** A subagent that runs `echo hi`, then waits for [release] before it replies. */
+function childWaiting(release: Promise<void>): Script {
+  return async (turn) => {
+    if (turn.step === 0) return fauxAssistantMessage(fauxToolCall("bash", { command: "echo hi" }), { stopReason: "toolUse" });
+    await release;
+    return fauxAssistantMessage("child done");
+  };
+}
+
+function eventTypes(entries: { event: Record<string, unknown> }[]): unknown[] {
+  return entries.map((logged) => logged.event.type);
+}
+
+function logEntry(event: Record<string, unknown>): LiveEntry {
+  return { at: 1, event };
+}
+
+function delta(type: string, text: string, contentIndex = 0): LiveEntry {
+  return logEntry({ type: "message_update", assistantMessageEvent: { type, contentIndex, delta: text } });
+}
+
+describe("live transcripts", () => {
+  it("send a run followed mid-way its log so far, then each event as it comes", async () => {
+    const release = latch();
+    const { session } = await start(parentCalling([{ id: "sub1", task: "CHILD go" }], childWaiting(release.promise)));
+    const prompt = session.prompt("PARENT go");
+    // The task, the bash call and its result are saved; the reply waits.
+    await eventually(() => (channel.latest()[0]?.messages ?? 0) >= 4);
+    channel.fromApp({ action: "follow", id: "r1" });
+    const log = channel.live[0]?.live;
+    expect(log?.id).toBe("r1");
+    const logged = log?.entries ?? [];
+    expect(eventTypes(logged)).toEqual(
+      expect.arrayContaining(["agent_start", "message_end", "tool_execution_start", "tool_execution_end", "turn_end"]),
+    );
+    // Messages that ended need none of their stream, and the app shows no system prompt.
+    expect(eventTypes(logged)).not.toContain("message_update");
+    const ended = logged.flatMap((entry) => (entry.event.type === "message_end" ? [entry.event.message] : []));
+    expect(ended).toEqual([
+      expect.objectContaining({ role: "user", content: [{ type: "text", text: "CHILD go" }] }),
+      expect.objectContaining({ role: "assistant" }),
+      expect.objectContaining({ role: "toolResult" }),
+    ]);
+    release.open();
+    await prompt;
+    const events = channel.live.slice(1).map((message) => message.event);
+    expect(events.every((event) => event?.id === "r1")).toBe(true);
+    expect(eventTypes(events as LiveEntry[])).toEqual(expect.arrayContaining(["message_start", "message_end", "agent_end"]));
+    expect(JSON.stringify(events)).toContain("child done");
+    session.dispose();
+  });
+
+  it("stop once the app unfollows the run", async () => {
+    const release = latch();
+    const { session } = await start(parentCalling([{ id: "sub1", task: "CHILD go" }], childWaiting(release.promise)));
+    const prompt = session.prompt("PARENT go");
+    await eventually(() => (channel.latest()[0]?.messages ?? 0) >= 4);
+    channel.fromApp({ action: "follow", id: "r1" });
+    channel.fromApp({ action: "unfollow", id: "r1" });
+    release.open();
+    await prompt;
+    expect(channel.live).toHaveLength(1);
+    session.dispose();
+  });
+
+  it("send nothing for a run that isn't listed", async () => {
+    const { session } = await start(parentCalling([{ id: "sub1", task: "CHILD hi" }], childDone));
+    await session.prompt("PARENT go");
+    await session.prompt("PARENT again");
+    channel.fromApp({ action: "follow", id: "r1" });
+    expect(channel.live).toEqual([]);
+    session.dispose();
+  });
+
+  it("keep a streaming message's deltas added up, and drop its stream once it ends", () => {
+    const log = newLog();
+    append(log, logEntry({ type: "message_start", message: { role: "assistant" } }));
+    append(log, logEntry({ type: "message_update", assistantMessageEvent: { type: "text_start", contentIndex: 0 } }));
+    append(log, delta("text_delta", "Hel"));
+    append(log, delta("text_delta", "lo"));
+    append(log, delta("thinking_delta", "hm", 1));
+    append(log, delta("thinking_delta", "m", 1));
+    expect(log.entries.map((kept) => kept.event.assistantMessageEvent)).toEqual([
+      undefined,
+      { type: "text_start", contentIndex: 0 },
+      { type: "text_delta", contentIndex: 0, delta: "Hello" },
+      { type: "thinking_delta", contentIndex: 1, delta: "hmm" },
+    ]);
+    append(log, logEntry({ type: "message_end", message: { role: "assistant" } }));
+    expect(eventTypes(log.entries)).toEqual(["message_end"]);
+  });
+
+  it("keep only a running tool's latest output and the latest steering queue", () => {
+    const log = newLog();
+    const update = (output: string) => logEntry({ type: "tool_execution_update", toolCallId: "t1", partialResult: output });
+    append(log, logEntry({ type: "tool_execution_start", toolCallId: "t1" }));
+    append(log, update("a"));
+    append(log, logEntry({ type: "queue_update", steering: ["one"] }));
+    append(log, update("ab"));
+    append(log, logEntry({ type: "queue_update", steering: [] }));
+    expect(log.entries.map((kept) => kept.event)).toEqual([
+      { type: "tool_execution_start", toolCallId: "t1" },
+      { type: "tool_execution_update", toolCallId: "t1", partialResult: "ab" },
+      { type: "queue_update", steering: [] },
+    ]);
+    append(log, logEntry({ type: "tool_execution_end", toolCallId: "t1" }));
+    expect(eventTypes(log.entries)).toEqual(["tool_execution_start", "queue_update", "tool_execution_end"]);
+  });
+
+  it("leave out a stream update's message so far and every image's data", () => {
+    const update = forApp({
+      type: "message_update",
+      message: fauxAssistantMessage("so far"),
+      assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "x", partial: fauxAssistantMessage("so far") },
+    } as never);
+    expect(update).toEqual({ type: "message_update", assistantMessageEvent: { type: "text_delta", contentIndex: 0, delta: "x" } });
+    const image = { type: "image", data: "A".repeat(1000), mimeType: "image/png" };
+    const end = forApp({
+      type: "tool_execution_end",
+      toolCallId: "t1",
+      toolName: "read",
+      result: { content: [{ type: "text", text: "read" }, image] },
+      isError: false,
+    } as never);
+    expect(end).toEqual({
+      type: "tool_execution_end",
+      toolCallId: "t1",
+      toolName: "read",
+      result: { content: [{ type: "text", text: "read" }, { type: "image", mimeType: "image/png" }] },
+      isError: false,
+    });
+    expect(image.data).toHaveLength(1000);
   });
 });
 

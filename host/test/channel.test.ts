@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { AppInputRouter, type ChannelMessage, ChannelReader, MAX_CHANNEL_LINE, OutputMerger } from "../src/channel.js";
+import {
+  AppInputRouter,
+  type ChannelMessage,
+  ChannelReader,
+  MAX_CHANNEL_LINE,
+  MAX_SOCKET_LINE,
+  OutputMerger,
+} from "../src/channel.js";
 
 /** [data] cut into chunks at pseudo-random points from [seed], so every run tries the same cuts. */
 function chunks(data: Buffer, seed: number): Buffer[] {
@@ -150,7 +157,7 @@ describe("ChannelReader", () => {
       (reason) => dropped.push(reason),
     );
     reader.push(Buffer.from(`{"topic":"a","data":{"x":1}}\n{"type":"pipkin_exit","topic":"a"}\n`));
-    reader.push(Buffer.from(`{"topic":"b","data":"${"q".repeat(MAX_CHANNEL_LINE)}"}\n`));
+    reader.push(Buffer.from(`{"topic":"b","data":"${"q".repeat(MAX_SOCKET_LINE)}"}\n`));
     reader.push(Buffer.from(`{"topic":"c"}\n`));
 
     expect(received).toEqual([
@@ -158,6 +165,6 @@ describe("ChannelReader", () => {
       { topic: "c", data: null },
     ]);
     expect(dropped[0]).toBe("not a channel message");
-    expect(dropped[1]).toBe(`Line exceeds ${MAX_CHANNEL_LINE} bytes`);
+    expect(dropped[1]).toBe(`Line exceeds ${MAX_SOCKET_LINE} bytes`);
   });
 });
