@@ -11,7 +11,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.ui.unit.IntOffset
 
 /**
- * How a stack of screens moves from depth [from] to depth [to]: a deeper screen slides in from the end edge over the one
+ * How a stack of screens moves from depth [from] to depth [to]: a deeper screen slides in from the right over the one
  * below, which shifts a quarter width for depth, and a popped screen slides back out over the one it uncovers. The same
  * depth cross-fades. Same timing as the sidebar panels.
  *

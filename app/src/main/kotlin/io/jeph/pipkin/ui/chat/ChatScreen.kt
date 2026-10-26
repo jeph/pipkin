@@ -96,7 +96,8 @@ internal fun ChatScreen(
     LaunchedEffect(controller) { controller.steering.collectQueue() }
     // The pane's own: a subagent shows in place of its chat and never in the other pane or as a tab of its own.
     var subagent by rememberSaveable { mutableStateOf<String?>(null) }
-    BackHandler(enabled = subagent != null) { subagent = null }
+    // Not while the chat slides out of the pane: Back then belongs to the screen taking its place.
+    BackHandler(enabled = subagent != null && !controls.leaving) { subagent = null }
     AnimatedContent(
       targetState = subagent,
       transitionSpec = { stackTransition(from = initialState.depth, to = targetState.depth) },

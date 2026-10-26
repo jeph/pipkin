@@ -28,7 +28,7 @@ import io.jeph.pipkin.workspace.sameAs
 
 /**
  * One pane's screen for what it shows: a chat, a terminal, a file or a commit, or a placeholder for nothing yet. The
- * pane stacks its screens as its history does: what opens over the shown item slides in from the end edge, and what
+ * pane stacks its screens as its history does: what opens over the shown item slides in from the right, and what
  * leaves for an item Back returns to, or for the one replacing a closed tab or an archived chat, slides back out over
  * it. While [covered] by a side panel, whose own slide brings the pane back, the screen changes in place.
  */

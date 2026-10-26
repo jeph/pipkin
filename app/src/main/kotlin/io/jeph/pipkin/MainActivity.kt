@@ -118,7 +118,7 @@ private const val DARK_NAV_SCRIM = 0x801B1B1B.toInt()
 
 /**
  * Shows the top of the navigator's stack; onboarding is the root until setup completes. Pushed
- * screens slide in from the end edge over the one below, and slide back out when popped.
+ * screens slide in from the right over the one below, and slide back out when popped.
  */
 @Composable
 private fun PipkinApp(graph: AppGraph, requestedChat: MutableStateFlow<ChatLocation?>) {
