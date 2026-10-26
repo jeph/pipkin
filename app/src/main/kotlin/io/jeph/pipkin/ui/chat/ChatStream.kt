@@ -122,8 +122,8 @@ internal fun ChatStream(
   DisposableEffect(listState) {
     onDispose {
       scroll.top = listState.top()
-      // Replies the chat no longer has, as after a session switch, needn't stay parsed.
-      view.markdown.keepShown(items.mapNotNullTo(HashSet()) { (it as? TimelineItem.AssistantText)?.markdown })
+      // Markdown the chat no longer has, as after a session switch, needn't stay parsed.
+      view.markdown.keepShown(items.mapNotNullTo(HashSet()) { it.cachedMarkdown })
     }
   }
   val follow = scroll.follow
@@ -291,11 +291,11 @@ private fun StreamList(
 }
 
 /**
- * Holds back a newly shown list's drawing until every finished reply it has laid out on screen is parsed, so a chat
- * whose replies weren't parsed ahead appears once, in its final place, instead of drawing them empty and then jumping
- * as their text lands. A list without items yet, such as a chat whose history Pi still has to send, draws at once but
- * doesn't count: the history's arrival is held back the same way. Once it has drawn items, or [stopHolding] was
- * called, it holds nothing back, so a reply scrolled to later shows empty until parsed.
+ * Holds back a newly shown list's drawing until every finished reply and extension message it has laid out on screen
+ * is parsed, so a chat whose markdown wasn't parsed ahead appears once, in its final place, instead of drawing it
+ * empty and then jumping as the text lands. A list without items yet, such as a chat whose history Pi still has to
+ * send, draws at once but doesn't count: the history's arrival is held back the same way. Once it has drawn items, or
+ * [stopHolding] was called, it holds nothing back, so markdown scrolled to later shows empty until parsed.
  */
 private class FirstDrawGate(private val listState: LazyListState) {
   private var open = false
@@ -310,8 +310,8 @@ private class FirstDrawGate(private val listState: LazyListState) {
     if (open) return true
     markdownCache.version
     val ready = !holding || listState.layoutInfo.visibleItemsInfo.all { info ->
-      val reply = items.getOrNull(info.index - firstItemIndex) as? TimelineItem.AssistantText
-      reply == null || reply.streaming || markdownCache[reply.markdown] != null
+      val markdown = items.getOrNull(info.index - firstItemIndex)?.cachedMarkdown
+      markdown == null || markdownCache[markdown] != null
     }
     open = ready && items.isNotEmpty()
     return ready
@@ -502,5 +502,13 @@ private fun gapBefore(previous: TimelineItem?, item: TimelineItem): Dp = when {
 
 private val TimelineItem.isStep: Boolean
   get() = this is TimelineItem.ToolCall || this is TimelineItem.Thinking || this is TimelineItem.Steps
+
+/** The markdown [MarkdownCache] keeps this item's parse under: a finished reply's or an extension message's. */
+private val TimelineItem.cachedMarkdown: String?
+  get() = when (this) {
+    is TimelineItem.AssistantText -> markdown.takeUnless { streaming }
+    is TimelineItem.ExtensionMessage -> markdown.takeIf { it.isNotBlank() }
+    else -> null
+  }
 
 private fun Modifier.contentWidth(): Modifier = widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth()
