@@ -44,6 +44,12 @@ Leave code you change better than you found it, and limit the cleanup to that co
 
 A task isn't done until `./gradlew check` passes. It runs ktlint, detekt, Android lint, the unit tests, and the host's type check, lint, and tests, and every release build runs it first, so a failure on `dev` blocks the next release. Fix any failure it reports, including ones in code you didn't change, rather than leaving it for later. Fix the code instead of silencing a check: don't add `@Suppress`, lint or detekt baselines, ignore comments, or configuration that turns a rule off.
 
+## Google Play releases
+
+Until Google Play finishes verifying Pipkin, the Release workflow's "Release on Google Play" job fails at "Upload and release" with `404 "Package not found: io.jeph.pipkin."`, because Play doesn't have the app yet. That's expected and fine. By then the workflow has already published the GitHub release, nothing reaches Play, and the log masks every secret. Don't fix it, re-run it, or report it as a problem. Any other failure in the workflow is still a real one.
+
+Once a "Release on Google Play" job succeeds, Play has the app, so delete this section from `AGENTS.md`.
+
 ## Text the user sees
 
 Pipkin is set up for translation, so every text the app itself shows comes from a string resource in `app/src/main/res/values/strings_*.xml`: labels, errors, notices, notifications, and snackbars alike. Text from Pi or the model is shown as Pi sends it. In Compose, use `stringResource` or `pluralStringResource`; code without a `Context` uses `AppStrings`. An exception whose message reaches the UI, like `HostFailure` or `RpcError`, resolves its message when it's read, so it's never stored in English. Give a string with placeholders a comment saying what each one holds. Format numbers, times, and dates with the locale (`NumberFormat`, `DateFormat`, `DateUtils`), not fixed patterns or English suffixes.
