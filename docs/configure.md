@@ -7,7 +7,7 @@ Pipkin runs [Pi](https://pi.dev), so the agent is configured the way Pi is: with
 
 ## Where the configuration lives
 
-Pipkin's config folder is `~/.pipkin/pi` in Termux. The full path is `/data/data/com.termux/files/home/.pipkin/pi`, and **Settings → Agent → Config folder** has a button that copies it.
+Pipkin's config folder is `~/.pipkin/pi` in Termux. The full path is `/data/data/com.termux/files/home/.pipkin/pi`, and **Settings → Configuration → Config folder** has a button that copies it.
 
 A plain Pi install uses `~/.pi/agent` instead. Pipkin doesn't read that folder, so settings, sign-ins, and extensions you set up for your own `pi` don't carry over, and the reverse is true too.
 
@@ -37,7 +37,7 @@ To browse the folder, add `~/.pipkin/pi` as a workspace, or open the file explor
 After you change a file, reload so the agent picks it up:
 
 - Tap the tabs button at the top of the chat and choose **Reload agent**, or type `/reload`, to reload the current chat. If the agent is working, Pipkin asks before stopping it.
-- **Settings → Agent → Reload all agents** reloads every chat that isn't working.
+- **Settings → Configuration → Reload idle agents** reloads every chat that isn't working.
 
 A reload restarts the agent in the same folder and keeps the conversation.
 
@@ -61,7 +61,7 @@ Trusting a folder also trusts the folders inside it. `AGENTS.md` files don't nee
 
 ## Back up and restore
 
-Open **Settings → Agent → Backups** and tap **Back up now**. A backup holds Pi's configuration: settings, sign-ins, models, extensions, skills, prompts, and themes. Chats aren't part of it.
+Open **Settings → Configuration → Backups** and tap **Back up now**. A backup holds Pi's configuration: settings, sign-ins, models, extensions, skills, prompts, and themes. Chats aren't part of it.
 
 Backups are saved in Termux at `~/.pipkin/backups`. The Android Files app can reach them under Termux, so you can copy one somewhere safe. Uninstalling Termux or clearing its data deletes them too.
 

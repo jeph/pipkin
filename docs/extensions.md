@@ -14,7 +14,7 @@ Pipkin bundles extensions for ease of use, or where the experience it wants isn'
 - **Pipkin subagents** lets the agent hand self-contained tasks to subagents, which you can follow, steer, and stop. See [Subagents](#subagents).
 - **Pipkin web access** lets the agent search the web and read pages, docs, and PDFs. `/websearch` opens its search curator. It's a copy of [pi-web-access](https://github.com/nicobailon/pi-web-access), changed to start faster on Android. Its settings, such as search API keys, go in `~/.pipkin/pi/web-search.json`; the [pi-web-access README](https://github.com/nicobailon/pi-web-access#readme) lists them.
 
-Turn them off in **Settings → Pipkin extensions**. Idle chats reload to apply the change; working chats apply it when their agent next starts.
+Turn them off in **Settings → Extensions**. Idle chats reload to apply the change; working chats apply it when their agent next starts.
 
 If you install `npm:pi-web-access` yourself, Pipkin drops its bundled copy. Likewise, if another extension registers a `subagent` tool, Pipkin subagents stands aside and leaves the tool to that extension.
 
@@ -112,7 +112,7 @@ Pi's [packages documentation](https://github.com/earendil-works/pi/blob/main/pac
 
 ### Update installed packages
 
-**Settings → Agent → Update Pi extensions** runs Pi's `pi update --extensions` with Pipkin's config folder. After you confirm, Pi updates every package listed in `~/.pipkin/pi/settings.json` to its latest version, except npm packages pinned to a version, such as `npm:@example/pi-tools@1.2.0`. The row shows Pi's progress, and a message says when the update finished or why it failed. Pi itself stays at the version Pipkin ships, and Pipkin's bundled extensions update with the app.
+**Settings → Extensions → Update Pi extensions** runs Pi's `pi update --extensions` with Pipkin's config folder. After you confirm, Pi updates every package listed in `~/.pipkin/pi/settings.json` to its latest version, except npm packages pinned to a version, such as `npm:@example/pi-tools@1.2.0`. The row shows Pi's progress, and a message says when the update finished or why it failed. Pi itself stays at the version Pipkin ships, and Pipkin's bundled extensions update with the app.
 
 Chats can't start while the update runs. Afterwards, chats that aren't working reload with the new versions; a working chat picks them up the next time its agent starts.
 

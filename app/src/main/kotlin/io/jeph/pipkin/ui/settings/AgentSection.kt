@@ -31,9 +31,12 @@ private sealed interface ReinstallOutcome {
   data class Failed(val message: String) : ReinstallOutcome
 }
 
-/** Termux and Pi versions, the permissions page, and reinstalling the pinned Pi runtime. */
+/**
+ * The agent and the Termux it runs in: their versions, the running agents page, the permissions page, and reinstalling
+ * the pinned Pi runtime.
+ */
 @Composable
-internal fun TermuxSection(graph: AppGraph, onOpenPermissions: () -> Unit) {
+internal fun AgentSection(graph: AppGraph, onOpenRunningAgents: () -> Unit, onOpenPermissions: () -> Unit) {
   val context = LocalContext.current
   val hostClient = graph.hostClient
   val termuxVersion = remember(context) { TermuxInstall.version(context) }
@@ -65,10 +68,24 @@ internal fun TermuxSection(graph: AppGraph, onOpenPermissions: () -> Unit) {
       }
     }
   }
-  SettingsSection(title = stringResource(R.string.settings_section_termux)) {
+  SettingsSection(title = stringResource(R.string.settings_section_agent)) {
     SettingsRow(title = stringResource(R.string.settings_termux)) { SettingsValue(status) }
     SettingsDivider()
-    SettingsRow(title = stringResource(R.string.settings_permissions), onClick = onOpenPermissions)
+    SettingsRow(
+      title = stringResource(R.string.settings_running_agents),
+      subtitle = stringResource(R.string.settings_running_agents_summary),
+      onClick = onOpenRunningAgents,
+    ) {
+      Chevron()
+    }
+    SettingsDivider()
+    SettingsRow(
+      title = stringResource(R.string.settings_permissions),
+      subtitle = stringResource(R.string.settings_permissions_summary),
+      onClick = onOpenPermissions,
+    ) {
+      Chevron()
+    }
     SettingsDivider()
     ReinstallRow(
       installing = installing,

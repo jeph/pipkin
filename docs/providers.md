@@ -14,7 +14,7 @@ The agent runs on your phone, but the AI model it talks to runs at a provider. P
 | **Kimi** | An API key from the [Kimi Code console](https://www.kimi.com/code) |
 | **OpenAI-compatible API** | A base URL and API key from any service that speaks the OpenAI API, including gateways and servers you run yourself |
 
-You can connect several and switch between them per chat. Add them during setup, or later in **Settings → Providers → Add a provider**.
+You can connect several and switch between them per chat. Add them during setup, or later in **Settings → Providers and models → Add a provider**.
 
 ## Sign in with a subscription
 
@@ -29,7 +29,7 @@ The other options are useful when the browser flow doesn't work on your phone:
 - **Copy code login** (Claude): sign in, then paste the code Anthropic shows you.
 - **Device code login** (OpenAI): Pipkin shows a code; open the link, enter the code, and Pipkin finishes on its own.
 
-To sign out, open the subscription in **Settings → Providers** and tap **Sign out**.
+To sign out, open the subscription in **Settings → Providers and models** and tap **Sign out**.
 
 ## Add a Gemini, Z.ai or Kimi key
 
@@ -40,11 +40,11 @@ Pipkin uses Pi's built-in support for these providers, so their models, context 
 
 Google doesn't let third-party apps use a Google AI Pro or Ultra subscription, so Gemini needs an API key rather than a Google sign-in.
 
-To remove a key, open the provider in **Settings → Providers** and tap **Remove key**.
+To remove a key, open the provider in **Settings → Providers and models** and tap **Remove key**.
 
 ## Add an OpenAI-compatible API
 
-1. In **Settings → Providers**, tap **Add a provider**, then **OpenAI-compatible API**.
+1. In **Settings → Providers and models**, tap **Add a provider**, then **OpenAI-compatible API**.
 2. Fill in:
    - **Provider ID**: a short name for it, such as `deepinfra`. Lowercase letters, digits, and dashes.
    - **Base URL**: the API's address, which usually ends in `/v1`, such as `https://api.example.com/v1`.
@@ -69,7 +69,7 @@ To remove a provider, open it and tap **Remove provider**. Pipkin forgets the pr
 
 Under the message box, the model chip shows the current model. Tap it to search and switch. Under the models, **Reasoning effort** sets how much the model thinks before answering; it only offers the levels the current model supports, and the chip next to the model chip shows the one picked. Tapping that chip, or typing `/model` or `/thinking`, opens the same sheet, and `/thinking high` sets a level directly.
 
-Whatever you pick applies to the current chat and becomes the default for new chats. To control which models show up in the list, open a provider in **Settings → Providers** and add or remove its models.
+Whatever you pick applies to the current chat and becomes the default for new chats. To control which models show up in the list, open a provider in **Settings → Providers and models** and add or remove its models.
 
 ## Where it's stored
 

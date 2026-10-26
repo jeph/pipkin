@@ -3,6 +3,7 @@ package io.jeph.pipkin.ui.settings
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.icu.text.ListFormatter
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -34,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.AppGraph
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.data.BundledExtension
 import io.jeph.pipkin.data.PiExtensionUpdate
 import io.jeph.pipkin.data.PiExtensionUpdateOutcome
@@ -50,14 +53,14 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
-/** Settings: providers, agent, appearance, notifications, Termux, advanced and about cards under a header. */
+/** Settings: models, chats, appearance, extensions, agent, configuration and about cards under a header. */
 @Composable
 internal fun SettingsScreen(
   onBack: () -> Unit,
-  onOpenPermissions: () -> Unit,
   onOpenProviders: () -> Unit,
+  onOpenRunningAgents: () -> Unit,
+  onOpenPermissions: () -> Unit,
   onOpenBackups: () -> Unit,
-  onOpenAdvanced: () -> Unit,
   onOpenLicenses: () -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
@@ -78,9 +81,9 @@ internal fun SettingsScreen(
         graph = graph,
         snackbar = snackbar,
         onOpenProviders = onOpenProviders,
+        onOpenRunningAgents = onOpenRunningAgents,
         onOpenPermissions = onOpenPermissions,
         onOpenBackups = onOpenBackups,
-        onOpenAdvanced = onOpenAdvanced,
         onOpenLicenses = onOpenLicenses,
       )
     }
@@ -96,9 +99,9 @@ private fun SettingsContent(
   graph: AppGraph,
   snackbar: SnackbarStackState,
   onOpenProviders: () -> Unit,
+  onOpenRunningAgents: () -> Unit,
   onOpenPermissions: () -> Unit,
   onOpenBackups: () -> Unit,
-  onOpenAdvanced: () -> Unit,
   onOpenLicenses: () -> Unit,
 ) {
   Column(
@@ -114,84 +117,83 @@ private fun SettingsContent(
       modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth(),
       verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s24),
     ) {
-      ProvidersSection(onOpenProviders = onOpenProviders)
-      AgentSection(graph = graph, snackbar = snackbar, onOpenBackups = onOpenBackups)
-      ExtensionsSection(graph = graph)
+      ModelsSection(accounts = graph.accountRepository, onOpenProviders = onOpenProviders)
+      ChatsSection(preferences = graph.preferences)
       AppearanceSection(preferences = graph.preferences)
-      NotificationsSection(preferences = graph.preferences)
-      TermuxSection(graph = graph, onOpenPermissions = onOpenPermissions)
-      AdvancedSection(onOpenAdvanced = onOpenAdvanced)
+      ExtensionsSection(graph = graph, snackbar = snackbar)
+      AgentSection(graph = graph, onOpenRunningAgents = onOpenRunningAgents, onOpenPermissions = onOpenPermissions)
+      ConfigurationSection(graph = graph, snackbar = snackbar, onOpenBackups = onOpenBackups)
       AboutSection(onOpenLicenses = onOpenLicenses)
     }
   }
 }
 
-/** One row into the providers page. */
+/**
+ * One row into the providers page, naming the providers added so far. It shows what the last refresh found and asks
+ * for none itself, since that would start the host just for opening Settings.
+ */
 @Composable
-private fun ProvidersSection(onOpenProviders: () -> Unit) {
-  SettingsSection(title = stringResource(R.string.settings_section_providers)) {
+private fun ModelsSection(accounts: AccountRepository, onOpenProviders: () -> Unit) {
+  val status by accounts.status.collectAsStateWithLifecycle()
+  val locale = LocalConfiguration.current.locales[0]
+  val added = status?.let { current ->
+    subscriptions.filter { current.isSignedIn(it.id) }.map { stringResource(it.title) } + current.custom.map { it.id }
+  }
+  val summary = when {
+    added == null -> null
+    added.isEmpty() -> stringResource(R.string.settings_providers_none)
+    else -> ListFormatter.getInstance(locale).format(added)
+  }
+  SettingsSection(title = stringResource(R.string.settings_section_models)) {
     SettingsRow(
       title = stringResource(R.string.providers_title),
+      subtitle = summary,
       onClick = onOpenProviders,
       leading = {
         LucideIcon(icon = R.drawable.ic_lucide_plug, contentDescription = null, tint = pipkinColors.foregroundMuted)
       },
     ) {
-      LucideIcon(
-        icon = R.drawable.ic_lucide_chevron_right,
-        contentDescription = null,
-        tint = pipkinColors.foregroundMuted,
-      )
+      Chevron()
     }
   }
 }
 
 @Composable
-private fun AgentSection(graph: AppGraph, snackbar: SnackbarStackState, onOpenBackups: () -> Unit) {
-  val context = LocalContext.current
-  val scope = rememberCoroutineScope()
-  val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val reloaded = stringResource(R.string.settings_reload_agents_done)
-  val configFolder = stringResource(R.string.settings_config_folder)
-  val configDir = hello?.configDir?.takeIf { it.isNotEmpty() }
-  SettingsSection(title = stringResource(R.string.settings_section_agent)) {
-    SettingsRow(
-      title = stringResource(R.string.settings_reload_agents),
-      onClick = {
-        graph.registry.reloadIdle()
-        scope.launch { snackbar.show(reloaded) }
-      },
-    )
-    SettingsDivider()
-    UpdateExtensionsRow(update = graph.piExtensionUpdate, snackbar = snackbar)
-    SettingsDivider()
-    SettingsRow(
-      title = configFolder,
-      subtitle = configDir ?: stringResource(R.string.settings_config_folder_unknown),
-    ) {
-      if (configDir != null) {
-        RoundIconButton(
-          icon = R.drawable.ic_lucide_copy,
-          contentDescription = stringResource(R.string.settings_copy),
-          onClick = { copyToClipboard(context, configFolder, configDir) },
-          tint = pipkinColors.foregroundMuted,
-        )
+private fun AppearanceSection(preferences: Preferences) {
+  val theme by preferences.theme.collectAsStateWithLifecycle()
+  SettingsSection(title = stringResource(R.string.settings_section_appearance)) {
+    ThemePicker(selected = theme, onSelect = preferences::setTheme)
+  }
+}
+
+/**
+ * A switch for each extension Pipkin bundles, and updating the Pi extensions installed in its settings. A switch
+ * reloads idle chats so they pick the change up at once; a working chat picks it up when its agent next starts.
+ */
+@Composable
+private fun ExtensionsSection(graph: AppGraph, snackbar: SnackbarStackState) {
+  val disabled by graph.preferences.disabledExtensions.collectAsStateWithLifecycle()
+  Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12)) {
+    SettingsSection(title = stringResource(R.string.settings_section_extensions)) {
+      BundledExtension.entries.forEach { extension ->
+        val enabled = extension.id !in disabled
+        val toggle = { on: Boolean ->
+          graph.preferences.setExtensionEnabled(extension, on)
+          graph.sessionRepository.forgetExtensionUi()
+          graph.registry.reloadIdle()
+        }
+        SettingsRow(
+          title = stringResource(extension.title),
+          subtitle = stringResource(extension.summary),
+          modifier = Modifier.toggleable(value = enabled, role = Role.Switch, onValueChange = toggle),
+        ) {
+          SettingsSwitch(checked = enabled)
+        }
+        SettingsDivider()
       }
+      UpdateExtensionsRow(update = graph.piExtensionUpdate, snackbar = snackbar)
     }
-    SettingsDivider()
-    SettingsRow(
-      title = stringResource(R.string.backups_title),
-      onClick = onOpenBackups,
-      leading = {
-        LucideIcon(
-          icon = R.drawable.ic_lucide_archive_restore,
-          contentDescription = null,
-          tint = pipkinColors.foregroundMuted,
-        )
-      },
-    ) {
-      Chevron()
-    }
+    SettingsCaption(text = stringResource(R.string.settings_extensions_caption))
   }
 }
 
@@ -218,102 +220,77 @@ private fun UpdateExtensionsRow(update: PiExtensionUpdate, snackbar: SnackbarSta
     scope.launch { snackbar.show(message) }
     update.acknowledge()
   }
+  val subtitle = when {
+    !running -> stringResource(R.string.settings_update_extensions_summary)
+    else -> progress ?: stringResource(R.string.settings_update_extensions_running)
+  }
   SettingsRow(
     title = stringResource(R.string.settings_update_extensions),
-    subtitle = if (running) progress ?: stringResource(R.string.settings_update_extensions_running) else null,
+    subtitle = subtitle,
     enabled = !running,
     onClick = { confirming = true },
   ) {
     if (running) SimmeringPot()
   }
-  if (confirming) {
-    ConfirmDialog(
-      title = stringResource(R.string.settings_update_extensions_title),
-      text = stringResource(R.string.settings_update_extensions_text),
-      confirmLabel = stringResource(R.string.settings_update_extensions_confirm),
-      icon = R.drawable.ic_lucide_refresh_cw,
-      onConfirm = {
-        confirming = false
-        update.start()
-      },
-      onDismiss = { confirming = false },
-    )
-  }
+  if (!confirming) return
+  ConfirmDialog(
+    title = stringResource(R.string.settings_update_extensions_title),
+    text = stringResource(R.string.settings_update_extensions_text),
+    confirmLabel = stringResource(R.string.settings_update_extensions_confirm),
+    icon = R.drawable.ic_lucide_refresh_cw,
+    onConfirm = {
+      confirming = false
+      update.start()
+    },
+    onDismiss = { confirming = false },
+  )
 }
 
-/**
- * A switch for each extension Pipkin bundles. A change reloads idle chats so they pick it up at once; a working chat
- * picks it up when its agent next starts.
- */
+/** Pi's config folder: where it is, reloading idle chats after editing it, and backing it up. */
 @Composable
-private fun ExtensionsSection(graph: AppGraph) {
-  val disabled by graph.preferences.disabledExtensions.collectAsStateWithLifecycle()
-  Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12)) {
-    SettingsSection(title = stringResource(R.string.settings_section_extensions)) {
-      BundledExtension.entries.forEachIndexed { index, extension ->
-        if (index > 0) SettingsDivider()
-        val enabled = extension.id !in disabled
-        val toggle = { on: Boolean ->
-          graph.preferences.setExtensionEnabled(extension, on)
-          graph.sessionRepository.forgetExtensionUi()
-          graph.registry.reloadIdle()
-        }
-        SettingsRow(
-          title = stringResource(extension.title),
-          subtitle = stringResource(extension.summary),
-          modifier = Modifier.toggleable(value = enabled, role = Role.Switch, onValueChange = toggle),
-        ) {
-          SettingsSwitch(checked = enabled)
-        }
+private fun ConfigurationSection(graph: AppGraph, snackbar: SnackbarStackState, onOpenBackups: () -> Unit) {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
+  val reloaded = stringResource(R.string.settings_reload_agents_done)
+  val configFolder = stringResource(R.string.settings_config_folder)
+  val configDir = hello?.configDir?.takeIf { it.isNotEmpty() }
+  SettingsSection(title = stringResource(R.string.settings_section_configuration)) {
+    SettingsRow(
+      title = configFolder,
+      subtitle = configDir ?: stringResource(R.string.settings_config_folder_unknown),
+    ) {
+      if (configDir != null) {
+        RoundIconButton(
+          icon = R.drawable.ic_lucide_copy,
+          contentDescription = stringResource(R.string.settings_copy),
+          onClick = { copyToClipboard(context, configFolder, configDir) },
+          tint = pipkinColors.foregroundMuted,
+        )
       }
     }
-    SettingsCaption(text = stringResource(R.string.settings_extensions_caption))
-  }
-}
-
-@Composable
-private fun AppearanceSection(preferences: Preferences) {
-  val theme by preferences.theme.collectAsStateWithLifecycle()
-  SettingsSection(title = stringResource(R.string.settings_section_appearance)) {
-    ThemePicker(selected = theme, onSelect = preferences::setTheme)
-  }
-}
-
-/** Whether chats that finish or need an answer off screen show in the pill; Android's own settings cover the rest. */
-@Composable
-private fun NotificationsSection(preferences: Preferences) {
-  val enabled by preferences.inAppNotifications.collectAsStateWithLifecycle()
-  SettingsSection(title = stringResource(R.string.settings_section_notifications)) {
+    SettingsDivider()
     SettingsRow(
-      title = stringResource(R.string.settings_in_app_notifications),
-      subtitle = stringResource(R.string.settings_in_app_notifications_summary),
-      modifier = Modifier.toggleable(
-        value = enabled,
-        role = Role.Switch,
-        onValueChange = preferences::setInAppNotifications,
-      ),
-    ) {
-      SettingsSwitch(checked = enabled)
-    }
-  }
-}
-
-/** One row into the advanced page. */
-@Composable
-private fun AdvancedSection(onOpenAdvanced: () -> Unit) {
-  SettingsSection(title = null) {
+      title = stringResource(R.string.settings_reload_agents),
+      subtitle = stringResource(R.string.settings_reload_agents_summary),
+      onClick = {
+        graph.registry.reloadIdle()
+        scope.launch { snackbar.show(reloaded) }
+      },
+    )
+    SettingsDivider()
     SettingsRow(
-      title = stringResource(R.string.settings_advanced),
-      onClick = onOpenAdvanced,
+      title = stringResource(R.string.backups_title),
+      onClick = onOpenBackups,
       leading = {
-        LucideIcon(icon = R.drawable.ic_lucide_wrench, contentDescription = null, tint = pipkinColors.foregroundMuted)
+        LucideIcon(
+          icon = R.drawable.ic_lucide_archive_restore,
+          contentDescription = null,
+          tint = pipkinColors.foregroundMuted,
+        )
       },
     ) {
-      LucideIcon(
-        icon = R.drawable.ic_lucide_chevron_right,
-        contentDescription = null,
-        tint = pipkinColors.foregroundMuted,
-      )
+      Chevron()
     }
   }
 }
@@ -329,11 +306,7 @@ private fun AboutSection(onOpenLicenses: () -> Unit) {
     SettingsRow(title = stringResource(R.string.settings_version)) { SettingsValue(version) }
     SettingsDivider()
     SettingsRow(title = stringResource(R.string.settings_licenses), onClick = onOpenLicenses) {
-      LucideIcon(
-        icon = R.drawable.ic_lucide_chevron_right,
-        contentDescription = null,
-        tint = pipkinColors.foregroundMuted,
-      )
+      Chevron()
     }
     SettingsDivider()
     SettingsRow(title = stringResource(R.string.settings_privacy_policy), onClick = { openPrivacyPolicy(context) }) {

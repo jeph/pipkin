@@ -35,7 +35,7 @@
     <!-- %1$s: the command that failed, such as "npm ci" or "pi install", which a signal stopped before it exited. -->
     <string name="host_command_killed"><xliff:g id="command" example="npm ci">%1$s</xliff:g> failed (exit signal)</string>
 
-    <!-- Custom model providers (Settings > Models) -->
+    <!-- Custom model providers (Settings > Providers and models) -->
     <string name="host_provider_id_invalid">Use 1–40 lowercase letters, digits or dashes, starting with a letter or digit</string>
     <!-- %1$s: the provider ID the user typed, such as "openai". -->
     <string name="host_provider_id_builtin">\"<xliff:g id="id" example="openai">%1$s</xliff:g>\" is a built-in provider; choose another ID</string>
@@ -53,7 +53,7 @@
     <string name="host_provider_not_json">The server did not return JSON: <xliff:g id="body" example="Not Found">%1$s</xliff:g></string>
     <string name="host_provider_no_data_list">The server\'s <xliff:g id="path">/models</xliff:g> response has no data list</string>
 
-    <!-- Configuration backups (Settings > Backups) -->
+    <!-- Configuration backups (Settings > Configuration > Backups) -->
     <!-- Progress of a backup under way: how many files and folders it has backed up so far. -->
     <plurals name="host_backup_progress_backed_up">
         <item quantity="one">Backed up %1$d item</item>

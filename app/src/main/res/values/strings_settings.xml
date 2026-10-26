@@ -3,12 +3,12 @@
     <string name="settings_title">Settings</string>
     <string name="settings_back">Back</string>
     <string name="settings_copy">Copy</string>
-    <string name="settings_section_providers">Models</string>
-    <string name="settings_section_agent">Agent</string>
-    <string name="settings_section_extensions">Pipkin extensions</string>
+    <string name="settings_section_models">Models</string>
+    <string name="settings_section_chats">Chats</string>
     <string name="settings_section_appearance">Appearance</string>
-    <string name="settings_section_notifications">Notifications</string>
-    <string name="settings_section_termux">Termux</string>
+    <string name="settings_section_extensions">Extensions</string>
+    <string name="settings_section_agent">Agent</string>
+    <string name="settings_section_configuration">Configuration</string>
     <string name="settings_section_about">About</string>
 
     <string name="settings_claude">Claude</string>
@@ -28,16 +28,19 @@
     <string name="settings_key_saved">Key saved</string>
     <string name="settings_remove_key">Remove key</string>
 
-    <string name="providers_title">Providers</string>
+    <string name="providers_title">Providers and models</string>
+    <string name="settings_providers_none">No providers yet</string>
     <string name="providers_empty">No providers yet. Add one to start chatting.</string>
     <string name="providers_add">Add a provider</string>
     <string name="providers_compatible">OpenAI-compatible API</string>
     <string name="providers_compatible_subtitle">Any endpoint that takes an API key</string>
     <string name="providers_added">Added</string>
 
-    <string name="settings_reload_agents">Reload all agents</string>
+    <string name="settings_reload_agents">Reload idle agents</string>
+    <string name="settings_reload_agents_summary">Applies config folder changes to idle chats</string>
     <string name="settings_reload_agents_done">Idle agents reloaded</string>
     <string name="settings_update_extensions">Update Pi extensions</string>
+    <string name="settings_update_extensions_summary">Updates the packages installed in Pi\'s settings</string>
     <string name="settings_update_extensions_running">Updating Pi extensions…</string>
     <string name="settings_update_extensions_title">Update Pi extensions?</string>
     <string name="settings_update_extensions_text">Pi updates every package installed in its settings to the latest version, except packages pinned to a version. Chats can\'t start until the update finishes. Afterwards, idle chats reload with the new versions, and working chats pick them up when they next start.</string>
@@ -75,7 +78,8 @@
     <string name="settings_extension_subagents_summary">Subagents the agent hands tasks to, which you can follow, steer and stop</string>
     <string name="settings_extensions_caption">Idle chats reload to pick up a change. A working chat picks it up the next time its agent starts.</string>
 
-    <string name="settings_advanced">Advanced</string>
+    <string name="settings_running_agents">Running agents</string>
+    <string name="settings_running_agents_summary">How many run at once, and when idle ones stop</string>
     <string name="settings_running_chats">Running chats</string>
     <string name="settings_running_chats_fewer">Fewer running chats</string>
     <string name="settings_running_chats_more">More running chats</string>
@@ -115,6 +119,7 @@
     <string name="settings_pi_version">Agent %1$s</string>
     <string name="settings_pi_missing">Agent not installed</string>
     <string name="settings_permissions">Permissions</string>
+    <string name="settings_permissions_summary">Background running, notifications and Termux</string>
     <string name="settings_reinstall_pi">Reinstall the Pipkin agent</string>
     <string name="settings_reinstall_running">Installing the Pipkin agent %1$s…</string>
     <string name="settings_reinstall_done">The Pipkin agent %1$s is installed</string>

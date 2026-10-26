@@ -22,7 +22,7 @@ Everything else lives in Termux's storage on your phone, which you can also open
 - your chats and their history, including the transcripts of the subagents a chat runs
 - the agent's configuration, including your subscription sign-ins and API keys
 - extensions, skills, and prompt templates you add
-- backups you make in **Settings → Backups**, which are written to a folder in Termux and aren't uploaded anywhere
+- backups you make in **Settings → Configuration → Backups**, which are written to a folder in Termux and aren't uploaded anywhere
 - the files and projects you and the agent work on
 
 [Configure the agent](/docs/configure/) lists where each of these is kept.
@@ -34,7 +34,7 @@ Pipkin opts out of Android's backup to your Google account and of the transfer t
 Pipkin sends data off the phone only to do what you ask, and only to these services:
 
 - **Your AI model provider.** The agent sends your messages, the photos you attach, and the parts of your files and command output it reads to the provider you connect, such as Anthropic, OpenAI, Google, Z.ai, Moonshot AI, or an OpenAI-compatible API you add. When you sign in with a subscription, you sign in on the provider's own website. Pipkin also asks a provider you add for its list of models, using the API key you gave it.
-- **Web search and page fetching.** When the agent searches the web, the bundled web access extension sends the search query to a search service. By default that's [Exa](https://exa.ai), which needs no account, or OpenAI's web search if you've connected OpenAI; you can choose others in its settings. When the agent reads a web page, PDF, or video, it downloads it from the site that hosts it. Depending on the extraction services and credentials you've set up for the extension, such as Gemini or Datalab, it may also send the whole page, PDF, or video link to one of them to read it, separately from your chat's model provider. You can turn the extension off in **Settings → Pipkin extensions**.
+- **Web search and page fetching.** When the agent searches the web, the bundled web access extension sends the search query to a search service. By default that's [Exa](https://exa.ai), which needs no account, or OpenAI's web search if you've connected OpenAI; you can choose others in its settings. When the agent reads a web page, PDF, or video, it downloads it from the site that hosts it. Depending on the extraction services and credentials you've set up for the extension, such as Gemini or Datalab, it may also send the whole page, PDF, or video link to one of them to read it, separately from your chat's model provider. You can turn the extension off in **Settings → Extensions**.
 - **Downloads during setup and updates.** Setup downloads Node.js from Termux's package mirrors and Pi from the [npm registry](https://www.npmjs.com). Installing or updating extensions downloads them from where they're published.
 - **Commands and extensions.** The agent runs commands in Termux, and those can reach any service, for example when it runs `git push` or installs a package. Extensions you install run with the same access. What they send is up to the command or extension, not Pipkin.
 

@@ -3,7 +3,7 @@ package io.jeph.pipkin.data
 import io.jeph.pipkin.host.SessionInfo
 import java.util.concurrent.TimeUnit
 
-/** The Advanced setting that archives chats nobody touched for a number of days. */
+/** The setting in Settings › Chats that archives chats nobody touched for a number of days. */
 internal object AutoArchive {
   /** The days a chat may go untouched that the setting offers. */
   val DAYS = 1..30

@@ -20,7 +20,7 @@
 
     <string name="onboarding_done_title">You\'re all set</string>
     <string name="onboarding_done_body">Open a folder from the sidebar to start your first chat.</string>
-    <string name="onboarding_done_body_no_model">Connect a model in Settings → Providers before your first chat.</string>
+    <string name="onboarding_done_body_no_model">Connect a model in Settings → Providers and models before your first chat.</string>
     <string name="onboarding_start">Start using Pipkin</string>
 
     <string name="onboarding_termux_title">Termux</string>

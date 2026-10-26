@@ -14,8 +14,8 @@ sealed interface Destination {
   /** Termux setup and Pipkin's Android permissions, reached from Settings. */
   data object Permissions : Destination
 
-  /** Settings most people leave alone, such as how many chats keep Pi running, reached from Settings. */
-  data object Advanced : Destination
+  /** How many chats keep their agent running and when idle ones stop, reached from Settings › Agent. */
+  data object RunningAgents : Destination
 
   /** Backups of Pi's configuration in Termux, reached from Settings. */
   data object Backups : Destination
@@ -103,7 +103,7 @@ class AppNavigator(initial: List<Destination>) {
 
       Destination.Permissions -> PERMISSIONS
 
-      Destination.Advanced -> ADVANCED
+      Destination.RunningAgents -> RUNNING_AGENTS
 
       Destination.Backups -> BACKUPS
 
@@ -140,7 +140,7 @@ class AppNavigator(initial: List<Destination>) {
 
       key == PERMISSIONS -> Destination.Permissions
 
-      key == ADVANCED -> Destination.Advanced
+      key == RUNNING_AGENTS -> Destination.RunningAgents
 
       key == BACKUPS -> Destination.Backups
 
@@ -176,7 +176,7 @@ class AppNavigator(initial: List<Destination>) {
     private const val MAIN = "main"
     private const val SETTINGS = "settings"
     private const val PERMISSIONS = "permissions"
-    private const val ADVANCED = "advanced"
+    private const val RUNNING_AGENTS = "running-agents"
     private const val BACKUPS = "backups"
     private const val LICENSES = "licenses"
     private const val LICENSE = "license:"

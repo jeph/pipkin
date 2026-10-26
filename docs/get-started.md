@@ -32,7 +32,7 @@ A build from source is named **Pipkin Dev** and installs beside a release. It ke
 
 ## Walk through setup
 
-Open Pipkin and tap **Get started**. Each step shows **Done** once it's complete, and you can go back to any of them later from **Settings → Permissions**.
+Open Pipkin and tap **Get started**. Each step shows **Done** once it's complete, and you can go back to any of them later from **Settings → Agent → Permissions**.
 
 1. **Install Termux.** Pipkin links to F-Droid and Google Play. Install Termux, then come back to Pipkin. If you have a copy of Termux from somewhere else, Pipkin asks you to uninstall it first.
 2. **Let Pipkin use Termux** (F-Droid build only). Allow **Run commands in Termux environment** when Android asks. This is how Pipkin starts the agent in Termux.
@@ -42,7 +42,7 @@ Open Pipkin and tap **Get started**. Each step shows **Done** once it's complete
 6. **Let Termux run in the background** (optional but recommended). The agent runs inside Termux, so Termux needs the same allowance. If Android can't ask directly, Pipkin shows where the setting is on your phone.
 7. **Let Termux use phone storage** (optional but recommended). Lets the agent work on files outside Termux, such as in Downloads or Documents.
 8. **Install the agent.** Tap **Install**. Pipkin installs Pi and its bundled extensions in Termux. It takes a few minutes, and you can leave the screen while it runs.
-9. **Connect a model** (optional here). Sign in with **Claude** or **OpenAI**, add a **Gemini**, **Z.ai** or **Kimi** key, or add an **OpenAI-compatible API**. You can also do this later in **Settings → Providers**.
+9. **Connect a model** (optional here). Sign in with **Claude** or **OpenAI**, add a **Gemini**, **Z.ai** or **Kimi** key, or add an **OpenAI-compatible API**. You can also do this later in **Settings → Providers and models**.
 
 When you see **You're all set**, tap **Start using Pipkin**.
 
@@ -68,7 +68,7 @@ A few things to know while it works:
 - **Changes**: in a git repository, see exactly what the agent changed, file by file. Pipkin asks you to trust a repository before it runs git there, because a repository's own settings can run programs.
 - **Terminal**: tap the tabs button, the square with the tab count at the top of the chat, and choose **New terminal** to open a Termux shell right next to your chat.
 - **The tabs button** opens a sheet with the workspace's tabs, the one on screen first, and under them what that tab can do. For a chat: start another chat, rename it, reload the agent after changing its configuration, copy the session's file path, or archive it. Terminals, files, and commits have the same button.
-- **Auto-archive**: turn on **Settings → Advanced → Auto-archive chats** to archive chats you haven't used for 1 to 30 days (7 by default). A chat counts as used when it gets a new message or you open it. Pipkin never archives a chat that's working, running background tasks, or on screen, and you can restore any chat from the archive.
+- **Auto-archive**: turn on **Settings → Chats → Auto-archive chats** to archive chats you haven't used for 1 to 30 days (7 by default). A chat counts as used when it gets a new message or you open it. Pipkin never archives a chat that's working, running background tasks, or on screen, and you can restore any chat from the archive.
 
 On a foldable or tablet, open chats, files, changes, and terminals side by side with **Open in split screen**.
 
@@ -78,7 +78,7 @@ On a foldable or tablet, open chats, files, changes, and terminals side by side 
 
 **Android won't ask for the Termux permission again.** Grant it from Pipkin's app info: **Permissions → Additional permissions → Run commands in Termux environment → Allow**.
 
-**Chats stop when the phone is locked.** Allow background activity for both Pipkin and Termux in **Settings → Permissions**. Some phones name this setting differently, and the step shows where to find it. [Run in the background](/docs/background/) explains what else can stop a chat.
+**Chats stop when the phone is locked.** Allow background activity for both Pipkin and Termux in **Settings → Agent → Permissions**. Some phones name this setting differently, and the step shows where to find it. [Run in the background](/docs/background/) explains what else can stop a chat.
 
 **Pipkin says Termux isn't running or its helper didn't start.** Tap **Open Termux** to see why. Once Termux is running, Pipkin switches back on its own. If Termux asks for the setup command, tap **Set up Termux** in Pipkin.
 

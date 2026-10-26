@@ -29,7 +29,7 @@ The agent can run a command in the background, such as a development server, a l
 - **Each task's output is kept** in a log file under `~/.pipkin/background` in Termux, until a day after the task last wrote to it. The result names the file, so you or the agent can read all of it.
 - **At most four tasks run at once in each chat.** Android stops apps that start too many processes, so each task runs as a single command.
 
-The agent is told to use background tasks for anything that should keep running. It can still start processes another way, such as with `&`, `nohup`, `tmux`, or `screen`, but Pipkin can't see those or keep the phone awake for them, so Android may stop them. To turn background tasks off, turn off **Pipkin background** in **Settings → Pipkin extensions**.
+The agent is told to use background tasks for anything that should keep running. It can still start processes another way, such as with `&`, `nohup`, `tmux`, or `screen`, but Pipkin can't see those or keep the phone awake for them, so Android may stop them. To turn background tasks off, turn off **Pipkin background** in **Settings → Extensions**.
 
 ### Why Pipkin has its own
 
@@ -43,20 +43,20 @@ Pi's package list already has background-task extensions, such as [pi-background
 
 Once every chat is idle, no background task is running, and no terminal is running a command, Pipkin removes its notification and releases the wake lock, so the phone can sleep normally. Pipkin doesn't hold a wake lock while idle, so leaving it open costs no extra battery.
 
-Idle chats also give back their memory. A chat that isn't working, waiting on background tasks, or on screen stops its agent after the time set in **Settings → Advanced → Stop idle chats after** (5 minutes by default). Its history stays, and the agent starts again when you open the chat.
+Idle chats also give back their memory. A chat that isn't working, waiting on background tasks, or on screen stops its agent after the time set in **Settings → Agent → Running agents → Stop idle chats after** (5 minutes by default). Its history stays, and the agent starts again when you open the chat.
 
 Pipkin only starts Termux while Pipkin is on screen, because Android can refuse to start another app from the background. Anything that needs a new agent, such as reopening a chat whose agent stopped, waits until you come back to Pipkin.
 
 ## Allow background activity
 
-Battery optimization can still stop Pipkin or Termux, or cut off the agent's network, after a while in the background. Setup asks you to exempt both apps; you can do it later from **Settings → Permissions**:
+Battery optimization can still stop Pipkin or Termux, or cut off the agent's network, after a while in the background. Setup asks you to exempt both apps; you can do it later from **Settings → Agent → Permissions**:
 
 - **Run in the background** exempts Pipkin. Tap **Allow** when Android asks.
 - **Let Termux run in the background** exempts Termux. If Android can't ask directly, Pipkin opens Termux's battery settings, where you choose **Allow background usage → Unrestricted**.
 
 Phone makers often name the setting differently, and many add battery managers of their own that can stop apps even with the exemption. If chats or tasks still stop while you're away, see [Troubleshooting](#troubleshooting) for the settings on your phone.
 
-Also turn on **Notifications** in **Settings → Permissions**. Without them, Pipkin can't tell you when a chat finishes, stops, or [asks you something](/docs/extensions/#how-extensions-look-in-pipkin) while you're away.
+Also turn on **Notifications** in **Settings → Agent → Permissions**. Without them, Pipkin can't tell you when a chat finishes, stops, or [asks you something](/docs/extensions/#how-extensions-look-in-pipkin) while you're away.
 
 ## What Android can still stop
 
@@ -85,8 +85,8 @@ When a chat's agent is stopped this way, the chat shows **Agent stopped** (see [
 
 These work on any Android version and change nothing outside Pipkin:
 
-- Lower **Settings → Advanced → Running chats**, which caps how many chats keep their agent running at once (6 by default, up to 16).
-- Shorten **Settings → Advanced → Stop idle chats after**, so chats you've left stop their agent sooner. Their history stays.
+- Lower **Settings → Agent → Running agents → Running chats**, which caps how many chats keep their agent running at once (6 by default, up to 16).
+- Shorten **Settings → Agent → Running agents → Stop idle chats after**, so chats you've left stop their agent sooner. Their history stays.
 - Close terminals you aren't using, and stop servers or watchers you started once you're done with them.
 
 #### Turn the limit off

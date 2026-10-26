@@ -53,7 +53,6 @@ import io.jeph.pipkin.ui.onboarding.OnboardingScreen
 import io.jeph.pipkin.ui.onboarding.PermissionsScreen
 import io.jeph.pipkin.ui.settings.AddModelsScreen
 import io.jeph.pipkin.ui.settings.AddProviderScreen
-import io.jeph.pipkin.ui.settings.AdvancedScreen
 import io.jeph.pipkin.ui.settings.BackupsScreen
 import io.jeph.pipkin.ui.settings.LicenseScreen
 import io.jeph.pipkin.ui.settings.LicensesScreen
@@ -61,6 +60,7 @@ import io.jeph.pipkin.ui.settings.ModelEditorScreen
 import io.jeph.pipkin.ui.settings.ProviderDrafts
 import io.jeph.pipkin.ui.settings.ProviderEditorScreen
 import io.jeph.pipkin.ui.settings.ProvidersScreen
+import io.jeph.pipkin.ui.settings.RunningAgentsScreen
 import io.jeph.pipkin.ui.settings.SettingsScreen
 import io.jeph.pipkin.ui.settings.SubscriptionScreen
 import io.jeph.pipkin.ui.settings.ownsDraft
@@ -202,8 +202,8 @@ private fun Screen(
     Destination.Archive, is Destination.ArchivedChat, is Destination.ArchivedSubagent ->
       ArchivePage(top, navigator, actions, requestedChat)
 
-    Destination.Settings, Destination.Permissions, Destination.Backups, Destination.Advanced, Destination.Licenses,
-    is Destination.License,
+    Destination.Settings, Destination.Permissions, Destination.Backups, Destination.RunningAgents,
+    Destination.Licenses, is Destination.License,
     -> SettingsPages(top, navigator)
 
     Destination.Providers -> ProvidersScreen(
@@ -259,7 +259,7 @@ private fun SettingsPages(top: Destination, navigator: AppNavigator) {
 
     Destination.Backups -> BackupsScreen(onBack = { navigator.pop() })
 
-    Destination.Advanced -> AdvancedScreen(onBack = { navigator.pop() })
+    Destination.RunningAgents -> RunningAgentsScreen(onBack = { navigator.pop() })
 
     Destination.Licenses -> LicensesScreen(
       onBack = { navigator.pop() },
@@ -270,10 +270,10 @@ private fun SettingsPages(top: Destination, navigator: AppNavigator) {
 
     else -> SettingsScreen(
       onBack = { navigator.pop() },
-      onOpenPermissions = { navigator.push(Destination.Permissions) },
       onOpenProviders = { navigator.push(Destination.Providers) },
+      onOpenRunningAgents = { navigator.push(Destination.RunningAgents) },
+      onOpenPermissions = { navigator.push(Destination.Permissions) },
       onOpenBackups = { navigator.push(Destination.Backups) },
-      onOpenAdvanced = { navigator.push(Destination.Advanced) },
       onOpenLicenses = { navigator.push(Destination.Licenses) },
     )
   }
