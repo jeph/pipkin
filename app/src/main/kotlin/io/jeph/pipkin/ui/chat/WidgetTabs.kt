@@ -36,7 +36,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
@@ -459,7 +458,6 @@ private fun WidgetPanel(item: KeyedWidget, belowEditor: Boolean, tight: Boolean,
 }
 
 /** The whole widget over the chat, for one too long for its panel: its label over every line, selectable. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WidgetSheet(item: KeyedWidget, tabs: WidgetTabs, onDismiss: () -> Unit) {
   val colors = pipkinColors

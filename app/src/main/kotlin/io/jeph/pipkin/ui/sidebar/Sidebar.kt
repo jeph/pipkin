@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -152,10 +151,7 @@ private fun AddWorkspacePicker(home: String, workspaces: List<Workspace>, onDism
   AddWorkspaceSheet(
     home = home,
     isWorkspace = { cwd -> workspaces.any { sameFolder(it.cwd, cwd) } },
-    onAdd = { cwd ->
-      preferences.addWorkspace(cwd)
-      onDismiss()
-    },
+    onAdd = preferences::addWorkspace,
     onDismiss = onDismiss,
   )
 }
@@ -235,10 +231,9 @@ private fun RemoveWorkspaceDialog(removal: WorkspaceRemoval, home: String) {
 }
 
 /** A workspace's sheet under its path: Open in split screen when [onOpenInSplit] is given, and Remove workspace. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun WorkspaceActions(path: String, onDismiss: () -> Unit, onOpenInSplit: (() -> Unit)?, onRemove: () -> Unit) {
-  PipkinSheet(onDismissRequest = onDismiss) {
+  PipkinSheet(onDismissRequest = onDismiss) { dismiss ->
     // A long path keeps its end, the folder that tells workspaces apart.
     Text(
       text = path,
@@ -252,20 +247,14 @@ private fun WorkspaceActions(path: String, onDismiss: () -> Unit, onOpenInSplit:
       SheetRow(
         label = stringResource(R.string.shell_split_open),
         icon = R.drawable.ic_lucide_columns_2,
-        onClick = {
-          onDismiss()
-          onOpenInSplit()
-        },
+        onClick = { dismiss(onOpenInSplit) },
       )
     }
     SheetRow(
       label = stringResource(R.string.archive_remove_workspace),
       icon = R.drawable.ic_lucide_folder_minus,
       labelColor = pipkinColors.destructive,
-      onClick = {
-        onDismiss()
-        onRemove()
-      },
+      onClick = { dismiss(onRemove) },
     )
   }
 }

@@ -81,10 +81,14 @@ internal fun PublishTabActions(slot: ShownTabActions, actions: List<TabAction>) 
 
 /**
  * The session sheet's section for the shown tab: an Actions label over its [actions] as tiles, three to a row; each
- * action runs after [onDismiss] closes the sheet.
+ * action runs once [dismiss] has slid the sheet away.
  */
 @Composable
-internal fun TabActionGrid(actions: List<TabAction>, onDismiss: () -> Unit, modifier: Modifier = Modifier) {
+internal fun TabActionGrid(
+  actions: List<TabAction>,
+  dismiss: (then: () -> Unit) -> Unit,
+  modifier: Modifier = Modifier,
+) {
   Column(
     modifier = modifier
       .padding(horizontal = PipkinTokens.Spacing.s16)
@@ -99,7 +103,7 @@ internal fun TabActionGrid(actions: List<TabAction>, onDismiss: () -> Unit, modi
       // Each row is as tall as its tallest tile, so a label that wraps doesn't leave its neighbours short.
       Row(Modifier.height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(TILE_GAP)) {
         row.forEach { action ->
-          ActionTile(action, onDismiss, Modifier.weight(1f).fillMaxHeight())
+          ActionTile(action, dismiss, Modifier.weight(1f).fillMaxHeight())
         }
         repeat(TILES_PER_ROW - row.size) { Spacer(Modifier.weight(1f)) }
       }
@@ -108,7 +112,7 @@ internal fun TabActionGrid(actions: List<TabAction>, onDismiss: () -> Unit, modi
 }
 
 @Composable
-private fun ActionTile(action: TabAction, onDismiss: () -> Unit, modifier: Modifier) {
+private fun ActionTile(action: TabAction, dismiss: (then: () -> Unit) -> Unit, modifier: Modifier) {
   val colors = pipkinColors
   val tint = if (action.destructive) colors.destructive else colors.foreground
   val onClick = action.onClick
@@ -117,10 +121,7 @@ private fun ActionTile(action: TabAction, onDismiss: () -> Unit, modifier: Modif
       .heightIn(min = TILE_HEIGHT)
       .clip(TILE_SHAPE)
       .background(colors.surface2)
-      .clickable(enabled = onClick != null, role = Role.Button) {
-        onDismiss()
-        onClick?.invoke()
-      }
+      .clickable(enabled = onClick != null, role = Role.Button) { onClick?.let(dismiss) }
       .alpha(if (onClick != null) 1f else DISABLED_ALPHA)
       .padding(horizontal = PipkinTokens.Spacing.s6, vertical = PipkinTokens.Spacing.s12),
     verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6, Alignment.CenterVertically),

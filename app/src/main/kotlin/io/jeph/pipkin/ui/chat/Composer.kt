@@ -41,7 +41,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldDecorator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -382,7 +381,6 @@ private fun receiveImages(
 }
 
 /** Opens the attach sheet: photos (only when the model accepts images) or any files. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AttachButton(controller: ChatController, model: JSONObject?) {
   var sheetOpen by remember { mutableStateOf(false) }
@@ -404,24 +402,20 @@ private fun AttachButton(controller: ChatController, model: JSONObject?) {
   )
   if (!sheetOpen) return
   val acceptsImages = acceptsImages(model)
-  PipkinSheet(onDismissRequest = { sheetOpen = false }) {
+  PipkinSheet(onDismissRequest = { sheetOpen = false }) { dismiss ->
     SheetRow(
       label = stringResource(R.string.chat_attach_photos),
       icon = R.drawable.ic_lucide_image,
       value = if (acceptsImages) null else stringResource(R.string.chat_images_text_only),
       enabled = acceptsImages,
       onClick = {
-        sheetOpen = false
-        photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        dismiss { photos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
       },
     )
     SheetRow(
       label = stringResource(R.string.chat_attach_files),
       icon = R.drawable.ic_lucide_paperclip,
-      onClick = {
-        sheetOpen = false
-        files.launch(arrayOf("*/*"))
-      },
+      onClick = { dismiss { files.launch(arrayOf("*/*")) } },
     )
   }
 }

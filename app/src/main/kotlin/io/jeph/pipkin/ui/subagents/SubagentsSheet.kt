@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
@@ -79,7 +78,6 @@ internal fun rememberChatSubagents(process: AgentProcess, timeline: TimelineStat
  * its tool call's id; [onStopAll] stops every active one. Closes once the chat has no subagents left, as after the
  * user's next message.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SubagentsSheet(
   subagents: ChatSubagents,
@@ -88,12 +86,13 @@ internal fun SubagentsSheet(
   onStopAll: () -> Unit,
   onDismiss: () -> Unit,
 ) {
-  LaunchedEffect(subagents.runs.isEmpty()) { if (subagents.runs.isEmpty()) onDismiss() }
   val groups = subagents.groups()
-  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = SHEET_MAX_HEIGHT) {
+  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = SHEET_MAX_HEIGHT) { dismiss ->
+    LaunchedEffect(subagents.runs.isEmpty()) { if (subagents.runs.isEmpty()) dismiss {} }
     SheetHeader(subagents)
     LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
-      val row = @Composable { run: SubagentRun -> RunRow(run, subagents, question, onOpen) }
+      val open = { toolCallId: String -> dismiss { onOpen(toolCallId) } }
+      val row = @Composable { run: SubagentRun -> RunRow(run, subagents, question, open) }
       group(R.string.subagents_group_waiting, groups.waiting, row, warning = true)
       group(R.string.subagents_group_running, groups.running, row)
       group(R.string.subagents_group_finished, groups.finished, row)

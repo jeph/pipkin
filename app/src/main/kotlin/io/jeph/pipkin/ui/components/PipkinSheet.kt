@@ -22,9 +22,12 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
@@ -45,25 +48,36 @@ import androidx.core.view.SoftwareKeyboardControllerCompat
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * A modal bottom sheet. With [heightFraction] the sheet is that share of the window tall whatever its
  * content, and [content] can fill the space with weights. With [maxHeightFraction] the sheet wraps its
  * content up to that share; give the scrolling part `weight(1f, fill = false)` so it scrolls there.
  * When the keyboard is up, the sheet waits for it to close and reopens it once the sheet is gone.
+ * [content] gets `dismiss`, for an action that closes the sheet: after [TOUCH_HOLD_MILLIS], so the
+ * touch shows, it slides the sheet away as a swipe or Back does, runs its `then` once the sheet is out
+ * of sight, and calls [onDismissRequest] once it's hidden, also when it leaves the screen on the way.
+ * An action that would reshape the sheet or open something over it goes in `then`; one that shows the
+ * pick in the sheet, or decides whether it closes, runs first. A `dismiss` while one is under way does
+ * nothing, and a finger that catches the sheet as it slides keeps it open.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PipkinSheet(
   onDismissRequest: () -> Unit,
   modifier: Modifier = Modifier,
-  sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
   heightFraction: Float? = null,
   maxHeightFraction: Float? = null,
-  content: @Composable ColumnScope.() -> Unit,
+  content: @Composable ColumnScope.(dismiss: (then: () -> Unit) -> Unit) -> Unit,
 ) {
   if (!keyboardClosedForSheet()) return
+  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+  val dismiss = rememberSheetDismiss(sheetState, onDismissRequest)
   val windowHeight = LocalWindowInfo.current.containerSize.height
   val sizing = when {
     heightFraction != null -> Modifier.sheetHeight(heightFraction, windowHeight, fill = true)
@@ -103,10 +117,60 @@ fun PipkinSheet(
         .then(sizing)
         .navigationBarsPadding()
         .padding(bottom = PipkinTokens.Spacing.s16),
-      content = content,
-    )
+    ) {
+      content(dismiss)
+    }
   }
 }
+
+/** The `dismiss` [PipkinSheet] hands its content. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun rememberSheetDismiss(sheetState: SheetState, onDismissRequest: () -> Unit): (then: () -> Unit) -> Unit {
+  val hideScope = rememberCoroutineScope()
+  val currentOnDismissRequest = rememberUpdatedState(onDismissRequest)
+  return remember(sheetState, hideScope) { SheetDismiss(sheetState, hideScope, currentOnDismissRequest) }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+private class SheetDismiss(
+  private val sheetState: SheetState,
+  private val hideScope: CoroutineScope,
+  private val onDismissRequest: State<() -> Unit>,
+) : (() -> Unit) -> Unit {
+  private var closing = false
+
+  override fun invoke(then: () -> Unit) {
+    if (closing) return
+    closing = true
+    var thenRan = false
+    val runThen = {
+      if (!thenRan) {
+        thenRan = true
+        then()
+      }
+    }
+    hideScope.launch {
+      delay(TOUCH_HOLD_MILLIS)
+      // Material's spring settles well after the sheet is out of sight; what the action brings up needn't wait for it.
+      launch {
+        delay(SLIDE_MILLIS)
+        runThen()
+      }
+      sheetState.hide()
+    }.invokeOnCompletion {
+      closing = false
+      runThen()
+      if (!sheetState.isVisible || !hideScope.isActive) onDismissRequest.value()
+    }
+  }
+}
+
+/** How long a sheet stays after an action closes it, so the touch's ripple and what it picked show first. */
+private const val TOUCH_HOLD_MILLIS = 120L
+
+/** How long a sheet takes to slide out of sight once it starts to hide. */
+private const val SLIDE_MILLIS = 100L
 
 private val SHEET_SHAPE = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
 

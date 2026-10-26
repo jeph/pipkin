@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,7 +54,6 @@ import org.json.JSONObject
  * Opened while it still streams, the sheet follows its end like the chat does until the user drags away.
  * [streamingArguments] gives a tool call's raw arguments while they stream, as the timeline's `streamingArguments`.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ToolCallSheet(item: TimelineItem, streamingArguments: (key: String) -> String?, onDismiss: () -> Unit) {
   val presentation = when (item) {

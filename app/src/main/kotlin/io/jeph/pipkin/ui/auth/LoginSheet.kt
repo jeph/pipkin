@@ -14,12 +14,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -27,7 +25,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,23 +65,14 @@ import kotlinx.coroutines.launch
  * runs while the sheet is shown; dismissing it cancels the login, which closes the host channel and
  * aborts Pi's flow. A Claude sign-in then offers pi-anthropic-auth unless Pi already installs it.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun LoginSheet(providerId: String, onDismiss: () -> Unit) {
   val context = LocalContext.current
   val accounts = context.appGraph.accountRepository
-  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-  val currentOnDismiss by rememberUpdatedState(onDismiss)
   var attempt by remember { mutableIntStateOf(0) }
   val flow = remember(attempt) { LoginFlowState() }
   var offerClaudePlugin by remember(attempt) { mutableStateOf(false) }
-  val scope = rememberCoroutineScope()
-  val close: () -> Unit = {
-    scope.launch {
-      sheetState.hide()
-      currentOnDismiss()
-    }
-  }
+  var finished by remember(attempt) { mutableStateOf(false) }
   val noBrowser = stringResource(R.string.login_no_browser)
   val provider = subscriptions.firstOrNull { it.id == providerId }
   val open: (String) -> Unit = { url ->
@@ -100,15 +88,15 @@ internal fun LoginSheet(providerId: String, onDismiss: () -> Unit) {
       return@LaunchedEffect
     }
     delay(1_000)
-    sheetState.hide()
-    currentOnDismiss()
+    finished = true
   }
   val browserUrl = flow.browser?.url
   // Pi waits for the browser round trip, so open the page as soon as it is known.
   LaunchedEffect(browserUrl) {
     if (browserUrl != null) open(browserUrl)
   }
-  PipkinSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+  PipkinSheet(onDismissRequest = onDismiss) { dismiss ->
+    if (finished) LaunchedEffect(Unit) { dismiss {} }
     // Large text can make the Claude plugin offer taller than the screen; scrolling keeps its buttons reachable.
     Column(
       modifier = Modifier
@@ -129,7 +117,7 @@ internal fun LoginSheet(providerId: String, onDismiss: () -> Unit) {
         onOpen = open,
         onRetry = { attempt += 1 },
       )
-      if (offerClaudePlugin) ClaudePluginOffer(onOpen = open, onDone = close)
+      if (offerClaudePlugin) ClaudePluginOffer(onOpen = open, onDone = { dismiss {} })
     }
   }
 }

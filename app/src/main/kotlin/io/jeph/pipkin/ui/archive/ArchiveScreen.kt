@@ -443,7 +443,6 @@ internal fun FolderLine(session: SessionInfo, home: String, modifier: Modifier =
 }
 
 /** One archived chat's sheet: Restore (unless its folder is gone) and Delete. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ArchivedChatActions(
   session: SessionInfo,
@@ -452,26 +451,20 @@ internal fun ArchivedChatActions(
   onRestore: () -> Unit,
   onDelete: () -> Unit,
 ) {
-  PipkinSheet(onDismissRequest = onDismiss) {
+  PipkinSheet(onDismissRequest = onDismiss) { dismiss ->
     SheetRow(
       label = stringResource(R.string.archive_restore),
       icon = R.drawable.ic_lucide_archive_restore,
       value = if (session.cwdExists) null else stringResource(R.string.archive_folder_missing),
       enabled = enabled && session.cwdExists,
-      onClick = {
-        onDismiss()
-        onRestore()
-      },
+      onClick = { dismiss(onRestore) },
     )
     SheetRow(
       label = stringResource(R.string.archive_delete),
       icon = R.drawable.ic_lucide_trash_2,
       labelColor = pipkinColors.destructive,
       enabled = enabled,
-      onClick = {
-        onDismiss()
-        onDelete()
-      },
+      onClick = { dismiss(onDelete) },
     )
   }
 }

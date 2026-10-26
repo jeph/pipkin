@@ -1,6 +1,5 @@
 package io.jeph.pipkin.ui.workspace
 
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,13 +21,10 @@ import io.jeph.pipkin.ui.components.PipkinDialog
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
 
-private enum class Stage { Menu, Rename }
-
 /**
  * A chat's sheet in the tab menu (Open in split screen when [onOpenInSplit] is given, Rename, Archive) and the rename
- * dialog it leads to.
+ * dialog it leads to, which opens once the sheet has slid away.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SessionActions(
   session: SessionInfo,
@@ -37,44 +33,47 @@ internal fun SessionActions(
   onArchive: () -> Unit,
   onOpenInSplit: (() -> Unit)?,
 ) {
-  var stage by rememberSaveable(session.path) { mutableStateOf(Stage.Menu) }
-  when (stage) {
-    Stage.Menu -> PipkinSheet(onDismissRequest = onDismiss) {
+  var menuOpen by rememberSaveable(session.path) { mutableStateOf(true) }
+  var renaming by rememberSaveable(session.path) { mutableStateOf(false) }
+  if (menuOpen) {
+    PipkinSheet(
+      onDismissRequest = {
+        menuOpen = false
+        if (!renaming) onDismiss()
+      },
+    ) { dismiss ->
       if (onOpenInSplit != null) {
         SheetRow(
           label = stringResource(R.string.shell_split_open),
           icon = R.drawable.ic_lucide_columns_2,
           onClick = {
-            onDismiss()
             onOpenInSplit()
+            dismiss {}
           },
         )
       }
       SheetRow(
         label = stringResource(R.string.shell_session_rename),
         icon = R.drawable.ic_lucide_pencil,
-        onClick = { stage = Stage.Rename },
+        onClick = { dismiss { renaming = true } },
       )
       SheetRow(
         label = stringResource(R.string.archive_action),
         icon = R.drawable.ic_lucide_archive,
-        onClick = {
-          onDismiss()
-          onArchive()
-        },
+        onClick = { dismiss(onArchive) },
       )
     }
-
-    Stage.Rename -> RenameDialog(
-      title = stringResource(R.string.shell_rename_title),
-      initial = session.name.orEmpty(),
-      onDismiss = onDismiss,
-      onConfirm = { name ->
-        onRename(name)
-        onDismiss()
-      },
-    )
   }
+  if (!renaming) return
+  RenameDialog(
+    title = stringResource(R.string.shell_rename_title),
+    initial = session.name.orEmpty(),
+    onDismiss = onDismiss,
+    onConfirm = { name ->
+      onRename(name)
+      onDismiss()
+    },
+  )
 }
 
 /**

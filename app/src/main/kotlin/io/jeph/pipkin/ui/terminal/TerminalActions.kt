@@ -1,6 +1,5 @@
 package io.jeph.pipkin.ui.terminal
 
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,29 +27,34 @@ internal enum class TerminalDialog { Rename, ConfirmClose }
 
 /**
  * A terminal tab's actions sheet in the session sheet's tab rows: Rename and Close terminal, which asks first, since
- * closing stops what runs in it. [onClose] runs once the user confirms.
+ * closing stops what runs in it. [onClose] runs once the user confirms. Each opens its dialog once the sheet has slid
+ * away.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TerminalActionsSheet(session: TerminalSession, onClose: () -> Unit, onDismiss: () -> Unit) {
+  var menuOpen by rememberSaveable(session.id) { mutableStateOf(true) }
   var dialog by rememberSaveable(session.id) { mutableStateOf<TerminalDialog?>(null) }
-  dialog?.let {
-    TerminalDialogs(session, it, onClose, onDismiss)
-    return
+  if (menuOpen) {
+    PipkinSheet(
+      onDismissRequest = {
+        menuOpen = false
+        if (dialog == null) onDismiss()
+      },
+    ) { dismiss ->
+      SheetRow(
+        label = stringResource(R.string.terminal_rename),
+        icon = R.drawable.ic_lucide_pencil,
+        onClick = { dismiss { dialog = TerminalDialog.Rename } },
+      )
+      SheetRow(
+        label = stringResource(R.string.terminal_close),
+        icon = R.drawable.ic_lucide_x,
+        labelColor = pipkinColors.destructive,
+        onClick = { dismiss { dialog = TerminalDialog.ConfirmClose } },
+      )
+    }
   }
-  PipkinSheet(onDismissRequest = onDismiss) {
-    SheetRow(
-      label = stringResource(R.string.terminal_rename),
-      icon = R.drawable.ic_lucide_pencil,
-      onClick = { dialog = TerminalDialog.Rename },
-    )
-    SheetRow(
-      label = stringResource(R.string.terminal_close),
-      icon = R.drawable.ic_lucide_x,
-      labelColor = pipkinColors.destructive,
-      onClick = { dialog = TerminalDialog.ConfirmClose },
-    )
-  }
+  dialog?.let { TerminalDialogs(session, it, onClose, onDismiss) }
 }
 
 /** [dialog] for [session]; [onClose] runs once the user confirms closing, and [onDismiss] closes the dialog. */

@@ -23,7 +23,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -295,25 +294,20 @@ private fun decodeImage(bytes: ByteArray): ImageBitmap? {
 }
 
 /** A file tab's actions: copy the file's full path, or close the tab. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun FileActionsSheet(file: FileTab, onClose: () -> Unit, onDismiss: () -> Unit) {
   val context = LocalContext.current
-  val dismissThen = { action: () -> Unit ->
-    onDismiss()
-    action()
-  }
-  PipkinSheet(onDismissRequest = onDismiss) {
+  PipkinSheet(onDismissRequest = onDismiss) { dismiss ->
     SheetRow(
       label = stringResource(R.string.file_copy_path),
       icon = R.drawable.ic_lucide_copy,
-      onClick = { dismissThen { copyToClipboard(context, file.name, "${file.cwd}/${file.path}") } },
+      onClick = { dismiss { copyToClipboard(context, file.name, "${file.cwd}/${file.path}") } },
     )
     SheetRow(
       label = stringResource(R.string.file_close),
       icon = R.drawable.ic_lucide_x,
       labelColor = pipkinColors.destructive,
-      onClick = { dismissThen(onClose) },
+      onClick = { dismiss(onClose) },
     )
   }
 }

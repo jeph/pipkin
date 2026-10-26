@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -153,7 +152,6 @@ internal fun TrustPrompt(onTrust: () -> Unit, onNotNow: () -> Unit, modifier: Mo
  * The Changes toolbar: the branch once a diff has loaded, the comparison [mode], which a tap offers to change, the
  * diff's totals, then Refresh, a spinner while [refreshing], and the diff options.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ChangesToolbar(
   workspace: GitWorkspace,
@@ -265,7 +263,6 @@ private fun modeLabel(mode: GitDiffMode): String = stringResource(
 )
 
 /** The comparisons, the selected one checked; Committed says which branch it compares with which. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ModeSheet(
   mode: GitDiffMode,
@@ -273,7 +270,7 @@ private fun ModeSheet(
   onSelect: (GitDiffMode) -> Unit,
   onDismiss: () -> Unit,
 ) {
-  PipkinSheet(onDismissRequest = onDismiss) {
+  PipkinSheet(onDismissRequest = onDismiss) { dismiss ->
     for (option in GitDiffMode.entries) {
       MenuRow(
         label = modeLabel(option),
@@ -281,8 +278,8 @@ private fun ModeSheet(
         icon = null,
         checked = option == mode,
         onClick = {
-          onDismiss()
           onSelect(option)
+          dismiss {}
         },
       )
     }
@@ -293,7 +290,6 @@ private fun ModeSheet(
  * Paseo's diff options: fold or unfold every file, then the whitespace and wrapping toggles, each named for what a
  * tap switches to.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun OptionsSheet(workspace: GitWorkspace, onDismiss: () -> Unit) {
   val preferences = LocalContext.current.appGraph.preferences
@@ -301,7 +297,7 @@ private fun OptionsSheet(workspace: GitWorkspace, onDismiss: () -> Unit) {
   val wrapLines by preferences.diffWrapLines.collectAsStateWithLifecycle()
   val paths = (workspace.changes as? ChangesContent.Loaded)?.document?.sections.orEmpty().map { it.file.path }
   val allCollapsed = paths.isNotEmpty() && workspace.collapsed.containsAll(paths)
-  PipkinSheet(onDismissRequest = onDismiss) {
+  PipkinSheet(onDismissRequest = onDismiss) { dismiss ->
     MenuRow(
       label = stringResource(if (allCollapsed) R.string.git_expand_all else R.string.git_collapse_all),
       description = null,
@@ -311,10 +307,7 @@ private fun OptionsSheet(workspace: GitWorkspace, onDismiss: () -> Unit) {
         R.drawable.ic_lucide_list_chevrons_down_up
       },
       checked = false,
-      onClick = {
-        onDismiss()
-        workspace.collapsed = if (allCollapsed) emptySet() else paths.toSet()
-      },
+      onClick = { dismiss { workspace.collapsed = if (allCollapsed) emptySet() else paths.toSet() } },
     )
     HorizontalDivider(thickness = 1.dp, color = pipkinColors.border)
     MenuRow(
@@ -322,20 +315,14 @@ private fun OptionsSheet(workspace: GitWorkspace, onDismiss: () -> Unit) {
       description = null,
       icon = R.drawable.ic_lucide_pilcrow,
       checked = false,
-      onClick = {
-        onDismiss()
-        preferences.setDiffHideWhitespace(!hideWhitespace)
-      },
+      onClick = { dismiss { preferences.setDiffHideWhitespace(!hideWhitespace) } },
     )
     MenuRow(
       label = stringResource(if (wrapLines) R.string.git_scroll_long_lines else R.string.git_wrap_long_lines),
       description = null,
       icon = R.drawable.ic_lucide_wrap_text,
       checked = false,
-      onClick = {
-        onDismiss()
-        preferences.setDiffWrapLines(!wrapLines)
-      },
+      onClick = { dismiss { preferences.setDiffWrapLines(!wrapLines) } },
     )
   }
 }

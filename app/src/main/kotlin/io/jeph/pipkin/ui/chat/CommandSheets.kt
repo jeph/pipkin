@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,7 +31,6 @@ import org.json.JSONObject
 private const val SHEET_MAX_HEIGHT = 0.8f
 
 /** `/session`: the session's name, file and id, message counts, tokens, context use and cost, as in Pi's terminal UI. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SessionInfoSheet(stats: JSONObject, name: String?, home: String?, onDismiss: () -> Unit) {
   val numbers = NumberFormat.getIntegerInstance()
@@ -99,11 +97,10 @@ private fun ContextRow(usage: JSONObject, numbers: NumberFormat) {
 }
 
 /** `/fork`: the user messages to fork from, newest first; picking one forks and fills the composer with it. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ForkSheet(messages: List<JSONObject>, onDismiss: () -> Unit, onFork: (entryId: String) -> Unit) {
   val colors = pipkinColors
-  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = SHEET_MAX_HEIGHT) {
+  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = SHEET_MAX_HEIGHT) { dismiss ->
     SectionTitle(R.string.chat_fork_title)
     Column(modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
       messages.asReversed().forEach { message ->
@@ -112,10 +109,7 @@ internal fun ForkSheet(messages: List<JSONObject>, onDismiss: () -> Unit, onFork
           modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 44.dp)
-            .clickable {
-              onDismiss()
-              onFork(message.optString("entryId"))
-            }
+            .clickable { dismiss { onFork(message.optString("entryId")) } }
             .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s12),
           color = colors.foreground,
           fontSize = PipkinTokens.FontSize.base,

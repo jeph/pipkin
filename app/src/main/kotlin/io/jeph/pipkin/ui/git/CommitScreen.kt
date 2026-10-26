@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -90,18 +89,14 @@ internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: M
 }
 
 /** A commit tab's actions: close it. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun CommitActionsSheet(onClose: () -> Unit, onDismiss: () -> Unit) {
-  PipkinSheet(onDismissRequest = onDismiss) {
+  PipkinSheet(onDismissRequest = onDismiss) { dismiss ->
     SheetRow(
       label = stringResource(R.string.git_commit_close),
       icon = R.drawable.ic_lucide_x,
       labelColor = pipkinColors.destructive,
-      onClick = {
-        onDismiss()
-        onClose()
-      },
+      onClick = { dismiss(onClose) },
     )
   }
 }

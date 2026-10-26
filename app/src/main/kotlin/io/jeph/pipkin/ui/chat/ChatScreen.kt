@@ -410,10 +410,7 @@ private fun ChatSheets(
     ChatSheet.Subagents -> SubagentsSheet(
       subagents = rememberChatSubagents(process, timeline),
       question = timeline.pendingUi?.title,
-      onOpen = {
-        dismiss()
-        onOpenSubagent(it)
-      },
+      onOpen = onOpenSubagent,
       onStopAll = { controller.scope.launch { process.stopAllSubagents() } },
       onDismiss = dismiss,
     )

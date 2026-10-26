@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -79,7 +78,6 @@ import io.jeph.pipkin.workspace.WorkspaceTab
  * reach. A terminal, a file or a commit closes by swiping it right or from its actions sheet, which also renames a
  * terminal.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun WorkspaceTabsSheet(
   pane: Pane,
@@ -98,47 +96,54 @@ internal fun WorkspaceTabsSheet(
   val archiving = remember(actions) { TabArchiving(actions) }
   val closing = remember(actions) { TabClosing(actions) }
   var menu by remember { mutableStateOf<TabMenu?>(null) }
-  val swapPanes = {
-    onSwapPanes()
-    onDismiss()
-  }
-  val show = { tab: WorkspaceTab -> if (graph.tabs.show(pane, tab)) onDismiss() else swapPanes() }
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
   LaunchedEffect(tabs.chats) { archiving.forgetGone(tabs.chats) }
+  var closedAs by remember { mutableStateOf<ClosedAs?>(null) }
   // A short window, such as a phone on its side, has no room for the tiles under the tabs without squeezing the tabs
   // out, so there the tiles scroll at the end of the list instead.
   val pinActions = LocalWindowInfo.current.containerDpSize.height >= PINNED_ACTIONS_MIN_HEIGHT
-  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = 0.85f) {
+  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = 0.85f) { dismiss ->
+    // A chat opens before the sheet closes, since a chat that can't open keeps it open with a notice. The sheet then
+    // keeps showing what it showed, so the opened chat doesn't reorder the rows or swap the tiles as it slides away.
+    val closeOnOpened = {
+      closedAs = ClosedAs(tabs, shownTab.current)
+      dismiss { closedAs = null }
+    }
+    val swapPanes = { dismiss(onSwapPanes) }
+    val show = { tab: WorkspaceTab -> dismiss { if (!graph.tabs.show(pane, tab)) onSwapPanes() } }
+    val closed = closedAs
+    val actionTiles = if (closed != null) closed.actions else shownTab.current
     TabsSheetTitle(name = projectName(cwd, home), path = tildePath(cwd, home))
     TabsLabels()
     TabList(
-      tabs = tabs,
+      tabs = closed?.tabs ?: tabs,
       archiving = archiving,
       closing = closing,
       callbacks = TabListCallbacks(
-        onOpenChat = { session -> if (actions.openChat(pane, session.cwd, session.path)) onDismiss() },
+        onOpenChat = { session -> if (actions.openChat(pane, session.cwd, session.path)) closeOnOpened() },
         onShow = show,
         onSwapPanes = swapPanes,
         onActions = { menu = it },
       ),
-      footer = shownTab.current?.takeUnless { pinActions }?.let { { TabActionGrid(it, onDismiss) } },
+      footer = actionTiles?.takeUnless { pinActions }?.let { { TabActionGrid(it, dismiss) } },
       modifier = Modifier.weight(1f, fill = false),
     )
-    if (pinActions) shownTab.current?.let { TabActionGrid(it, onDismiss) }
+    if (pinActions) actionTiles?.let { TabActionGrid(it, dismiss) }
     SnackbarStackOverlay(snackbar)
-  }
-  menu?.let { shownMenu ->
-    // Only chats no pane shows open in split screen: the second pane's own rows already show there.
-    val path = (shownMenu as? TabMenu.Chat)?.session?.path
-    val openInSplit = onShownInSplit?.let { shown ->
-      { session: SessionInfo ->
-        if (actions.openChat(Pane.Secondary, session.cwd, session.path)) {
-          shown()
-          onDismiss()
+    // Within the sheet's content, so opening a chat in split screen from the actions sheet slides this one away too.
+    menu?.let { shownMenu ->
+      // Only chats no pane shows open in split screen: the second pane's own rows already show there.
+      val path = (shownMenu as? TabMenu.Chat)?.session?.path
+      val openInSplit = onShownInSplit?.let { shown ->
+        { session: SessionInfo ->
+          if (actions.openChat(Pane.Secondary, session.cwd, session.path)) {
+            shown()
+            closeOnOpened()
+          }
         }
-      }
-    }?.takeIf { path != tabs.shown.chat && path != tabs.shown.elsewhereChat }
-    TabMenuSheet(shownMenu, actions, archiving, openInSplit, onDismiss = { menu = null })
+      }?.takeIf { path != tabs.shown.chat && path != tabs.shown.elsewhereChat }
+      TabMenuSheet(shownMenu, actions, archiving, openInSplit, onDismiss = { menu = null })
+    }
   }
   ConfirmArchive(archiving)
   ConfirmCloseTab(closing)
@@ -243,6 +248,9 @@ private sealed interface TabMenu {
 
   data class Tab(val tab: WorkspaceTab) : TabMenu
 }
+
+/** The [tabs] and the shown tab's [actions] the session sheet showed when opening a chat closed it. */
+private class ClosedAs(val tabs: WorkspaceTabs, val actions: List<TabAction>?)
 
 /**
  * [menu]'s actions sheet: a chat's renames or archives it, and opens it in split screen through [openInSplit] when

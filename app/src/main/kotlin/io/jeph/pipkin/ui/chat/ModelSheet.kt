@@ -1,5 +1,11 @@
 package io.jeph.pipkin.ui.chat
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,7 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -49,11 +54,16 @@ private const val PICKER_MAX_HEIGHT = 0.8f
 private val LEVEL_SHAPE = RoundedCornerShape(12.dp)
 private val LEVEL_GAP = 6.dp
 
+/** How long a pick takes to fill its pill or show its check, short enough to finish before the sheet starts to move. */
+private const val PICK_MILLIS = 100
+
+/** A tap's pick, shown as picked while the sheet slides away: a [model], or a thinking [level]. */
+private class Pick(val model: JSONObject? = null, val level: String? = null)
+
 /**
  * The composer's model picker: a search field (starting at [initialQuery]) over the models grouped by provider, and
  * under them, for a reasoning [model], the thinking levels Pi offers for it with [thinkingLevel] picked.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ModelSheet(
   controller: ChatController,
@@ -64,6 +74,7 @@ internal fun ModelSheet(
 ) {
   var models by remember { mutableStateOf<List<JSONObject>?>(null) }
   var query by rememberSaveable { mutableStateOf(initialQuery) }
+  var pick by remember { mutableStateOf<Pick?>(null) }
   val accounts = LocalContext.current.appGraph.accountRepository
   val status by accounts.status.collectAsStateWithLifecycle()
   val refreshError by accounts.refreshError.collectAsStateWithLifecycle()
@@ -78,16 +89,26 @@ internal fun ModelSheet(
       else -> models?.filter { "${it.optString("provider")}/${it.optString("id")}" in scope }
     }
   }
-  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = PICKER_MAX_HEIGHT) {
+  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = PICKER_MAX_HEIGHT) { dismiss ->
+    // The sheet shows the pick at once and switches Pi once it has slid away, so Pi's answer can't reshape it on the
+    // way; other taps meanwhile are ignored. A finger that catches the sheet keeps it open to pick again.
+    fun pickAndClose(picked: Pick, switch: () -> Unit) {
+      if (pick != null) return
+      pick = picked
+      dismiss {
+        switch()
+        pick = null
+      }
+    }
     SearchField(query, onQueryChange = { query = it }, placeholder = stringResource(R.string.chat_model_search))
-    ModelList(scoped, query.trim(), model, Modifier.weight(1f, fill = false)) { selected ->
-      controller.setModel(selected.optString("provider"), selected.optString("id"))
-      onDismiss()
+    ModelList(scoped, query.trim(), pick?.model ?: model, Modifier.weight(1f, fill = false)) { selected ->
+      pickAndClose(Pick(model = selected)) {
+        controller.setModel(selected.optString("provider"), selected.optString("id"))
+      }
     }
     if (supportsThinking(model)) {
-      ThinkingLevels(controller, model, thinkingLevel) { level ->
-        controller.setThinkingLevel(level)
-        onDismiss()
+      ThinkingLevels(controller, model, pick?.level ?: thinkingLevel) { level ->
+        pickAndClose(Pick(level = level)) { controller.setThinkingLevel(level) }
       }
     }
   }
@@ -118,18 +139,23 @@ private fun ThinkingLevels(controller: ChatController, model: JSONObject?, curre
   ) {
     shown.forEach { level ->
       val picked = level == current
+      val fill by animateColorAsState(if (picked) colors.accent else colors.surface0, tween(PICK_MILLIS))
+      val textColor by animateColorAsState(
+        if (picked) colors.accentForeground else colors.foregroundMuted,
+        tween(PICK_MILLIS),
+      )
       Box(
         modifier = Modifier
           .heightIn(min = 36.dp)
           .clip(LEVEL_SHAPE)
-          .background(if (picked) colors.accent else colors.surface0)
+          .background(fill)
           .selectable(selected = picked, role = Role.RadioButton, onClick = { onPick(level) })
           .padding(horizontal = PipkinTokens.Spacing.s12, vertical = PipkinTokens.Spacing.s8),
         contentAlignment = Alignment.Center,
       ) {
         Text(
           text = thinkingLevelLabel(level),
-          color = if (picked) colors.accentForeground else colors.foregroundMuted,
+          color = textColor,
           fontSize = 12.5.sp,
           fontWeight = FontWeight.Bold,
           maxLines = 1,
@@ -167,7 +193,13 @@ private fun ModelList(
         SheetRow(
           label = modelLabel(entry).orEmpty(),
           onClick = { onSelect(entry) },
-          trailing = { if (isSameModel(entry, current)) CheckIcon() },
+          trailing = {
+            AnimatedVisibility(
+              visible = isSameModel(entry, current),
+              enter = fadeIn(tween(PICK_MILLIS)) + scaleIn(tween(PICK_MILLIS)),
+              exit = fadeOut(tween(PICK_MILLIS)),
+            ) { CheckIcon() }
+          },
         )
       }
     }
