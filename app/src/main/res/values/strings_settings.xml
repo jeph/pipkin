@@ -99,7 +99,7 @@
     <string name="settings_auto_archive_days">Days without activity</string>
     <string name="settings_auto_archive_fewer">Fewer days</string>
     <string name="settings_auto_archive_more">More days</string>
-    <string name="settings_auto_archive_summary">Archives a chat after a set number of days without a new message or being opened.</string>
+    <string name="settings_auto_archive_summary">Archives a chat after a set number of days without a new message or being opened</string>
 
     <string name="settings_theme">Theme</string>
     <!-- Theme names. System follows the phone's dark mode, using Porcelain by day and Stone by night. The others are
