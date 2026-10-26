@@ -63,17 +63,21 @@ internal fun StatusBanner(
   if (state == AgentProcessState.Ready || state is AgentProcessState.Exited) return
   // The caller may fill the width, which widthIn can't narrow, so the card is capped in a box that takes it.
   Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-    val note = Modifier.widthIn(max = PipkinTokens.noteMaxWidth)
-    StatusCard(state, onRetry, onOpenOnboarding, note)
+    StatusCard(state, onRetry, onOpenOnboarding, Modifier.widthIn(max = PipkinTokens.noteMaxWidth))
   }
 }
 
 @Composable
-private fun StatusCard(state: AgentProcessState, onRetry: () -> Unit, onOpenOnboarding: () -> Unit, note: Modifier) {
+private fun StatusCard(
+  state: AgentProcessState,
+  onRetry: () -> Unit,
+  onOpenOnboarding: () -> Unit,
+  modifier: Modifier,
+) {
   when (state) {
-    AgentProcessState.Starting -> StartingBanner(note)
+    AgentProcessState.Starting -> StartingBanner(modifier)
 
-    is AgentProcessState.Installing -> BannerCard(note) {
+    is AgentProcessState.Installing -> BannerCard(modifier) {
       Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
         SimmeringPot(size = PipkinTokens.IconSize.lg)
         BannerTitle(stringResource(R.string.chat_installing))
@@ -92,7 +96,7 @@ private fun StatusCard(state: AgentProcessState, onRetry: () -> Unit, onOpenOnbo
       }
     }
 
-    is AgentProcessState.Failed -> FailedBanner(state, onRetry, onOpenOnboarding, note)
+    is AgentProcessState.Failed -> FailedBanner(state, onRetry, onOpenOnboarding, modifier)
 
     AgentProcessState.Ready, is AgentProcessState.Exited -> Unit
   }

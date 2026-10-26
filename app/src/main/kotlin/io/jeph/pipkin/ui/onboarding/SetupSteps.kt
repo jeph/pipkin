@@ -1,5 +1,7 @@
 package io.jeph.pipkin.ui.onboarding
 
+import android.Manifest
+import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -136,7 +138,9 @@ private fun permissionSpec(
 
 @Composable
 private fun notificationsSpec(state: OnboardingState, onAction: (SetupAction) -> Unit): StepSpec {
-  val blocked = android.Manifest.permission.POST_NOTIFICATIONS in state.blockedPermissions
+  // Android asks for the notifications permission from 13 on, so it's never blocked before then.
+  val blocked = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+    Manifest.permission.POST_NOTIFICATIONS in state.blockedPermissions
   val label = if (blocked) R.string.onboarding_open_settings else R.string.onboarding_allow
   return permissionSpec(
     step = SetupStep.Notifications,
