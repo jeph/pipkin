@@ -24,6 +24,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,7 +39,9 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -60,11 +63,11 @@ import kotlinx.coroutines.launch
  * content up to that share; give the scrolling part `weight(1f, fill = false)` so it scrolls there.
  * When the keyboard is up, the sheet waits for it to close and reopens it once the sheet is gone.
  * [content] gets `dismiss`, for an action that closes the sheet: after [TOUCH_HOLD_MILLIS], so the
- * touch shows, it slides the sheet away as a swipe or Back does, runs its `then` once the sheet is out
- * of sight, and calls [onDismissRequest] once it's hidden, also when it leaves the screen on the way.
- * An action that would reshape the sheet or open something over it goes in `then`; one that shows the
- * pick in the sheet, or decides whether it closes, runs first. A `dismiss` while one is under way does
- * nothing, and a finger that catches the sheet as it slides keeps it open.
+ * touch shows, it slides the sheet away as a swipe or Back does, runs its `then` once the sheet is all
+ * but out of sight, and calls [onDismissRequest] once it's hidden, also when it leaves the screen on the
+ * way. An action that would reshape the sheet or open something over it goes in `then`; one that shows
+ * the pick in the sheet, or decides whether it closes, runs first. A `dismiss` while one is under way
+ * does nothing, and a finger that catches the sheet as it slides keeps it open and drops the `then`.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,6 +109,7 @@ fun PipkinSheet(
     val unscrolled = rememberScrollableState { 0f }
     Column(
       modifier = Modifier
+        .onGloballyPositioned { dismiss.shownFraction = it.boundsInWindow().height / it.size.height }
         .nestedScroll(guard)
         .scrollable(unscrolled, Orientation.Vertical)
         .pointerInput(guard) {
@@ -126,7 +130,7 @@ fun PipkinSheet(
 /** The `dismiss` [PipkinSheet] hands its content. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun rememberSheetDismiss(sheetState: SheetState, onDismissRequest: () -> Unit): (then: () -> Unit) -> Unit {
+private fun rememberSheetDismiss(sheetState: SheetState, onDismissRequest: () -> Unit): SheetDismiss {
   val hideScope = rememberCoroutineScope()
   val currentOnDismissRequest = rememberUpdatedState(onDismissRequest)
   return remember(sheetState, hideScope) { SheetDismiss(sheetState, hideScope, currentOnDismissRequest) }
@@ -140,6 +144,9 @@ private class SheetDismiss(
 ) : (() -> Unit) -> Unit {
   private var closing = false
 
+  /** How much of the sheet's content is on screen: 1 when it's all up, 0 once it's out of sight. */
+  var shownFraction by mutableFloatStateOf(1f)
+
   override fun invoke(then: () -> Unit) {
     if (closing) return
     closing = true
@@ -152,15 +159,17 @@ private class SheetDismiss(
     }
     hideScope.launch {
       delay(TOUCH_HOLD_MILLIS)
-      // Material's spring settles well after the sheet is out of sight; what the action brings up needn't wait for it.
-      launch {
-        delay(SLIDE_MILLIS)
+      // Material's animation settles well after the sheet is out of sight; what the action brings up needn't wait
+      // for it. A drag that catches the sheet cancels [SheetState.hide], and this job with it, dropping `then`.
+      val outOfSight = launch {
+        snapshotFlow { shownFraction }.first { it <= OUT_OF_SIGHT_FRACTION }
         runThen()
       }
       sheetState.hide()
+      outOfSight.cancel()
+      runThen()
     }.invokeOnCompletion {
       closing = false
-      runThen()
       if (!sheetState.isVisible || !hideScope.isActive) onDismissRequest.value()
     }
   }
@@ -169,8 +178,8 @@ private class SheetDismiss(
 /** How long a sheet stays after an action closes it, so the touch's ripple and what it picked show first. */
 private const val TOUCH_HOLD_MILLIS = 120L
 
-/** How long a sheet takes to slide out of sight once it starts to hide. */
-private const val SLIDE_MILLIS = 100L
+/** The share of a closing sheet's content still on screen when the action it closed for runs. */
+private const val OUT_OF_SIGHT_FRACTION = 0.1f
 
 private val SHEET_SHAPE = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp)
 
