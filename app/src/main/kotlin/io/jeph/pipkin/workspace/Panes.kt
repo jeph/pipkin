@@ -219,7 +219,7 @@ internal class Panes<P : ManagedProcess>(
 }
 
 /** The same item: the same tab, or the same chat, though reloaded as another process. */
-private fun PaneItem<ManagedProcess>.sameAs(other: PaneItem<ManagedProcess>): Boolean = when (this) {
+internal fun PaneItem<ManagedProcess>.sameAs(other: PaneItem<ManagedProcess>): Boolean = when (this) {
   is PaneItem.Tab -> this == other
 
   is PaneItem.Chat ->

@@ -1,6 +1,7 @@
 package io.jeph.pipkin.ui.chat
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +18,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -42,6 +42,7 @@ import io.jeph.pipkin.ui.ShellActions
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
+import io.jeph.pipkin.ui.stackTransition
 import io.jeph.pipkin.ui.subagents.ChatSubagentScreen
 import io.jeph.pipkin.ui.subagents.SubagentsSheet
 import io.jeph.pipkin.ui.subagents.rememberChatSubagents
@@ -57,32 +58,30 @@ import kotlinx.coroutines.launch
 
 /**
  * One chat in a pane: header, stream and composer for [process]; a null process shows a starting placeholder. What
- * the screen keeps of each chat comes from [views]. The header's buttons, and `/resume`, act through [controls]: the
- * tab menu, the explorer, the sidebar and, in the second pane, closing split screen. A subagent the chat started opens
- * in its place, in the same pane, until Back.
+ * the screen keeps of each chat comes from [views], and what outlives it from [paneChats]. The header's buttons, and
+ * `/resume`, act through [controls]: the tab menu, the explorer, the sidebar and, in the second pane, closing split
+ * screen. A subagent the chat started slides in over it, in the same pane, until Back slides it back out.
  */
 @Composable
 internal fun ChatScreen(
   process: AgentProcess?,
+  paneChats: PaneChats,
   actions: ShellActions,
   views: ChatViews,
   controls: PaneControls,
   onOpenSettings: () -> Unit,
   onOpenProviders: () -> Unit,
   onOpenOnboarding: () -> Unit,
-  modifier: Modifier = Modifier,
 ) {
-  // Outlive a process swap, so a message about the closed chat (delete failed) still shows.
-  val snackbar = remember { SnackbarStackState() }
-  val scope = rememberCoroutineScope()
   if (process == null) {
-    PlaceholderChat(controls, modifier)
+    PlaceholderChat(controls)
     return
   }
   // Everything below is per chat. Collecting a chat's flows outside this key would show the previous chat's
   // timeline for a frame after a switch, until the collector of the new one has run.
   key(process) {
     val context = LocalContext.current
+    val snackbar = paneChats.snackbar
     var sheet by remember { mutableStateOf<ChatSheet?>(null) }
     val navigator = rememberNavigator(
       onSheet = { sheet = it },
@@ -91,34 +90,37 @@ internal fun ChatScreen(
       onOpenSettings = onOpenSettings,
     )
     val controller = remember {
-      ChatController(process, views[process], context.applicationContext, scope, snackbar, navigator)
+      ChatController(process, views[process], context.applicationContext, paneChats.scope, snackbar, navigator)
     }
     LaunchedEffect(controller) { controller.collectEffects() }
     LaunchedEffect(controller) { controller.steering.collectQueue() }
     // The pane's own: a subagent shows in place of its chat and never in the other pane or as a tab of its own.
     var subagent by rememberSaveable { mutableStateOf<String?>(null) }
-    val shownSubagent = subagent
-    if (shownSubagent != null) {
-      BackHandler { subagent = null }
-      ChatSubagentScreen(
-        controller = controller,
-        toolCallId = shownSubagent,
-        chatTitle = chatTitle(process),
-        controls = controls,
-        onBack = { subagent = null },
-        modifier = modifier,
-      )
-    } else {
-      ChatContent(
-        controller,
-        snackbar,
-        controls,
-        onOpenProviders,
-        onOpenOnboarding,
-        onSheet = { sheet = it },
-        onOpenSubagent = { subagent = it },
-        modifier,
-      )
+    BackHandler(enabled = subagent != null) { subagent = null }
+    AnimatedContent(
+      targetState = subagent,
+      transitionSpec = { stackTransition(from = initialState.depth, to = targetState.depth) },
+      label = "subagent",
+    ) { shownSubagent ->
+      if (shownSubagent != null) {
+        ChatSubagentScreen(
+          controller = controller,
+          toolCallId = shownSubagent,
+          chatTitle = chatTitle(process),
+          controls = controls,
+          onBack = { subagent = null },
+        )
+      } else {
+        ChatContent(
+          controller,
+          snackbar,
+          controls,
+          onOpenProviders,
+          onOpenOnboarding,
+          onSheet = { sheet = it },
+          onOpenSubagent = { subagent = it },
+        )
+      }
     }
     PublishChatActions(
       controller,
@@ -132,6 +134,9 @@ internal fun ChatScreen(
     ChatDialogs(controller, sheet, onSheet = { sheet = it }, onArchive = actions::archive)
   }
 }
+
+/** A subagent's depth over its chat, for the slide between them; none is the chat itself. */
+private val String?.depth: Int get() = if (this == null) 0 else 1
 
 /** A [ChatNavigator] that outlives recompositions and always calls the latest callbacks. */
 @Composable
@@ -169,7 +174,6 @@ private fun ChatContent(
   onOpenOnboarding: () -> Unit,
   onSheet: (ChatSheet) -> Unit,
   onOpenSubagent: (toolCallId: String) -> Unit,
-  modifier: Modifier,
 ) {
   val process = controller.process
   val timeline by process.screenTimeline.collectAsStateWithLifecycle()
@@ -188,7 +192,7 @@ private fun ChatContent(
     }
   }
   Column(
-    modifier = modifier.fillMaxSize().background(pipkinColors.surface0).closeContextDetailsOnPress(controller),
+    modifier = Modifier.fillMaxSize().background(pipkinColors.surface0).closeContextDetailsOnPress(controller),
   ) {
     ChatHeader(process, controls, Modifier.onUnhandledTap(dismissKeyboard))
     // The keyboard and a dialog both take the room the steering box and widget panels would use, so then the steering
@@ -308,8 +312,8 @@ private fun SlashMenuHost(controller: ChatController, ready: Boolean, modifier: 
 
 /** Shown while the shell has no process for the pane yet. */
 @Composable
-private fun PlaceholderChat(controls: PaneControls, modifier: Modifier) {
-  Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
+private fun PlaceholderChat(controls: PaneControls) {
+  Column(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
     HeaderBar(
       title = stringResource(R.string.chat_new_chat),
       leading = { SidebarButton(controls.onToggleSidebar) },

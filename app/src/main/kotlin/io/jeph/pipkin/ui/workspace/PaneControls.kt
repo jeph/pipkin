@@ -26,6 +26,12 @@ internal class PaneControls(
   val onCloseSplit: (() -> Unit)?,
 ) {
   val shownTab = ShownTabActions()
+
+  /**
+   * These controls with a [shownTab] nothing reads, for a screen sliding out of the pane, so the actions it sets as it
+   * leaves never replace those of the screen taking its place.
+   */
+  fun forLeavingScreen() = PaneControls(pane, onToggleSidebar, onOpenTabs, onToggleExplorer, onCloseTab, onCloseSplit)
 }
 
 /** The end-side pane's button that closes split screen, at the end of its screens' headers. */

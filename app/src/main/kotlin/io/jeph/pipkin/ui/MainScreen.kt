@@ -411,7 +411,9 @@ private fun WorkspacePanes(
             }
           },
           workspace = {
-            WorkspacePane(item, actions, views, controls, onOpenSettings, onOpenProviders, onOpenOnboarding)
+            // Covered until the panel has settled on the screen, so a chat picked in the sidebar comes in with it.
+            val covered = panel != Panel.Chat || panels[pane].currentValue != Panel.Chat
+            WorkspacePane(item, covered, actions, views, controls, onOpenSettings, onOpenProviders, onOpenOnboarding)
           },
           explorer = {
             PaneExplorer(pane, item, panel == Panel.Explorer, snackbar, swapPanes) { panels.show(pane, Panel.Chat) }
