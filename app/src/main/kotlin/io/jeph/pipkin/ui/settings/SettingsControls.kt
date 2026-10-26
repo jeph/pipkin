@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -112,6 +113,27 @@ internal fun Stepper(value: Int, range: IntRange, onChange: (Int) -> Unit, fewer
       tint = colors.foreground,
     )
   }
+}
+
+/**
+ * The latest line of a command's output under the [SettingsRow] running it, kept to one line so the row doesn't jump
+ * as the output changes.
+ */
+@Composable
+internal fun SettingsProgressLine(text: String) {
+  Text(
+    text = text,
+    modifier =
+      Modifier
+        .fillMaxWidth()
+        .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s12),
+    color = pipkinColors.foregroundMuted,
+    fontFamily = PipkinFonts.mono,
+    fontSize = PipkinTokens.FontSize.code,
+    lineHeight = PipkinTokens.LineHeight.code,
+    maxLines = 1,
+    overflow = TextOverflow.Ellipsis,
+  )
 }
 
 /** The shape of a settings form field: the same rounded well as a dialog's field. */

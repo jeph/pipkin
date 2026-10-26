@@ -73,7 +73,7 @@ internal fun SettingsDivider() {
   HorizontalDivider(thickness = 1.dp, color = pipkinColors.border)
 }
 
-/** A 56dp settings card row: optional leading icon, title, optional muted subtitle, trailing control. */
+/** A 56dp settings card row: optional leading icon, title, optional muted subtitle that wraps in full, trailing control. */
 @Composable
 internal fun SettingsRow(
   title: String,
@@ -107,8 +107,6 @@ internal fun SettingsRow(
           text = subtitle,
           color = colors.foregroundMuted,
           fontSize = PipkinTokens.FontSize.sm,
-          maxLines = 2,
-          overflow = TextOverflow.Ellipsis,
         )
       }
     }

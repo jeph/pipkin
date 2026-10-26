@@ -1,8 +1,6 @@
 package io.jeph.pipkin.ui.settings
 
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,14 +9,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.AppGraph
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.termux.TermuxInstall
 import io.jeph.pipkin.ui.components.SimmeringPot
-import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.io.IOException
@@ -105,7 +101,6 @@ private fun ReinstallRow(
   outcome: ReinstallOutcome?,
   onReinstall: () -> Unit,
 ) {
-  val colors = pipkinColors
   val subtitle =
     when {
       installing -> stringResource(R.string.settings_reinstall_running, expectedVersion)
@@ -120,26 +115,12 @@ private fun ReinstallRow(
   ) {
     if (installing) SimmeringPot()
   }
-  if (installing && progressLine != null) {
-    Text(
-      text = progressLine,
-      modifier =
-        Modifier
-          .fillMaxWidth()
-          .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s12),
-      color = colors.foregroundMuted,
-      fontFamily = PipkinFonts.mono,
-      fontSize = PipkinTokens.FontSize.code,
-      lineHeight = PipkinTokens.LineHeight.code,
-      maxLines = 1,
-      overflow = TextOverflow.Ellipsis,
-    )
-  }
+  if (installing && progressLine != null) SettingsProgressLine(progressLine)
   if (outcome is ReinstallOutcome.Failed && !installing) {
     SettingsCaption(
       text = outcome.message,
       modifier = Modifier.padding(start = PipkinTokens.Spacing.s12, bottom = PipkinTokens.Spacing.s12),
-      color = colors.destructive,
+      color = pipkinColors.destructive,
     )
   }
 }

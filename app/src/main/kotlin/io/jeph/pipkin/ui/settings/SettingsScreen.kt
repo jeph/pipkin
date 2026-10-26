@@ -220,10 +220,9 @@ private fun UpdateExtensionsRow(update: PiExtensionUpdate, snackbar: SnackbarSta
     scope.launch { snackbar.show(message) }
     update.acknowledge()
   }
-  val subtitle = when {
-    !running -> stringResource(R.string.settings_update_extensions_summary)
-    else -> progress ?: stringResource(R.string.settings_update_extensions_running)
-  }
+  val subtitle = stringResource(
+    if (running) R.string.settings_update_extensions_running else R.string.settings_update_extensions_summary,
+  )
   SettingsRow(
     title = stringResource(R.string.settings_update_extensions),
     subtitle = subtitle,
@@ -232,6 +231,7 @@ private fun UpdateExtensionsRow(update: PiExtensionUpdate, snackbar: SnackbarSta
   ) {
     if (running) SimmeringPot()
   }
+  progress?.takeIf { running }?.let { SettingsProgressLine(it) }
   if (!confirming) return
   ConfirmDialog(
     title = stringResource(R.string.settings_update_extensions_title),
