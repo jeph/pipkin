@@ -65,7 +65,7 @@ internal fun AgentSection(graph: AppGraph, onOpenRunningAgents: () -> Unit, onOp
     }
   }
   SettingsSection(title = stringResource(R.string.settings_section_agent)) {
-    SettingsRow(title = stringResource(R.string.settings_termux)) { SettingsValue(status) }
+    SettingsRow(title = stringResource(R.string.settings_termux), subtitle = status)
     SettingsDivider()
     SettingsRow(
       title = stringResource(R.string.settings_running_agents),
