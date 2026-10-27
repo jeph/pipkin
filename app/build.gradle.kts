@@ -395,6 +395,13 @@ android {
       isPseudoLocalesEnabled = true
       applicationIdSuffix = ".debug"
     }
+    // Google Play requires at least 25% shrinking, optimization and obfuscation of apps with over 10 MB of DEX code.
+    // Only the release is minified, so test that build on an emulator before cutting a release (AGENTS.md).
+    release {
+      isMinifyEnabled = true
+      isShrinkResources = true
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+    }
   }
 
   // Production classes log through android.util.Log, whose JVM stub otherwise throws in unit tests.
