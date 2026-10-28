@@ -377,6 +377,7 @@ android {
   packaging { jniLibs { useLegacyPackaging = true } }
 
   buildFeatures {
+    aidl = true
     compose = true
   }
 

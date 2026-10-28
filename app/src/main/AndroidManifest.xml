@@ -109,6 +109,12 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="User-started on-device coding agent sessions running in Termux; keeps Pipkin's connection to Pi alive and offers Stop." />
         </service>
+        <!-- Runs one local model in its own process, so Android killing it for memory leaves the UI, and unloading
+             a model is killing the process. -->
+        <service
+            android:name=".localmodel.engine.InferenceService"
+            android:exported="false"
+            android:process=":inference" />
         <receiver
             android:name=".host.HostResultReceiver"
             android:exported="false" />

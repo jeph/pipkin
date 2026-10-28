@@ -9,4 +9,7 @@ internal object TermuxBuild {
 
   /** The first of the five loopback ports the Play-Termux helper may listen on. */
   const val HELPER_FIRST_PORT = 47320
+
+  /** The loopback port Pi reaches Pipkin's local models on, just past the helper's. */
+  const val LOCAL_MODEL_PORT = 47325
 }

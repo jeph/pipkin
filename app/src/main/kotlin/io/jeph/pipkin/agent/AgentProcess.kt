@@ -110,6 +110,7 @@ internal class AgentProcess(
   private val processScope = CoroutineScope(scope.coroutineContext + job)
   private val stateFlow = MutableStateFlow<AgentProcessState>(AgentProcessState.Starting)
   private val sessionFileState = MutableStateFlow(sessionPath)
+  private val sessionIdState = MutableStateFlow<String?>(null)
   private val sessionNameState = MutableStateFlow<String?>(null)
   private val extensionTitleState = MutableStateFlow(sessionPath?.let { sessions.extensionTitles[it] })
   private val extensionStatusesState = MutableStateFlow(sessionPath?.let { sessions.extensionStatuses[it] }.orEmpty())
@@ -186,6 +187,9 @@ internal class AgentProcess(
   val state: StateFlow<AgentProcessState> = stateFlow.asStateFlow()
 
   override val sessionFile: StateFlow<String?> = sessionFileState.asStateFlow()
+
+  /** `get_state.sessionId`, which pi-ai sends local models as `x-session-affinity` to say which chat a request is. */
+  val sessionId: StateFlow<String?> = sessionIdState.asStateFlow()
 
   /** `get_state.sessionName`, kept current by `set_session_name` and `session_info_changed`. */
   val sessionName: StateFlow<String?> = sessionNameState.asStateFlow()
@@ -819,6 +823,7 @@ internal class AgentProcess(
       // arriving meanwhile is saved by the timeline's callback instead.
       if (named) sessions.notices.put(path, timeline.savedNotices())
     }
+    (data.opt("sessionId") as? String)?.let { sessionIdState.value = it }
     sessionNameState.value = data.opt("sessionName") as? String
     // With no usable model Pi (1.1.0, still in 1.4.0) reports a placeholder whose provider is "unknown" rather than
     // omitting it.
