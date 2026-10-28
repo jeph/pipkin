@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_section_experimental">Experimental</string>
+    <string name="local_models_title">Local models</string>
+    <string name="local_models_row_on">On</string>
+    <string name="local_models_row_off">Run small models on this phone</string>
+
+    <string name="local_models_enable">Run models on this phone</string>
+    <string name="local_models_enable_summary">Experimental. Chats can pick the models you download here like any other. They\'re slower and less capable than a provider\'s, and use a lot of memory and battery.</string>
+
+    <string name="local_models_section_status">Status</string>
+    <string name="local_models_stopped">No model loaded</string>
+    <string name="local_models_stopped_summary">A model loads when a chat sends it a message.</string>
+    <!-- %1$s: the model's name, such as "Qwen3 0.6B". -->
+    <string name="local_models_loading">Loading %1$s</string>
+    <!-- %1$s: how much of the model has loaded, as a percentage formatted for the locale, such as "40%". -->
+    <string name="local_models_loading_summary">%1$s loaded</string>
+    <!-- %1$s: the model's name, such as "Qwen3 0.6B". -->
+    <string name="local_models_ready">%1$s is ready</string>
+    <!-- %1$s: the engine running the model, such as "LiteRT-LM". %2$s: the processor it runs on, such as "GPU".
+         %3$s: how many tokens of context it was loaded with, formatted for the locale, such as "4,096". -->
+    <string name="local_models_ready_summary">%1$s on the %2$s, %3$s tokens of context</string>
+    <!-- %1$s: the model's name, such as "Qwen3 0.6B". -->
+    <string name="local_models_failed">%1$s couldn\'t load</string>
+    <string name="local_models_unload">Unload</string>
+    <string name="local_models_idle_unload">Minutes before an unused model unloads</string>
+    <string name="local_models_idle_unload_fewer">Fewer minutes</string>
+    <string name="local_models_idle_unload_more">More minutes</string>
+    <string name="local_models_status_caption">One model runs at a time. While it answers one chat, other chats that use a local model wait their turn.</string>
+
+    <string name="local_models_section_models">Models</string>
+    <!-- %1$s: the engine, such as "LiteRT-LM". %2$s: the processor it runs on, such as "CPU". %3$s: the download's
+         size, such as "614 MB". -->
+    <string name="local_models_build">%1$s on the %2$s, %3$s</string>
+    <!-- %1$s: the build that's downloaded, as local_models_build describes it. -->
+    <string name="local_models_downloaded">Downloaded: %1$s</string>
+    <string name="local_models_unavailable">No build of this model runs on this phone.</string>
+    <string name="local_models_download">Download</string>
+    <string name="local_models_cancel">Cancel</string>
+    <string name="local_models_retry">Try again</string>
+    <string name="local_models_delete">Delete</string>
+    <!-- %1$s: the bytes downloaded so far, such as "312 MB". %2$s: the download's size, such as "614 MB". -->
+    <string name="local_models_progress">%1$s of %2$s</string>
+    <!-- %1$s: how much more free storage the download needs, such as "1.2 GB". -->
+    <string name="local_models_error_space">Not enough free storage. The download needs %1$s more.</string>
+    <string name="local_models_error_network">The download stopped. Try again to pick up where it left off.</string>
+    <!-- %1$d: the HTTP status code Hugging Face answered with, such as 404. -->
+    <string name="local_models_error_http">Hugging Face turned the download down (HTTP %1$d).</string>
+    <string name="local_models_error_corrupt">The downloaded file wasn\'t the expected one, so it was deleted. Try again.</string>
+    <string name="local_models_engine">Engine</string>
+    <string name="local_models_engine_automatic">Automatic</string>
+    <string name="local_models_engine_llama">llama.cpp</string>
+    <string name="local_models_engine_litert">LiteRT-LM</string>
+    <string name="local_models_backend_cpu">CPU</string>
+    <string name="local_models_backend_gpu">GPU</string>
+    <string name="local_models_backend_npu">NPU</string>
+    <!-- %1$s: the model's name, such as "Qwen3 0.6B". -->
+    <string name="local_models_delete_title">Delete %1$s?</string>
+    <!-- %1$s: the storage the model's files take, such as "614 MB". -->
+    <string name="local_models_delete_text">This frees %1$s. Chats using it stop working until you download it again.</string>
+
+    <!-- What a chat using a local model shows above its composer while its request waits or runs. -->
+    <!-- %1$s: the model's name, such as "Qwen3 0.6B". -->
+    <string name="chat_local_queued">Waiting for %1$s</string>
+    <!-- %1$s: the model's name, such as "Qwen3 0.6B". %2$s: how many requests are ahead, formatted for the locale. -->
+    <plurals name="chat_local_queued_behind">
+        <item quantity="one">Waiting for %1$s, %2$s request ahead</item>
+        <item quantity="other">Waiting for %1$s, %2$s requests ahead</item>
+    </plurals>
+    <!-- %1$s: the name of the model another chat is using, such as "Gemma 4 E2B". -->
+    <string name="chat_local_busy">Waiting: another chat is using %1$s</string>
+    <!-- %1$s: the name of the model another chat is using, such as "Gemma 4 E2B". %2$s: how many requests are ahead,
+         formatted for the locale. -->
+    <plurals name="chat_local_busy_behind">
+        <item quantity="one">Waiting: another chat is using %1$s, %2$s request ahead</item>
+        <item quantity="other">Waiting: another chat is using %1$s, %2$s requests ahead</item>
+    </plurals>
+    <!-- %1$s: the model's name, such as "Qwen3 0.6B". %2$s: how much has loaded, as a percentage formatted for the
+         locale, such as "40%". -->
+    <string name="chat_local_loading">Loading %1$s, %2$s</string>
+    <!-- %1$s: prompt tokens read so far. %2$s: the prompt's tokens in all. Both formatted for the locale. -->
+    <string name="chat_local_reading">Reading the prompt: %1$s of %2$s tokens</string>
+    <!-- %1$s: prompt tokens read so far. %2$s: the prompt's tokens in all. %3$s: tokens reused from the previous
+         request instead of read again. All formatted for the locale. -->
+    <string name="chat_local_reading_cached">Reading the prompt: %1$s of %2$s tokens, %3$s reused</string>
+    <!-- %1$s: how fast the model writes, in tokens per second, formatted for the locale, such as "8.2". -->
+    <string name="chat_local_writing">Writing, %1$s tokens/s</string>
+</resources>

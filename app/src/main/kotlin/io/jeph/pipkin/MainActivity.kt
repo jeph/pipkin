@@ -49,6 +49,7 @@ import io.jeph.pipkin.ui.settings.AddProviderScreen
 import io.jeph.pipkin.ui.settings.BackupsScreen
 import io.jeph.pipkin.ui.settings.LicenseScreen
 import io.jeph.pipkin.ui.settings.LicensesScreen
+import io.jeph.pipkin.ui.settings.LocalModelsScreen
 import io.jeph.pipkin.ui.settings.ModelEditorScreen
 import io.jeph.pipkin.ui.settings.ProviderDrafts
 import io.jeph.pipkin.ui.settings.ProviderEditorScreen
@@ -198,7 +199,7 @@ private fun Screen(
       ArchivePage(top, navigator, actions, requestedChat)
 
     Destination.Settings, Destination.Permissions, Destination.Backups, Destination.RunningAgents,
-    Destination.Licenses, is Destination.License,
+    Destination.LocalModels, Destination.Licenses, is Destination.License,
     -> SettingsPages(top, navigator)
 
     Destination.Providers -> ProvidersScreen(
@@ -266,6 +267,8 @@ private fun SettingsPages(top: Destination, navigator: AppNavigator) {
 
     Destination.RunningAgents -> RunningAgentsScreen(onBack = { navigator.pop() })
 
+    Destination.LocalModels -> LocalModelsScreen(onBack = { navigator.pop() })
+
     Destination.Licenses -> LicensesScreen(
       onBack = { navigator.pop() },
       onOpenLicense = { navigator.push(Destination.License(it)) },
@@ -279,6 +282,7 @@ private fun SettingsPages(top: Destination, navigator: AppNavigator) {
       onOpenRunningAgents = { navigator.push(Destination.RunningAgents) },
       onOpenPermissions = { navigator.push(Destination.Permissions) },
       onOpenBackups = { navigator.push(Destination.Backups) },
+      onOpenLocalModels = { navigator.push(Destination.LocalModels) },
       onOpenLicenses = { navigator.push(Destination.Licenses) },
     )
   }

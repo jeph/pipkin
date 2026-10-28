@@ -53,7 +53,7 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
-/** Settings: models, chats, appearance, extensions, agent, configuration and about cards under a header. */
+/** Settings: models, chats, appearance, extensions, agent, configuration, experimental and about cards under a header. */
 @Composable
 internal fun SettingsScreen(
   onBack: () -> Unit,
@@ -61,6 +61,7 @@ internal fun SettingsScreen(
   onOpenRunningAgents: () -> Unit,
   onOpenPermissions: () -> Unit,
   onOpenBackups: () -> Unit,
+  onOpenLocalModels: () -> Unit,
   onOpenLicenses: () -> Unit,
 ) {
   val graph = LocalContext.current.appGraph
@@ -84,6 +85,7 @@ internal fun SettingsScreen(
         onOpenRunningAgents = onOpenRunningAgents,
         onOpenPermissions = onOpenPermissions,
         onOpenBackups = onOpenBackups,
+        onOpenLocalModels = onOpenLocalModels,
         onOpenLicenses = onOpenLicenses,
       )
     }
@@ -102,6 +104,7 @@ private fun SettingsContent(
   onOpenRunningAgents: () -> Unit,
   onOpenPermissions: () -> Unit,
   onOpenBackups: () -> Unit,
+  onOpenLocalModels: () -> Unit,
   onOpenLicenses: () -> Unit,
 ) {
   Column(
@@ -123,6 +126,7 @@ private fun SettingsContent(
       ExtensionsSection(graph = graph, snackbar = snackbar)
       AgentSection(graph = graph, onOpenRunningAgents = onOpenRunningAgents, onOpenPermissions = onOpenPermissions)
       ConfigurationSection(graph = graph, snackbar = snackbar, onOpenBackups = onOpenBackups)
+      ExperimentalSection(preferences = graph.preferences, onOpenLocalModels = onOpenLocalModels)
       AboutSection(onOpenLicenses = onOpenLicenses)
     }
   }

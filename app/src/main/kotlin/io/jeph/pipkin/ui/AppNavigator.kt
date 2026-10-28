@@ -20,6 +20,9 @@ sealed interface Destination {
   /** Backups of Pi's configuration in Termux, reached from Settings. */
   data object Backups : Destination
 
+  /** Downloading and running models on the phone, reached from Settings › Experimental. */
+  data object LocalModels : Destination
+
   /** The third-party licences the app ships, reached from Settings › About. */
   data object Licenses : Destination
 
@@ -107,6 +110,8 @@ class AppNavigator(initial: List<Destination>) {
 
       Destination.Backups -> BACKUPS
 
+      Destination.LocalModels -> LOCAL_MODELS
+
       Destination.Licenses -> LICENSES
 
       is Destination.License -> LICENSE + d.path
@@ -133,30 +138,17 @@ class AppNavigator(initial: List<Destination>) {
       is Destination.ArchivedSubagent -> ARCHIVED_SUBAGENT + d.toolCallId + "\n" + d.path
     }
 
+    /** The destinations that carry nothing but their key. */
+    private val SCREENS = listOf(
+      Destination.Main, Destination.Settings, Destination.Permissions, Destination.RunningAgents, Destination.Backups,
+      Destination.LocalModels, Destination.Licenses, Destination.Onboarding, Destination.Providers,
+      Destination.AddProvider, Destination.AddModels, Destination.Archive,
+    )
+
     private fun destination(key: String): Destination? = when {
-      key == MAIN -> Destination.Main
-
-      key == SETTINGS -> Destination.Settings
-
-      key == PERMISSIONS -> Destination.Permissions
-
-      key == RUNNING_AGENTS -> Destination.RunningAgents
-
-      key == BACKUPS -> Destination.Backups
-
-      key == LICENSES -> Destination.Licenses
+      SCREENS.any { key(it) == key } -> SCREENS.first { key(it) == key }
 
       key.startsWith(LICENSE) -> Destination.License(key.removePrefix(LICENSE))
-
-      key == ONBOARDING -> Destination.Onboarding
-
-      key == PROVIDERS -> Destination.Providers
-
-      key == ADD_PROVIDER -> Destination.AddProvider
-
-      key == ADD_MODELS -> Destination.AddModels
-
-      key == ARCHIVE -> Destination.Archive
 
       key.startsWith(ARCHIVED_CHAT) -> Destination.ArchivedChat(key.removePrefix(ARCHIVED_CHAT))
 
@@ -178,6 +170,7 @@ class AppNavigator(initial: List<Destination>) {
     private const val PERMISSIONS = "permissions"
     private const val RUNNING_AGENTS = "running-agents"
     private const val BACKUPS = "backups"
+    private const val LOCAL_MODELS = "local-models"
     private const val LICENSES = "licenses"
     private const val LICENSE = "license:"
     private const val ONBOARDING = "onboarding"

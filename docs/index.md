@@ -13,12 +13,13 @@ Pipkin has three parts. You install the app and Termux, and setup installs Pi fo
 - **[Termux](https://termux.dev)** is a Linux-like environment for Android. The agent works there, so it can install and run real tools with `pkg`, the same way it would on a computer.
 - **[Pi](https://pi.dev)** is the open-source agent that does the work. Pipkin installs it in Termux, starts one Pi process for each chat, and shows what it does in the app.
 
-The thinking happens at the AI model you connect, such as Claude or OpenAI, so you need a network connection while a chat is working.
+The thinking happens at the AI model you connect, such as Claude or OpenAI, so you need a network connection while a chat is working. The exception is an experimental [local model](/docs/local-models/), a small model that runs on the phone itself.
 
 ## Where to go next
 
 - **[Get started](/docs/get-started/)**: install Pipkin and Termux, walk through setup, and start your first chat.
 - **[Connect a model](/docs/providers/)**: sign in with a Claude or OpenAI subscription, add a Gemini, Z.ai, Kimi or OpenRouter API key, or add any OpenAI-compatible API.
+- **[Local models](/docs/local-models/)**: download a small model and run it on the phone, with no provider. Experimental.
 - **[Configure the agent](/docs/configure/)**: find Pi's configuration in Termux and change how the agent behaves.
 - **[Extensions](/docs/extensions/)**: add Pi extensions, skills, and prompt templates, and see which ones Pipkin bundles.
 - **[Run in the background](/docs/background/)**: how Pipkin keeps chats working while you're away, and what Android can still stop.

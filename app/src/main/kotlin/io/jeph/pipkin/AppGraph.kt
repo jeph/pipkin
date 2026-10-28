@@ -91,7 +91,7 @@ internal class AppGraph(private val application: Application) {
   val gitHost = GitHost(hostClient, scope)
   val commits = CommitTabRegistry(gitHost, tabs, preferences.trustedRepositories, scope)
   val layout = WorkspaceLayout(this)
-  val localModels = LocalModels()
+  val localModels = LocalModels(application, scope, preferences, keepAlive)
 
   /** What the chat screens keep of each chat, such as unsent drafts, held here so it survives rotation and folding. */
   val chatViews = ChatViews()

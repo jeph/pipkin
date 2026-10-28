@@ -214,7 +214,12 @@ private fun ChatContent(
         )
       },
       dialog = { PendingDialogCard(controller, timeline) },
-      steering = { PendingSteeringBox(controller, timeline, compact = tight) },
+      steering = {
+        Column {
+          LocalModelActivityPill(process, timeline.model)
+          PendingSteeringBox(controller, timeline, compact = tight)
+        }
+      },
       composer = {
         Composer(
           controller = controller,
