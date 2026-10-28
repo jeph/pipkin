@@ -401,7 +401,8 @@ android {
     release {
       isMinifyEnabled = true
       isShrinkResources = true
-      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+      // LiteRT-LM's AAR ships no consumer rules, and its native code calls back into its Kotlin classes by name.
+      proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "litertlm-rules.pro")
     }
   }
 
@@ -447,6 +448,8 @@ dependencies {
   implementation("androidx.core:core-ktx:1.19.1")
   implementation("androidx.lifecycle:lifecycle-process:2.11.0")
   implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+  // Runs .litertlm models in the :inference process (localmodel/engine/litert).
+  implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.1")
   implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.46.0")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
   // The snapshot of main at c3480d9, which aligns IME input with Termux; 0.1.0-alpha01 predates it.
