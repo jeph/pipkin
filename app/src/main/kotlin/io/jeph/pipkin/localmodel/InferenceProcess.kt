@@ -27,8 +27,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
-/** Where a loaded model serves, for the proxy: loopback [port], `Authorization: Bearer` [apiKey]. */
-internal data class ModelEndpoint(val modelId: String, val port: Int, val apiKey: String)
+/**
+ * Where a loaded model serves, for the proxy: loopback [port], `Authorization: Bearer` [apiKey]. [modelPath] is the
+ * file it loaded, which tells whether it's still the build to serve.
+ */
+internal data class ModelEndpoint(val modelId: String, val modelPath: String, val port: Int, val apiKey: String)
 
 /**
  * The `:inference` process as a [ModelHost]: loading binds [InferenceService] in a fresh process and starts one engine
@@ -46,7 +49,15 @@ internal class InferenceProcess(context: Context, private val installed: () -> L
   /** The loaded model's endpoint, or null when none serves. */
   val endpoint: ModelEndpoint? get() = synchronized(lock) { current?.takeIf { it.ready }?.endpoint }
 
-  override val loadedModel: String? get() = endpoint?.modelId
+  /**
+   * The loaded model, as long as it's still the build [installed] lists for it: choosing another engine for a loaded
+   * model, or deleting it, makes the next request load what's there now.
+   */
+  override val loadedModel: String?
+    get() {
+      val endpoint = endpoint ?: return null
+      return endpoint.modelId.takeIf { installed().any { it.file.absolutePath == endpoint.modelPath } }
+    }
 
   override suspend fun load(modelId: String) {
     unloadAndWait()
@@ -100,7 +111,7 @@ internal class InferenceProcess(context: Context, private val installed: () -> L
   }
 
   private fun bind(config: EngineConfig): Bound {
-    val bound = Bound(ModelEndpoint(config.modelAlias, config.port, config.apiKey))
+    val bound = Bound(ModelEndpoint(config.modelAlias, config.modelPath, config.port, config.apiKey))
     synchronized(lock) { current = bound }
     val intent = Intent(context, InferenceService::class.java)
     // BIND_IMPORTANT raises the process to the main process's importance, which AgentService keeps in the foreground

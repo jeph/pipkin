@@ -6,19 +6,25 @@ import io.jeph.pipkin.localmodel.engine.Backend
 import io.jeph.pipkin.localmodel.engine.EngineKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EngineChoiceTest {
   private val plainPhone = DeviceProfile(socModel = "SM8650", hasOpenCl = false)
 
-  private fun artifact(engine: EngineKind, backend: Backend, socModels: Set<String> = emptySet()) = ModelArtifact(
+  private fun artifact(
+    engine: EngineKind,
+    backend: Backend,
+    socModels: Set<String> = emptySet(),
+    contextSize: Int = 4096,
+  ) = ModelArtifact(
     engine = engine,
     backend = backend,
-    url = "https://example.com/${engine.wire}-${backend.wire}",
+    url = "https://example.com/${engine.wire}-${backend.wire}-$contextSize",
     sha256 = "0".repeat(64),
     sizeBytes = 1,
-    fileName = "${engine.wire}-${backend.wire}",
-    contextSize = 4096,
+    fileName = "${engine.wire}-${backend.wire}-$contextSize",
+    contextSize = contextSize,
     socModels = socModels,
   )
 
@@ -100,16 +106,41 @@ class EngineChoiceTest {
   }
 
   @Test
-  fun qwenSmallRunsOnLiteRtsCpuBuildOnAnEmulator() {
-    val qwen = checkNotNull(LocalModelCatalog.model("qwen3-0.6b"))
-    val chosen = EngineChoice.choose(qwen, DeviceProfile(socModel = "", hasOpenCl = false), EngineOverride.AUTOMATIC)
-    assertEquals("Qwen3-0.6B.litertlm", chosen?.fileName)
+  fun aBuildThatHoldsPisPromptBeatsFasterOnesThatDont() {
+    val roomy = artifact(EngineKind.LLAMA, Backend.CPU, contextSize = EngineChoice.AGENT_CONTEXT)
+    val model = everything.copy(artifacts = listOf(npu, gpu, litertCpu, roomy))
+    assertEquals(roomy, choose(model = model, device = DeviceProfile("Tensor G5", hasOpenCl = true)))
   }
 
   @Test
-  fun gemmaRunsOnTheTensorG5Npu() {
+  fun amongBuildsThatHoldPisPromptLiteRtStillComesFirst() {
+    val roomyLlama = artifact(EngineKind.LLAMA, Backend.CPU, contextSize = EngineChoice.AGENT_CONTEXT)
+    val roomyLiteRt = artifact(EngineKind.LITERT, Backend.CPU, contextSize = EngineChoice.AGENT_CONTEXT)
+    assertEquals(roomyLiteRt, choose(model = everything.copy(artifacts = listOf(roomyLlama, roomyLiteRt))))
+  }
+
+  @Test
+  fun anOverrideIsFollowedIntoABuildTooSmallForPisPrompt() {
+    val roomy = artifact(EngineKind.LLAMA, Backend.CPU, contextSize = EngineChoice.AGENT_CONTEXT)
+    val model = everything.copy(artifacts = listOf(litertCpu, roomy))
+    assertEquals(litertCpu, choose(model = model, override = EngineOverride.LITERT))
+  }
+
+  @Test
+  fun everyCatalogModelChoosesABuildThatHoldsPisPromptOnAnyPhone() {
+    val phones = listOf(DeviceProfile(socModel = "", hasOpenCl = false), DeviceProfile("Tensor G5", hasOpenCl = true))
+    for (model in LocalModelCatalog.models) {
+      for (phone in phones) {
+        val chosen = checkNotNull(EngineChoice.choose(model, phone, EngineOverride.AUTOMATIC))
+        assertTrue("${model.id} on ${phone.socModel}", chosen.contextSize >= EngineChoice.AGENT_CONTEXT)
+      }
+    }
+  }
+
+  @Test
+  fun choosingLiteRtForGemmaOnAPixel10TakesItsGpuBuildOverTheShortNpuOne() {
     val gemma = checkNotNull(LocalModelCatalog.model("gemma-4-e2b"))
-    val chosen = EngineChoice.choose(gemma, DeviceProfile("Tensor G5", hasOpenCl = true), EngineOverride.AUTOMATIC)
-    assertEquals(Backend.NPU, chosen?.backend)
+    val chosen = EngineChoice.choose(gemma, DeviceProfile("Tensor G5", hasOpenCl = true), EngineOverride.LITERT)
+    assertEquals(Backend.GPU, chosen?.backend)
   }
 }

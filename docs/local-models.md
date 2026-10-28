@@ -22,7 +22,7 @@ When the download finishes, the model shows up in a chat's model list like any o
 | **Qwen3 0.6B** | about 0.6 GB, or 1.2 GB on a MediaTek Dimensity 9500 | The smallest and fastest. Runs on almost any phone. |
 | **Qwen3 1.7B** | about 1.8 GB | Better answers, slower. |
 | **Qwen3 4B** | about 2.5 GB | The most capable, and the slowest. Needs a phone with plenty of memory. |
-| **Gemma 4 E2B** | 2 to 3.1 GB, depending on the phone | Google's small model. On a Pixel 10 it runs on the phone's NPU. |
+| **Gemma 4 E2B** | 2 to 2.8 GB, depending on the phone | Google's small model. On a phone with the GPU driver it needs, it runs on the GPU. |
 
 All of them can think before they answer, like larger models with reasoning.
 
@@ -32,10 +32,10 @@ A model takes about as much memory as its download while it runs, plus some for 
 
 ## How Pipkin runs a model
 
-Pipkin has two engines that run models, and picks the faster one your phone supports for each model:
+Pipkin has two engines that run models, and for each model picks the faster one your phone supports among the builds that can hold the agent's instructions and tools, which take about 7,000 tokens before a chat even starts:
 
-- **LiteRT-LM**, Google's engine for phones. It can use the phone's NPU (its AI chip) when a model was built for that chip, the GPU when the phone has the driver it needs, or the CPU.
-- **llama.cpp**, which runs a model on the CPU. Pipkin uses it for models LiteRT-LM has no build of.
+- **LiteRT-LM**, Google's engine for phones. It can use the phone's GPU when the phone has the driver it needs, or the CPU. Some of its builds also run on a phone's NPU (its AI chip), but those hold too short a conversation for the agent, so Pipkin picks one only when LiteRT-LM has no other build for your phone and you've chosen LiteRT-LM yourself.
+- **llama.cpp**, which runs a model on the CPU. Pipkin uses it for models whose LiteRT-LM builds are too small for the agent or that LiteRT-LM has no build of.
 
 Each model's row under **Models** says which engine it runs with, on which part of the phone, and how big its download is. If a model has builds for both engines, you can pick one under **Engine**; **Automatic** goes back to Pipkin's choice. Download again after switching, since each engine has its own file.
 

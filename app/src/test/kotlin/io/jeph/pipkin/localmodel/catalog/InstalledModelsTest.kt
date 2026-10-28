@@ -20,10 +20,10 @@ class InstalledModelsTest {
   fun theChosenBuildIsListedWhenDownloaded() {
     val files = setOf("Qwen3-0.6B.litertlm", "Qwen3-0.6B-Q8_0.gguf")
     val listed = installed(files).single()
-    assertEquals("Qwen3-0.6B.litertlm", listed.artifact.fileName)
-    assertEquals(File(dir, "Qwen3-0.6B.litertlm"), listed.file)
-    val overridden = installed(files, mapOf(qwen.id to EngineOverride.LLAMA)).single()
-    assertEquals("Qwen3-0.6B-Q8_0.gguf", overridden.artifact.fileName)
+    assertEquals("Qwen3-0.6B-Q8_0.gguf", listed.artifact.fileName)
+    assertEquals(File(dir, "Qwen3-0.6B-Q8_0.gguf"), listed.file)
+    val overridden = installed(files, mapOf(qwen.id to EngineOverride.LITERT)).single()
+    assertEquals("Qwen3-0.6B.litertlm", overridden.artifact.fileName)
   }
 
   @Test

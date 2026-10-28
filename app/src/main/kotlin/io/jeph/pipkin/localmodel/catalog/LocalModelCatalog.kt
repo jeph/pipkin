@@ -95,6 +95,7 @@ internal object LocalModelCatalog {
           sha256 = "af1082986639ecde7db95d91be6fe54f8b6b458104734c5bafc204e69d6852dc",
           sizeBytes = 3_113_545_589,
           fileName = "gemma-4-E2B-it_Google_Tensor_G5.litertlm",
+          // An NPU build's context is fixed when it's compiled; the model card benchmarks this one at 4,096.
           contextSize = 4096,
           socModels = setOf(GOOGLE_TENSOR_G5),
         ),
@@ -105,7 +106,8 @@ internal object LocalModelCatalog {
           sha256 = "a53a59001894c58e6bdb5b9b227709f91a2e3e556baa7d85acf9c55402ba5cf5",
           sizeBytes = 2_008_432_640,
           fileName = "gemma-4-E2B-it-gpu.litertlm",
-          contextSize = 4096,
+          // The model card: "The model can support up to 32k context length".
+          contextSize = 32768,
         ),
         ModelArtifact(
           engine = EngineKind.LITERT,
@@ -114,7 +116,7 @@ internal object LocalModelCatalog {
           sha256 = "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
           sizeBytes = 2_588_147_712,
           fileName = "gemma-4-E2B-it.litertlm",
-          contextSize = 4096,
+          contextSize = 32768,
         ),
         ModelArtifact(
           engine = EngineKind.LLAMA,

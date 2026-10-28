@@ -31,19 +31,22 @@ internal data class DeviceProfile(val socModel: String?, val hasOpenCl: Boolean)
 }
 
 /**
- * Picks the build of a model to run on this phone. LiteRT-LM comes first, since it can run a model on the phone's NPU
- * or GPU and its CPU builds are made for phones; llama.cpp is the fallback for models LiteRT-LM has no build of.
- * Within an engine, an NPU build compiled for this phone's SoC beats a GPU build, which needs an OpenCL driver, which
- * beats a CPU build.
+ * Picks the build of a model to run on this phone. A build has to hold a coding agent's conversation first: Pi's
+ * system prompt and tools alone come to about 7,000 tokens, so a build with less than [AGENT_CONTEXT] is chosen only
+ * when no build has more. Among builds that fit, LiteRT-LM comes first, since it can run a model on the phone's NPU or
+ * GPU and its CPU builds are made for phones. Within an engine, an NPU build compiled for this phone's SoC beats a GPU
+ * build, which needs an OpenCL driver, which beats a CPU build.
  */
 internal object EngineChoice {
   /**
-   * The build to run, or null when no build of [model] runs on [device]. An [override] whose engine has no build that
-   * runs here, such as one set on another phone, is passed over as if it were [EngineOverride.AUTOMATIC].
+   * The build to run, or null when no build of [model] runs on [device]. An [override] picks its engine's best build,
+   * even one too small for Pi's prompt when that engine has nothing bigger; one whose engine has no build that runs
+   * here, such as one set on another phone, is passed over as if it were [EngineOverride.AUTOMATIC].
    */
   fun choose(model: CatalogModel, device: DeviceProfile, override: EngineOverride): ModelArtifact? {
     val runnable = runnable(model, device)
-    return runnable.firstOrNull { it.engine == override.engine } ?: runnable.firstOrNull()
+    val candidates = runnable.filter { it.engine == override.engine }.ifEmpty { runnable }
+    return candidates.firstOrNull { it.contextSize >= AGENT_CONTEXT } ?: candidates.firstOrNull()
   }
 
   /** The builds of [model] that can run on [device], best first. */
@@ -55,6 +58,12 @@ internal object EngineChoice {
         Backend.CPU -> true
       }
     }.sortedWith(compareBy({ ENGINE_ORDER.indexOf(it.engine) }, { BACKEND_ORDER.indexOf(it.backend) }))
+
+  /**
+   * The context a build needs for Pi: its system prompt and tools, about 7,000 tokens, plus the quarter of the context
+   * compaction keeps free for the reply.
+   */
+  const val AGENT_CONTEXT = 16_384
 
   /** The engines [model] has a build of on [device], the choices the user may override [choose] with. */
   fun engines(model: CatalogModel, device: DeviceProfile): List<EngineKind> =
