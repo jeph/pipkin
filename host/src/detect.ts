@@ -44,15 +44,24 @@ function listContains(entry: JsonObject, path: string, item: string): boolean | 
   return Array.isArray(value) ? value.includes(item) : undefined;
 }
 
-/** codex-lb's `metadata.supported_reasoning_levels`; efforts Pi has no level for are dropped, and a list with none Pi knows is ignored. */
-function thinkingLevelMap(entry: JsonObject): ThinkingLevelMap | undefined {
+/** Reasoning efforts the entry lists: codex-lb's `metadata.supported_reasoning_levels[].effort`, or Kimi's `reasoning.effort.valid`. */
+function efforts(entry: JsonObject): Set<string> | undefined {
   const levels = at(entry, "metadata.supported_reasoning_levels");
-  if (!Array.isArray(levels)) return undefined;
-  const efforts = new Set(levels.flatMap((level) => (isObject(level) && typeof level.effort === "string" ? [level.effort] : [])));
-  if (!["none", ...THINKING_LEVELS].some((level) => efforts.has(level))) return undefined;
+  if (Array.isArray(levels)) {
+    return new Set(levels.flatMap((level) => (isObject(level) && typeof level.effort === "string" ? [level.effort] : [])));
+  }
+  const valid = at(entry, "reasoning.effort.valid");
+  if (Array.isArray(valid)) return new Set(valid.filter((effort): effort is string => typeof effort === "string"));
+  return undefined;
+}
+
+/** The listed efforts as Pi levels; efforts Pi has no level for are dropped, and a list with none Pi knows is ignored. */
+function thinkingLevelMap(entry: JsonObject): ThinkingLevelMap | undefined {
+  const listed = efforts(entry);
+  if (listed === undefined || !["none", ...THINKING_LEVELS].some((level) => listed.has(level))) return undefined;
   const map: ThinkingLevelMap = {};
   for (const level of THINKING_LEVELS) {
-    map[level] = level === "off" ? (efforts.has("none") ? "none" : null) : efforts.has(level) ? level : null;
+    map[level] = level === "off" ? (listed.has("none") ? "none" : null) : listed.has(level) ? level : null;
   }
   return map;
 }
@@ -73,11 +82,11 @@ function cost(entry: JsonObject): ModelCost | undefined {
   return { input, output, cacheRead: pricing(entry, "input_cache_read") ?? 0, cacheWrite: pricing(entry, "input_cache_write") ?? 0 };
 }
 
-/** Reads the capabilities an OpenAI-compatible `/models` entry reports (codex-lb, OpenRouter, LiteLLM-style). */
+/** Reads the capabilities an OpenAI-compatible `/models` entry reports (codex-lb, OpenRouter, Kimi, LiteLLM-style). */
 export function detectModel(id: string, entry: JsonObject): ModelDef {
   const def: ModelDef = { id };
 
-  const name = [at(entry, "metadata.display_name"), entry.name].find((value) => typeof value === "string" && value !== "");
+  const name = [at(entry, "metadata.display_name"), entry.display_name, entry.name].find((value) => typeof value === "string" && value !== "");
   if (typeof name === "string") def.name = name;
 
   const levels = thinkingLevelMap(entry);
@@ -95,8 +104,9 @@ export function detectModel(id: string, entry: JsonObject): ModelDef {
   const images = anyOf([
     flag(entry, "supports_images"),
     flag(entry, "supports_vision"),
+    flag(entry, "supports_image_in"),
     flag(entry, "capabilities.supports_images"),
-    ...["input_modalities", "metadata.input_modalities", "capabilities.input_modalities", "architecture.input_modalities"].map(
+    ...["input_modalities", "metadata.input_modalities", "capabilities.input_modalities", "architecture.input_modalities", "modalities.input"].map(
       (path) => listContains(entry, path, "image"),
     ),
   ]);

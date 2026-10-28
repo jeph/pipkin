@@ -52,6 +52,8 @@
     <!-- %1$s: the start of what the server answered instead. -->
     <string name="host_provider_not_json">The server did not return JSON: <xliff:g id="body" example="Not Found">%1$s</xliff:g></string>
     <string name="host_provider_no_data_list">The server\'s <xliff:g id="path">/models</xliff:g> response has no data list</string>
+    <!-- Listing the models of a provider whose API key was removed, for example by the agent. -->
+    <string name="host_subscription_no_key">No API key is saved for this provider</string>
 
     <!-- Configuration backups (Settings > Configuration > Backups) -->
     <!-- Progress of a backup under way: how many files and folders it has backed up so far. -->

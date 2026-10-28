@@ -3,8 +3,8 @@ import { HostError, loadPi } from "../env.js";
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { stringParam } from "../params.js";
-import { createRuntime, loginType } from "../runtime.js";
-import { keepProviderInScope, scopeResolver, scopeUniverse } from "../scope.js";
+import { createRuntime, hiddenUntilPicked, loginType } from "../runtime.js";
+import { hideUnpickedProvider, keepProviderInScope, scopeResolver, scopeUniverse } from "../scope.js";
 import { openSettingsIfValid, saveEnabledModels } from "../settings.js";
 
 type AuthInteraction = Parameters<ModelRuntime["login"]>[2];
@@ -91,12 +91,17 @@ export async function login(ctx: ModeContext): Promise<JsonObject> {
   } finally {
     await settings.flush();
   }
-  // A scope written before sign-in may match none of this provider's models; they must show now.
   const scope = openSettingsIfValid(ctx, pi);
-  if (scope !== undefined && scope.enabledModels.length > 0) {
-    const resolve = scopeResolver(pi, await scopeUniverse(runtime, ctx.signal));
-    const patterns = await keepProviderInScope(scope.enabledModels, providerId, scope.defaultRef, resolve);
-    if (patterns !== undefined) await saveEnabledModels(scope, patterns);
-  }
+  if (scope === undefined) return {};
+  const hidden = hiddenUntilPicked(providerId);
+  // An empty scope shows every model, which is already right unless this provider's stay hidden.
+  if (!hidden && scope.enabledModels.length === 0) return {};
+  const universe = await scopeUniverse(runtime, ctx.signal);
+  const resolve = scopeResolver(pi, universe);
+  // Otherwise a scope written before sign-in may match none of this provider's models; they must show now.
+  const patterns = hidden
+    ? await hideUnpickedProvider(scope.enabledModels, providerId, scope.defaultRef, universe, resolve)
+    : await keepProviderInScope(scope.enabledModels, providerId, scope.defaultRef, universe, resolve);
+  if (patterns !== undefined) await saveEnabledModels(scope, patterns);
   return {};
 }

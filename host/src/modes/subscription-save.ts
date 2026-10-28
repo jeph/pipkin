@@ -30,6 +30,26 @@ function override(def: ModelDef, base: ModelDef, stored: JsonObject | undefined)
   return result;
 }
 
+function hasEfforts(map: unknown): boolean {
+  return isObject(map) && Object.entries(map).some(([level, effort]) => level !== "off" && effort !== null);
+}
+
+/**
+ * The compat settings every Chat Completions model the provider ships agrees on, among those that do (or don't)
+ * offer reasoning efforts like `def`. Pi gives a model it doesn't ship such a sibling's api and base URL but not
+ * its compat, which models such as Kimi's need; settings the siblings disagree on are left to Pi to detect.
+ */
+function sharedCompat(builtin: readonly { api: string; thinkingLevelMap?: unknown; compat?: unknown }[], def: ModelDef): JsonObject | undefined {
+  const thinks = hasEfforts(def.thinkingLevelMap);
+  const compats = builtin
+    .filter((model) => model.api === "openai-completions" && hasEfforts(model.thinkingLevelMap) === thinks)
+    .map((model) => (isObject(model.compat) ? model.compat : {}));
+  const [first, ...rest] = compats;
+  if (first === undefined) return undefined;
+  const shared = Object.fromEntries(Object.entries(first).filter(([key, value]) => rest.every((compat) => isDeepStrictEqual(compat[key], value))));
+  return Object.keys(shared).length > 0 ? shared : undefined;
+}
+
 /**
  * Saves the per-model settings of a provider Pi ships and which of its models show. Built-in models
  * get `providers.<id>.modelOverrides`, other ids `providers.<id>.models`; visibility is settings.json
@@ -47,11 +67,8 @@ export async function subscriptionSave(ctx: ModeContext): Promise<JsonObject> {
   // Both files are checked before either is written.
   const document = await readModelsJson(ctx.env.configDir);
   const settings = openSettings(ctx, pi);
-  const catalogue = new Map(
-    (await createRuntime(ctx, { builtinOnly: true }))
-      .getModels(providerId)
-      .map((model) => [model.id, parseModelDef(model.id, model as unknown as JsonObject)]),
-  );
+  const builtin = (await createRuntime(ctx, { builtinOnly: true })).getModels(providerId);
+  const catalogue = new Map(builtin.map((model) => [model.id, parseModelDef(model.id, model as unknown as JsonObject)]));
 
   const before = document.providers[providerId];
   const entry: JsonObject = isObject(before) ? structuredClone(before) : {};
@@ -66,7 +83,8 @@ export async function subscriptionSave(ctx: ModeContext): Promise<JsonObject> {
     let next: JsonObject;
     if (base === undefined || storedModels.has(def.id)) {
       // Ids Pi doesn't ship, and ids the agent defined in full (replacing Pi's), live in `models`.
-      extras.push(mergeManagedFields(def, storedModels.get(def.id)));
+      const compat = storedModels.has(def.id) ? undefined : sharedCompat(builtin, def);
+      extras.push(mergeManagedFields(def, storedModels.get(def.id) ?? (compat === undefined ? undefined : { compat })));
       ids.add(def.id);
       next = withoutManagedFields(stored);
     } else {

@@ -21,6 +21,8 @@
     <string name="settings_zai_subtitle">GLM Coding Plan API key</string>
     <string name="settings_kimi">Kimi</string>
     <string name="settings_kimi_subtitle">Kimi Code API key</string>
+    <string name="settings_openrouter">OpenRouter</string>
+    <string name="settings_openrouter_subtitle">OpenRouter API key</string>
     <string name="settings_sign_in">Sign in</string>
     <string name="settings_signed_in">Signed in</string>
     <string name="settings_sign_out">Sign out</string>
@@ -137,6 +139,7 @@
     <string name="login_title_gemini">Add a Gemini API key</string>
     <string name="login_title_zai">Add a Z.ai Coding Plan key</string>
     <string name="login_title_kimi">Add a Kimi Code API key</string>
+    <string name="login_title_openrouter">Add an OpenRouter API key</string>
     <string name="login_starting">Starting sign-in…</string>
     <string name="login_browser">Finish signing in with your browser</string>
     <string name="login_open_again">Open again</string>
@@ -221,7 +224,9 @@
     <string name="provider_keep_editing">Keep editing</string>
 
     <string name="models_available">Available models</string>
-    <string name="models_none">The endpoint didn\'t list any models.</string>
+    <string name="models_none">No models to add.</string>
+    <!-- %1$s: why the provider's list of models couldn't be read, for example "HTTP 401: Invalid Authentication". -->
+    <string name="models_list_failed">Couldn\'t get the provider\'s list of models, so these are the ones Pi knows: %1$s</string>
     <string name="models_custom">Custom models</string>
     <string name="models_custom_hint">Model ID</string>
     <string name="models_custom_add">Add model</string>

@@ -185,7 +185,7 @@ describe("modes backed by the Pi SDK", () => {
     });
   });
 
-  const BUILTIN = ["anthropic", "openai-codex", "google", "zai", "kimi-coding"].map((id) => ({
+  const BUILTIN = ["anthropic", "openai-codex", "google", "zai", "kimi-coding", "openrouter"].map((id) => ({
     id,
     name: expect.any(String),
     configured: false,

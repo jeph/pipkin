@@ -4,6 +4,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.ModelConfig
 import io.jeph.pipkin.ui.Destination
@@ -19,6 +20,12 @@ internal interface ModelDraft {
 
   /** What the add-models page lists. */
   val available: List<ModelConfig>
+
+  /** True while [loadAvailable] asks the provider for its models. */
+  val loadingAvailable: Boolean get() = false
+
+  /** Why the provider's own list of models couldn't be read; [available] then falls back to Pi's catalogue. */
+  val availableError: String? get() = null
 
   /** The models on the provider page, in order. */
   val added: List<ModelForm>
@@ -37,6 +44,9 @@ internal interface ModelDraft {
 
   /** Adds [custom]'s id, looked up in Pi's catalogue through [lookup]. */
   suspend fun addCustom(lookup: suspend (String) -> ModelConfig, fallbackError: String)
+
+  /** Fills [available] for the add-models page, for example from the provider's own list of models. */
+  suspend fun loadAvailable(accounts: AccountRepository, fallbackError: String) = Unit
 }
 
 /** The add-models page's "custom model" field. */

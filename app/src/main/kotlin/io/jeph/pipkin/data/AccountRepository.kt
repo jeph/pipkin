@@ -73,6 +73,9 @@ internal class AccountRepository(
 
   suspend fun modelDefaults(ids: List<String>, api: String): List<ModelConfig> = hostClient.modelDefaults(ids, api)
 
+  /** What the provider says its stored key may use, or null when it has no such list; nothing is saved. */
+  suspend fun subscriptionModels(providerId: String): List<ModelConfig>? = hostClient.subscriptionModels(providerId)
+
   suspend fun saveProvider(provider: ProviderConfig) {
     hostClient.providerSave(provider)
     changed()

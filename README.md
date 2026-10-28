@@ -65,7 +65,7 @@ your code, and every command it runs on the phone itself:
   tree-sitter syntax highlighting for more than twenty languages, look back through commits, and
   open terminals without leaving the app.
 - **Your model, your plan.** Sign in with a Claude Pro or Max subscription or an OpenAI Codex
-  subscription, add a Gemini, Z.ai Coding Plan or Kimi Code API key, or add any OpenAI-compatible
+  subscription, add a Gemini, Z.ai Coding Plan, Kimi Code or OpenRouter API key, or add any OpenAI-compatible
   API, including hosted gateways and servers you run yourself. Add several and switch per chat.
 - **Runs in the background.** Lock your phone or switch apps; a notification tells you when the chat
   is done or needs your answer. While you're in Pipkin, a small pill under the header tells you the

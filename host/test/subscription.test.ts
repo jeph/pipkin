@@ -133,7 +133,7 @@ describe("subscription model settings and scope", () => {
       theme: "dark",
       defaultProvider: "my-lb",
       defaultModel: "lb-1",
-      enabledModels: ["my-lb/lb-1", "google/*", "kimi-coding/*", "openai-codex/*", "zai/*", "my-lb/*", "anthropic/claude-opus-4-8"],
+      enabledModels: ["my-lb/lb-1", "google/*", "openai-codex/*", "my-lb/*", "anthropic/claude-opus-4-8"],
     });
   });
 
@@ -159,6 +159,36 @@ describe("subscription model settings and scope", () => {
     expect(await enabledModels()).toEqual(["openai-codex/*", "anthropic/*"]);
   });
 
+  it("names each model instead of provider/* while OpenRouter's copies of its ids would match", async () => {
+    await writeJson(path.join(dirs.configDir, "auth.json"), {
+      anthropic: { type: "api_key", key: "key-123" },
+      openrouter: { type: "api_key", key: "key-123" },
+    });
+    await writeJson(settingsPath, { enabledModels: ["anthropic/claude-opus-4-8", "openrouter/google/gemma-4-31b-it:free"] });
+    const ids = await providerIds("anthropic");
+    expect(await save("anthropic", ids, [])).toMatchObject({ ok: true });
+    expect(await enabledModels()).toEqual(["openrouter/google/gemma-4-31b-it:free", ...ids.map((id) => `anthropic/${id}`)]);
+  });
+
+  it("shows every OpenRouter model with a glob that reaches past the slash in its ids", async () => {
+    await writeJson(path.join(dirs.configDir, "auth.json"), { openrouter: { type: "api_key", key: "key-123" } });
+    await writeJson(settingsPath, { enabledModels: ["openai-codex/*"] });
+    const ids = await providerIds("openrouter");
+    expect(await save("openrouter", ids, [])).toMatchObject({ ok: true });
+    expect(await enabledModels()).toEqual(["openai-codex/*", "openrouter/**"]);
+    const { builtin } = await status();
+    expect(builtin).toEqual(expect.arrayContaining([expect.objectContaining({ id: "openrouter", enabled: expect.arrayContaining(ids) })]));
+  });
+
+  it("keeps OpenRouter's models hidden when its last picked model is taken off", async () => {
+    await writeJson(path.join(dirs.configDir, "auth.json"), { openrouter: { type: "api_key", key: "key-123" } });
+    await writeJson(settingsPath, { enabledModels: ["openrouter/google/gemma-4-31b-it:free"] });
+    expect(await save("openrouter", [], [])).toMatchObject({ ok: true });
+    expect(await enabledModels()).toEqual(expect.arrayContaining([expect.any(String)]));
+    const { builtin } = await status();
+    expect(builtin).toEqual(expect.arrayContaining([expect.objectContaining({ id: "openrouter", enabled: [] })]));
+  });
+
   it("reports the scope, enabled ids, extra ids and overridden settings", async () => {
     await writeJson(modelsPath, {
       providers: {
@@ -181,6 +211,7 @@ describe("subscription model settings and scope", () => {
       expect.objectContaining({ id: "google", enabled: [], extraIds: [] }),
       expect.objectContaining({ id: "zai", enabled: [], extraIds: [] }),
       expect.objectContaining({ id: "kimi-coding", enabled: [], extraIds: [] }),
+      expect.objectContaining({ id: "openrouter", enabled: [], extraIds: [] }),
     ]);
     expect(data.custom).toEqual([expect.objectContaining({ id: "my-lb" })]);
   });
@@ -189,7 +220,7 @@ describe("subscription model settings and scope", () => {
     await writeFile(settingsPath, "{");
     const data = await status();
     expect(data).toMatchObject({ scope: null, settingsError: expect.any(String) });
-    expect(data.builtin).toEqual(Array.from({ length: 5 }, () => expect.objectContaining({ enabled: null })));
+    expect(data.builtin).toEqual(Array.from({ length: 6 }, () => expect.objectContaining({ enabled: null })));
   });
 
   it("rejects an invalid settings.json without writing either file", async () => {

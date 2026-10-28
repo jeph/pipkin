@@ -58,6 +58,8 @@ import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.auth.LoginSheet
 import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.settings.isSignedIn
+import io.jeph.pipkin.ui.settings.usesApiKey
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -67,10 +69,15 @@ import io.jeph.pipkin.ui.theme.pipkinColors
  * setup command, granted a permission), turns its actions into Continue rather than moving on, so the page doesn't
  * change under a tap the user is about to make. Skipped optional steps and the welcome are remembered, so reopening
  * Pipkin resumes at the first step still open. Opened again after setup (a "needs attention" tap), it starts at the
- * broken step and [onClose] leaves it.
+ * broken step and [onClose] leaves it. Once an API key is added, [onPickModels] opens its provider's models to pick.
  */
 @Composable
-internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit, onClose: (() -> Unit)?) {
+internal fun OnboardingScreen(
+  onFinished: () -> Unit,
+  onAddProvider: () -> Unit,
+  onPickModels: (providerId: String) -> Unit,
+  onClose: (() -> Unit)?,
+) {
   val context = LocalContext.current
   val graph = remember(context) { context.appGraph }
   var loginProvider by rememberSaveable { mutableStateOf<String?>(null) }
@@ -153,7 +160,20 @@ internal fun OnboardingScreen(onFinished: () -> Unit, onAddProvider: () -> Unit,
     }
   }
 
-  loginProvider?.let { LoginSheet(providerId = it, onDismiss = { loginProvider = null }) }
+  loginProvider?.let { id -> SetupLoginSheet(id, onClosed = { loginProvider = null }, onPickModels = onPickModels) }
+}
+
+/** Signs in to [providerId]; once it holds an API key, [onPickModels] opens its models to pick. */
+@Composable
+private fun SetupLoginSheet(providerId: String, onClosed: () -> Unit, onPickModels: (providerId: String) -> Unit) {
+  val accounts = LocalContext.current.appGraph.accountRepository
+  LoginSheet(
+    providerId = providerId,
+    onDismiss = {
+      onClosed()
+      if (usesApiKey(providerId) && accounts.status.value?.isSignedIn(providerId) == true) onPickModels(providerId)
+    },
+  )
 }
 
 /** Moves on right away from a step this phone or build no longer shows (Termux swapped between builds). */

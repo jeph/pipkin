@@ -1,6 +1,7 @@
 package io.jeph.pipkin.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,7 +11,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,6 +34,7 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PillButton
 import io.jeph.pipkin.ui.components.PipkinDialog
 import io.jeph.pipkin.ui.components.RoundIconButton
+import io.jeph.pipkin.ui.components.SearchField
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -71,20 +79,42 @@ internal fun ModelsSection(
   }
 }
 
-/** Lists what the endpoint or Pi offers; tapping a model adds it to the provider or takes it off again. */
+/**
+ * Lists what the endpoint, the provider or Pi offers, narrowed by a search; tapping a model adds it to the
+ * provider or takes it off again.
+ */
 @Composable
 internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
   val accounts = LocalContext.current.appGraph.accountRepository
   val scope = rememberCoroutineScope()
   val failed = stringResource(R.string.provider_failed)
+  var query by rememberSaveable { mutableStateOf("") }
+  LaunchedEffect(draft) { draft.loadAvailable(accounts, failed) }
   SettingsPage(title = stringResource(R.string.provider_add_models), onBack = onBack) {
     val available = draft.available
     val availableIds = available.mapTo(HashSet()) { it.id }
+    SearchField(query, onQueryChange = { query = it }, placeholder = stringResource(R.string.chat_model_search))
     FieldLabel(stringResource(R.string.models_available))
-    if (available.isEmpty()) {
-      SettingsCaption(text = stringResource(R.string.models_none))
-    } else {
-      ModelPickList(models = available, draft = draft)
+    val term = query.trim()
+    val shown = remember(available, term) {
+      available.filter {
+        term.isEmpty() || it.id.contains(term, ignoreCase = true) ||
+          it.name?.contains(term, ignoreCase = true) == true
+      }
+    }
+    draft.availableError?.let {
+      SettingsCaption(text = stringResource(R.string.models_list_failed, it), color = pipkinColors.destructive)
+    }
+    when {
+      draft.loadingAvailable -> Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        SimmeringPot()
+      }
+
+      available.isEmpty() -> SettingsCaption(text = stringResource(R.string.models_none))
+
+      shown.isEmpty() -> SettingsCaption(text = stringResource(R.string.chat_model_search_empty))
+
+      else -> ModelPickList(models = shown, draft = draft)
     }
     FieldLabel(stringResource(R.string.models_custom))
     val custom = draft.added.filter { it.id !in availableIds }.map(ModelForm::preview)

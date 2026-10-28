@@ -1,6 +1,6 @@
 ---
 title: Connect a model
-description: Sign in with a Claude or OpenAI subscription, add a Gemini, Z.ai or Kimi API key or an OpenAI-compatible API, and choose models per chat.
+description: Sign in with a Claude or OpenAI subscription, add a Gemini, Z.ai, Kimi or OpenRouter API key or an OpenAI-compatible API, and choose models per chat.
 ---
 
 The agent runs on your phone, but the AI model it talks to runs at a provider. Pipkin supports these:
@@ -12,6 +12,7 @@ The agent runs on your phone, but the AI model it talks to runs at a provider. P
 | **Gemini** | A Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) |
 | **Z.ai** | An API key for the [GLM Coding Plan](https://z.ai/subscribe) |
 | **Kimi** | An API key from the [Kimi Code console](https://www.kimi.com/code) |
+| **OpenRouter** | An API key from [OpenRouter](https://openrouter.ai/settings/keys) |
 | **OpenAI-compatible API** | A base URL, and an API key if the service needs one, from any service that speaks the OpenAI API, including gateways and servers you run yourself |
 
 You can connect several and switch between them per chat. Add them during setup, or later in **Settings → Providers and models → Add a provider**.
@@ -31,12 +32,15 @@ The other options are useful when the browser flow doesn't work on your phone:
 
 To sign out, open the subscription in **Settings → Providers and models** and tap **Sign out**.
 
-## Add a Gemini, Z.ai or Kimi key
+## Add a Gemini, Z.ai, Kimi or OpenRouter key
 
-1. Choose **Gemini**, **Z.ai** or **Kimi**.
-2. Paste your API key and tap **Continue**. Pipkin shows **Key saved**.
+1. Choose **Gemini**, **Z.ai**, **Kimi** or **OpenRouter**.
+2. Paste your API key and tap **Continue**. Pipkin saves the key and opens **Add models** for the provider.
+3. Search the list and tap the models you want, then tap **Done** and **Save**.
 
-Pipkin uses Pi's built-in support for these providers, so their models, context windows and reasoning levels are already filled in. Usage counts against your Gemini API billing, your GLM Coding Plan, or your Kimi Code membership. Pipkin doesn't check the key when you save it; a wrong key shows up as an error in the first chat.
+For Z.ai, Kimi and OpenRouter, **Add models** lists the models the provider says your key can use, so new models show up there before Pi knows them, and no models are switched on until you pick some. OpenRouter offers hundreds of models; free ones end in `:free`. If you add an OpenRouter key and pick no models, Pi starts new chats on its own OpenRouter default, a paid model, so check the model chip before you send. If the provider's list can't be read, Pipkin explains why and shows the models Pi knows instead. Gemini always shows the models Pi knows, all switched on.
+
+Pipkin uses Pi's built-in support for these providers, so the models Pi knows come with their context windows and reasoning levels filled in. Usage counts against your Gemini API billing, your GLM Coding Plan, your Kimi Code membership, or your OpenRouter credits. Pipkin doesn't check the key when you save it; a wrong key shows up when Pipkin lists the provider's models, or as an error in the first chat.
 
 Google doesn't let third-party apps use a Google AI Pro or Ultra subscription, so Gemini needs an API key rather than a Google sign-in.
 
@@ -78,7 +82,7 @@ Whatever you pick applies to the current chat and becomes the default for new ch
 
 Pipkin saves providers in Pi's own configuration files, in Termux under `~/.pipkin/pi`:
 
-- `auth.json` holds subscription sign-ins and the Gemini, Z.ai and Kimi keys.
+- `auth.json` holds subscription sign-ins and the Gemini, Z.ai, Kimi and OpenRouter keys.
 - `models.json` holds OpenAI-compatible providers, their models, and their API keys.
 - `settings.json` holds the default model and which models appear in the list.
 

@@ -56,7 +56,18 @@ internal val subscriptions = listOf(
     "openai-completions",
     usesApiKey = true,
   ),
+  Subscription(
+    "openrouter",
+    R.string.settings_openrouter,
+    R.string.settings_openrouter_subtitle,
+    R.string.login_title_openrouter,
+    "openai-completions",
+    usesApiKey = true,
+  ),
 )
 
 /** True once Pi holds a credential for the provider [id]. */
 internal fun AuthStatus.isSignedIn(id: String): Boolean = builtin.any { it.id == id && it.configured }
+
+/** True for a provider Pipkin connects with an API key, whose models the user picks after adding it. */
+internal fun usesApiKey(providerId: String): Boolean = subscriptions.any { it.id == providerId && it.usesApiKey }

@@ -97,10 +97,11 @@ internal fun ProvidersScreen(
 
 /**
  * The kinds of provider to add. A provider Pi ships signs in (or takes its API key) over a sheet and
- * [onAdded] runs once Pi holds its credential; the OpenAI-compatible option continues to the provider editor.
+ * [onAdded] runs with its id once Pi holds its credential; the OpenAI-compatible option continues to the
+ * provider editor.
  */
 @Composable
-internal fun AddProviderScreen(onBack: () -> Unit, onAddCompatible: () -> Unit, onAdded: () -> Unit) {
+internal fun AddProviderScreen(onBack: () -> Unit, onAddCompatible: () -> Unit, onAdded: (providerId: String) -> Unit) {
   val accounts = LocalContext.current.appGraph.accountRepository
   val status by accounts.status.collectAsStateWithLifecycle()
   val refreshError by accounts.refreshError.collectAsStateWithLifecycle()
@@ -136,7 +137,7 @@ internal fun AddProviderScreen(onBack: () -> Unit, onAddCompatible: () -> Unit, 
       providerId = id,
       onDismiss = {
         signingIn = null
-        if (accounts.status.value?.isSignedIn(id) == true) onAdded()
+        if (accounts.status.value?.isSignedIn(id) == true) onAdded(id)
       },
     )
   }

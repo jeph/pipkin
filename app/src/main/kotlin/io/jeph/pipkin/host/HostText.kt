@@ -129,6 +129,7 @@ private val templates: Map<String, Template> = mapOf(
   "provider_web_page" to Template.Text(R.string.host_provider_web_page, listOf("url")),
   "provider_not_json" to Template.Text(R.string.host_provider_not_json, listOf("body")),
   "provider_no_data_list" to Template.Text(R.string.host_provider_no_data_list),
+  "subscription_no_key" to Template.Text(R.string.host_subscription_no_key),
 
   "backup_progress_backed_up" to Template.Plural(R.plurals.host_backup_progress_backed_up),
   "backup_progress_restored" to Template.Plural(R.plurals.host_backup_progress_restored),

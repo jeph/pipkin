@@ -57,6 +57,7 @@ import io.jeph.pipkin.ui.settings.RunningAgentsScreen
 import io.jeph.pipkin.ui.settings.SettingsScreen
 import io.jeph.pipkin.ui.settings.SubscriptionScreen
 import io.jeph.pipkin.ui.settings.ownsDraft
+import io.jeph.pipkin.ui.settings.usesApiKey
 import io.jeph.pipkin.ui.stackTransition
 import io.jeph.pipkin.ui.subagents.ArchivedSubagentScreen
 import io.jeph.pipkin.ui.theme.PipkinTheme
@@ -210,7 +211,10 @@ private fun Screen(
     Destination.AddProvider -> AddProviderScreen(
       onBack = { navigator.pop() },
       onAddCompatible = { navigator.push(Destination.ProviderEditor(null)) },
-      onAdded = { navigator.popTo(Destination.Providers) },
+      onAdded = { id ->
+        navigator.popTo(Destination.Providers)
+        if (usesApiKey(id)) navigator.pickModels(id)
+      },
     )
 
     is Destination.Subscription -> SubscriptionScreen(
@@ -239,10 +243,17 @@ private fun Screen(
     Destination.Onboarding -> OnboardingScreen(
       onFinished = { navigator.replaceAll(Destination.Main) },
       onAddProvider = { navigator.push(Destination.ProviderEditor(null)) },
+      onPickModels = navigator::pickModels,
       // Before setup finishes the wizard is the root; opened from the main screen later, it can be closed.
       onClose = if (shown.size > 1) ({ navigator.pop() }) else null,
     )
   }
+}
+
+/** Opens the models to add for the provider Pi ships [providerId], over its page so Save there keeps them. */
+private fun AppNavigator.pickModels(providerId: String) {
+  push(Destination.Subscription(providerId))
+  push(Destination.AddModels)
 }
 
 /** Settings, or one of the pages reached from it that needs nothing but the navigator. */

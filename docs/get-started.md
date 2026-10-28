@@ -9,7 +9,7 @@ Setup takes a few minutes, and Pipkin does most of it for you. It checks off eac
 
 - An Android phone or tablet running **Android 10 or newer**, with a 64-bit processor (almost every phone from the last few years).
 - **Termux** from [F-Droid](https://f-droid.org/packages/com.termux/) (version 0.118 or newer) or [Google Play](https://play.google.com/store/apps/details?id=com.termux) (needs Android 11 or newer). The F-Droid version is recommended. Pipkin only works with these two signed builds and refuses copies of Termux from anywhere else.
-- **An AI model to talk to**: a Claude Pro or Max subscription, an OpenAI Codex subscription, a Gemini, Z.ai Coding Plan or Kimi Code API key, or any OpenAI-compatible service, including one you run yourself. See [Connect a model](/docs/providers/).
+- **An AI model to talk to**: a Claude Pro or Max subscription, an OpenAI Codex subscription, a Gemini, Z.ai Coding Plan, Kimi Code or OpenRouter API key, or any OpenAI-compatible service, including one you run yourself. See [Connect a model](/docs/providers/).
 - **A network connection** while a chat is working.
 
 ## Install Pipkin
@@ -42,7 +42,7 @@ Open Pipkin and tap **Get started**. Each step shows **Done** once it's complete
 6. **Let Termux run in the background** (optional but recommended). The agent runs inside Termux, so Termux needs the same allowance. If Android can't ask directly, Pipkin shows where the setting is on your phone.
 7. **Let Termux use phone storage** (optional but recommended). Lets the agent work on files outside Termux, such as in Downloads or Documents.
 8. **Install the agent.** Tap **Install**. Pipkin installs Pi and its bundled extensions in Termux. It takes a few minutes, and you can leave the screen while it runs.
-9. **Connect a model** (optional here). Sign in with **Claude** or **OpenAI**, add a **Gemini**, **Z.ai** or **Kimi** key, or add an **OpenAI-compatible API**. You can also do this later in **Settings → Providers and models**.
+9. **Connect a model** (optional here). Sign in with **Claude** or **OpenAI**, add a **Gemini**, **Z.ai**, **Kimi** or **OpenRouter** key and pick its models, or add an **OpenAI-compatible API**. You can also do this later in **Settings → Providers and models**.
 
 When you see **You're all set**, tap **Start using Pipkin**.
 

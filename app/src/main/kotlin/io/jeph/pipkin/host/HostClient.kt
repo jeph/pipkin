@@ -150,6 +150,11 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     call("model_defaults", JSONObject().put("ids", JSONArray(ids)).put("api", api))
       .optJSONArray("models").objects().map(ModelConfig::from)
 
+  /** The models the stored API key of the Pi provider [providerId] may use as it lists them; null when it has no list. */
+  suspend fun subscriptionModels(providerId: String): List<ModelConfig>? =
+    call("subscription_models", JSONObject().put("providerId", providerId))
+      .optJSONArray("models")?.objects()?.map(ModelConfig::from)
+
   suspend fun providerSave(provider: ProviderConfig) {
     call("provider_save", provider.toJson())
   }

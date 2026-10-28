@@ -52,8 +52,9 @@ export async function providerSave(ctx: ModeContext): Promise<JsonObject> {
 
   if (settings !== undefined && settings.enabledModels.length > 0) {
     const saved = models.map((model) => ({ provider: id, id: model.id, name: model.name ?? model.id }));
-    const resolve = scopeResolver(pi, replaceProviderModels(await scopeUniverse(runtime, ctx.signal), id, saved));
-    const patterns = await keepProviderInScope(settings.enabledModels, id, settings.defaultRef, resolve);
+    const universe = replaceProviderModels(await scopeUniverse(runtime, ctx.signal), id, saved);
+    const resolve = scopeResolver(pi, universe);
+    const patterns = await keepProviderInScope(settings.enabledModels, id, settings.defaultRef, universe, resolve);
     if (patterns !== undefined) await saveEnabledModels(settings, patterns);
   }
   return {};
