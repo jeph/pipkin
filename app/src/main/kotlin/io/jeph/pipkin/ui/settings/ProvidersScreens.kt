@@ -5,21 +5,17 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.add
-import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -49,6 +45,7 @@ import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.components.StatusDot
+import io.jeph.pipkin.ui.components.scrollFades
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.io.IOException
@@ -180,24 +177,36 @@ internal fun SettingsPage(
 }
 
 /**
- * [SettingsPage] for a page as long as a provider's hundreds of models: only the items on screen are composed.
- * Items are centred but not spaced; each caps its own width with [SettingsItemWidth] and spaces itself.
+ * [SettingsPage] for a page as long as a provider's hundreds of models: only the items on screen are composed, and
+ * [footer] stays at the bottom of the screen under them, the list fading out where it scrolls past either edge. Items
+ * are centred but not spaced; each caps its own width with [SettingsItemWidth] and spaces itself.
  */
 @Composable
-internal fun LazySettingsPage(title: String, onBack: () -> Unit, content: LazyListScope.() -> Unit) {
+internal fun LazySettingsPage(
+  title: String,
+  onBack: () -> Unit,
+  footer: @Composable () -> Unit,
+  content: LazyListScope.() -> Unit,
+) {
   val spacing = PipkinTokens.Spacing
-  val padding = WindowInsets.navigationBars
-    // The keyboard already lifts the list above the navigation bar.
-    .exclude(WindowInsets.ime)
-    .add(WindowInsets(left = spacing.s16, top = spacing.s24, right = spacing.s16, bottom = spacing.s24))
-    .asPaddingValues()
+  val listState = rememberLazyListState()
+  val background = pipkinColors.surface0
   SettingsPageFrame(title, onBack, snackbar = null) {
-    LazyColumn(
-      modifier = Modifier.fillMaxSize().imePadding(),
-      contentPadding = padding,
+    Column(
+      modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding(),
       horizontalAlignment = Alignment.CenterHorizontally,
-      content = content,
-    )
+    ) {
+      LazyColumn(
+        modifier = Modifier.weight(1f).fillMaxWidth().scrollFades(listState, background),
+        state = listState,
+        contentPadding = PaddingValues(start = spacing.s16, top = spacing.s24, end = spacing.s16, bottom = spacing.s12),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        content = content,
+      )
+      Box(modifier = SettingsItemWidth.padding(start = spacing.s16, end = spacing.s16, bottom = spacing.s16)) {
+        footer()
+      }
+    }
   }
 }
 

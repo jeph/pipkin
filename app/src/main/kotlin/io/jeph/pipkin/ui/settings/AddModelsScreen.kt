@@ -66,7 +66,13 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
   val newId by remember(draft) {
     derivedStateOf { query.trim().takeIf { id -> id.isNotEmpty() && models.none { it.id == id } } }
   }
-  LazySettingsPage(title = stringResource(R.string.provider_add_models), onBack = onBack) {
+  LazySettingsPage(
+    title = stringResource(R.string.provider_add_models),
+    onBack = onBack,
+    footer = {
+      PillButton(label = stringResource(R.string.models_done), onClick = onBack, modifier = Modifier.fillMaxWidth())
+    },
+  ) {
     item {
       SearchField(
         query,
@@ -90,7 +96,6 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
       }
     }
     modelRows(draft, models, shown)
-    item { PillButton(label = stringResource(R.string.models_done), onClick = onBack, modifier = SpacedItem) }
   }
 }
 

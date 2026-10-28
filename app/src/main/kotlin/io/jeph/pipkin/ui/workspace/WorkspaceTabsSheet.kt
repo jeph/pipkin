@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -28,11 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
@@ -60,6 +54,7 @@ import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SnackbarStackOverlay
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.components.SwipeAway
+import io.jeph.pipkin.ui.components.scrollFades
 import io.jeph.pipkin.ui.sidebar.pathTextStyle
 import io.jeph.pipkin.ui.sidebar.projectName
 import io.jeph.pipkin.ui.sidebar.tildePath
@@ -444,26 +439,3 @@ private val PINNED_ACTIONS_MIN_HEIGHT = 600.dp
 
 /** The list key of the tiles when they scroll at the end of the tabs. */
 private const val FOOTER_KEY = "pipkin:tab-actions"
-
-/**
- * Fades the top of a list into [color] once it's scrolled and the bottom while rows lie below. Painted in the
- * sheet's colour over the rows rather than as a transparency mask, which would draw the whole list offscreen; [state]
- * is read while drawing, so scrolling redraws the fades without recomposing the list.
- */
-private fun Modifier.scrollFades(state: LazyListState, color: Color): Modifier = drawWithContent {
-  drawContent()
-  val fade = SCROLL_FADE.toPx().coerceAtMost(size.height / 2)
-  if (state.canScrollBackward) {
-    drawRect(Brush.verticalGradient(listOf(color, Color.Transparent), endY = fade), size = Size(size.width, fade))
-  }
-  if (state.canScrollForward) {
-    val top = size.height - fade
-    drawRect(
-      Brush.verticalGradient(listOf(Color.Transparent, color), startY = top, endY = size.height),
-      topLeft = Offset(0f, top),
-      size = Size(size.width, fade),
-    )
-  }
-}
-
-private val SCROLL_FADE = 40.dp
