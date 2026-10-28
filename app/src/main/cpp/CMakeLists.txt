@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(pipkin-syntax LANGUAGES C)
+# pipkin-syntax, the tree-sitter grammars, and pipkin-llama in llama/, llama.cpp's server for local models.
+project(pipkin LANGUAGES C CXX)
 
 # The pinned sources fetched by Gradle's fetchTreeSitterSources task.
 if(NOT TREE_SITTER_SOURCES)
@@ -66,3 +67,5 @@ target_compile_options(pipkin-syntax PRIVATE -Wall -Wextra -Werror -Wno-unused-p
 # Third-party sources build at -O2 without warnings, even in debug builds, where parsing at -O0
 # would lag behind a streaming reply.
 set_source_files_properties(${TS}/tree-sitter/lib/src/lib.c ${GRAMMAR_FILES} PROPERTIES COMPILE_OPTIONS "-O2;-w")
+
+add_subdirectory(llama)
