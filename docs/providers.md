@@ -17,6 +17,8 @@ The agent runs on your phone, but the AI model it talks to runs at a provider. P
 
 You can connect several and switch between them per chat. Add them during setup, or later in **Settings → Providers and models → Add a provider**.
 
+To run a small model on the phone itself instead, with no provider, see [Local models](/docs/local-models/). It's experimental.
+
 ## Sign in with a subscription
 
 1. Choose **Claude** or **OpenAI**.

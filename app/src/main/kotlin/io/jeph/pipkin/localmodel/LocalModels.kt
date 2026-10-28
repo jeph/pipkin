@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.data.AccountRepository
+import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.host.HostFailure
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.ModelConfig
@@ -13,23 +14,24 @@ import java.security.SecureRandom
 import java.util.Base64
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
  * On-device models: the downloaded files ([store]), the process serving one of them to Pi ([runtime]), and Pi's
- * `pipkin-local` provider, kept listing exactly the downloaded models while [enabled].
+ * `pipkin-local` provider, kept listing exactly the downloaded models while the feature is on.
  */
 internal class LocalModels(
   context: Context,
   private val scope: CoroutineScope,
   keepAlive: KeepAlive,
   private val accounts: AccountRepository,
-  private val enabled: StateFlow<Boolean>,
-  idleUnloadMinutes: StateFlow<Int>,
+  preferences: Preferences,
 ) {
   private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -38,8 +40,14 @@ internal class LocalModels(
     prefs.edit().putString(KEY_API_KEY, it).apply()
   }
 
-  val store = ModelStore()
-  val runtime = LocalModelRuntime(context, scope, keepAlive, store.installed, idleUnloadMinutes) { apiKey }
+  /** On in Settings, and set up: before setup, Termux can't run the host or Pi, so there is nothing to serve yet. */
+  private val enabled: StateFlow<Boolean> =
+    combine(preferences.setupComplete, preferences.localModelsEnabled) { setUp, on -> setUp && on }
+      .stateIn(scope, SharingStarted.Eagerly, false)
+
+  val store = ModelStore(context, scope, preferences, keepAlive)
+  val runtime =
+    LocalModelRuntime(context, scope, keepAlive, store.installed, preferences.localModelIdleUnloadMinutes) { apiKey }
 
   init {
     scope.launch { enabled.collect(runtime::serve) }

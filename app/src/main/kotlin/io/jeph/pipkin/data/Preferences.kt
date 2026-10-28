@@ -5,6 +5,8 @@ import androidx.core.content.edit
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.IdleStop
 import io.jeph.pipkin.host.GitDiffMode
+import io.jeph.pipkin.localmodel.catalog.EngineOverride
+import io.jeph.pipkin.localmodel.catalog.LocalModelSettings
 import io.jeph.pipkin.ui.files.ExplorerSort
 import io.jeph.pipkin.ui.files.SortKey
 import io.jeph.pipkin.ui.git.ExplorerTab
@@ -50,6 +52,12 @@ internal class Preferences(context: Context) {
   }
   private val disabledExtensionsState = MutableStateFlow(readStringSet(DISABLED_EXTENSIONS))
   private val inAppNotificationsState = MutableStateFlow(prefs.getBoolean(IN_APP_NOTIFICATIONS, true))
+  private val localModelsEnabledState = MutableStateFlow(prefs.getBoolean(LOCAL_MODELS_ENABLED, false))
+  private val localModelEnginesState = MutableStateFlow(readEnumMap(LOCAL_MODEL_ENGINES, EngineOverride.entries))
+  private val localModelIdleUnloadMinutesState = MutableStateFlow(
+    prefs.getInt(LOCAL_MODEL_IDLE_UNLOAD_MINUTES, LocalModelSettings.DEFAULT_IDLE_UNLOAD_MINUTES)
+      .coerceIn(LocalModelSettings.IDLE_UNLOAD_MINUTES),
+  )
 
   /** Onboarding finished. */
   val setupComplete: StateFlow<Boolean> = setupCompleteState.asStateFlow()
@@ -121,6 +129,15 @@ internal class Preferences(context: Context) {
 
   /** The extensions Pipkin bundles that the user turned off, by [BundledExtension.id]; a chat's next Pi leaves them out. */
   val disabledExtensions: StateFlow<Set<String>> = disabledExtensionsState.asStateFlow()
+
+  /** Whether Pipkin offers on-device models to Pi; off until the user turns the experiment on. */
+  val localModelsEnabled: StateFlow<Boolean> = localModelsEnabledState.asStateFlow()
+
+  /** The engine the user picked for each local model, by catalog id; a model without one is chosen automatically. */
+  val localModelEngines: StateFlow<Map<String, EngineOverride>> = localModelEnginesState.asStateFlow()
+
+  /** How many minutes a loaded local model may sit unused before its memory is given back. */
+  val localModelIdleUnloadMinutes: StateFlow<Int> = localModelIdleUnloadMinutesState.asStateFlow()
 
   fun setSetupComplete(complete: Boolean) {
     prefs.edit { putBoolean(SETUP_COMPLETE, complete) }
@@ -280,6 +297,29 @@ internal class Preferences(context: Context) {
     disabledExtensionsState.value = updated
   }
 
+  fun setLocalModelsEnabled(enabled: Boolean) {
+    prefs.edit { putBoolean(LOCAL_MODELS_ENABLED, enabled) }
+    localModelsEnabledState.value = enabled
+  }
+
+  /** Sets the engine [modelId] runs with; [EngineOverride.AUTOMATIC] forgets the choice. */
+  fun setLocalModelEngine(modelId: String, override: EngineOverride) {
+    val updated = if (override == EngineOverride.AUTOMATIC) {
+      localModelEnginesState.value - modelId
+    } else {
+      localModelEnginesState.value + (modelId to override)
+    }
+    prefs.edit { putString(LOCAL_MODEL_ENGINES, JSONObject(updated.mapValues { it.value.name }).toString()) }
+    localModelEnginesState.value = updated
+  }
+
+  /** Sets [localModelIdleUnloadMinutes], kept within [LocalModelSettings.IDLE_UNLOAD_MINUTES]. */
+  fun setLocalModelIdleUnloadMinutes(minutes: Int) {
+    val allowed = minutes.coerceIn(LocalModelSettings.IDLE_UNLOAD_MINUTES)
+    prefs.edit { putInt(LOCAL_MODEL_IDLE_UNLOAD_MINUTES, allowed) }
+    localModelIdleUnloadMinutesState.value = allowed
+  }
+
   /** The tabs and panes last shown, for a restarted Pipkin to show again; null before any were saved. */
   fun savedLayout(): SavedLayout? = prefs.getString(LAYOUT, null)?.let(::savedLayoutOf)
 
@@ -311,7 +351,10 @@ internal class Preferences(context: Context) {
     return List(array.length()) { array.getString(it) }.toSet()
   }
 
-  /** The JSON object at [key] of folder keys to names of [entries]; names no entry has any more are dropped. */
+  /**
+   * The JSON object at [key] of folder keys or model ids to names of [entries]; names no entry has any more are
+   * dropped.
+   */
   private fun <T : Enum<T>> readEnumMap(key: String, entries: List<T>): Map<String, T> {
     val json = JSONObject(prefs.getString(key, null) ?: return emptyMap())
     return json.keys().asSequence()
@@ -360,5 +403,8 @@ internal class Preferences(context: Context) {
     const val LAYOUT = "layout"
     const val DISABLED_EXTENSIONS = "disabledExtensions"
     const val IN_APP_NOTIFICATIONS = "inAppNotifications"
+    const val LOCAL_MODELS_ENABLED = "localModelsEnabled"
+    const val LOCAL_MODEL_ENGINES = "localModelEngines"
+    const val LOCAL_MODEL_IDLE_UNLOAD_MINUTES = "localModelIdleUnloadMinutes"
   }
 }

@@ -93,15 +93,7 @@ internal class AppGraph(private val application: Application) {
   val gitHost = GitHost(hostClient, scope)
   val commits = CommitTabRegistry(gitHost, tabs, preferences.trustedRepositories, scope)
   val layout = WorkspaceLayout(this)
-  val localModels = LocalModels(
-    application,
-    scope,
-    keepAlive,
-    accountRepository,
-    // Before setup, Termux can't run the host or Pi, so there is nothing to serve or register yet.
-    enabled = preferences.setupComplete,
-    idleUnloadMinutes = MutableStateFlow(DEFAULT_IDLE_UNLOAD_MINUTES),
-  )
+  val localModels = LocalModels(application, scope, keepAlive, accountRepository, preferences)
 
   /** What the chat screens keep of each chat, such as unsent drafts, held here so it survives rotation and folding. */
   val chatViews = ChatViews()
@@ -209,10 +201,6 @@ internal class AppGraph(private val application: Application) {
         }
         .collect { session -> session?.let(localModels.runtime::endLease) }
     }
-  }
-
-  private companion object {
-    const val DEFAULT_IDLE_UNLOAD_MINUTES = 5
   }
 }
 
