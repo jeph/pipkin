@@ -1,6 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadPi, type PiSdk } from "../src/env.js";
-import { keepProviderInScope, putDefaultFirst, type ScopeModel, type ScopeResolver, scopeResolver, withoutMisdirected } from "../src/scope.js";
+import {
+  keepProviderInScope,
+  NO_MODELS,
+  putDefaultFirst,
+  type ScopeModel,
+  type ScopeResolver,
+  scopeResolver,
+  withoutMisdirected,
+} from "../src/scope.js";
 import { type Dirs, installRealPi, makeDirs, removeDirs } from "./harness.js";
 
 const UNIVERSE = [
@@ -32,6 +40,11 @@ describe("keeping a provider in scope", () => {
   it("leaves an empty scope or one that already matches alone", async () => {
     expect(await keepProviderInScope([], "anthropic", undefined, UNIVERSE, resolve)).toBeUndefined();
     expect(await keepProviderInScope(["sonnet"], "anthropic", undefined, UNIVERSE, resolve)).toBeUndefined();
+  });
+
+  it("replaces the no-models placeholder once a provider gains models", async () => {
+    expect(await keepProviderInScope([NO_MODELS], "anthropic", undefined, UNIVERSE, resolve)).toEqual(["anthropic/*"]);
+    expect(await resolve([NO_MODELS])).toEqual([]);
   });
 
   it("moves the default model's explicit entry first", async () => {

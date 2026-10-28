@@ -189,6 +189,23 @@ describe("subscription model settings and scope", () => {
     expect(builtin).toEqual(expect.arrayContaining([expect.objectContaining({ id: "openrouter", enabled: [] })]));
   });
 
+  it("keeps OpenRouter's models hidden when the only other provider's last model is taken off", async () => {
+    // Codex is the only signed-in provider with models in scope; Anthropic's and Google's ids would name OpenRouter's copies.
+    await writeJson(path.join(dirs.configDir, "auth.json"), {
+      "openai-codex": { type: "oauth", access: "access", refresh: "refresh", expires: Date.now() + 3_600_000 },
+      openrouter: { type: "api_key", key: "key-123" },
+    });
+    const [codexId] = await providerIds("openai-codex");
+    if (codexId === undefined) throw new Error("Pi lists no Codex model");
+    await writeJson(settingsPath, { enabledModels: [`openai-codex/${codexId}`] });
+    expect(await save("openai-codex", [], [])).toMatchObject({ ok: true });
+    const data = await status();
+    expect(data.scope).toEqual([]);
+    expect(data.builtin).toEqual(expect.arrayContaining([expect.objectContaining({ id: "openrouter", enabled: [] })]));
+    expect(await save("openai-codex", [codexId], [])).toMatchObject({ ok: true });
+    expect(await enabledModels()).toEqual([`openai-codex/${codexId}`]);
+  });
+
   it("reports the scope, enabled ids, extra ids and overridden settings", async () => {
     await writeJson(modelsPath, {
       providers: {

@@ -66,7 +66,7 @@ function dedupe(patterns: readonly string[]): string[] {
  * Rewrites `patterns` so that `provider` contributes exactly `enabled` (`"all"`: all its models) and
  * every other provider keeps the models it had. Empty `patterns` (all in scope) starts from all of
  * every provider's models. As no patterns would show every model, a result with none falls back to
- * the other providers' models.
+ * the other providers' models, or to `NO_MODELS`.
  */
 export async function rebuildForProvider(
   patterns: readonly string[],
@@ -75,7 +75,7 @@ export async function rebuildForProvider(
   universe: readonly ScopeModel[],
   resolve: ScopeResolver,
 ): Promise<string[]> {
-  const start = patterns.length > 0 ? patterns : await everyProvider(universe, resolve);
+  const start = patterns.length > 0 ? patterns.filter((pattern) => pattern !== NO_MODELS) : await everyProvider(universe, resolve);
   const rebuilt: string[] = [];
   for (const pattern of start) {
     if (ownedBy(pattern, provider)) continue;
@@ -95,13 +95,25 @@ async function everyProvider(universe: readonly ScopeModel[], resolve: ScopeReso
   return patterns.flat();
 }
 
-/** All models of every provider but `provider` and those hidden until picked, for a scope that must not be empty. */
+/**
+ * The pattern a scope with no model holds, since Pi reads an empty `enabledModels` as every model. Its
+ * prefix can't be a provider id (no provider id starts with `_`), so it names no provider, matches no
+ * model, and Pipkin's model list shows nothing. Pi, finding no match for any pattern, still starts a
+ * chat on its default model.
+ */
+export const NO_MODELS = "_pipkin/no-models";
+
+/**
+ * All models of every provider but `provider` and those hidden until picked, for a scope that must not
+ * be empty, or `[NO_MODELS]` when there are none.
+ */
 async function othersFallback(provider: string | undefined, universe: readonly ScopeModel[], resolve: ScopeResolver): Promise<string[]> {
   const others = (await everyProvider(universe, resolve)).filter((pattern) => {
     const named = namedProvider(pattern);
     return named !== provider?.toLowerCase() && !hiddenUntilPicked(named);
   });
-  return await dropMisdirected(others, universe, resolve);
+  const kept = await dropMisdirected(others, universe, resolve);
+  return kept.length > 0 ? kept : [NO_MODELS];
 }
 
 function refPattern(ref: ScopeRef): string {
@@ -198,7 +210,7 @@ export async function keepProviderInScope(
 ): Promise<string[] | undefined> {
   if (patterns.length === 0) return undefined;
   if ((await resolve(patterns)).some((ref) => ref.provider === provider)) return undefined;
-  const added = [...patterns, ...(await providerPatterns(provider, "all", universe, resolve))];
+  const added = [...patterns.filter((pattern) => pattern !== NO_MODELS), ...(await providerPatterns(provider, "all", universe, resolve))];
   return await putDefaultFirst(await dropMisdirected(added, universe, resolve), defaultRef, resolve);
 }
 
