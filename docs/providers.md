@@ -61,9 +61,10 @@ If the check fails, Pipkin explains why. The most common fixes:
 - **API key not accepted**: check the key is complete and still active.
 - **This server needs an API key**: the server turned down a check without a key. Enter the key it expects.
 - **No models list at this URL**: the base URL usually needs to end in `/v1`.
-- **The server lists no models**: the check connected, but the server has no model to offer yet. Download or load one on it, for example with `ollama pull`, then tap **Check** again.
 - **Not an OpenAI-compatible API**: the URL points at a website rather than the API.
 - **Couldn't reach the server** or **No response**: check the address and that your phone is online.
+
+If the check connects but Pipkin says **The server lists no models**, the server has no model to offer yet. Download or load one on it, for example with `ollama pull`, then tap **Check** again, or add a model by its ID under **Custom models**.
 
 To remove a provider, open it and tap **Remove provider**. Pipkin forgets the provider, its models, and its API key.
 
