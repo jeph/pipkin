@@ -49,18 +49,19 @@ internal interface ModelDraft {
   suspend fun loadAvailable(accounts: AccountRepository, fallbackError: String) = Unit
 }
 
-/** Adding a custom model typed into the add-models page's search: whether it is being looked up, or why it failed. */
+/**
+ * Adding a custom model typed into the add-models page's search: which id is being looked up, and why the last one
+ * failed. Both belong to an id, so a search changed while a lookup runs never shows another id's result.
+ */
 @Stable
 internal class CustomModelLookup {
-  var running by mutableStateOf(false)
+  /** The id being looked up; while it runs, no other is. */
+  var addingId by mutableStateOf<String?>(null)
     private set
-  var error by mutableStateOf<String?>(null)
-    private set
+  private var failure by mutableStateOf<Failure?>(null)
 
-  /** The search changed, so the last failure no longer describes what it holds. */
-  fun clearError() {
-    error = null
-  }
+  /** Why adding [modelId] failed the last time, or null. */
+  fun errorFor(modelId: String): String? = failure?.takeIf { it.modelId == modelId }?.message
 
   /** Looks [modelId] up and hands it to [onAdded], unless [addKnown] adds it from what the draft already has. */
   suspend fun add(
@@ -70,19 +71,21 @@ internal class CustomModelLookup {
     addKnown: (String) -> Boolean,
     onAdded: (ModelConfig) -> Unit,
   ) {
-    if (modelId.isEmpty() || running || addKnown(modelId)) return
-    running = true
-    error = null
+    if (modelId.isEmpty() || addingId != null || addKnown(modelId)) return
+    addingId = modelId
+    failure = null
     try {
       onAdded(lookup(modelId))
     } catch (rejected: HostRejected) {
-      error = rejected.error
-    } catch (failure: IOException) {
-      error = failure.message ?: fallbackError
+      failure = Failure(modelId, rejected.error)
+    } catch (unreachable: IOException) {
+      failure = Failure(modelId, unreachable.message ?: fallbackError)
     } finally {
-      running = false
+      addingId = null
     }
   }
+
+  private class Failure(val modelId: String, val message: String)
 }
 
 /** The provider or subscription draft while its page is on the screen stack, so its sub-pages share it. */

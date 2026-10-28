@@ -70,10 +70,7 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
     item {
       SearchField(
         query,
-        onQueryChange = {
-          query = it
-          draft.customLookup.clearError()
-        },
+        onQueryChange = { query = it },
         placeholder = stringResource(R.string.models_search),
         modifier = SettingsItemWidth,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Search),
@@ -170,12 +167,12 @@ private fun AddCustomModelRow(modelId: String, lookup: CustomModelLookup, onAdd:
         .fillMaxWidth()
         .heightIn(min = 40.dp)
         .clip(RoundedCornerShape(PipkinTokens.Radius.xl))
-        .clickable(enabled = !lookup.running, onClick = onAdd)
+        .clickable(enabled = lookup.addingId == null, onClick = onAdd)
         .padding(horizontal = PipkinTokens.Spacing.s16),
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
     ) {
-      if (lookup.running) {
+      if (lookup.addingId == modelId) {
         SimmeringPot()
       } else {
         LucideIcon(icon = R.drawable.ic_lucide_plus, contentDescription = null, tint = colors.accent)
@@ -187,6 +184,6 @@ private fun AddCustomModelRow(modelId: String, lookup: CustomModelLookup, onAdd:
         fontSize = PipkinTokens.FontSize.base,
       )
     }
-    lookup.error?.let { SettingsCaption(text = it, color = colors.destructive) }
+    lookup.errorFor(modelId)?.let { SettingsCaption(text = it, color = colors.destructive) }
   }
 }
