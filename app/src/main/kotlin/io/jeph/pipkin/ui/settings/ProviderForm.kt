@@ -15,7 +15,7 @@ import java.io.IOException
 /** The endpoint details a connection check covers; changing any of them makes the check stale. */
 internal data class Connection(val baseUrl: String, val apiKey: String, val api: String)
 
-/** Result of listing the endpoint's models with the key, which proves it is reachable and accepts the key. */
+/** Result of listing the endpoint's models with the key, if any, which proves it is reachable and accepts the key. */
 internal sealed interface ConnectionCheck {
   data object Idle : ConnectionCheck
 
@@ -79,10 +79,10 @@ internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraf
   val fetched: List<ModelConfig> get() = (check as? ConnectionCheck.Ok)?.models.orEmpty()
 
   val idValid: Boolean get() = ID_PATTERN.matches(id)
-  val hasConnectionDetails: Boolean get() = baseUrl.isNotBlank() && apiKey.isNotBlank()
-  val canCheck: Boolean get() = hasConnectionDetails && check !is ConnectionCheck.Checking
+  val hasBaseUrl: Boolean get() = baseUrl.isNotBlank()
+  val canCheck: Boolean get() = hasBaseUrl && check !is ConnectionCheck.Checking
   val canSave: Boolean
-    get() = idValid && hasConnectionDetails && models.isNotEmpty() && models.all { it.valid } && !saving
+    get() = idValid && hasBaseUrl && models.isNotEmpty() && models.all { it.valid } && !saving
   val dirty: Boolean get() = snapshot() != baseline
 
   /** Fills the draft from the stored provider once; later status updates do not overwrite edits. */

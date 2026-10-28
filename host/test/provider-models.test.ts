@@ -86,6 +86,13 @@ describe("provider_models and model_defaults", () => {
         response.end(failure.body);
         return;
       }
+      if (request.url === "/open/models") {
+        // A local server without auth, which turns down an Authorization header it can't check, like an empty bearer token.
+        const keyless = request.headers.authorization === undefined;
+        response.writeHead(keyless ? 200 : 400, { "content-type": "application/json" });
+        response.end(JSON.stringify(keyless ? { object: "list", data: entries } : { error: "unexpected Authorization header" }));
+        return;
+      }
       const authorized = request.headers.authorization === "Bearer sk-test" && request.url === "/v1/models";
       response.writeHead(authorized ? 200 : 401, { "content-type": "application/json" });
       response.end(JSON.stringify(authorized ? { object: "list", data: entries } : { error: "nope" }));
@@ -164,6 +171,13 @@ describe("provider_models and model_defaults", () => {
       maxTokens: 128_000,
       cost: expect.objectContaining({ input: expect.any(Number), output: expect.any(Number) }),
     }]));
+  });
+
+  it("lists a keyless endpoint's models without sending an Authorization header", async () => {
+    entries = [{ id: "qwen3:0.6b", object: "model" }];
+    expect(await runMode("provider_models", dirs, { baseUrl: `${origin}/open`, apiKey: "", api: "openai-completions" })).toEqual(
+      success([{ id: "qwen3:0.6b" }]),
+    );
   });
 
   it.each([

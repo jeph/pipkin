@@ -33,7 +33,7 @@
     <string name="providers_empty">No providers yet. Add one to start chatting.</string>
     <string name="providers_add">Add a provider</string>
     <string name="providers_compatible">OpenAI-compatible API</string>
-    <string name="providers_compatible_subtitle">Any endpoint that takes an API key</string>
+    <string name="providers_compatible_subtitle">Any endpoint that speaks the OpenAI API, hosted or local</string>
     <string name="providers_added">Added</string>
 
     <string name="settings_reload_agents">Reload idle agents</string>
@@ -166,6 +166,7 @@
     <string name="provider_base_url">Base URL</string>
     <string name="provider_base_url_hint">https://host/v1</string>
     <string name="provider_api_key">API key</string>
+    <string name="provider_api_key_hint">Leave empty if the server needs none</string>
     <string name="provider_show_key">Show</string>
     <string name="provider_hide_key">Hide</string>
     <string name="provider_api_type">API type</string>
@@ -175,7 +176,7 @@
     <string name="provider_connection">Connection</string>
     <string name="provider_check">Check</string>
     <string name="provider_status_unchecked">Not checked</string>
-    <string name="provider_status_needs_details">Enter the base URL and API key first</string>
+    <string name="provider_status_needs_url">Enter the base URL first</string>
     <string name="provider_status_ready">Check to load this endpoint\'s models</string>
     <string name="provider_status_outdated">Details changed since the last check</string>
     <string name="provider_status_checking">Checking…</string>
@@ -189,6 +190,8 @@
     </plurals>
     <string name="provider_error_unauthorized">API key not accepted</string>
     <string name="provider_error_unauthorized_hint">The server turned this key down. Check that it\'s complete and still active.</string>
+    <string name="provider_error_no_key">This server needs an API key</string>
+    <string name="provider_error_no_key_hint">It turned down the request without one. Enter the key it expects, then check again.</string>
     <string name="provider_error_not_found">No models list at this URL</string>
     <string name="provider_error_not_found_hint">Nothing answered at /models. OpenAI-compatible base URLs usually end in /v1.</string>
     <string name="provider_error_rate_limited">Too many requests</string>

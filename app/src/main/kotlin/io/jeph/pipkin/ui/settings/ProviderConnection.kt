@@ -118,7 +118,7 @@ private fun connectionStatus(form: ProviderForm): ConnectionStatus = when (val c
     stringResource(R.string.provider_status_unchecked),
     stringResource(
       when {
-        !form.hasConnectionDetails -> R.string.provider_status_needs_details
+        !form.hasBaseUrl -> R.string.provider_status_needs_url
         form.checkOutdated -> R.string.provider_status_outdated
         else -> R.string.provider_status_ready
       },
@@ -134,7 +134,7 @@ private fun StatusIcon(@DrawableRes icon: Int, tint: Color) {
 /** What went wrong in words, what to try, and what the server said, which can be selected to copy. */
 @Composable
 private fun ConnectionFailurePanel(failure: ConnectionCheck.Failed, modifier: Modifier = Modifier) {
-  val explanation = failureExplanation(failure.code)
+  val explanation = failureExplanation(failure.code, keyless = failure.connection.apiKey.isEmpty())
   ErrorPanel(
     title = stringResource(explanation.title),
     message = explanation.hint?.let { stringResource(it) } ?: failure.message,
@@ -147,7 +147,8 @@ private fun ConnectionFailurePanel(failure: ConnectionCheck.Failed, modifier: Mo
 private class FailureExplanation(@StringRes val title: Int, @StringRes val hint: Int?, val showDetail: Boolean = true)
 
 /** Unknown codes and failures that never reached the host show the message as it came. */
-private fun failureExplanation(code: String?): FailureExplanation = when (code) {
+private fun failureExplanation(code: String?, keyless: Boolean): FailureExplanation = when (code) {
+  "unauthorized" if keyless -> FailureExplanation(R.string.provider_error_no_key, R.string.provider_error_no_key_hint)
   "unauthorized" -> FailureExplanation(R.string.provider_error_unauthorized, R.string.provider_error_unauthorized_hint)
   "not_found" -> FailureExplanation(R.string.provider_error_not_found, R.string.provider_error_not_found_hint)
   "rate_limited" -> FailureExplanation(R.string.provider_error_rate_limited, R.string.provider_error_rate_limited_hint)

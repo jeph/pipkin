@@ -9,7 +9,7 @@ Setup takes a few minutes, and Pipkin does most of it for you. It checks off eac
 
 - An Android phone or tablet running **Android 10 or newer**, with a 64-bit processor (almost every phone from the last few years).
 - **Termux** from [F-Droid](https://f-droid.org/packages/com.termux/) (version 0.118 or newer) or [Google Play](https://play.google.com/store/apps/details?id=com.termux) (needs Android 11 or newer). The F-Droid version is recommended. Pipkin only works with these two signed builds and refuses copies of Termux from anywhere else.
-- **An AI model to talk to**: a Claude Pro or Max subscription, an OpenAI Codex subscription, a Gemini, Z.ai Coding Plan or Kimi Code API key, or an API key for any OpenAI-compatible service. See [Connect a model](/docs/providers/).
+- **An AI model to talk to**: a Claude Pro or Max subscription, an OpenAI Codex subscription, a Gemini, Z.ai Coding Plan or Kimi Code API key, or any OpenAI-compatible service, including one you run yourself. See [Connect a model](/docs/providers/).
 - **A network connection** while a chat is working.
 
 ## Install Pipkin

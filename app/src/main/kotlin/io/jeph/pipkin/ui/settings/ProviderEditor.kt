@@ -185,6 +185,7 @@ private fun ApiKeyField(form: ProviderForm) {
       modifier = Modifier.fillMaxWidth(),
       shape = SettingsFieldShape,
       colors = settingsFieldColors(),
+      placeholder = { Text(stringResource(R.string.provider_api_key_hint)) },
       trailingIcon = {
         TextButton(onClick = { visible = !visible }) {
           Text(stringResource(if (visible) R.string.provider_hide_key else R.string.provider_show_key))

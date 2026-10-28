@@ -3,7 +3,7 @@ title: Privacy policy
 description: What data Pipkin keeps on your phone, what leaves it, and where it goes.
 ---
 
-_Last updated: October 25, 2026_
+_Last updated: October 27, 2026_
 
 Pipkin is an app for running the [Pi](https://pi.dev) coding agent in [Termux](https://termux.dev) on your Android phone. It's made by Jeph, an independent developer, and is open source, so you can check everything on this page in [its code](https://github.com/jeph/pipkin).
 
@@ -33,7 +33,7 @@ Pipkin opts out of Android's backup to your Google account and of the transfer t
 
 Pipkin sends data off the phone only to do what you ask, and only to these services:
 
-- **Your AI model provider.** The agent sends your messages, the photos you attach, and the parts of your files and command output it reads to the provider you connect, such as Anthropic, OpenAI, Google, Z.ai, Moonshot AI, or an OpenAI-compatible API you add. When you sign in with a subscription, you sign in on the provider's own website. Pipkin also asks a provider you add for its list of models, using the API key you gave it.
+- **Your AI model provider.** The agent sends your messages, the photos you attach, and the parts of your files and command output it reads to the provider you connect, such as Anthropic, OpenAI, Google, Z.ai, Moonshot AI, or an OpenAI-compatible API you add. When you sign in with a subscription, you sign in on the provider's own website. Pipkin also asks a provider you add for its list of models, using the API key you gave it, if any.
 - **Web search and page fetching.** When the agent searches the web, the bundled web access extension sends the search query to a search service. By default that's [Exa](https://exa.ai), which needs no account, or OpenAI's web search if you've connected OpenAI; you can choose others in its settings. When the agent reads a web page, PDF, or video, it downloads it from the site that hosts it. Depending on the extraction services and credentials you've set up for the extension, such as Gemini or Datalab, it may also send the whole page, PDF, or video link to one of them to read it, separately from your chat's model provider. You can turn the extension off in **Settings → Extensions**.
 - **Downloads during setup and updates.** Setup downloads Node.js from Termux's package mirrors and Pi from the [npm registry](https://www.npmjs.com). Installing or updating extensions downloads them from where they're published.
 - **Commands and extensions.** The agent runs commands in Termux, and those can reach any service, for example when it runs `git push` or installs a package. Extensions you install run with the same access. What they send is up to the command or extension, not Pipkin.

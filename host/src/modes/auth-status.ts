@@ -2,7 +2,7 @@ import { HostError, type HostText, loadPi } from "../env.js";
 import { isObject, type JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { type ModelDef, objectsById, parseModelDef } from "../model-def.js";
-import { readModelsJson } from "../models-json.js";
+import { NO_API_KEY, readModelsJson } from "../models-json.js";
 import { BUILTIN_PROVIDERS, createRuntime } from "../runtime.js";
 import { type ScopeRef, scopeResolver, scopeUniverse } from "../scope.js";
 import { openSettings, readGlobalSettings, userNpmPackages } from "../settings.js";
@@ -59,8 +59,8 @@ export async function authStatus(ctx: ModeContext): Promise<JsonObject> {
       id,
       baseUrl: provider.baseUrl,
       api: provider.api,
-      // The editor shows and reuses the stored key, so editing never asks for it again.
-      apiKey: typeof provider.apiKey === "string" ? provider.apiKey : "",
+      // The editor shows and reuses the stored key, so editing never asks for it again; a keyless provider shows none.
+      apiKey: typeof provider.apiKey === "string" && provider.apiKey !== NO_API_KEY ? provider.apiKey : "",
       // Wrongly typed managed fields are left out; provider_save rewrites them from the editor.
       models: models.flatMap((model): ModelDef[] => {
         if (typeof model === "string") return [{ id: model }];

@@ -31,7 +31,7 @@ export async function providerModels(ctx: ModeContext): Promise<JsonObject> {
   // The body read shares the timeout and failure handling: a server can send headers and then stall or hang up.
   try {
     response = await fetch(url, {
-      headers: { Authorization: `Bearer ${apiKey}` },
+      headers: apiKey === "" ? {} : { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(TIMEOUT_MS)]),
     });
     body = await response.text();

@@ -12,7 +12,7 @@ The agent runs on your phone, but the AI model it talks to runs at a provider. P
 | **Gemini** | A Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) |
 | **Z.ai** | An API key for the [GLM Coding Plan](https://z.ai/subscribe) |
 | **Kimi** | An API key from the [Kimi Code console](https://www.kimi.com/code) |
-| **OpenAI-compatible API** | A base URL and API key from any service that speaks the OpenAI API, including gateways and servers you run yourself |
+| **OpenAI-compatible API** | A base URL, and an API key if the service needs one, from any service that speaks the OpenAI API, including gateways and servers you run yourself |
 
 You can connect several and switch between them per chat. Add them during setup, or later in **Settings → Providers and models → Add a provider**.
 
@@ -48,7 +48,7 @@ To remove a key, open the provider in **Settings → Providers and models** and 
 2. Fill in:
    - **Provider ID**: a short name for it, such as `deepinfra`. Lowercase letters, digits, and dashes.
    - **Base URL**: the API's address, which usually ends in `/v1`, such as `https://api.example.com/v1`.
-   - **API key**: the key from your provider.
+   - **API key**: the key from your provider. Leave it empty for a server that needs none, such as Ollama or llama.cpp running on your network.
    - **API type**: **Chat Completions** works almost everywhere. Choose **Responses** if your provider supports OpenAI's newer Responses API.
 3. Tap **Check**. Pipkin asks the API for its list of models and shows **Connected** when it answers.
 4. Tap **Add models** and pick from **Available models**, or type a **Model ID** under **Custom models**.
@@ -59,6 +59,7 @@ Pipkin fills in what it knows about popular models. Tap a model to adjust its se
 If the check fails, Pipkin explains why. The most common fixes:
 
 - **API key not accepted**: check the key is complete and still active.
+- **This server needs an API key**: the server turned down a check without a key. Enter the key it expects.
 - **No models list at this URL**: the base URL usually needs to end in `/v1`.
 - **Not an OpenAI-compatible API**: the URL points at a website rather than the API.
 - **Couldn't reach the server** or **No response**: check the address and that your phone is online.

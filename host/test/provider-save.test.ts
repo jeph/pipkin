@@ -120,9 +120,11 @@ describe("provider_save mode", () => {
     },
   );
 
-  it("rejects an empty API key without writing", async () => {
-    expect(await runMode("provider_save", dirs, { ...SAVE, apiKey: "" })).toMatchObject({ ok: false, code: "bad_params" });
-    await expect(readFile(modelsPath, "utf8")).rejects.toThrow("ENOENT");
+  it("saves a keyless provider with a placeholder key Pi accepts, which the editor sees as no key", async () => {
+    expect(await runMode("provider_save", dirs, { ...SAVE, apiKey: "" })).toMatchObject({ ok: true });
+    expect(await saved()).toMatchObject({ providers: { "codex-lb": { apiKey: "none" } } });
+    const status = await runMode("auth_status", dirs, {});
+    expect(status.data).toMatchObject({ custom: [expect.objectContaining({ id: "codex-lb", apiKey: "" })] });
   });
 
   it("rejects invalid models.json without writing", async () => {

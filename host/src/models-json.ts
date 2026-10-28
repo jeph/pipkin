@@ -5,6 +5,12 @@ import { isObject, type JsonObject } from "./framing.js";
 
 export const MODELS_INVALID = "models.json is not valid JSON. Ask the agent to fix it.";
 
+/**
+ * The `apiKey` Pipkin stores for an endpoint that needs none, such as a local server. Pi lists a `models.json`
+ * provider's models only when it has a key, so a keyless provider gets this one; the server ignores it.
+ */
+export const NO_API_KEY = "none";
+
 export interface ModelsJson {
   /** The whole document; unknown keys are preserved on write. */
   root: JsonObject;
