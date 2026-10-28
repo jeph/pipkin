@@ -9,8 +9,6 @@ import java.io.IOException
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -79,22 +77,21 @@ internal class LlamaEngine : InferenceEngine {
 
   /**
    * Whether this CPU runs the library: on arm64, ggml's CPU backend is built for ARMv8.2 with dot product and FP16
-   * vector arithmetic (app/src/main/cpp/llama/CMakeLists.txt), and an older core would die of SIGILL. The kernel's
-   * HWCAP auxiliary vector entry lists the features.
+   * vector arithmetic (app/src/main/cpp/llama/CMakeLists.txt), and an older core would die of SIGILL. Every core has to
+   * have them, as the server's threads run on any. `/proc/cpuinfo` lists each core's features; `/proc/self/auxv` would
+   * say the same, but a release build's process isn't dumpable, so the kernel makes that file root's.
    */
   private fun cpuSupported(): Boolean {
     if (System.getProperty("os.arch") != "aarch64") return true
-    val auxv = try {
-      ByteBuffer.wrap(File("/proc/self/auxv").readBytes()).order(ByteOrder.nativeOrder())
+    val cores = try {
+      File("/proc/cpuinfo").readLines().filter { it.startsWith("Features") }
     } catch (_: IOException) {
       return false
     }
-    while (auxv.remaining() >= AUXV_ENTRY_BYTES) {
-      val type = auxv.long
-      val value = auxv.long
-      if (type == AT_HWCAP) return value and REQUIRED_HWCAPS == REQUIRED_HWCAPS
+    return cores.isNotEmpty() && cores.all { line ->
+      val features = line.substringAfter(':').trim().split(' ').toSet()
+      features.containsAll(REQUIRED_FEATURES)
     }
-    return false
   }
 
   private companion object {
@@ -106,11 +103,8 @@ internal class LlamaEngine : InferenceEngine {
     /** As much stack as a program's main thread gets on Linux, where llama-server normally runs its model loop. */
     const val SERVER_STACK_BYTES = 8L * 1024 * 1024
 
-    const val AUXV_ENTRY_BYTES = 16
-    const val AT_HWCAP = 16L
-
-    /** HWCAP_ASIMDHP (FP16 vector arithmetic) and HWCAP_ASIMDDP (dot product), from the kernel's asm/hwcap.h. */
-    const val REQUIRED_HWCAPS = (1L shl 10) or (1L shl 20)
+    /** FP16 vector arithmetic and dot product, as the kernel names them in `/proc/cpuinfo`. */
+    val REQUIRED_FEATURES = setOf("asimdhp", "asimddp")
   }
 }
 
