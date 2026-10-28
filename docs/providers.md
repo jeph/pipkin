@@ -55,7 +55,7 @@ To remove a key, open the provider in **Settings → Providers and models**, tap
    - **API key**: the key from your provider. Leave it empty for a server that needs none, such as Ollama or llama.cpp running on your network.
    - **API type**: **Chat Completions** works almost everywhere. Choose **Responses** if your provider supports OpenAI's newer Responses API.
 3. Tap **Check**. Pipkin asks the API for its list of models and shows **Connected** when it answers.
-4. Tap **Add models** and pick from **Available models**, or type a **Model ID** under **Custom models**.
+4. Tap **Add models** and pick from **Available models**, or type a **Model ID** under **Custom models** at the top of the page.
 5. Tap **Save**.
 
 Pipkin fills in what it knows about popular models. Tap a model to adjust its settings: whether it **Accepts images**, whether it **Supports thinking** and at which levels, its **Context window** and **Max output tokens**, and its cost per million tokens if you want Pipkin to show what a chat costs.

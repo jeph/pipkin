@@ -6,12 +6,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.exclude
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -151,6 +159,58 @@ internal fun SettingsPage(
   snackbar: SnackbarStackState? = null,
   content: @Composable ColumnScope.() -> Unit,
 ) {
+  SettingsPageFrame(title, onBack, snackbar) {
+    Column(
+      modifier =
+        Modifier
+          .fillMaxSize()
+          .verticalScroll(rememberScrollState())
+          .imePadding()
+          .navigationBarsPadding()
+          .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s24),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      Column(
+        modifier = SettingsItemWidth,
+        verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
+        content = content,
+      )
+    }
+  }
+}
+
+/**
+ * [SettingsPage] for a page as long as a provider's hundreds of models: only the items on screen are composed.
+ * Items are centred but not spaced; each caps its own width with [SettingsItemWidth] and spaces itself.
+ */
+@Composable
+internal fun LazySettingsPage(title: String, onBack: () -> Unit, content: LazyListScope.() -> Unit) {
+  val spacing = PipkinTokens.Spacing
+  val padding = WindowInsets.navigationBars
+    // The keyboard already lifts the list above the navigation bar.
+    .exclude(WindowInsets.ime)
+    .add(WindowInsets(left = spacing.s16, top = spacing.s24, right = spacing.s16, bottom = spacing.s24))
+    .asPaddingValues()
+  SettingsPageFrame(title, onBack, snackbar = null) {
+    LazyColumn(
+      modifier = Modifier.fillMaxSize().imePadding(),
+      contentPadding = padding,
+      horizontalAlignment = Alignment.CenterHorizontally,
+      content = content,
+    )
+  }
+}
+
+/** The width of a settings page's content, capped on wide screens. */
+internal val SettingsItemWidth = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth()
+
+@Composable
+private fun SettingsPageFrame(
+  title: String,
+  onBack: () -> Unit,
+  snackbar: SnackbarStackState?,
+  body: @Composable () -> Unit,
+) {
   Box(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
     Column(modifier = Modifier.fillMaxSize()) {
       HeaderBar(
@@ -163,22 +223,7 @@ internal fun SettingsPage(
           )
         },
       )
-      Column(
-        modifier =
-          Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .imePadding()
-            .navigationBarsPadding()
-            .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s24),
-        horizontalAlignment = Alignment.CenterHorizontally,
-      ) {
-        Column(
-          modifier = Modifier.widthIn(max = PipkinTokens.contentMaxWidth).fillMaxWidth(),
-          verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
-          content = content,
-        )
-      }
+      body()
     }
     if (snackbar != null) {
       SnackbarStack(

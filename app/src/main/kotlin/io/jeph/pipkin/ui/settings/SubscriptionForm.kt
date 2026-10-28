@@ -40,7 +40,11 @@ internal class SubscriptionForm(val providerId: String) : ModelDraft {
 
   /** The provider's list once read, each with the draft's settings when it has the model; else Pi's catalogue. */
   override val available: List<ModelConfig>
-    get() = listed?.map { model(it.id)?.preview() ?: it } ?: forms.map(ModelForm::preview)
+    get() {
+      val listed = listed ?: return forms.map(ModelForm::preview)
+      val formsById = forms.associateBy(ModelForm::id)
+      return listed.map { formsById[it.id]?.preview() ?: it }
+    }
   override val added: List<ModelForm> get() = forms.filter { it.id in enabled }
   override val custom = CustomModelInput()
 
