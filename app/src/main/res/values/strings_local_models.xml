@@ -78,6 +78,8 @@
     <!-- %1$s: the model's name, such as "Qwen3 0.6B". %2$s: how much has loaded, as a percentage formatted for the
          locale, such as "40%". -->
     <string name="chat_local_loading">Loading %1$s, %2$s</string>
+    <!-- Shown while the model reads the prompt, for an engine that doesn't report how far it has got. -->
+    <string name="chat_local_reading_unknown">Reading the prompt</string>
     <!-- %1$s: prompt tokens read so far. %2$s: the prompt's tokens in all. Both formatted for the locale. -->
     <string name="chat_local_reading">Reading the prompt: %1$s of %2$s tokens</string>
     <!-- %1$s: prompt tokens read so far. %2$s: the prompt's tokens in all. %3$s: tokens reused from the previous

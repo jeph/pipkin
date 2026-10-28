@@ -17,6 +17,7 @@ import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -95,6 +96,8 @@ internal class LocalModelServer(
         } catch (failure: LocalModelException) {
           client.fail(failure.message)
         } catch (failure: IOException) {
+          // Pi hanging up closes the engine's connection on purpose, which fails the read in progress.
+          call.ensureActive()
           Log.w(TAG, "Lost the connection to $modelId's engine", failure)
           client.fail(AppStrings.get(R.string.local_model_error_connection, modelId, failure.message.orEmpty()))
         } finally {

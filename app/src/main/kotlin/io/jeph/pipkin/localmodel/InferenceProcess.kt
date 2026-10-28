@@ -56,7 +56,7 @@ internal class InferenceProcess(context: Context, private val installed: () -> L
   override val loadedModel: String?
     get() {
       val endpoint = endpoint ?: return null
-      return endpoint.modelId.takeIf { installed().any { it.file.absolutePath == endpoint.modelPath } }
+      return endpoint.modelId.takeIf { installed().any { model -> model.file.absolutePath == endpoint.modelPath } }
     }
 
   override suspend fun load(modelId: String) {

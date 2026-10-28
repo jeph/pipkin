@@ -71,15 +71,22 @@ private fun activityText(activity: SessionActivity): String {
       NumberFormat.getPercentInstance(locale).format(activity.progress),
     )
 
-    is SessionActivity.ReadingPrompt -> if (activity.cached > 0) {
-      stringResource(
+    // LiteRT-LM doesn't say how far it has read, so its prompt's size stays unknown.
+    is SessionActivity.ReadingPrompt -> when {
+      activity.total == 0 -> stringResource(R.string.chat_local_reading_unknown)
+
+      activity.cached > 0 -> stringResource(
         R.string.chat_local_reading_cached,
         count.format(activity.processed),
         count.format(activity.total),
         count.format(activity.cached),
       )
-    } else {
-      stringResource(R.string.chat_local_reading, count.format(activity.processed), count.format(activity.total))
+
+      else -> stringResource(
+        R.string.chat_local_reading,
+        count.format(activity.processed),
+        count.format(activity.total),
+      )
     }
 
     is SessionActivity.Writing -> {
