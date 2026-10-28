@@ -41,9 +41,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 
 /** The app's long-lived objects, built once by [PipkinApplication]. Reach it with [Context.appGraph]. */
@@ -91,7 +93,14 @@ internal class AppGraph(private val application: Application) {
   val gitHost = GitHost(hostClient, scope)
   val commits = CommitTabRegistry(gitHost, tabs, preferences.trustedRepositories, scope)
   val layout = WorkspaceLayout(this)
-  val localModels = LocalModels()
+  val localModels = LocalModels(
+    application,
+    scope,
+    keepAlive,
+    accountRepository,
+    enabled = MutableStateFlow(true),
+    idleUnloadMinutes = MutableStateFlow(DEFAULT_IDLE_UNLOAD_MINUTES),
+  )
 
   /** What the chat screens keep of each chat, such as unsent drafts, held here so it survives rotation and folding. */
   val chatViews = ChatViews()
@@ -107,6 +116,7 @@ internal class AppGraph(private val application: Application) {
     restartChatsOnceTermuxWorks()
     feedChatInbox()
     touchChatsOnScreen()
+    endLocalModelLeases()
     val dialogNotifications = DialogNotifications(application, registry, chatsOnScreen, visibility, chatInbox) {
       hostClient.lastHello.value?.home
     }
@@ -183,6 +193,25 @@ internal class AppGraph(private val application: Application) {
         AgentService.refresh(application)
       }
     }
+  }
+
+  /**
+   * A chat keeps the local model reserved between the requests of its agent turn; when the turn ends, the model is
+   * free for the next chat at once.
+   */
+  @OptIn(ExperimentalCoroutinesApi::class)
+  private fun endLocalModelLeases() {
+    scope.launch {
+      registry.processes
+        .flatMapLatest { processes ->
+          processes.values.map { process -> process.busy.filter { !it }.map { process.sessionId.value } }.merge()
+        }
+        .collect { session -> session?.let(localModels.runtime::endLease) }
+    }
+  }
+
+  private companion object {
+    const val DEFAULT_IDLE_UNLOAD_MINUTES = 5
   }
 }
 

@@ -454,4 +454,6 @@ dependencies {
   implementation("io.github.sagernet:libghostty-android-compose:0.1.0-20260909.143535-10")
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.json:json:20260814")
+  // Virtual time for the local model scheduler's reservations and idle unload.
+  testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
 }

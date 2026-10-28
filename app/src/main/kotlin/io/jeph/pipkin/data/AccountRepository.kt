@@ -91,6 +91,12 @@ internal class AccountRepository(
     changed()
   }
 
+  /** Makes Pi's `pipkin-local` provider list exactly [models], served at [baseUrl]; idle chats restart to see them. */
+  suspend fun syncLocalModels(baseUrl: String, apiKey: String, models: List<ModelConfig>) {
+    hostClient.localModelsSync(baseUrl, apiKey, models)
+    changed()
+  }
+
   /** Installs a Pi package with `pi install`; idle chats restart to load it. Cancelling the caller aborts it. */
   suspend fun installPackage(source: String, onProgress: (String) -> Unit) {
     keepAlive.acquire("Pi install").use { hostClient.installPackage(source, onProgress) }

@@ -60,11 +60,27 @@ internal class LoopbackHttp(port: Int, private val handler: (HttpRequest, HttpRe
         return
       }
       socket.soTimeout = 0
+      watchForHangUp(input, request)
       try {
         handler(request, response)
       } catch (_: IOException) {
         // The client went away mid-response; there is no one left to tell.
       }
+    }
+  }
+
+  /**
+   * A client sends nothing after its request, so the next read ends only when it closes the connection. That tells a
+   * handler the client is gone while it has nothing to write, such as while a model reads a long prompt.
+   */
+  private fun watchForHangUp(input: InputStream, request: HttpRequest) {
+    connections.execute {
+      try {
+        while (input.read() >= 0) Unit
+      } catch (_: IOException) {
+        // A reset is a hang-up too.
+      }
+      request.hangUp()
     }
   }
 
@@ -143,9 +159,32 @@ internal class LoopbackHttp(port: Int, private val handler: (HttpRequest, HttpRe
 }
 
 /** A request with its headers' names lowercased. */
-internal class HttpRequest(val method: String, val path: String, val headers: Map<String, String>, val body: ByteArray) {
+internal class HttpRequest(
+  val method: String,
+  val path: String,
+  val headers: Map<String, String>,
+  val body: ByteArray,
+) {
+  private val lock = Any()
+  private var gone = false
+  private val hangUpActions = mutableListOf<() -> Unit>()
+
   /** The token of an `Authorization: Bearer <token>` header. */
   val bearer: String? get() = headers["authorization"]?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")
+
+  /** Runs [action] once the client closes its connection, at once if it already has. */
+  fun onHangUp(action: () -> Unit) {
+    val now = synchronized(lock) { gone.also { if (!it) hangUpActions += action } }
+    if (now) action()
+  }
+
+  internal fun hangUp() {
+    val actions = synchronized(lock) {
+      gone = true
+      hangUpActions.toList().also { hangUpActions.clear() }
+    }
+    actions.forEach { it() }
+  }
 }
 
 /**

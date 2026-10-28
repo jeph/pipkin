@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Errors a chat shows when Pipkin can't serve a request to an on-device model. Pi shows them as the request's error. -->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <!-- %1$s is the model's id, such as qwen3-0.6b. -->
+    <string name="local_model_error_not_installed"><xliff:g id="model" example="qwen3-0.6b">%1$s</xliff:g> isn\'t downloaded. Download it in Settings › Local models.</string>
+    <!-- %1$s is the model's id; %2$s is local_model_error_memory_sizes. -->
+    <string name="local_model_error_memory">There isn\'t enough free memory to load <xliff:g id="model" example="qwen3-4b">%1$s</xliff:g>: <xliff:g id="sizes" example="it needs about 3.0 GB and 1.2 GB is free">%2$s</xliff:g>. Close other apps or choose a smaller model.</string>
+    <!-- %1$s is the memory the model needs and %2$s the memory free, both formatted sizes such as 3.0 GB. -->
+    <string name="local_model_error_memory_sizes">it needs about <xliff:g id="needed" example="3.0 GB">%1$s</xliff:g> and <xliff:g id="free" example="1.2 GB">%2$s</xliff:g> is free</string>
+    <!-- %1$s is the model's id; %2$s is the engine's reason, in English. -->
+    <string name="local_model_error_load_failed"><xliff:g id="model" example="qwen3-0.6b">%1$s</xliff:g> couldn\'t be loaded: <xliff:g id="reason" example="failed to load model">%2$s</xliff:g></string>
+    <!-- %1$s is the model's id. -->
+    <string name="local_model_error_stopped">Android stopped <xliff:g id="model" example="qwen3-0.6b">%1$s</xliff:g>, probably to free memory. Send again to load it again.</string>
+</resources>
