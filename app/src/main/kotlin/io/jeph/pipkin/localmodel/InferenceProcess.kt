@@ -20,6 +20,7 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.security.SecureRandom
 import java.util.Base64
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,8 +86,14 @@ internal class InferenceProcess(context: Context, private val installed: () -> L
         }
       }
     }
-    bound.service.await().start(config.toJson(), listener)
-    val result = bound.outcome.await()
+    val result = try {
+      bound.service.await().start(config.toJson(), listener)
+      bound.outcome.await()
+    } catch (cancelled: CancellationException) {
+      // Nobody waits for this model any more; a half-loaded process would hold its memory and show as loading.
+      unload()
+      throw cancelled
+    }
     if (result.optString("type") != "ready") {
       val message = result.optString("message")
       unload()

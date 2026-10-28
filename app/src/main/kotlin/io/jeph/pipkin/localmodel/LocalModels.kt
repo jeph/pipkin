@@ -55,21 +55,21 @@ internal class LocalModels(
   }
 
   /**
-   * Writes the provider whenever what it should list changes, retrying while the Termux host can't be reached or
-   * refuses, as it does while Pi is being installed. Nothing was ever written on a fresh install, which is the same as
-   * an empty list, so a disabled feature never calls the host.
+   * Writes the provider on every start and whenever what it should list changes, since a backup restore, removing the
+   * provider or reinstalling Pi can change models.json behind Pipkin's back. Retries while the Termux host can't be
+   * reached or refuses, as it does while Pi is being installed. An empty list is only written once a provider was, so
+   * a feature that was never on doesn't call the host.
    */
   private fun syncProvider() {
     scope.launch {
       combine(enabled, store.installed) { on, installed -> if (on) installed.map(::modelConfig) else emptyList() }
         .distinctUntilChanged()
         .collectLatest { models ->
-          val signature = models.joinToString("\n") { it.toJson().toString() }
-          if (signature == prefs.getString(KEY_SYNCED, "")) return@collectLatest
+          if (models.isEmpty() && !prefs.getBoolean(KEY_WRITTEN, false)) return@collectLatest
           while (true) {
             try {
               accounts.syncLocalModels("http://127.0.0.1:${TermuxBuild.LOCAL_MODEL_PORT}/v1", apiKey, models)
-              prefs.edit().putString(KEY_SYNCED, signature).apply()
+              prefs.edit().putBoolean(KEY_WRITTEN, models.isNotEmpty()).apply()
               return@collectLatest
             } catch (failure: HostFailure) {
               Log.w(TAG, "Couldn't reach the host to update Pi's local models; retrying", failure)
@@ -98,8 +98,8 @@ internal class LocalModels(
     const val PREFS = "local-models"
     const val KEY_API_KEY = "api-key"
 
-    /** The provider list last written to Pi, so starting the app doesn't rewrite an unchanged one. */
-    const val KEY_SYNCED = "synced-provider"
+    /** Whether Pi's config lists local models, so an empty list must be written to remove them. */
+    const val KEY_WRITTEN = "provider-written"
     const val RETRY_MILLIS = 30_000L
     const val KEY_BYTES = 24
 
