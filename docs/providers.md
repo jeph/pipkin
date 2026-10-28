@@ -30,7 +30,7 @@ The other options are useful when the browser flow doesn't work on your phone:
 - **Copy code login** (Claude): sign in, then paste the code Anthropic shows you.
 - **Device code login** (OpenAI): Pipkin shows a code; open the link, enter the code, and Pipkin finishes on its own.
 
-To sign out, open the subscription in **Settings → Providers and models** and tap **Sign out**.
+To sign out, open the subscription in **Settings → Providers and models**, tap **Sign out**, and confirm.
 
 ## Add a Gemini, Z.ai, Kimi or OpenRouter key
 
@@ -44,7 +44,7 @@ Pipkin uses Pi's built-in support for these providers, so the models Pi knows co
 
 Google doesn't let third-party apps use a Google AI Pro or Ultra subscription, so Gemini needs an API key rather than a Google sign-in.
 
-To remove a key, open the provider in **Settings → Providers and models** and tap **Remove key**.
+To remove a key, open the provider in **Settings → Providers and models**, tap **Remove key**, and confirm. This deletes the key from your phone only; revoke it with the provider if you no longer want it to work.
 
 ## Add an OpenAI-compatible API
 

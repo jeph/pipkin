@@ -29,6 +29,12 @@
     <string name="settings_add_key">Add key</string>
     <string name="settings_key_saved">Key saved</string>
     <string name="settings_remove_key">Remove key</string>
+    <!-- %1$s: the provider's name, such as "Claude". -->
+    <string name="settings_sign_out_title">Sign out of %1$s?</string>
+    <string name="settings_sign_out_text">Chats can\'t use its models until you sign in again.</string>
+    <!-- %1$s: the provider's name, such as "OpenRouter". -->
+    <string name="settings_remove_key_title">Remove your %1$s key?</string>
+    <string name="settings_remove_key_text">Pipkin deletes the key from this phone, and chats can\'t use its models until you add a key again. The key keeps working elsewhere until you revoke it with the provider.</string>
 
     <string name="providers_title">Providers and models</string>
     <string name="settings_providers_none">No providers yet</string>

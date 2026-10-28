@@ -28,6 +28,8 @@ import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.auth.LoginSheet
 import io.jeph.pipkin.ui.auth.ProviderLogo
+import io.jeph.pipkin.ui.components.DialogConfirm
+import io.jeph.pipkin.ui.components.PipkinDialog
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.components.StatusDot
@@ -59,6 +61,8 @@ internal fun SubscriptionScreen(
   val failed = stringResource(R.string.provider_failed)
   val id = form.providerId
   val subscription = subscriptions.firstOrNull { it.id == id }
+  val name = subscription?.let { stringResource(it.title) } ?: id
+  val usesApiKey = subscription?.usesApiKey == true
   val signedIn = status?.isSignedIn(id)
   // Reads Pi's files afresh, so changes made outside Pipkin (for example by the agent) show here.
   LaunchedEffect(form) { accounts.refresh() }
@@ -73,7 +77,7 @@ internal fun SubscriptionScreen(
     }
   }
   SettingsPage(
-    title = subscription?.let { stringResource(it.title) } ?: id,
+    title = name,
     onBack = { if (form.dirty) confirmDiscard = true else onBack() },
     snackbar = snackbar,
   ) {
@@ -81,8 +85,9 @@ internal fun SubscriptionScreen(
     if (signedIn == true) {
       SubscriptionModels(
         form = form,
+        name = name,
         busy = busy,
-        usesApiKey = subscription?.usesApiKey == true,
+        usesApiKey = usesApiKey,
         onSave = { scope.launch { if (form.save(accounts, failed)) onBack() } },
         onSignOut = signOut,
         onAddModels = onAddModels,
@@ -120,10 +125,11 @@ private fun SubscriptionHeader(id: String, loading: Boolean, signedIn: Boolean?,
   }
 }
 
-/** A signed-in provider's models, Save, and sign-out. */
+/** A signed-in provider's models, Save, and sign-out, which [onSignOut] runs once confirmed. */
 @Composable
 private fun SubscriptionModels(
   form: SubscriptionForm,
+  name: String,
   busy: Boolean,
   usesApiKey: Boolean,
   onSave: () -> Unit,
@@ -131,6 +137,7 @@ private fun SubscriptionModels(
   onAddModels: () -> Unit,
   onOpenModel: (modelId: String) -> Unit,
 ) {
+  var confirmSignOut by remember { mutableStateOf(false) }
   ModelsSection(
     draft = form,
     emptyText = stringResource(R.string.subscription_models_empty),
@@ -149,9 +156,36 @@ private fun SubscriptionModels(
       title = stringResource(if (usesApiKey) R.string.settings_remove_key else R.string.settings_sign_out),
       titleColor = pipkinColors.destructive,
       enabled = !busy,
-      onClick = onSignOut,
+      onClick = { confirmSignOut = true },
     )
   }
+  if (confirmSignOut) {
+    SignOutDialog(
+      name = name,
+      usesApiKey = usesApiKey,
+      onConfirm = {
+        confirmSignOut = false
+        onSignOut()
+      },
+      onDismiss = { confirmSignOut = false },
+    )
+  }
+}
+
+/** Asks before signing out of [name], or for an API-key provider, before removing its key. */
+@Composable
+private fun SignOutDialog(name: String, usesApiKey: Boolean, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+  val title = if (usesApiKey) R.string.settings_remove_key_title else R.string.settings_sign_out_title
+  val text = if (usesApiKey) R.string.settings_remove_key_text else R.string.settings_sign_out_text
+  val action = if (usesApiKey) R.string.settings_remove_key else R.string.settings_sign_out
+  PipkinDialog(
+    title = stringResource(title, name),
+    text = stringResource(text),
+    icon = if (usesApiKey) R.drawable.ic_lucide_trash_2 else R.drawable.ic_lucide_log_out,
+    confirm = DialogConfirm(stringResource(action), onConfirm, destructive = true),
+    dismissLabel = stringResource(R.string.provider_cancel),
+    onDismiss = onDismiss,
+  )
 }
 
 /** Null once signed out, else why it failed. */
