@@ -4,6 +4,7 @@ import { HostError } from "../env.js";
 import { isObject, type JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { fillMissing, type ModelDef } from "../model-def.js";
+import { NO_API_KEY } from "../models-json.js";
 import { stringParam } from "../params.js";
 
 const TIMEOUT_MS = 15_000;
@@ -19,7 +20,7 @@ const HTML_BODY = /^\s*<(!doctype|html|head|body)/i;
  */
 export async function providerModels(ctx: ModeContext): Promise<JsonObject> {
   const baseUrl = stringParam(ctx.params, "baseUrl");
-  const apiKey = stringParam(ctx.params, "apiKey");
+  const apiKey = stringParam(ctx.params, "apiKey") || NO_API_KEY;
   const api = stringParam(ctx.params, "api");
   const protocol = URL.parse(baseUrl)?.protocol;
   if (protocol !== "http:" && protocol !== "https:") {
@@ -31,7 +32,7 @@ export async function providerModels(ctx: ModeContext): Promise<JsonObject> {
   // The body read shares the timeout and failure handling: a server can send headers and then stall or hang up.
   try {
     response = await fetch(url, {
-      headers: apiKey === "" ? {} : { Authorization: `Bearer ${apiKey}` },
+      headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.any([ctx.signal, AbortSignal.timeout(TIMEOUT_MS)]),
     });
     body = await response.text();

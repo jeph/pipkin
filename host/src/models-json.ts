@@ -6,8 +6,9 @@ import { isObject, type JsonObject } from "./framing.js";
 export const MODELS_INVALID = "models.json is not valid JSON. Ask the agent to fix it.";
 
 /**
- * The `apiKey` Pipkin stores for an endpoint that needs none, such as a local server. Pi lists a `models.json`
- * provider's models only when it has a key, so a keyless provider gets this one; the server ignores it.
+ * The `apiKey` Pipkin stores for an endpoint that needs none, such as a local server. Pi requires a non-empty key
+ * for a `models.json` provider and sends it in chat, so a keyless provider gets this one, as Pi's docs suggest for
+ * Ollama; the server ignores it. The connection check sends it too, so it tests what chat will send.
  */
 export const NO_API_KEY = "none";
 
