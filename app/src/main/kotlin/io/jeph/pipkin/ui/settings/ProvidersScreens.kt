@@ -178,13 +178,15 @@ internal fun SettingsPage(
 
 /**
  * [SettingsPage] for a page as long as a provider's hundreds of models: only the items on screen are composed, and
- * [footer] stays at the bottom of the screen under them, the list fading out where it scrolls past either edge. Items
- * are centred but not spaced; each caps its own width with [SettingsItemWidth] and spaces itself.
+ * only they scroll, between [header] at the top of the screen and [footer] at the bottom, fading out where they scroll
+ * past either edge. Items are centred but not spaced; each caps its own width with [SettingsItemWidth] and spaces
+ * itself.
  */
 @Composable
 internal fun LazySettingsPage(
   title: String,
   onBack: () -> Unit,
+  header: @Composable ColumnScope.() -> Unit,
   footer: @Composable () -> Unit,
   content: LazyListScope.() -> Unit,
 ) {
@@ -196,10 +198,13 @@ internal fun LazySettingsPage(
       modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding(),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+      Column(modifier = SettingsItemWidth.padding(start = spacing.s16, top = spacing.s24, end = spacing.s16)) {
+        header()
+      }
       LazyColumn(
         modifier = Modifier.weight(1f).fillMaxWidth().scrollFades(listState, background),
         state = listState,
-        contentPadding = PaddingValues(start = spacing.s16, top = spacing.s24, end = spacing.s16, bottom = spacing.s12),
+        contentPadding = PaddingValues(start = spacing.s16, end = spacing.s16, bottom = spacing.s12),
         horizontalAlignment = Alignment.CenterHorizontally,
         content = content,
       )

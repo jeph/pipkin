@@ -69,21 +69,14 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
   LazySettingsPage(
     title = stringResource(R.string.provider_add_models),
     onBack = onBack,
-    footer = {
-      PillButton(label = stringResource(R.string.models_done), onClick = onBack, modifier = Modifier.fillMaxWidth())
-    },
-  ) {
-    item {
+    header = {
       SearchField(
         query,
         onQueryChange = { query = it },
         placeholder = stringResource(R.string.models_search),
-        modifier = SettingsItemWidth,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Search),
       )
-    }
-    newId?.let { modelId ->
-      item {
+      newId?.let { modelId ->
         AddCustomModelRow(modelId, draft.customLookup) {
           scope.launch {
             draft.addCustom(
@@ -94,7 +87,11 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
           }
         }
       }
-    }
+    },
+    footer = {
+      PillButton(label = stringResource(R.string.models_done), onClick = onBack, modifier = Modifier.fillMaxWidth())
+    },
+  ) {
     modelRows(draft, models, shown)
   }
 }
@@ -166,7 +163,7 @@ private fun ModelPickRow(config: ModelConfig, draft: ModelDraft) {
 @Composable
 private fun AddCustomModelRow(modelId: String, lookup: CustomModelLookup, onAdd: () -> Unit) {
   val colors = pipkinColors
-  Column(modifier = SettingsItemWidth.padding(top = PipkinTokens.Spacing.s8)) {
+  Column(modifier = Modifier.fillMaxWidth().padding(top = PipkinTokens.Spacing.s8)) {
     Row(
       modifier = Modifier
         .fillMaxWidth()
