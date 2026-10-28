@@ -1,6 +1,7 @@
 package io.jeph.pipkin.ui.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,9 +75,7 @@ internal fun ProviderEditorScreen(
     ConnectionSection(form = form, onCheck = { scope.launch { form.checkConnection(accounts, failed) } })
     ModelsSection(
       draft = form,
-      emptyText = stringResource(
-        if (form.connected) R.string.provider_models_empty else R.string.provider_check_needed,
-      ),
+      emptyText = stringResource(modelsEmptyText(form)),
       onAddModels = onAddModels,
       onOpenModel = onOpenModel,
     )
@@ -172,6 +171,14 @@ private fun IdAndUrlFields(form: ProviderForm) {
       singleLine = true,
     )
   }
+}
+
+/** What the models list says while it's empty: check first, the server listed nothing, or none added yet. */
+@StringRes
+private fun modelsEmptyText(form: ProviderForm): Int = when {
+  !form.connected -> R.string.provider_check_needed
+  form.fetched.isEmpty() -> R.string.provider_server_no_models
+  else -> R.string.provider_models_empty
 }
 
 @Composable

@@ -65,6 +65,14 @@ const FAILURES: Record<string, { status: number; type: string; body: string }> =
   "/page/models": { status: 200, type: "text/html", body: "<html><body>Welcome</body></html>" },
 };
 
+/** JSON answers to `/models` that carry no model entries, keyed by path. */
+const ODD_LISTS: Record<string, JsonObject> = {
+  // Ollama before any model is downloaded: an OpenAI list whose data is null.
+  "/ollama-empty/models": { object: "list", data: null },
+  "/null-data/models": { data: null },
+  "/no-data/models": { models: [] },
+};
+
 describe("provider_models and model_defaults", () => {
   let dirs: Dirs;
   let server: Server;
@@ -84,6 +92,12 @@ describe("provider_models and model_defaults", () => {
       if (failure !== undefined) {
         response.writeHead(failure.status, { "content-type": failure.type });
         response.end(failure.body);
+        return;
+      }
+      const odd = ODD_LISTS[request.url ?? ""];
+      if (odd !== undefined) {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(JSON.stringify(odd));
         return;
       }
       if (request.url === "/open/models") {
@@ -196,6 +210,16 @@ describe("provider_models and model_defaults", () => {
     const result = await runMode("provider_models", dirs, { baseUrl: `${origin}/page`, apiKey: "k", api: "openai-responses" });
     const url = `${origin}/page/models`;
     expect(result).toMatchObject({ ok: false, code: "bad_response", error: `${url} returned a web page, not JSON`, i18n: { key: "provider_web_page", args: { url } } });
+  });
+
+  it("reads an OpenAI list with null data as no models", async () => {
+    const result = await runMode("provider_models", dirs, { baseUrl: `${origin}/ollama-empty`, apiKey: "", api: "openai-completions" });
+    expect(result).toEqual(success([]));
+  });
+
+  it.each(["/null-data", "/no-data"])("rejects JSON from %s that isn't an OpenAI list", async (prefix) => {
+    const result = await runMode("provider_models", dirs, { baseUrl: origin + prefix, apiKey: "k", api: "openai-completions" });
+    expect(result).toMatchObject({ ok: false, code: "bad_response", i18n: { key: "provider_no_data_list" } });
   });
 
   it.each(["api.example.com/v1", "ftp://example.com/v1", "https://"])("rejects %s as a base URL", async (url) => {

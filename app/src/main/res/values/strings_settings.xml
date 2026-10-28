@@ -213,6 +213,7 @@
     <string name="provider_models">Models</string>
     <string name="provider_add_models">Add models</string>
     <string name="provider_models_empty">No models yet.</string>
+    <string name="provider_server_no_models">The server lists no models. Download or load one on it, then check again, or add a model by its ID.</string>
     <string name="provider_model_invalid">Fix this model\'s settings</string>
     <string name="provider_discard_title">Discard changes?</string>
     <string name="provider_discard_text">Your changes aren\'t saved.</string>

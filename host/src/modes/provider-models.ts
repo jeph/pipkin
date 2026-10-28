@@ -72,12 +72,14 @@ export async function providerModels(ctx: ModeContext): Promise<JsonObject> {
       args: { body: preview },
     });
   }
-  const data = isObject(parsed) ? parsed.data : undefined;
-  if (!Array.isArray(data)) {
+  const envelope = isObject(parsed) ? parsed : {};
+  // An OpenAI list with nothing in it can come as `data: null`, as Ollama sends before any model is downloaded.
+  const list = envelope.object === "list" && envelope.data === null ? [] : envelope.data;
+  if (!Array.isArray(list)) {
     throw new HostError("bad_response", "The server's /models response has no data list", { key: "provider_no_data_list" });
   }
   const detected = new Map<string, ModelDef>();
-  for (const entry of data) {
+  for (const entry of list) {
     if (isObject(entry) && typeof entry.id === "string" && !detected.has(entry.id)) {
       detected.set(entry.id, detectModel(entry.id, entry));
     }
