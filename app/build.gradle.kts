@@ -68,13 +68,48 @@ val hostCheck = tasks.register<Exec>("hostCheck") {
   commandLine("pnpm", "run", "check")
 }
 
+/** A task that downloads source archives pinned by SHA-256, refusing any whose bytes changed. */
+abstract class PinnedSources : DefaultTask() {
+  @get:Inject
+  abstract val archives: ArchiveOperations
+
+  @get:Inject
+  abstract val files: FileSystemOperations
+
+  /** Downloads the tar.gz at [url], checks it against [sha256], and extracts it into [target]. */
+  protected fun extract(
+    name: String,
+    url: String,
+    sha256: String,
+    target: Provider<Directory>,
+    dropTopDirectory: Boolean,
+  ) {
+    val archive = temporaryDir.resolve("$name.tar.gz")
+    URI(url).toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
+    val digest = MessageDigest.getInstance("SHA-256").digest(archive.readBytes())
+    val actual = digest.joinToString("") { "%02x".format(it) }
+    check(actual == sha256) { "$url has SHA-256 $actual, not the pinned $sha256" }
+    files.copy {
+      from(archives.tarTree(archives.gzip(archive)))
+      into(target)
+      includeEmptyDirs = false
+      // Some release tarballs list a file twice; as with tar itself, the later entry wins.
+      duplicatesStrategy = DuplicatesStrategy.INCLUDE
+      if (dropTopDirectory) {
+        eachFile { relativePath = RelativePath(true, *relativePath.segments.drop(1).toTypedArray()) }
+      }
+    }
+    archive.delete()
+  }
+}
+
 /**
  * Downloads each of [urls] into [sourcesDir]/<name>, checked against [sha256s]; GitHub's tag and commit
  * archives wrap their files in one directory, which is dropped. Each grammar's highlight query, its
  * [queries] files joined in order, and every source's licence go to [assetsDir] as APK assets, with the
  * [notices] of third-party code inside a source that its own licence doesn't cover.
  */
-abstract class SyntaxSources : DefaultTask() {
+abstract class SyntaxSources : PinnedSources() {
   @get:Input
   abstract val urls: MapProperty<String, String>
 
@@ -94,34 +129,12 @@ abstract class SyntaxSources : DefaultTask() {
   @get:OutputDirectory
   abstract val assetsDir: DirectoryProperty
 
-  @get:Inject
-  abstract val archives: ArchiveOperations
-
-  @get:Inject
-  abstract val files: FileSystemOperations
-
   @TaskAction
   fun fetch() {
     files.delete { delete(sourcesDir, assetsDir) }
     val licenses = assetsDir.dir("syntax/licenses").get().asFile.apply { mkdirs() }
     for ((name, url) in urls.get()) {
-      val archive = temporaryDir.resolve("$name.tar.gz")
-      URI(url).toURL().openStream().use { input -> archive.outputStream().use { input.copyTo(it) } }
-      val digest = MessageDigest.getInstance("SHA-256").digest(archive.readBytes())
-      val sha256 = digest.joinToString("") { "%02x".format(it) }
-      val pinned = sha256s.get().getValue(name)
-      check(sha256 == pinned) { "$url has SHA-256 $sha256, not the pinned $pinned" }
-      files.copy {
-        from(archives.tarTree(archives.gzip(archive)))
-        into(sourcesDir.dir(name))
-        includeEmptyDirs = false
-        // Some release tarballs list a file twice; as with tar itself, the later entry wins.
-        duplicatesStrategy = DuplicatesStrategy.INCLUDE
-        if ("/archive/" in url) {
-          eachFile { relativePath = RelativePath(true, *relativePath.segments.drop(1).toTypedArray()) }
-        }
-      }
-      archive.delete()
+      extract(name, url, sha256s.get().getValue(name), sourcesDir.dir(name), dropTopDirectory = "/archive/" in url)
       // Lua's licence is LICENSE.md.
       val licenseFiles = listOf("LICENSE", "LICENSE.md").map { sourcesDir.file("$name/$it").get().asFile }
       licenseFiles.first { it.exists() }.copyTo(licenses.resolve("$name.txt"))
@@ -341,9 +354,55 @@ val syntaxSources = tasks.register<SyntaxSources>("syntaxSources") {
   sourcesDir.set(syntaxSourcesDir)
 }
 
+/**
+ * Downloads each of [urls] into [sourcesDir]/<name>, checked against [sha256s]; every archive wraps its files in one
+ * directory, which is dropped. The licences of what the library builds in are static assets under
+ * `src/main/assets/licenses`: llama-cpp.txt, kleidiai.txt, and llama.cpp's vendored cpp-httplib.txt, nlohmann-json.txt,
+ * stb-image.txt, miniaudio.txt and rotate-bits.txt; update them with the pins.
+ */
+abstract class LlamaSources : PinnedSources() {
+  @get:Input
+  abstract val urls: MapProperty<String, String>
+
+  @get:Input
+  abstract val sha256s: MapProperty<String, String>
+
+  @get:OutputDirectory
+  abstract val sourcesDir: DirectoryProperty
+
+  @TaskAction
+  fun fetch() {
+    files.delete { delete(sourcesDir) }
+    for ((name, url) in urls.get()) {
+      extract(name, url, sha256s.get().getValue(name), sourcesDir.dir(name), dropTopDirectory = true)
+    }
+  }
+}
+
+val llamaSourcesDir = layout.buildDirectory.dir("llama/sources")
+
+// The llama.cpp release the local models run on, and the KleidiAI release its CPU backend pins (ggml's
+// KLEIDIAI_COMMIT_TAG), which ggml would otherwise download, unchecked, while CMake configures.
+val llamaSources = tasks.register<LlamaSources>("llamaSources") {
+  description = "Fetches llama.cpp and the KleidiAI kernels for the local models' native build."
+  urls.set(
+    mapOf(
+      "llama.cpp" to "https://github.com/ggml-org/llama.cpp/archive/refs/tags/v0.8.0.tar.gz",
+      "kleidiai" to "https://github.com/ARM-software/kleidiai/releases/download/v1.32.0/kleidiai-v1.32.0-src.tar.gz",
+    ),
+  )
+  sha256s.set(
+    mapOf(
+      "llama.cpp" to "51b1e025d7b12e83fa55736e65bc254acd9d23e49f546be7531368fef82210ee",
+      "kleidiai" to "a48d373e7c5d721a0aecbf5ddaf0bdf245bc8064e6b84086f13db0e102b553a6",
+    ),
+  )
+  sourcesDir.set(llamaSourcesDir)
+}
+
 // The native build reads the fetched sources; AGP names its CMake tasks per variant and ABI.
 tasks.matching { it.name.startsWith("configureCMake") || it.name.startsWith("buildCMake") }.configureEach {
-  dependsOn(syntaxSources)
+  dependsOn(syntaxSources, llamaSources)
 }
 
 android {
@@ -357,10 +416,15 @@ android {
     // Release builds get both from .github/workflows/release.yml; local builds keep these placeholders.
     versionCode = providers.gradleProperty("pipkin.versionCode").map(String::toInt).getOrElse(1)
     versionName = providers.gradleProperty("pipkin.versionName").getOrElse("0.0.0-dev")
-    // 64-bit phones and the emulator; every ABI adds the grammars' whole native library.
+    // 64-bit phones and the emulator; every ABI adds the grammars' and llama.cpp's whole native libraries.
     ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     externalNativeBuild {
-      cmake { arguments += "-DTREE_SITTER_SOURCES=${syntaxSourcesDir.get().asFile}" }
+      cmake {
+        arguments += "-DTREE_SITTER_SOURCES=${syntaxSourcesDir.get().asFile}"
+        arguments += "-DLLAMA_SOURCES=${llamaSourcesDir.get().asFile}"
+        // Only the app's two libraries: llama.cpp's tools and examples would build for nothing.
+        targets += listOf("pipkin-syntax", "pipkin-llama")
+      }
     }
   }
 
