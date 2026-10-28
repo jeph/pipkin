@@ -5,8 +5,8 @@ Android libraries, Apache License 2.0. The app's Android and Kotlin libraries, a
   core, customview-poolingcontainer, emoji2, graphics-path, interpolator, lifecycle, navigationevent,
   profileinstaller, savedstate, startup, tracing, versionedparcelable and window. Copyright The Android Open Source
   Project.
-- Kotlin standard library (https://kotlinlang.org). Copyright JetBrains s.r.o. and Kotlin Programming Language
-  contributors.
+- Kotlin standard library and Kotlin reflection (https://kotlinlang.org). Copyright JetBrains s.r.o. and Kotlin
+  Programming Language contributors.
 - kotlinx.coroutines, kotlinx.serialization and kotlinx.collections.immutable (https://github.com/Kotlin). Copyright
   JetBrains s.r.o. and contributors.
 - JetBrains Markdown (https://github.com/JetBrains/markdown) and JetBrains Java Annotations
@@ -15,6 +15,10 @@ Android libraries, Apache License 2.0. The app's Android and Kotlin libraries, a
   Penz.
 - JSpecify (https://jspecify.dev). Copyright The JSpecify Authors.
 - Guava ListenableFuture (https://github.com/google/guava). Copyright The Guava Authors.
+- LiteRT-LM's Kotlin API (https://github.com/google-ai-edge/LiteRT-LM). Copyright Google LLC. The notices of its
+  native library are in litert-lm.txt.
+- Gson (https://github.com/google/gson) and Error Prone annotations (https://github.com/google/error-prone). Copyright
+  Google Inc. and The Error Prone Authors.
 
 None of these ships a NOTICE file.
 
