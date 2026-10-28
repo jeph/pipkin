@@ -1,5 +1,9 @@
 package io.jeph.pipkin.localmodel
 
+import android.os.SystemClock
+import android.util.Log
+import io.jeph.pipkin.AppStrings
+import io.jeph.pipkin.R
 import io.jeph.pipkin.localmodel.http.HttpRequest
 import io.jeph.pipkin.localmodel.http.HttpResponse
 import io.jeph.pipkin.localmodel.http.LoopbackHttp
@@ -91,7 +95,8 @@ internal class LocalModelServer(
         } catch (failure: LocalModelException) {
           client.fail(failure.message)
         } catch (failure: IOException) {
-          client.fail(failure.message.orEmpty())
+          Log.w(TAG, "Lost the connection to $modelId's engine", failure)
+          client.fail(AppStrings.get(R.string.local_model_error_connection, modelId, failure.message.orEmpty()))
         } finally {
           keepalive?.cancel()
           report(session, null)
@@ -102,34 +107,11 @@ internal class LocalModelServer(
     }
   }
 
+  /**
+   * Forwards [body] to the engine. An engine still finishing a request Pi gave up on, as LiteRT-LM does until a
+   * cancelled prompt read ends, answers 503; the request is tried again for a while rather than failing the next turn.
+   */
   private suspend fun proxy(
-    endpoint: ModelEndpoint,
-    body: JSONObject,
-    stream: Boolean,
-    session: String?,
-    client: Client,
-  ) {
-    val connection = URL("http://127.0.0.1:${endpoint.port}/v1/chat/completions").openConnection() as HttpURLConnection
-    coroutineScope {
-      // The reads below block, so cancelling the call can't reach them; closing the connection fails them, and the
-      // engine sees the hang-up and stops the model.
-      val aborter = launch {
-        try {
-          awaitCancellation()
-        } finally {
-          connection.disconnect()
-        }
-      }
-      try {
-        withContext(Dispatchers.IO) { exchange(connection, endpoint, body, stream, session, client) }
-      } finally {
-        aborter.cancel()
-      }
-    }
-  }
-
-  private fun exchange(
-    connection: HttpURLConnection,
     endpoint: ModelEndpoint,
     body: JSONObject,
     stream: Boolean,
@@ -141,14 +123,60 @@ internal class LocalModelServer(
       .put("return_progress", true)
       .toString()
       .toByteArray()
+    val giveUpAt = SystemClock.elapsedRealtime() + BUSY_RETRY_MILLIS
+    while (attempt(endpoint, bytes, stream, session, client, retryBusy = SystemClock.elapsedRealtime() < giveUpAt)) {
+      delay(BUSY_RETRY_DELAY_MILLIS)
+    }
+  }
+
+  /** True when the engine was busy and [retryBusy] asked for another try; otherwise the reply went to [client]. */
+  private suspend fun attempt(
+    endpoint: ModelEndpoint,
+    bytes: ByteArray,
+    stream: Boolean,
+    session: String?,
+    client: Client,
+    retryBusy: Boolean,
+  ): Boolean {
+    val connection = URL("http://127.0.0.1:${endpoint.port}/v1/chat/completions").openConnection() as HttpURLConnection
     connection.requestMethod = "POST"
     connection.doOutput = true
     connection.readTimeout = 0
     connection.setFixedLengthStreamingMode(bytes.size)
     connection.setRequestProperty("Content-Type", HttpResponse.JSON)
     connection.setRequestProperty("Authorization", "Bearer ${endpoint.apiKey}")
+    return coroutineScope {
+      // The reads below block, so cancelling the call can't reach them; closing the connection fails them, and the
+      // engine sees the hang-up and stops the model.
+      val aborter = launch {
+        try {
+          awaitCancellation()
+        } finally {
+          connection.disconnect()
+        }
+      }
+      try {
+        withContext(Dispatchers.IO) { exchange(connection, bytes, stream, session, client, retryBusy) }
+      } finally {
+        aborter.cancel()
+      }
+    }
+  }
+
+  private fun exchange(
+    connection: HttpURLConnection,
+    bytes: ByteArray,
+    stream: Boolean,
+    session: String?,
+    client: Client,
+    retryBusy: Boolean,
+  ): Boolean {
     connection.outputStream.use { it.write(bytes) }
     val status = connection.responseCode
+    if (status == STATUS_UNAVAILABLE && retryBusy) {
+      connection.errorStream?.close()
+      return true
+    }
     when {
       status !in STATUS_OK until STATUS_MULTIPLE ->
         client.upstreamError(status, connection.errorStream?.use { String(it.readBytes()) }.orEmpty())
@@ -157,6 +185,7 @@ internal class LocalModelServer(
 
       else -> client.respond(status, connection.inputStream.use { it.readBytes() })
     }
+    return false
   }
 
   private fun relayStream(connection: HttpURLConnection, session: String?, client: Client) {
@@ -230,9 +259,14 @@ internal class LocalModelServer(
   companion object {
     /** The header pi-ai sends the session id in when `compat.sendSessionAffinityHeaders` is on. */
     const val SESSION_HEADER = "x-session-affinity"
+    private const val TAG = "PipkinLocalModels"
     private const val DATA = "data: "
     private const val ERROR_TYPE = "local_model_unavailable"
     private const val KEEPALIVE_MILLIS = 10_000L
+
+    /** How long a request waits for an engine that's still ending a request Pi gave up on, and how often it asks. */
+    private const val BUSY_RETRY_MILLIS = 30_000L
+    private const val BUSY_RETRY_DELAY_MILLIS = 500L
     private const val STATUS_OK = 200
     private const val STATUS_MULTIPLE = 300
     private const val STATUS_BAD_REQUEST = 400
