@@ -98,7 +98,8 @@ internal class AppGraph(private val application: Application) {
     scope,
     keepAlive,
     accountRepository,
-    enabled = MutableStateFlow(true),
+    // Before setup, Termux can't run the host or Pi, so there is nothing to serve or register yet.
+    enabled = preferences.setupComplete,
     idleUnloadMinutes = MutableStateFlow(DEFAULT_IDLE_UNLOAD_MINUTES),
   )
 

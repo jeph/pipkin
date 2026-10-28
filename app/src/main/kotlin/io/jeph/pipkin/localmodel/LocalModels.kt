@@ -5,6 +5,7 @@ import android.util.Log
 import io.jeph.pipkin.agent.KeepAlive
 import io.jeph.pipkin.data.AccountRepository
 import io.jeph.pipkin.host.HostFailure
+import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.ModelConfig
 import io.jeph.pipkin.host.TermuxBuild
 import io.jeph.pipkin.localmodel.catalog.ModelStore
@@ -45,23 +46,29 @@ internal class LocalModels(
     syncProvider()
   }
 
-  /** Writes the provider whenever what it should list changes, retrying while the Termux host can't be reached. */
+  /**
+   * Writes the provider whenever what it should list changes, retrying while the Termux host can't be reached or
+   * refuses, as it does while Pi is being installed. Nothing was ever written on a fresh install, which is the same as
+   * an empty list, so a disabled feature never calls the host.
+   */
   private fun syncProvider() {
     scope.launch {
       combine(enabled, store.installed) { on, installed -> if (on) installed.map(::modelConfig) else emptyList() }
         .distinctUntilChanged()
         .collectLatest { models ->
           val signature = models.joinToString("\n") { it.toJson().toString() }
-          if (signature == prefs.getString(KEY_SYNCED, null)) return@collectLatest
+          if (signature == prefs.getString(KEY_SYNCED, "")) return@collectLatest
           while (true) {
             try {
               accounts.syncLocalModels("http://127.0.0.1:${TermuxBuild.LOCAL_MODEL_PORT}/v1", apiKey, models)
               prefs.edit().putString(KEY_SYNCED, signature).apply()
               return@collectLatest
             } catch (failure: HostFailure) {
-              Log.w(TAG, "Couldn't update Pi's local models; retrying", failure)
-              delay(RETRY_MILLIS)
+              Log.w(TAG, "Couldn't reach the host to update Pi's local models; retrying", failure)
+            } catch (failure: HostRejected) {
+              Log.w(TAG, "The host refused to update Pi's local models (${failure.code}); retrying", failure)
             }
+            delay(RETRY_MILLIS)
           }
         }
     }
