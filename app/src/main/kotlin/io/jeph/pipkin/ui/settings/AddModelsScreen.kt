@@ -1,17 +1,18 @@
 package io.jeph.pipkin.ui.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +36,6 @@ import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.ModelConfig
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PillButton
-import io.jeph.pipkin.ui.components.RoundIconButton
 import io.jeph.pipkin.ui.components.SearchField
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -43,8 +43,9 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
 /**
- * Lists what the endpoint, the provider or Pi offers, narrowed by a search; tapping a model adds it to the
- * provider or takes it off again. The custom model field comes first, so it is never below hundreds of models.
+ * Lists the provider's custom models, then what the endpoint, the provider or Pi offers, narrowed by a search; tapping
+ * a model adds it to the provider or takes it off again. A search that isn't a listed model's id offers to add it as a
+ * custom model.
  */
 @Composable
 internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
@@ -54,41 +55,44 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
   var query by rememberSaveable { mutableStateOf("") }
   LaunchedEffect(draft) { draft.loadAvailable(accounts, failed) }
   // Derived, so typing in the search or toggling a model doesn't rebuild a list of hundreds.
-  val available by remember(draft) { derivedStateOf { draft.available } }
-  val shown by remember(draft) { derivedStateOf { available.filter { matches(it, query.trim()) } } }
-  val custom by remember(draft) {
+  val models by remember(draft) {
     derivedStateOf {
+      val available = draft.available
       val availableIds = available.mapTo(HashSet()) { it.id }
-      draft.added.filter { it.id !in availableIds }.map(ModelForm::preview)
+      draft.added.filter { it.id !in availableIds }.map(ModelForm::preview) + available
     }
   }
+  val shown by remember(draft) { derivedStateOf { models.filter { matches(it, query.trim()) } } }
+  val newId by remember(draft) {
+    derivedStateOf { query.trim().takeIf { id -> id.isNotEmpty() && models.none { it.id == id } } }
+  }
   LazySettingsPage(title = stringResource(R.string.provider_add_models), onBack = onBack) {
-    item { FieldLabel(stringResource(R.string.models_custom), SettingsItemWidth) }
-    modelRows(custom, draft)
     item {
-      CustomModelField(
-        input = draft.custom,
-        modifier = SpacedItem,
-        onAdd = {
+      SearchField(
+        query,
+        onQueryChange = {
+          query = it
+          draft.customLookup.clearError()
+        },
+        placeholder = stringResource(R.string.models_search),
+        modifier = SettingsItemWidth,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Search),
+      )
+    }
+    newId?.let { modelId ->
+      item {
+        AddCustomModelRow(modelId, draft.customLookup) {
           scope.launch {
             draft.addCustom(
+              modelId = modelId,
               lookup = { id -> accounts.modelDefaults(listOf(id), draft.api).firstOrNull() ?: ModelConfig(id) },
               fallbackError = failed,
             )
           }
-        },
-      )
+        }
+      }
     }
-    item { FieldLabel(stringResource(R.string.models_available), SpacedItem) }
-    item {
-      SearchField(
-        query,
-        onQueryChange = { query = it },
-        placeholder = stringResource(R.string.chat_model_search),
-        modifier = SpacedItem,
-      )
-    }
-    availableRows(draft, available, shown)
+    modelRows(draft, models, shown)
     item { PillButton(label = stringResource(R.string.models_done), onClick = onBack, modifier = SpacedItem) }
   }
 }
@@ -96,8 +100,8 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
 /** A settings page item [SettingsItemWidth] wide, set apart from the one above. */
 private val SpacedItem = SettingsItemWidth.padding(top = PipkinTokens.Spacing.s12)
 
-/** The provider's models matching the search, or why there are none to show. */
-private fun LazyListScope.availableRows(draft: ModelDraft, available: List<ModelConfig>, shown: List<ModelConfig>) {
+/** The models matching the search as one settings card, a lazy item per row, or why there are none to show. */
+private fun LazyListScope.modelRows(draft: ModelDraft, models: List<ModelConfig>, shown: List<ModelConfig>) {
   draft.availableError?.let { error ->
     item {
       SettingsCaption(
@@ -112,41 +116,33 @@ private fun LazyListScope.availableRows(draft: ModelDraft, available: List<Model
       Box(modifier = SpacedItem, contentAlignment = Alignment.Center) { SimmeringPot() }
     }
 
-    available.isEmpty() -> item { SettingsCaption(text = stringResource(R.string.models_none), modifier = SpacedItem) }
+    models.isEmpty() -> item { SettingsCaption(text = stringResource(R.string.models_none), modifier = SpacedItem) }
 
     shown.isEmpty() -> item {
       SettingsCaption(text = stringResource(R.string.chat_model_search_empty), modifier = SpacedItem)
     }
 
-    else -> modelRows(shown, draft)
+    else -> itemsIndexed(shown) { index, config ->
+      val radius = PipkinTokens.Radius.xl
+      val top = if (index == 0) radius else 0.dp
+      val bottom = if (index == shown.lastIndex) radius else 0.dp
+      val shape = RoundedCornerShape(topStart = top, topEnd = top, bottomEnd = bottom, bottomStart = bottom)
+      Column(
+        modifier = SettingsItemWidth
+          .padding(top = if (index == 0) PipkinTokens.Spacing.s12 else 0.dp)
+          .clip(shape)
+          .background(pipkinColors.surface1),
+      ) {
+        if (index > 0) SettingsDivider()
+        ModelPickRow(config, draft)
+      }
+    }
   }
 }
 
 /** Case-insensitive match on the model's id or name. */
 private fun matches(model: ModelConfig, term: String): Boolean = term.isEmpty() ||
   model.id.contains(term, ignoreCase = true) || model.name?.contains(term, ignoreCase = true) == true
-
-/**
- * The models as one settings card, a lazy item per row. Unkeyed, since an endpoint may list an id twice and
- * duplicate keys would crash the list.
- */
-private fun LazyListScope.modelRows(models: List<ModelConfig>, draft: ModelDraft) {
-  itemsIndexed(models) { index, config ->
-    val radius = PipkinTokens.Radius.xl
-    val top = if (index == 0) radius else 0.dp
-    val bottom = if (index == models.lastIndex) radius else 0.dp
-    val shape = RoundedCornerShape(topStart = top, topEnd = top, bottomEnd = bottom, bottomStart = bottom)
-    Column(
-      modifier = SettingsItemWidth
-        .padding(top = if (index == 0) PipkinTokens.Spacing.s12 else 0.dp)
-        .clip(shape)
-        .background(pipkinColors.surface1),
-    ) {
-      if (index > 0) SettingsDivider()
-      ModelPickRow(config, draft)
-    }
-  }
-}
 
 @Composable
 private fun ModelPickRow(config: ModelConfig, draft: ModelDraft) {
@@ -164,35 +160,33 @@ private fun ModelPickRow(config: ModelConfig, draft: ModelDraft) {
   }
 }
 
+/** One quiet line offering to add [modelId], searched for but not listed, as a custom model, and why that failed. */
 @Composable
-private fun CustomModelField(input: CustomModelInput, modifier: Modifier, onAdd: () -> Unit) {
-  Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
+private fun AddCustomModelRow(modelId: String, lookup: CustomModelLookup, onAdd: () -> Unit) {
+  val colors = pipkinColors
+  Column(modifier = SettingsItemWidth.padding(top = PipkinTokens.Spacing.s8)) {
     Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .heightIn(min = 40.dp)
+        .clip(RoundedCornerShape(PipkinTokens.Radius.xl))
+        .clickable(enabled = !lookup.running, onClick = onAdd)
+        .padding(horizontal = PipkinTokens.Spacing.s16),
       verticalAlignment = Alignment.CenterVertically,
-      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+      horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
     ) {
-      OutlinedTextField(
-        value = input.text,
-        onValueChange = { input.text = it },
-        modifier = Modifier.weight(1f),
-        shape = SettingsFieldShape,
-        colors = settingsFieldColors(),
-        placeholder = { Text(stringResource(R.string.models_custom_hint)) },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { onAdd() }),
-        singleLine = true,
-      )
-      if (input.adding) {
+      if (lookup.running) {
         SimmeringPot()
       } else {
-        RoundIconButton(
-          icon = R.drawable.ic_lucide_plus,
-          contentDescription = stringResource(R.string.models_custom_add),
-          onClick = onAdd,
-          enabled = input.text.isNotBlank(),
-        )
+        LucideIcon(icon = R.drawable.ic_lucide_plus, contentDescription = null, tint = colors.accent)
       }
+      Text(
+        text = stringResource(R.string.models_add_custom, modelId),
+        modifier = Modifier.weight(1f),
+        color = colors.accent,
+        fontSize = PipkinTokens.FontSize.base,
+      )
     }
-    input.error?.let { SettingsCaption(text = it, color = pipkinColors.destructive) }
+    lookup.error?.let { SettingsCaption(text = it, color = colors.destructive) }
   }
 }

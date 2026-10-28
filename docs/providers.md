@@ -55,7 +55,7 @@ To remove a key, open the provider in **Settings → Providers and models**, tap
    - **API key**: the key from your provider. Leave it empty for a server that needs none, such as Ollama or llama.cpp running on your network.
    - **API type**: **Chat Completions** works almost everywhere. Choose **Responses** if your provider supports OpenAI's newer Responses API.
 3. Tap **Check**. Pipkin asks the API for its list of models and shows **Connected** when it answers.
-4. Tap **Add models** and pick from **Available models**, or type a **Model ID** under **Custom models** at the top of the page.
+4. Tap **Add models** and tap the models you want. To add one the API doesn't list, type its full ID in the search and tap **Add "…" as a custom model**.
 5. Tap **Save**.
 
 Pipkin fills in what it knows about popular models. Tap a model to adjust its settings: whether it **Accepts images**, whether it **Supports thinking** and at which levels, its **Context window** and **Max output tokens**, and its cost per million tokens if you want Pipkin to show what a chat costs.
@@ -68,7 +68,7 @@ If the check fails, Pipkin explains why. The most common fixes:
 - **Not an OpenAI-compatible API**: the URL points at a website rather than the API.
 - **Couldn't reach the server** or **No response**: check the address and that your phone is online.
 
-If the check connects but Pipkin says **The server lists no models**, the server has no model to offer yet. Download or load one on it, for example with `ollama pull`, then tap **Check** again, or add a model by its ID under **Custom models**.
+If the check connects but Pipkin says **The server lists no models**, the server has no model to offer yet. Download or load one on it, for example with `ollama pull`, then tap **Check** again, or type a model's ID in the search on **Add models** and add it as a custom model.
 
 To remove a provider, open it and tap **Remove provider**. Pipkin forgets the provider, its models, and its API key.
 

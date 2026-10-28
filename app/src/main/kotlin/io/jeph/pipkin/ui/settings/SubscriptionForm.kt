@@ -46,7 +46,7 @@ internal class SubscriptionForm(val providerId: String) : ModelDraft {
       return listed.map { formsById[it.id]?.preview() ?: it }
     }
   override val added: List<ModelForm> get() = forms.filter { it.id in enabled }
-  override val custom = CustomModelInput()
+  override val customLookup = CustomModelLookup()
 
   val canSave: Boolean get() = prefilled && forms.all { it.valid } && !saving
   val dirty: Boolean get() = snapshot() != baseline
@@ -89,12 +89,19 @@ internal class SubscriptionForm(val providerId: String) : ModelDraft {
     if (extraIds.remove(modelId)) forms.removeAll { it.id == modelId }
   }
 
-  override suspend fun addCustom(lookup: suspend (String) -> ModelConfig, fallbackError: String) {
-    custom.add(lookup, fallbackError, exists = { model(it) != null }) {
+  override suspend fun addCustom(modelId: String, lookup: suspend (String) -> ModelConfig, fallbackError: String) {
+    customLookup.add(modelId, lookup, fallbackError, addKnown = ::show) {
       forms.add(ModelForm(it))
       extraIds.add(it.id)
       enabled.add(it.id)
     }
+  }
+
+  /** Shows a model the draft already has, taken off earlier, again with its settings; false for one it hasn't. */
+  private fun show(modelId: String): Boolean {
+    if (model(modelId) == null) return false
+    if (modelId !in enabled) enabled.add(modelId)
+    return true
   }
 
   override suspend fun loadAvailable(accounts: AccountRepository, fallbackError: String) {

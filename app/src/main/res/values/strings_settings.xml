@@ -229,13 +229,12 @@
     <string name="provider_discard">Discard</string>
     <string name="provider_keep_editing">Keep editing</string>
 
-    <string name="models_available">Available models</string>
-    <string name="models_none">No models to add.</string>
+    <string name="models_search">Search or enter a model ID</string>
+    <string name="models_none">The provider lists no models. Enter a model ID above to add one.</string>
     <!-- %1$s: why the provider's list of models couldn't be read, for example "HTTP 401: Invalid Authentication". -->
     <string name="models_list_failed">Couldn\'t get the provider\'s list of models, so these are the ones Pi knows: %1$s</string>
-    <string name="models_custom">Custom models</string>
-    <string name="models_custom_hint">Model ID</string>
-    <string name="models_custom_add">Add model</string>
+    <!-- %1$s: the model ID typed into the search, for example "openai/gpt-4". -->
+    <string name="models_add_custom">Add \"%1$s\" as a custom model</string>
     <string name="models_done">Done</string>
 
     <string name="model_name">Display name</string>

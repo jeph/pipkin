@@ -30,7 +30,7 @@ internal interface ModelDraft {
   /** The models on the provider page, in order. */
   val added: List<ModelForm>
 
-  val custom: CustomModelInput
+  val customLookup: CustomModelLookup
 
   fun isAdded(modelId: String): Boolean
 
@@ -42,46 +42,45 @@ internal interface ModelDraft {
   /** Takes the model off the provider page. */
   fun remove(modelId: String)
 
-  /** Adds [custom]'s id, looked up in Pi's catalogue through [lookup]. */
-  suspend fun addCustom(lookup: suspend (String) -> ModelConfig, fallbackError: String)
+  /** Adds [modelId] as a custom model, looked up in Pi's catalogue through [lookup]; [customLookup] tracks it. */
+  suspend fun addCustom(modelId: String, lookup: suspend (String) -> ModelConfig, fallbackError: String)
 
   /** Fills [available] for the add-models page, for example from the provider's own list of models. */
   suspend fun loadAvailable(accounts: AccountRepository, fallbackError: String) = Unit
 }
 
-/** The add-models page's "custom model" field. */
+/** Adding a custom model typed into the add-models page's search: whether it is being looked up, or why it failed. */
 @Stable
-internal class CustomModelInput {
-  var text by mutableStateOf("")
-  var adding by mutableStateOf(false)
+internal class CustomModelLookup {
+  var running by mutableStateOf(false)
     private set
   var error by mutableStateOf<String?>(null)
     private set
 
-  /** Looks the typed id up and hands it to [onAdded]; an id [exists] already only clears the field. */
+  /** The search changed, so the last failure no longer describes what it holds. */
+  fun clearError() {
+    error = null
+  }
+
+  /** Looks [modelId] up and hands it to [onAdded], unless [addKnown] adds it from what the draft already has. */
   suspend fun add(
+    modelId: String,
     lookup: suspend (String) -> ModelConfig,
     fallbackError: String,
-    exists: (String) -> Boolean,
+    addKnown: (String) -> Boolean,
     onAdded: (ModelConfig) -> Unit,
   ) {
-    val modelId = text.trim()
-    if (modelId.isEmpty() || adding) return
-    if (exists(modelId)) {
-      text = ""
-      return
-    }
-    adding = true
+    if (modelId.isEmpty() || running || addKnown(modelId)) return
+    running = true
     error = null
     try {
       onAdded(lookup(modelId))
-      text = ""
     } catch (rejected: HostRejected) {
       error = rejected.error
     } catch (failure: IOException) {
       error = failure.message ?: fallbackError
     } finally {
-      adding = false
+      running = false
     }
   }
 }

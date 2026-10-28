@@ -125,7 +125,7 @@ internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraf
   override val canAddModels: Boolean get() = connected
   override val available: List<ModelConfig> get() = fetched
   override val added: List<ModelForm> get() = models
-  override val custom = CustomModelInput()
+  override val customLookup = CustomModelLookup()
 
   override fun isAdded(modelId: String): Boolean = model(modelId) != null
 
@@ -139,8 +139,8 @@ internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraf
     models.removeAll { it.id == modelId }
   }
 
-  override suspend fun addCustom(lookup: suspend (String) -> ModelConfig, fallbackError: String) {
-    custom.add(lookup, fallbackError, exists = ::isAdded) { models.add(ModelForm(it)) }
+  override suspend fun addCustom(modelId: String, lookup: suspend (String) -> ModelConfig, fallbackError: String) {
+    customLookup.add(modelId, lookup, fallbackError, addKnown = ::isAdded) { models.add(ModelForm(it)) }
   }
 
   /** True once `models.json` holds the provider. */
