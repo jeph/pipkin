@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -186,19 +186,19 @@ internal fun SettingsPage(
 internal fun LazySettingsPage(
   title: String,
   onBack: () -> Unit,
+  listState: LazyListState,
   header: @Composable ColumnScope.() -> Unit,
   footer: @Composable () -> Unit,
   content: LazyListScope.() -> Unit,
 ) {
   val spacing = PipkinTokens.Spacing
-  val listState = rememberLazyListState()
   val background = pipkinColors.surface0
   SettingsPageFrame(title, onBack, snackbar = null) {
     Column(
       modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding(),
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-      Column(modifier = SettingsItemWidth.padding(start = spacing.s16, top = spacing.s24, end = spacing.s16)) {
+      Column(modifier = SettingsItemWidth.padding(start = spacing.s16, top = spacing.s8, end = spacing.s16)) {
         header()
       }
       LazyColumn(

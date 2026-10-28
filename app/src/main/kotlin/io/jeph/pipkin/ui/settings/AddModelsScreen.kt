@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
@@ -66,13 +67,19 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
   val newId by remember(draft) {
     derivedStateOf { query.trim().takeIf { id -> id.isNotEmpty() && models.none { it.id == id } } }
   }
+  val listState = rememberLazyListState()
   LazySettingsPage(
     title = stringResource(R.string.provider_add_models),
     onBack = onBack,
+    listState = listState,
     header = {
       SearchField(
         query,
-        onQueryChange = { query = it },
+        onQueryChange = {
+          query = it
+          // The search stays put above the list, so a new one's first matches mustn't open scrolled past.
+          scope.launch { listState.scrollToItem(0) }
+        },
         placeholder = stringResource(R.string.models_search),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Search),
       )
