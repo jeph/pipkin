@@ -87,8 +87,11 @@ internal class ModelStore(
         keepAlive.acquire("model download").use {
           withContext(Dispatchers.IO) {
             downloader.download(artifact) { bytes ->
-              // Progress from the IO thread may land after a cancel, which must not bring the row back.
-              if (self.isActive) downloadsState.update { it + (model.id to DownloadState.Running(artifact, bytes)) }
+              // Published on the main thread, where cancel and delete run, so progress that lands after either
+              // can't bring the row back.
+              scope.launch {
+                if (current()) downloadsState.update { it + (model.id to DownloadState.Running(artifact, bytes)) }
+              }
             }
           }
         }
@@ -138,15 +141,13 @@ internal class ModelStore(
   }
 
   /**
-   * The catalog files already downloaded, by the size they must have; a part stays for resuming. Anything else in the
-   * folder is from a catalog Pipkin no longer offers, and is deleted so it doesn't hold storage the user can't see.
+   * The catalog files already downloaded, by the size they must have; a part stays for resuming. Other files are left
+   * alone: only Delete removes anything.
    */
-  private fun scan(): Set<String> {
-    val artifacts = LocalModelCatalog.models.flatMap { it.artifacts }
-    val known = artifacts.flatMap { listOf(it.fileName, it.fileName + ModelDownloader.PART_SUFFIX) }.toSet()
-    dir.listFiles()?.filter { it.name !in known }?.forEach { it.deleteRecursively() }
-    return artifacts.filter { downloader.file(it).length() == it.sizeBytes }.map { it.fileName }.toSet()
-  }
+  private fun scan(): Set<String> = LocalModelCatalog.models.flatMap { it.artifacts }
+    .filter { downloader.file(it).length() == it.sizeBytes }
+    .map { it.fileName }
+    .toSet()
 
   private companion object {
     const val DIRECTORY = "local-models"
