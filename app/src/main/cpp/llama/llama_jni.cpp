@@ -194,6 +194,11 @@ Java_io_jeph_pipkin_localmodel_engine_llama_LlamaServer_run(JNIEnv * env, jobjec
   std::setlocale(LC_NUMERIC, "C");
   std::signal(SIGPIPE, SIG_IGN);
 
+  // Registers ggml's backends, unless gpuName already has, while ggml still logs through its default logger, which
+  // writes no level: without an OpenCL driver, the OpenCL backend logs an error that every CPU-only phone expects, and
+  // that mustn't become first_error.
+  ggml_backend_dev_count();
+
   common_params params;
   common_init();
   // logcat stamps each line itself, and the pump reads the level from the prefix that's left.
@@ -225,4 +230,11 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_io_jeph_pipkin_localmodel_engine_llama_LlamaServer_firstError(JNIEnv * env, jobject) {
   std::lock_guard<std::mutex> lock(log_mutex);
   return first_error.empty() ? nullptr : env->NewStringUTF(first_error.c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_io_jeph_pipkin_localmodel_engine_llama_LlamaServer_gpuName(JNIEnv * env, jobject) {
+  redirect_output_to_logcat();
+  ggml_backend_dev_t gpu = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_GPU);
+  return gpu == nullptr ? nullptr : env->NewStringUTF(ggml_backend_dev_description(gpu));
 }

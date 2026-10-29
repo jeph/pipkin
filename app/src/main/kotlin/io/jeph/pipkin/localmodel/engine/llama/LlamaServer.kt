@@ -24,4 +24,11 @@ internal object LlamaServer {
 
   /** The first error llama.cpp logged, the cause of a failure, which says why [run] returned early. */
   external fun firstError(): String?
+
+  /**
+   * The name of the GPU that llama-server offloads to on `--device GPUOpenCL`, such as `QUALCOMM Adreno(TM) 840`, or
+   * null when ggml's OpenCL backend found none it supports: no OpenCL driver, a GPU other than an Adreno, or x86_64,
+   * which is built without the backend.
+   */
+  external fun gpuName(): String?
 }

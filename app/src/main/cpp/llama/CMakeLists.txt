@@ -51,8 +51,19 @@ if(ANDROID_ABI STREQUAL "arm64-v8a")
   # ggml fetches KleidiAI with FetchContent; this points it at Gradle's pinned copy and keeps CMake offline.
   set(FETCHCONTENT_SOURCE_DIR_KLEIDIAI ${LLAMA_SOURCES}/kleidiai)
   set(FETCHCONTENT_FULLY_DISCONNECTED ON)
+
+  # ggml's OpenCL backend, for the Adreno GPUs of Snapdragon phones, with the kernels compiled into the library and
+  # those written for Adreno, as llama.cpp's docs/backend/OPENCL.md builds it for Android. It drops any other GPU.
+  # Linking the vendor's libOpenCL.so would keep the library from loading on a phone without one, and GGML_BACKEND_DL
+  # is ruled out above, so FindOpenCL takes ../opencl's loader for the library, which opens the driver on first use;
+  # without one, the backend finds no platform and registers no device.
+  set(GGML_OPENCL ON)
+  set(GGML_OPENCL_EMBED_KERNELS ON)
+  set(GGML_OPENCL_USE_ADRENO_KERNELS ON)
+  set(OpenCL_INCLUDE_DIR ${OPENCL_HEADERS} CACHE PATH "Khronos's OpenCL headers" FORCE)
+  set(OpenCL_LIBRARY pipkin-opencl-loader CACHE STRING "Pipkin's OpenCL loader" FORCE)
 endif()
-# x86_64 runs on emulators and Chromebooks, and keeps the NDK's baseline of SSE4.2.
+# x86_64 runs on emulators and Chromebooks, keeps the NDK's baseline of SSE4.2, and has no GPU backend.
 
 add_subdirectory(${LLAMA_SOURCES}/llama.cpp llama.cpp EXCLUDE_FROM_ALL)
 

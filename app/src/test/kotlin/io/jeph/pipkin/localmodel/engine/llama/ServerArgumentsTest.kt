@@ -4,6 +4,7 @@ import io.jeph.pipkin.localmodel.engine.Backend
 import io.jeph.pipkin.localmodel.engine.EngineConfig
 import io.jeph.pipkin.localmodel.engine.EngineKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -43,6 +44,22 @@ class ServerArgumentsTest {
     assertEquals("deepseek", options["--reasoning-format"])
     assertTrue("--jinja" in options)
     assertTrue("--no-ui" in options)
+  }
+
+  @Test
+  fun theCpuOffloadsToNoDevice() {
+    val options = serverArguments(config).options()
+
+    assertEquals("none", options["--device"])
+    assertFalse("--gpu-layers" in options)
+  }
+
+  @Test
+  fun theGpuTakesEveryLayerOnTheOpenClDevice() {
+    val options = serverArguments(config.copy(backend = Backend.GPU)).options()
+
+    assertEquals("GPUOpenCL", options["--device"])
+    assertEquals("all", options["--gpu-layers"])
   }
 
   /** Each `--option` to the value after it, or to null when the next argument is another option. */

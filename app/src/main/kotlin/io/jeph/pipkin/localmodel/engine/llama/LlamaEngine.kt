@@ -19,11 +19,17 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 internal class LlamaEngine : InferenceEngine {
   override fun start(config: EngineConfig, onProgress: (Float) -> Unit) {
-    if (config.backend != Backend.CPU) {
-      throw EngineException("backend_unsupported", "llama.cpp runs models on the CPU, not the ${config.backend.wire}")
+    if (config.backend == Backend.NPU) {
+      throw EngineException("backend_unsupported", "llama.cpp runs models on the CPU or the GPU, not the NPU")
     }
+    // On the GPU too, since the CPU backend still runs the token embeddings and whatever the GPU's backend lacks.
     if (!cpuSupported()) {
       throw EngineException("cpu_unsupported", "llama.cpp needs an ARMv8.2 CPU with dot product and FP16 instructions")
+    }
+    // ggml-opencl compiles its kernels for the GPU as the model loads, which takes a while the first time, and caches
+    // the programs under TMPDIR, which Android sets to the app's cache directory.
+    if (config.backend == Backend.GPU && LlamaServer.gpuName() == null) {
+      throw EngineException("backend_unsupported", "llama.cpp runs on the GPU only with an Adreno GPU's OpenCL driver")
     }
     val exitStatus = AtomicInteger(RUNNING)
     val server = Thread(
@@ -133,9 +139,20 @@ internal fun serverArguments(config: EngineConfig): List<String> = listOf(
   // allows 8 GiB by default, memory a phone needs for the model itself.
   "--cache-ram", "512",
   // Weights the CPU kernels read as the file lays them out, such as the token embeddings, stay in the page cache, which
-  // Android can drop and read again; KleidiAI and ggml copy the rest into their own layouts in the process's memory.
+  // Android can drop and read again; KleidiAI and ggml copy the rest into their own layouts in the process's memory,
+  // or the GPU's.
   "--load-mode", "mmap",
   "--no-ui",
   "--no-slots",
   "--log-colors", "off",
-)
+) + deviceArguments(config.backend)
+
+/**
+ * On the GPU, every layer goes to the device of ggml's OpenCL backend, leaving the CPU the token embeddings and any
+ * operation the GPU's kernels lack. On the CPU, no device gets any, even on a phone that has one.
+ */
+private fun deviceArguments(backend: Backend): List<String> = if (backend == Backend.GPU) {
+  listOf("--device", "GPUOpenCL", "--gpu-layers", "all")
+} else {
+  listOf("--device", "none")
+}
