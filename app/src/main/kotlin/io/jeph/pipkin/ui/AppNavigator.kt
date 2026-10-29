@@ -20,7 +20,7 @@ sealed interface Destination {
   /** Backups of Pi's configuration in Termux, reached from Settings. */
   data object Backups : Destination
 
-  /** Downloading and running models on the phone, reached from Settings › Experimental. */
+  /** Downloading and running models on the phone, reached from Providers and models › Experimental. */
   data object LocalModels : Destination
 
   /** The third-party licences the app ships, reached from Settings › About. */

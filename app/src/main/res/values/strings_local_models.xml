@@ -5,8 +5,12 @@
     <string name="local_models_row_on">On</string>
     <string name="local_models_row_off">Run small models on this phone</string>
 
+    <!-- A warning at the top of the Local models page. -->
+    <string name="local_models_notice_title">Experimental feature</string>
+    <string name="local_models_notice">How well local models run depends entirely on your phone\'s hardware. While one runs, other apps can slow down or close on their own.</string>
+
     <string name="local_models_enable">Run models on this phone</string>
-    <string name="local_models_enable_summary">Experimental. Chats can pick the models you download here like any other. They\'re slower and less capable than a provider\'s, and use a lot of memory and battery.</string>
+    <string name="local_models_enable_summary">Chats can pick the models you download here like any other. They\'re slower and less capable than a provider\'s, and use a lot of memory and battery.</string>
 
     <string name="local_models_section_status">Status</string>
     <string name="local_models_stopped">No model loaded</string>

@@ -199,7 +199,7 @@ private fun Screen(
       ArchivePage(top, navigator, actions, requestedChat)
 
     Destination.Settings, Destination.Permissions, Destination.Backups, Destination.RunningAgents,
-    Destination.LocalModels, Destination.Licenses, is Destination.License,
+    Destination.Licenses, is Destination.License,
     -> SettingsPages(top, navigator)
 
     Destination.Providers -> ProvidersScreen(
@@ -207,7 +207,10 @@ private fun Screen(
       onAdd = { navigator.push(Destination.AddProvider) },
       onOpenSubscription = { navigator.push(Destination.Subscription(it)) },
       onEditProvider = { navigator.push(Destination.ProviderEditor(it)) },
+      onOpenLocalModels = { navigator.push(Destination.LocalModels) },
     )
+
+    Destination.LocalModels -> LocalModelsScreen(onBack = { navigator.pop() })
 
     Destination.AddProvider -> AddProviderScreen(
       onBack = { navigator.pop() },
@@ -267,8 +270,6 @@ private fun SettingsPages(top: Destination, navigator: AppNavigator) {
 
     Destination.RunningAgents -> RunningAgentsScreen(onBack = { navigator.pop() })
 
-    Destination.LocalModels -> LocalModelsScreen(onBack = { navigator.pop() })
-
     Destination.Licenses -> LicensesScreen(
       onBack = { navigator.pop() },
       onOpenLicense = { navigator.push(Destination.License(it)) },
@@ -282,7 +283,6 @@ private fun SettingsPages(top: Destination, navigator: AppNavigator) {
       onOpenRunningAgents = { navigator.push(Destination.RunningAgents) },
       onOpenPermissions = { navigator.push(Destination.Permissions) },
       onOpenBackups = { navigator.push(Destination.Backups) },
-      onOpenLocalModels = { navigator.push(Destination.LocalModels) },
       onOpenLicenses = { navigator.push(Destination.Licenses) },
     )
   }

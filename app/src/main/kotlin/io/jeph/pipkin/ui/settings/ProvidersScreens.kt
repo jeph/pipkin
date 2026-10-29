@@ -51,15 +51,20 @@ import io.jeph.pipkin.ui.theme.pipkinColors
 import java.io.IOException
 import kotlinx.coroutines.launch
 
-/** The added providers: signed-in providers Pi ships, then custom OpenAI-compatible endpoints. */
+/**
+ * The added providers: signed-in providers Pi ships, then custom OpenAI-compatible endpoints; below them, the
+ * experimental models that run on the phone.
+ */
 @Composable
 internal fun ProvidersScreen(
   onBack: () -> Unit,
   onAdd: () -> Unit,
   onOpenSubscription: (id: String) -> Unit,
   onEditProvider: (id: String) -> Unit,
+  onOpenLocalModels: () -> Unit,
 ) {
-  val accounts = LocalContext.current.appGraph.accountRepository
+  val graph = LocalContext.current.appGraph
+  val accounts = graph.accountRepository
   val status by accounts.status.collectAsStateWithLifecycle()
   val refreshError by accounts.refreshError.collectAsStateWithLifecycle()
   LaunchedEffect(Unit) { accounts.refresh() }
@@ -97,6 +102,7 @@ internal fun ProvidersScreen(
     DashedActionRow(label = stringResource(R.string.providers_add), icon = R.drawable.ic_lucide_plus, onClick = onAdd)
     current?.modelsError?.let { SettingsCaption(text = it.localized(), color = pipkinColors.destructive) }
     refreshError?.let { SettingsCaption(text = it, color = pipkinColors.destructive) }
+    LocalModelsSection(preferences = graph.preferences, onOpenLocalModels = onOpenLocalModels)
   }
 }
 

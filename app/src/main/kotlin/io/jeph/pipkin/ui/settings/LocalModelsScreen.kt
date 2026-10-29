@@ -44,9 +44,9 @@ import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** Settings › Experimental: one row into [LocalModelsScreen], saying whether local models are on. */
+/** Providers and models › Experimental: one row into [LocalModelsScreen], saying whether local models are on. */
 @Composable
-internal fun ExperimentalSection(preferences: Preferences, onOpenLocalModels: () -> Unit) {
+internal fun LocalModelsSection(preferences: Preferences, onOpenLocalModels: () -> Unit) {
   val enabled by preferences.localModelsEnabled.collectAsStateWithLifecycle()
   SettingsSection(title = stringResource(R.string.settings_section_experimental)) {
     SettingsRow(
@@ -62,13 +62,29 @@ internal fun ExperimentalSection(preferences: Preferences, onOpenLocalModels: ()
   }
 }
 
-/** Turning local models on, what the model process is doing, and downloading the catalog's models for this phone. */
+/**
+ * The experiment's warning, turning local models on, what the model process is doing, and downloading the catalog's
+ * models for this phone.
+ */
 @Composable
 internal fun LocalModelsScreen(onBack: () -> Unit) {
   val graph = LocalContext.current.appGraph
   val preferences = graph.preferences
   val enabled by preferences.localModelsEnabled.collectAsStateWithLifecycle()
   SettingsPage(title = stringResource(R.string.local_models_title), onBack = onBack) {
+    SettingsSection(title = null) {
+      SettingsRow(
+        title = stringResource(R.string.local_models_notice_title),
+        subtitle = stringResource(R.string.local_models_notice),
+        leading = {
+          LucideIcon(
+            icon = R.drawable.ic_lucide_triangle_alert,
+            contentDescription = null,
+            tint = pipkinColors.dotWarning,
+          )
+        },
+      )
+    }
     SettingsSection(title = null) {
       SettingsRow(
         title = stringResource(R.string.local_models_enable),

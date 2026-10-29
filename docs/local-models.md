@@ -9,7 +9,7 @@ Local models are an experiment. The models a phone can run are far smaller than 
 
 ## Turn it on
 
-1. Open **Settings → Experimental → Local models**.
+1. Open **Settings → Providers and models → Local models**.
 2. Turn on **Run models on this phone**.
 3. Under **Models**, tap **Download** next to a model.
 
@@ -49,7 +49,7 @@ Your phone runs one model at a time. When a chat sends a message to a local mode
 
 While a chat waits or the model works, the line under the reply, beside its timer, shows what's happening: waiting for another chat, loading the model, reading your message and the conversation so far, or writing the reply and how fast.
 
-The **Status** card under **Settings → Experimental → Local models** shows which model is loaded, on which engine, and how much conversation it can hold. Tap **Unload** to give its memory back right away; a chat that's using it stops with an error. Pipkin also unloads a model that hasn't been used for five minutes; change that under **Minutes before an unused model unloads**.
+The **Status** card under **Settings → Providers and models → Local models** shows which model is loaded, on which engine, and how much conversation it can hold. Tap **Unload** to give its memory back right away; a chat that's using it stops with an error. Pipkin also unloads a model that hasn't been used for five minutes; change that under **Minutes before an unused model unloads**.
 
 A local model can hold a shorter conversation than a provider's. When a chat gets near the limit, the agent compacts it, summarising the older messages, as it does for any model; `/compact` does it on demand.
 
