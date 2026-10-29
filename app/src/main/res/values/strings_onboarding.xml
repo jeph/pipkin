@@ -96,5 +96,7 @@
     <string name="onboarding_signin_body">Sign in with a subscription or add an API key. You can add more in Settings later.</string>
     <string name="onboarding_signin_needs_pi">Available once the agent is installed.</string>
     <string name="onboarding_signin_api">OpenAI-compatible API</string>
+    <!-- The setup choice that opens Local models, for models that run on the phone. -->
+    <string name="onboarding_signin_local">Local models (experimental)</string>
     <string name="onboarding_signed_in">Signed in</string>
 </resources>

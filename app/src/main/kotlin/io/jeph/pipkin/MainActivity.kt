@@ -199,7 +199,7 @@ private fun Screen(
       ArchivePage(top, navigator, actions, requestedChat)
 
     Destination.Settings, Destination.Permissions, Destination.Backups, Destination.RunningAgents,
-    Destination.Licenses, is Destination.License,
+    Destination.LocalModels, Destination.Licenses, is Destination.License,
     -> SettingsPages(top, navigator)
 
     Destination.Providers -> ProvidersScreen(
@@ -209,8 +209,6 @@ private fun Screen(
       onEditProvider = { navigator.push(Destination.ProviderEditor(it)) },
       onOpenLocalModels = { navigator.push(Destination.LocalModels) },
     )
-
-    Destination.LocalModels -> LocalModelsScreen(onBack = { navigator.pop() })
 
     Destination.AddProvider -> AddProviderScreen(
       onBack = { navigator.pop() },
@@ -248,6 +246,7 @@ private fun Screen(
       onFinished = { navigator.replaceAll(Destination.Main) },
       onAddProvider = { navigator.push(Destination.ProviderEditor(null)) },
       onPickModels = navigator::pickModels,
+      onOpenLocalModels = { navigator.push(Destination.LocalModels) },
       // Before setup finishes the wizard is the root; opened from the main screen later, it can be closed.
       onClose = if (shown.size > 1) ({ navigator.pop() }) else null,
     )
@@ -260,7 +259,7 @@ private fun AppNavigator.pickModels(providerId: String) {
   push(Destination.AddModels)
 }
 
-/** Settings, or one of the pages reached from it that needs nothing but the navigator. */
+/** Settings, or one of the pages reached from it or Providers and models that needs nothing but the navigator. */
 @Composable
 private fun SettingsPages(top: Destination, navigator: AppNavigator) {
   when (top) {
@@ -269,6 +268,8 @@ private fun SettingsPages(top: Destination, navigator: AppNavigator) {
     Destination.Backups -> BackupsScreen(onBack = { navigator.pop() })
 
     Destination.RunningAgents -> RunningAgentsScreen(onBack = { navigator.pop() })
+
+    Destination.LocalModels -> LocalModelsScreen(onBack = { navigator.pop() })
 
     Destination.Licenses -> LicensesScreen(
       onBack = { navigator.pop() },

@@ -13,15 +13,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
+import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.AuthStatus
+import io.jeph.pipkin.localmodel.catalog.LocalModelCatalog
 import io.jeph.pipkin.ui.auth.ProviderLogo
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.settings.isSignedIn
@@ -29,10 +34,16 @@ import io.jeph.pipkin.ui.settings.subscriptions
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** The ways to reach a model: the providers Pi ships that Pipkin connects, or an OpenAI-compatible API. */
+/**
+ * The ways to reach a model: the providers Pi ships that Pipkin connects, an OpenAI-compatible API, or the experimental
+ * models that run on the phone, ready once one is downloaded with local models on.
+ */
 @Composable
 internal fun SignInChoices(authStatus: AuthStatus?, enabled: Boolean, onAction: (SetupAction) -> Unit) {
   val colors = pipkinColors
+  val graph = LocalContext.current.appGraph
+  val localModelsOn by graph.preferences.localModelsEnabled.collectAsStateWithLifecycle()
+  val localModels by graph.localModels.store.installed.collectAsStateWithLifecycle()
   val shape = RoundedCornerShape(PipkinTokens.Radius.xl)
   Column(
     modifier = Modifier.fillMaxWidth().background(colors.surface1, shape).padding(vertical = PipkinTokens.Spacing.s4),
@@ -47,10 +58,16 @@ internal fun SignInChoices(authStatus: AuthStatus?, enabled: Boolean, onAction: 
     }
     SignInRow(
       label = stringResource(R.string.onboarding_signin_api),
-      signedIn = authStatus?.custom?.isNotEmpty() == true,
+      signedIn = authStatus?.custom.orEmpty().any { it.id != LocalModelCatalog.PROVIDER_ID },
       enabled = enabled,
       onClick = { onAction(SetupAction.AddProvider) },
     ) { LucideIcon(icon = R.drawable.ic_lucide_key_round, contentDescription = null) }
+    SignInRow(
+      label = stringResource(R.string.onboarding_signin_local),
+      signedIn = localModelsOn && localModels.isNotEmpty(),
+      enabled = enabled,
+      onClick = { onAction(SetupAction.OpenLocalModels) },
+    ) { LucideIcon(icon = R.drawable.ic_lucide_brain, contentDescription = null) }
   }
 }
 

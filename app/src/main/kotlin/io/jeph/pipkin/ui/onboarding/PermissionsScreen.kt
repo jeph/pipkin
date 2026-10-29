@@ -63,8 +63,8 @@ internal fun PermissionsScreen(onBack: () -> Unit) {
 }
 
 /**
- * Handles [SetupAction]s; [onPermissionResult] runs after a runtime permission prompt closes. [onLogin] and
- * [onAddProvider] serve the sign-in step, which only onboarding shows.
+ * Handles [SetupAction]s; [onPermissionResult] runs after a runtime permission prompt closes. [onLogin],
+ * [onAddProvider] and [onOpenLocalModels] serve the sign-in step, which only onboarding shows.
  */
 @Composable
 internal fun rememberSetupActions(
@@ -72,6 +72,7 @@ internal fun rememberSetupActions(
   onPermissionResult: () -> Unit,
   onLogin: (providerId: String) -> Unit = {},
   onAddProvider: () -> Unit = {},
+  onOpenLocalModels: () -> Unit = {},
 ): (SetupAction) -> Unit {
   val context = LocalContext.current
   val graph = remember(context) { context.appGraph }
@@ -113,6 +114,8 @@ internal fun rememberSetupActions(
       is SetupAction.Login -> onLogin(action.providerId)
 
       SetupAction.AddProvider -> onAddProvider()
+
+      SetupAction.OpenLocalModels -> onOpenLocalModels()
     }
   }
 }

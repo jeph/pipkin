@@ -14,12 +14,9 @@ import java.security.SecureRandom
 import java.util.Base64
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
@@ -31,7 +28,7 @@ internal class LocalModels(
   private val scope: CoroutineScope,
   keepAlive: KeepAlive,
   private val accounts: AccountRepository,
-  preferences: Preferences,
+  private val preferences: Preferences,
 ) {
   private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -40,17 +37,12 @@ internal class LocalModels(
     prefs.edit().putString(KEY_API_KEY, it).apply()
   }
 
-  /** On in Settings, and set up: before setup, Termux can't run the host or Pi, so there is nothing to serve yet. */
-  private val enabled: StateFlow<Boolean> =
-    combine(preferences.setupComplete, preferences.localModelsEnabled) { setUp, on -> setUp && on }
-      .stateIn(scope, SharingStarted.Eagerly, false)
-
   val store = ModelStore(context, scope, preferences, keepAlive)
   val runtime =
     LocalModelRuntime(context, scope, keepAlive, store.installed, preferences) { apiKey }
 
   init {
-    scope.launch { enabled.collect(runtime::serve) }
+    scope.launch { preferences.localModelsEnabled.collect(runtime::serve) }
     syncProvider()
   }
 
@@ -62,7 +54,9 @@ internal class LocalModels(
    */
   private fun syncProvider() {
     scope.launch {
-      combine(enabled, store.installed) { on, installed -> if (on) installed.map(::modelConfig) else emptyList() }
+      combine(preferences.localModelsEnabled, store.installed) { on, installed ->
+        if (on) installed.map(::modelConfig) else emptyList()
+      }
         .distinctUntilChanged()
         .collectLatest { models ->
           if (models.isEmpty() && !prefs.getBoolean(KEY_WRITTEN, false)) return@collectLatest

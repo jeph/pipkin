@@ -55,6 +55,8 @@ internal sealed interface SetupAction {
   data class Login(val providerId: String) : SetupAction
 
   data object AddProvider : SetupAction
+
+  data object OpenLocalModels : SetupAction
 }
 
 /** What Android reports about Termux and Pipkin's permissions; re-read whenever Pipkin comes back. */

@@ -69,13 +69,15 @@ import io.jeph.pipkin.ui.theme.pipkinColors
  * setup command, granted a permission), turns its actions into Continue rather than moving on, so the page doesn't
  * change under a tap the user is about to make. Skipped optional steps and the welcome are remembered, so reopening
  * Pipkin resumes at the first step still open. Opened again after setup (a "needs attention" tap), it starts at the
- * broken step and [onClose] leaves it. Once an API key is added, [onPickModels] opens its provider's models to pick.
+ * broken step and [onClose] leaves it. Once an API key is added, [onPickModels] opens its provider's models to pick;
+ * [onOpenLocalModels] opens the experimental models that run on the phone.
  */
 @Composable
 internal fun OnboardingScreen(
   onFinished: () -> Unit,
   onAddProvider: () -> Unit,
   onPickModels: (providerId: String) -> Unit,
+  onOpenLocalModels: () -> Unit,
   onClose: (() -> Unit)?,
 ) {
   val context = LocalContext.current
@@ -89,6 +91,7 @@ internal fun OnboardingScreen(
     onPermissionResult = checks::refresh,
     onLogin = { loginProvider = it },
     onAddProvider = onAddProvider,
+    onOpenLocalModels = onOpenLocalModels,
   )
   AutoInstall(graph, state)
   val history = rememberSaveable(saver = HistorySaver) { mutableStateListOf(firstPage(state)) }
