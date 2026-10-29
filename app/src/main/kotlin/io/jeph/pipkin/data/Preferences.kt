@@ -25,9 +25,12 @@ import org.json.JSONObject
 internal class Preferences(context: Context) {
   private val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
-  /** Android's build and Pipkin's version, which [localModelFailedBuilds] are kept for. */
+  /**
+   * Android's build and when Pipkin was last installed or updated, which [localModelFailedBuilds] are kept for. The
+   * install time rather than the version, since every development build has the same version.
+   */
   private val softwareVersion =
-    "${Build.FINGERPRINT} ${context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode}"
+    "${Build.FINGERPRINT} ${context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime}"
   private val setupCompleteState = MutableStateFlow(prefs.getBoolean(SETUP_COMPLETE, false))
   private val setupCommandCopiedForState = MutableStateFlow(prefs.getString(SETUP_COMMAND_COPIED_FOR, null))
   private val setupPagesPassedState = MutableStateFlow(readStringSet(SETUP_PAGES_PASSED))
