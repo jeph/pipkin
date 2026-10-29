@@ -47,6 +47,12 @@ class ServerArgumentsTest {
   }
 
   @Test
+  fun noPromptStatesAreCopiedToRam() {
+    // Leaving the option out isn't the same: llama.cpp then keeps up to 8 GiB of them.
+    assertEquals("0", serverArguments(config).options()["--cache-ram"])
+  }
+
+  @Test
   fun theCpuOffloadsToNoDevice() {
     val options = serverArguments(config).options()
 

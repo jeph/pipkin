@@ -142,9 +142,11 @@ internal fun serverArguments(config: EngineConfig): List<String> = listOf(
   // The slot reuses the cached prompt's longest common prefix by default; this also reuses chunks of 256 tokens or
   // more after a change in the middle, such as a compacted or edited message, by shifting their KV entries.
   "--cache-reuse", "256",
-  // Prompt states of other conversations, kept in RAM to restore when a session comes back to the slot. llama.cpp
-  // allows 8 GiB by default, memory a phone needs for the model itself.
-  "--cache-ram", "512",
+  // No copies of prompt states in RAM for other conversations to come back to. llama.cpp copies the slot's state out
+  // when another chat's request takes the slot, a burst of memory on top of the model's that on a phone gets apps, then
+  // the model, stopped, and a 4B model's cache for Pi's prompt alone outgrows any budget a phone could spare. 0 turns
+  // them off; leaving the option out allows 8 GiB.
+  "--cache-ram", "0",
   // Weights the CPU kernels read as the file lays them out, such as the token embeddings, stay in the page cache, which
   // Android can drop and read again; KleidiAI and ggml copy the rest into their own layouts in the process's memory,
   // or the GPU's.

@@ -42,7 +42,7 @@ internal object LocalModelCatalog {
         file = "Qwen3-0.6B-Q8_0.gguf",
         sha256 = "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
         sizeBytes = 639_446_688,
-        contextSize = 32768,
+        contextSize = CONTEXT,
       ),
     ),
     CatalogModel(
@@ -55,7 +55,7 @@ internal object LocalModelCatalog {
         file = "Qwen3-1.7B-Q8_0.gguf",
         sha256 = "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
         sizeBytes = 1_834_426_016,
-        contextSize = 32768,
+        contextSize = CONTEXT,
       ),
     ),
     CatalogModel(
@@ -68,7 +68,7 @@ internal object LocalModelCatalog {
         file = "Qwen3-4B-Q4_K_M.gguf",
         sha256 = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
         sizeBytes = 2_497_280_256,
-        contextSize = 32768,
+        contextSize = CONTEXT,
       ),
     ),
     CatalogModel(
@@ -95,8 +95,7 @@ internal object LocalModelCatalog {
           sha256 = "a53a59001894c58e6bdb5b9b227709f91a2e3e556baa7d85acf9c55402ba5cf5",
           sizeBytes = 2_008_432_640,
           fileName = "gemma-4-E2B-it-gpu.litertlm",
-          // The model card: "The model can support up to 32k context length".
-          contextSize = 32768,
+          contextSize = CONTEXT,
         ),
         ModelArtifact(
           engine = EngineKind.LITERT,
@@ -105,14 +104,14 @@ internal object LocalModelCatalog {
           sha256 = "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
           sizeBytes = 2_588_147_712,
           fileName = "gemma-4-E2B-it.litertlm",
-          contextSize = 32768,
+          contextSize = CONTEXT,
         ),
       ) + llamaBuilds(
         repository = "ggml-org/gemma-4-E2B-it-GGUF",
         file = "gemma-4-E2B-it-Q4_0.gguf",
         sha256 = "8e30dff3ac4c8434c49a7036fa15564bdbb6044e42bf04550bf1a096ad7e6a52",
         sizeBytes = 2_841_481_184,
-        contextSize = 32768,
+        contextSize = CONTEXT,
       ),
     ),
   )
@@ -125,6 +124,13 @@ internal object LocalModelCatalog {
   /** The provider Pi lists the catalog's models under, whose model ids are [CatalogModel.id]. */
   const val PROVIDER_ID = "pipkin-local"
 }
+
+/**
+ * The conversation a build that isn't compiled for a fixed one holds: as much as Pi needs and no more, though the models
+ * allow 32,768 tokens or more, since llama.cpp keeps the whole context's cache in memory from the start, and the bigger
+ * a model's footprint the sooner Android stops other apps, then the model, to free memory.
+ */
+private const val CONTEXT = EngineChoice.AGENT_CONTEXT
 
 /** The most a reply may take, which Pi is told as each model's `maxTokens`. */
 private const val MAX_TOKENS = 8192
