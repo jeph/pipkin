@@ -32,8 +32,8 @@
     <!-- %1$s: the engine, such as "LiteRT-LM". %2$s: the processor it runs on, such as "CPU". %3$s: the download's
          size, such as "614 MB". -->
     <string name="local_models_build">%1$s on the %2$s, %3$s</string>
-    <!-- %1$s: the build that's downloaded, as local_models_build describes it. -->
-    <string name="local_models_downloaded">Downloaded: %1$s</string>
+    <!-- %1$s: the downloaded build the model runs with, as local_models_build describes it. -->
+    <string name="local_models_runs_with">Runs with %1$s</string>
     <string name="local_models_unavailable">No build of this model runs on this phone.</string>
     <string name="local_models_download">Download</string>
     <string name="local_models_cancel">Cancel</string>
@@ -47,8 +47,6 @@
     <!-- %1$d: the HTTP status code Hugging Face answered with, such as 404. -->
     <string name="local_models_error_http">Hugging Face turned the download down (HTTP %1$d).</string>
     <string name="local_models_error_corrupt">The downloaded file wasn\'t the expected one, so it was deleted. Try again.</string>
-    <string name="local_models_engine">Engine</string>
-    <string name="local_models_engine_automatic">Automatic</string>
     <string name="local_models_engine_llama">llama.cpp</string>
     <string name="local_models_engine_litert">LiteRT-LM</string>
     <string name="local_models_backend_cpu">CPU</string>

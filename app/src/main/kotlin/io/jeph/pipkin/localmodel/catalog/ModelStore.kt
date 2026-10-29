@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
@@ -41,14 +42,13 @@ internal sealed interface DownloadState {
 internal class ModelStore(
   context: Context,
   private val scope: CoroutineScope,
-  private val preferences: Preferences,
+  preferences: Preferences,
   private val keepAlive: KeepAlive,
-  /** This phone, which decides the build of each model. */
-  val device: DeviceProfile = DeviceProfile.current(),
 ) {
   private val dir = File(context.noBackupFilesDir, DIRECTORY)
   private val downloader = ModelDownloader(dir, HttpsDownloadSource)
   private val downloadedState = MutableStateFlow<Set<String>>(emptySet())
+  private val hardwareState = MutableStateFlow<DeviceProfile?>(null)
   private val downloadsState = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
   private val downloadJobs = mutableMapOf<String, Job>()
   private val cleanups = mutableMapOf<String, Job>()
@@ -59,19 +59,31 @@ internal class ModelStore(
   /** Each model's download that is running or failed, by catalog id. */
   val downloads: StateFlow<Map<String, DownloadState>> = downloadsState.asStateFlow()
 
+  /**
+   * This phone, which decides the build of each model, with the builds that failed to load here; null until the OpenCL
+   * driver has been asked for the GPU.
+   */
+  val device: StateFlow<DeviceProfile?> =
+    combine(hardwareState, preferences.localModelFailedBuilds) { hardware, failed ->
+      hardware?.copy(failedBuilds = failed)
+    }.stateIn(scope, SharingStarted.Eagerly, null)
+
   /** The models downloaded and verified, each with the build chosen for this phone. */
   val installed: StateFlow<List<InstalledModel>> =
-    combine(downloadedState, preferences.localModelEngines) { files, overrides ->
-      installedModels(LocalModelCatalog.models, files, overrides, device, dir)
+    combine(downloadedState, device.filterNotNull()) { files, phone ->
+      installedModels(LocalModelCatalog.models, files, phone, dir)
     }.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
   init {
-    scope.launch { downloadedState.value = withContext(Dispatchers.IO) { scan() } }
+    scope.launch {
+      val (hardware, files) = withContext(Dispatchers.IO) { DeviceProfile.current() to scan() }
+      hardwareState.value = hardware
+      downloadedState.value = files
+    }
   }
 
-  /** The build of [model] to run here, following the engine the user picked for it. */
-  fun chosen(model: CatalogModel): ModelArtifact? =
-    EngineChoice.choose(model, device, preferences.localModelEngines.value[model.id] ?: EngineOverride.AUTOMATIC)
+  /** The build of [model] to run here, or null before the phone is known or when no build runs on it. */
+  fun chosen(model: CatalogModel): ModelArtifact? = device.value?.let { EngineChoice.choose(model, it) }
 
   /** Downloads the build of [model] [chosen] now, unless it's downloading already or has no build for this phone. */
   fun download(model: CatalogModel) {
@@ -156,19 +168,16 @@ internal class ModelStore(
 }
 
 /**
- * Each model of [models] with a file among [downloaded] that runs on [device]: the build [EngineChoice] picks under the
- * user's [overrides] when that one is downloaded, else the best one downloaded, since the user fetched it on purpose.
- * An NPU build for another phone's SoC isn't listed, since it can't load here.
+ * Each model of [models] with a file among [downloaded] that runs on [device], with the build [EngineChoice] picks
+ * among the downloaded ones: the best for the phone when it's downloaded, else one the user fetched before. An NPU
+ * build for another phone's SoC, or a build that failed to load here, isn't listed.
  */
 internal fun installedModels(
   models: List<CatalogModel>,
   downloaded: Set<String>,
-  overrides: Map<String, EngineOverride>,
   device: DeviceProfile,
   dir: File,
 ): List<InstalledModel> = models.mapNotNull { model ->
-  val chosen = EngineChoice.choose(model, device, overrides[model.id] ?: EngineOverride.AUTOMATIC)
-  val artifact = chosen?.takeIf { it.fileName in downloaded }
-    ?: EngineChoice.runnable(model, device).firstOrNull { it.fileName in downloaded }
-  artifact?.let { InstalledModel(model, it, File(dir, it.fileName)) }
+  val local = model.copy(artifacts = model.artifacts.filter { it.fileName in downloaded })
+  EngineChoice.choose(local, device)?.let { InstalledModel(model, it, File(dir, it.fileName)) }
 }

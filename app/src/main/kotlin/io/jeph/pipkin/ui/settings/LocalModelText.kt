@@ -7,7 +7,6 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.localmodel.ModelArtifact
 import io.jeph.pipkin.localmodel.RuntimeState
 import io.jeph.pipkin.localmodel.catalog.DownloadFailure
-import io.jeph.pipkin.localmodel.catalog.EngineOverride
 import io.jeph.pipkin.localmodel.engine.Backend
 import io.jeph.pipkin.localmodel.engine.EngineKind
 
@@ -50,11 +49,4 @@ internal val Backend.label: Int
     Backend.CPU -> R.string.local_models_backend_cpu
     Backend.GPU -> R.string.local_models_backend_gpu
     Backend.NPU -> R.string.local_models_backend_npu
-  }
-
-internal val EngineOverride.label: Int
-  @StringRes get() = when (this) {
-    EngineOverride.AUTOMATIC -> R.string.local_models_engine_automatic
-    EngineOverride.LLAMA -> R.string.local_models_engine_llama
-    EngineOverride.LITERT -> R.string.local_models_engine_litert
   }

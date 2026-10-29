@@ -10,13 +10,16 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class EngineChoiceTest {
-  private val plainPhone = DeviceProfile(socModel = "SM8650", hasOpenCl = false)
+  private val plainPhone = DeviceProfile(socModel = "SM8650", gpu = null)
+  private val adreno = plainPhone.copy(gpu = "QUALCOMM Adreno(TM) 750")
+  private val mali = plainPhone.copy(gpu = "Mali-G925-Immortalis MC12")
+  private val pixel = DeviceProfile(socModel = "Tensor G5", gpu = "PowerVR D-Series DXT-48-1536")
 
   private fun artifact(
     engine: EngineKind,
     backend: Backend,
     socModels: Set<String> = emptySet(),
-    contextSize: Int = 4096,
+    contextSize: Int = EngineChoice.AGENT_CONTEXT,
   ) = ModelArtifact(
     engine = engine,
     backend = backend,
@@ -29,118 +32,98 @@ class EngineChoiceTest {
   )
 
   private val npu = artifact(EngineKind.LITERT, Backend.NPU, setOf("Tensor G5"))
-  private val gpu = artifact(EngineKind.LITERT, Backend.GPU)
+  private val litertGpu = artifact(EngineKind.LITERT, Backend.GPU)
   private val litertCpu = artifact(EngineKind.LITERT, Backend.CPU)
-  private val llama = artifact(EngineKind.LLAMA, Backend.CPU)
-  private val everything = CatalogModel("m", "M", reasoning = true, maxTokens = 1, listOf(llama, litertCpu, gpu, npu))
+  private val llamaGpu = artifact(EngineKind.LLAMA, Backend.GPU)
+  private val llamaCpu = artifact(EngineKind.LLAMA, Backend.CPU)
+  private val everything = CatalogModel(
+    "m",
+    "M",
+    reasoning = true,
+    maxTokens = 1,
+    listOf(llamaCpu, litertCpu, llamaGpu, litertGpu, npu),
+  )
 
-  private fun choose(
-    model: CatalogModel = everything,
-    device: DeviceProfile = plainPhone,
-    override: EngineOverride = EngineOverride.AUTOMATIC,
-  ) = EngineChoice.choose(model, device, override)
+  private fun choose(model: CatalogModel = everything, device: DeviceProfile = plainPhone) =
+    EngineChoice.choose(model, device)
 
   @Test
   fun anNpuBuildForThisPhonesSocComesFirst() {
-    assertEquals(npu, choose(device = DeviceProfile("Tensor G5", hasOpenCl = true)))
+    assertEquals(npu, choose(device = pixel))
   }
 
   @Test
   fun theSocModelMatchesWhateverItsCase() {
-    assertEquals(npu, choose(device = DeviceProfile("TENSOR G5", hasOpenCl = false)))
+    assertEquals(npu, choose(device = DeviceProfile("TENSOR G5", gpu = null)))
   }
 
   @Test
-  fun anNpuBuildForAnotherSocIsPassedOver() {
-    assertEquals(gpu, choose(device = DeviceProfile("MT6993", hasOpenCl = true)))
+  fun anNpuBuildForAnotherSocOrWithoutASocModelIsPassedOver() {
+    assertEquals(litertGpu, choose(device = adreno.copy(socModel = "MT6993")))
+    assertEquals(litertGpu, choose(device = adreno.copy(socModel = null)))
   }
 
   @Test
-  fun withoutASocModelBeforeApi31NoNpuBuildIsChosen() {
-    assertEquals(gpu, choose(device = DeviceProfile(socModel = null, hasOpenCl = true)))
+  fun theGpuBeatsTheCpuAndLiteRtComesFirstOnIt() {
+    assertEquals(litertGpu, choose(device = adreno))
+    assertEquals(llamaGpu, choose(model = everything.copy(artifacts = listOf(llamaCpu, litertCpu, llamaGpu)), adreno))
   }
 
   @Test
-  fun aGpuBuildNeedsOpenCl() {
-    assertEquals(gpu, choose(device = plainPhone.copy(hasOpenCl = true)))
-    assertEquals(litertCpu, choose(device = plainPhone))
+  fun llamaCppRunsOnAdrenoGpusOnly() {
+    val llamaOnly = everything.copy(artifacts = listOf(llamaCpu, llamaGpu))
+    assertEquals(llamaGpu, choose(llamaOnly, adreno))
+    assertEquals(llamaCpu, choose(llamaOnly, mali))
+    assertEquals(litertGpu, choose(device = mali))
   }
 
   @Test
-  fun llamaCppRunsWhatLiteRtHasNoBuildOf() {
-    val llamaOnly = everything.copy(artifacts = listOf(llama))
-    assertEquals(llama, choose(model = llamaOnly))
+  fun withoutAnOpenClDriverOnlyTheCpuRuns() {
+    assertEquals(litertCpu, choose())
+    assertEquals(listOf(litertCpu, llamaCpu), EngineChoice.runnable(everything, plainPhone))
   }
 
   @Test
-  fun llamaCppRunsAModelWhoseOnlyLiteRtBuildNeedsAnotherPhone() {
-    assertEquals(llama, choose(model = everything.copy(artifacts = listOf(npu, llama))))
-  }
-
-  @Test
-  fun anOverridePicksThatEnginesBestBuild() {
-    assertEquals(llama, choose(override = EngineOverride.LLAMA, device = DeviceProfile("Tensor G5", true)))
-    assertEquals(gpu, choose(override = EngineOverride.LITERT, device = plainPhone.copy(hasOpenCl = true)))
-  }
-
-  @Test
-  fun anOverrideForAnEngineWithNothingRunnableFallsBackToAutomatic() {
-    val llamaOnly = everything.copy(artifacts = listOf(llama))
-    assertEquals(llama, choose(model = llamaOnly, override = EngineOverride.LITERT))
+  fun aBuildThatFailedHereIsPassedOverForTheNextBest() {
+    assertEquals(litertGpu, choose(device = pixel.copy(failedBuilds = setOf(npu.kind))))
+    assertEquals(llamaGpu, choose(device = adreno.copy(failedBuilds = setOf(litertGpu.kind))))
   }
 
   @Test
   fun aModelWithNothingRunnableHasNoChoice() {
-    val npuOnly = everything.copy(artifacts = listOf(npu))
-    assertNull(choose(model = npuOnly))
-    assertNull(choose(model = npuOnly, override = EngineOverride.LITERT))
-  }
-
-  @Test
-  fun theEnginesOfferedAreThoseWithARunnableBuild() {
-    assertEquals(listOf(EngineKind.LITERT, EngineKind.LLAMA), EngineChoice.engines(everything, plainPhone))
-    assertEquals(
-      listOf(EngineKind.LLAMA),
-      EngineChoice.engines(everything.copy(artifacts = listOf(npu, llama)), plainPhone),
-    )
+    assertNull(choose(model = everything.copy(artifacts = listOf(npu))))
   }
 
   @Test
   fun aBuildThatHoldsPisPromptBeatsFasterOnesThatDont() {
-    val roomy = artifact(EngineKind.LLAMA, Backend.CPU, contextSize = EngineChoice.AGENT_CONTEXT)
-    val model = everything.copy(artifacts = listOf(npu, gpu, litertCpu, roomy))
-    assertEquals(roomy, choose(model = model, device = DeviceProfile("Tensor G5", hasOpenCl = true)))
+    val shortNpu = artifact(EngineKind.LITERT, Backend.NPU, setOf("Tensor G5"), contextSize = 4096)
+    val shortGpu = artifact(EngineKind.LITERT, Backend.GPU, contextSize = 4096)
+    val model = everything.copy(artifacts = listOf(shortNpu, shortGpu, llamaCpu))
+    assertEquals(llamaCpu, choose(model, pixel))
   }
 
   @Test
-  fun amongBuildsThatHoldPisPromptLiteRtStillComesFirst() {
-    val roomyLlama = artifact(EngineKind.LLAMA, Backend.CPU, contextSize = EngineChoice.AGENT_CONTEXT)
-    val roomyLiteRt = artifact(EngineKind.LITERT, Backend.CPU, contextSize = EngineChoice.AGENT_CONTEXT)
-    assertEquals(roomyLiteRt, choose(model = everything.copy(artifacts = listOf(roomyLlama, roomyLiteRt))))
-  }
-
-  @Test
-  fun anOverrideIsFollowedIntoABuildTooSmallForPisPrompt() {
-    val roomy = artifact(EngineKind.LLAMA, Backend.CPU, contextSize = EngineChoice.AGENT_CONTEXT)
-    val model = everything.copy(artifacts = listOf(litertCpu, roomy))
-    assertEquals(litertCpu, choose(model = model, override = EngineOverride.LITERT))
+  fun withNothingThatHoldsPisPromptTheBestBuildRunsAnyway() {
+    val shortNpu = artifact(EngineKind.LITERT, Backend.NPU, setOf("Tensor G5"), contextSize = 4096)
+    val shortCpu = artifact(EngineKind.LITERT, Backend.CPU, contextSize = 4096)
+    assertEquals(shortNpu, choose(everything.copy(artifacts = listOf(shortCpu, shortNpu)), pixel))
   }
 
   @Test
   fun everyCatalogModelChoosesABuildThatHoldsPisPromptOnAnyPhone() {
-    val phones = listOf(DeviceProfile(socModel = "", hasOpenCl = false), DeviceProfile("Tensor G5", hasOpenCl = true))
+    val phones = listOf(DeviceProfile(socModel = "", gpu = null), pixel, adreno, mali)
     for (model in LocalModelCatalog.models) {
       for (phone in phones) {
-        val chosen = checkNotNull(EngineChoice.choose(model, phone, EngineOverride.AUTOMATIC))
-        assertTrue("${model.id} on ${phone.socModel}", chosen.contextSize >= EngineChoice.AGENT_CONTEXT)
+        val chosen = checkNotNull(EngineChoice.choose(model, phone))
+        assertTrue("${model.id} on ${phone.gpu}", chosen.contextSize >= EngineChoice.AGENT_CONTEXT)
       }
     }
   }
 
   @Test
-  fun choosingLiteRtForGemmaOnAPixel10TakesItsGpuBuildOverTheShortNpuOne() {
-    val gemma = checkNotNull(LocalModelCatalog.model("gemma-4-e2b"))
-    val chosen = EngineChoice.choose(gemma, DeviceProfile("Tensor G5", hasOpenCl = true), EngineOverride.LITERT)
-    assertEquals(Backend.GPU, chosen?.backend)
+  fun everyCatalogModelRunsOnAnAdrenoGpu() {
+    for (model in LocalModelCatalog.models) {
+      assertEquals(model.id, Backend.GPU, EngineChoice.choose(model, adreno)?.backend)
+    }
   }
 }

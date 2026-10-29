@@ -15,8 +15,11 @@ class LocalModelCatalogTest {
   }
 
   @Test
-  fun fileNamesAreUniqueSinceTheyShareOneFolder() {
-    assertEquals(artifacts.size, artifacts.map { it.fileName }.toSet().size)
+  fun buildsThatShareAFileNameShareTheFileSinceTheyShareOneFolder() {
+    for ((name, builds) in artifacts.groupBy { it.fileName }) {
+      assertEquals(name, 1, builds.map { Triple(it.url, it.sha256, it.sizeBytes) }.distinct().size)
+      assertEquals(name, builds.size, builds.map { it.kind }.distinct().size)
+    }
   }
 
   @Test
@@ -39,9 +42,9 @@ class LocalModelCatalogTest {
 
   @Test
   fun everyModelRunsSomewhereWithoutAnNpu() {
-    val anyPhone = DeviceProfile(socModel = null, hasOpenCl = false)
+    val anyPhone = DeviceProfile(socModel = null, gpu = null)
     for (model in models) {
-      assertTrue(model.id, EngineChoice.choose(model, anyPhone, EngineOverride.AUTOMATIC) != null)
+      assertTrue(model.id, EngineChoice.choose(model, anyPhone) != null)
     }
   }
 }

@@ -1,51 +1,32 @@
 package io.jeph.pipkin.ui.chat
 
 import android.icu.text.NumberFormat
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.localmodel.SessionActivity
 import io.jeph.pipkin.localmodel.catalog.LocalModelCatalog
-import io.jeph.pipkin.ui.components.LoadingPill
-import io.jeph.pipkin.ui.theme.PipkinTokens
 import org.json.JSONObject
 
 /**
- * What the phone's model is doing for this chat, in a pill over the composer, while the chat's [model] is a local one
- * and its request waits or runs. A local model can take a while to load or to read a long prompt before the first word
- * shows, and other chats may hold it, so without this the chat would look stuck.
+ * What the phone's model is doing for this chat, for its run footer, while the chat's [model] is a local one and its
+ * request waits or runs; null otherwise. A local model can take a while to load or to read a long prompt before the
+ * first word shows, and other chats may hold it, so without this the chat would look stuck.
  */
 @Composable
-internal fun LocalModelActivityPill(process: AgentProcess, model: JSONObject?) {
-  if (model?.optString("provider") != LocalModelCatalog.PROVIDER_ID) return
+internal fun localModelActivity(process: AgentProcess, model: JSONObject?): String? {
+  if (model?.optString("provider") != LocalModelCatalog.PROVIDER_ID) return null
   val runtime = LocalContext.current.appGraph.localModels.runtime
   val sessionId by process.sessionId.collectAsStateWithLifecycle()
   val sessions by runtime.sessions.collectAsStateWithLifecycle()
-  val activity = sessionId?.let(sessions::get) ?: return
-  Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-    LoadingPill(
-      text = activityText(activity),
-      // Announced as it changes, since it's the chat's only sign of progress until the reply starts.
-      modifier = Modifier
-        .padding(bottom = PipkinTokens.Spacing.s8)
-        .semantics { liveRegion = LiveRegionMode.Polite },
-    )
-  }
+  return sessionId?.let(sessions::get)?.let { activityText(it) }
 }
 
 @Composable

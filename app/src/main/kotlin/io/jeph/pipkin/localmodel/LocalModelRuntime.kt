@@ -5,7 +5,9 @@ import android.content.Context
 import android.content.res.Configuration
 import android.util.Log
 import io.jeph.pipkin.agent.KeepAlive
+import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.host.TermuxBuild
+import io.jeph.pipkin.localmodel.catalog.kind
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,23 +21,26 @@ import kotlinx.coroutines.launch
 /**
  * Serves the downloaded models to Pi: the endpoint Pi's `pipkin-local` provider calls while [serve] is on, the
  * scheduler that runs one request and keeps one model loaded at a time, and the `:inference` process that holds that
- * model. Keeps Pipkin awake while a request waits or runs, unloads the model after [idleUnloadMinutes] without
- * requests, and unloads an idle model as soon as Android says Pipkin went to the background.
+ * model. Keeps Pipkin awake while a request waits or runs, unloads the model after the [preferences]' idle minutes
+ * without requests, unloads an idle model as soon as Android says Pipkin went to the background, and saves a GPU or
+ * NPU build that fails to load in [preferences], so the next load picks another.
  */
 internal class LocalModelRuntime(
   context: Context,
   private val scope: CoroutineScope,
   private val keepAlive: KeepAlive,
   private val installed: StateFlow<List<InstalledModel>>,
-  idleUnloadMinutes: StateFlow<Int>,
+  preferences: Preferences,
   private val apiKey: () -> String,
 ) {
-  private val process = InferenceProcess(context) { installed.value }
+  private val process = InferenceProcess(context, installed = { installed.value }) { build ->
+    scope.launch { preferences.addLocalModelFailedBuild(build.kind) }
+  }
   private val scheduler = LocalModelScheduler(
     scope,
     process,
     leaseMillis = LEASE_MILLIS,
-    idleUnloadMillis = { idleUnloadMinutes.value * MILLIS_PER_MINUTE },
+    idleUnloadMillis = { preferences.localModelIdleUnloadMinutes.value * MILLIS_PER_MINUTE },
   )
   private val live = MutableStateFlow<Map<String, SessionActivity>>(emptyMap())
   private var server: LocalModelServer? = null

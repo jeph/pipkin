@@ -35,8 +35,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -236,13 +239,24 @@ private val NoticeKind.icon: Int
   }
 
 /**
- * Live `m:ss` while the run works or the chat waits on [backgroundTasks], then how long the run took. While the run
- * waits on [subagents] queued or running, it says how many, and while the chat waits on background tasks, how many.
+ * What the chat's last run footer shows beyond its time: the [backgroundTasks] the chat still waits on, and what the
+ * phone's model is doing for the open run, as [localModel] says, when the chat uses one.
+ */
+internal data class TurnStatus(val backgroundTasks: Int = 0, val localModel: String? = null) {
+  companion object {
+    val None = TurnStatus()
+  }
+}
+
+/**
+ * Live `m:ss` while the run works or the chat waits on background tasks, then how long the run took. While the run
+ * works, it says what the [status]' local model is doing and how many [subagents] it waits on, queued or running, and
+ * while the chat waits on background tasks, how many.
  */
 @Composable
 internal fun TurnFooterRow(
   item: TimelineItem.TurnFooter,
-  backgroundTasks: Int,
+  status: TurnStatus,
   modifier: Modifier = Modifier,
   subagents: Int = 0,
 ) {
@@ -252,12 +266,21 @@ internal fun TurnFooterRow(
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
   ) {
     val duration = item.durationMillis
+    val backgroundTasks = status.backgroundTasks
     if (duration != null && backgroundTasks == 0) {
       FooterText(durationText(duration))
       return@Row
     }
     SimmeringPot(size = PipkinTokens.IconSize.sm)
     RunningElapsed(item.startedAt)
+    if (duration == null && status.localModel != null) {
+      FooterText(
+        text = status.localModel,
+        // Announced as it changes, since it's the chat's only sign of progress until the reply starts.
+        modifier = Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite },
+        maxLines = 1,
+      )
+    }
     if (subagents > 0) {
       val count = NumberFormat.getIntegerInstance().format(subagents)
       FooterText(pluralStringResource(R.plurals.chat_waiting_on_subagents, subagents, count))
@@ -268,11 +291,14 @@ internal fun TurnFooterRow(
 }
 
 @Composable
-private fun FooterText(text: String) {
+private fun FooterText(text: String, modifier: Modifier = Modifier, maxLines: Int = Int.MAX_VALUE) {
   Text(
     text = text,
+    modifier = modifier,
     color = pipkinColors.foregroundMuted,
     fontSize = PipkinTokens.FontSize.sm,
+    maxLines = maxLines,
+    overflow = TextOverflow.Ellipsis,
     style = LocalTextStyle.current.copy(fontFeatureSettings = PipkinFonts.TABULAR),
   )
 }

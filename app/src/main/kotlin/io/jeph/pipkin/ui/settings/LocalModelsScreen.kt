@@ -4,13 +4,10 @@ import android.content.Context
 import android.icu.text.NumberFormat
 import android.text.format.Formatter
 import androidx.annotation.StringRes
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
@@ -38,7 +35,6 @@ import io.jeph.pipkin.localmodel.catalog.DeviceProfile
 import io.jeph.pipkin.localmodel.catalog.DownloadFailure
 import io.jeph.pipkin.localmodel.catalog.DownloadState
 import io.jeph.pipkin.localmodel.catalog.EngineChoice
-import io.jeph.pipkin.localmodel.catalog.EngineOverride
 import io.jeph.pipkin.localmodel.catalog.LocalModelCatalog
 import io.jeph.pipkin.localmodel.catalog.LocalModelSettings
 import io.jeph.pipkin.localmodel.engine.Backend
@@ -66,10 +62,7 @@ internal fun ExperimentalSection(preferences: Preferences, onOpenLocalModels: ()
   }
 }
 
-/**
- * Turning local models on, what the model process is doing, and downloading the catalog's models, each in the build
- * chosen for this phone unless the user picks the engine.
- */
+/** Turning local models on, what the model process is doing, and downloading the catalog's models for this phone. */
 @Composable
 internal fun LocalModelsScreen(onBack: () -> Unit) {
   val graph = LocalContext.current.appGraph
@@ -92,10 +85,14 @@ internal fun LocalModelsScreen(onBack: () -> Unit) {
     if (enabled) {
       StatusSection(graph.localModels.runtime, preferences)
       SettingsCaption(text = stringResource(R.string.local_models_status_caption))
-      SettingsSection(title = stringResource(R.string.local_models_section_models)) {
-        LocalModelCatalog.models.forEachIndexed { index, model ->
-          if (index > 0) SettingsDivider()
-          ModelEntry(model, graph.localModels, preferences)
+      // Known once the OpenCL driver has been asked for the GPU, which is quick but kept off the main thread.
+      val device by graph.localModels.store.device.collectAsStateWithLifecycle()
+      device?.let { phone ->
+        SettingsSection(title = stringResource(R.string.local_models_section_models)) {
+          LocalModelCatalog.models.forEachIndexed { index, model ->
+            if (index > 0) SettingsDivider()
+            ModelEntry(model, phone, graph.localModels)
+          }
         }
       }
     }
@@ -157,29 +154,30 @@ private fun statusSummary(state: RuntimeState): String {
 }
 
 /**
- * One catalog model: the build chosen for this phone and its size, what's downloaded, the download's progress or why
- * it failed, and its actions; then the engine, when the model has builds for more than one that run here.
+ * One catalog model: the build chosen for this phone and its size, the build it runs with now if that's another one
+ * downloaded before, the download's progress or why it failed, and its actions.
  */
 @Composable
-private fun ModelEntry(model: CatalogModel, localModels: LocalModels, preferences: Preferences) {
+private fun ModelEntry(model: CatalogModel, device: DeviceProfile, localModels: LocalModels) {
   val context = LocalContext.current
   val store = localModels.store
   val downloads by store.downloads.collectAsStateWithLifecycle()
   val downloaded by store.downloaded.collectAsStateWithLifecycle()
-  val overrides by preferences.localModelEngines.collectAsStateWithLifecycle()
-  val override = overrides[model.id] ?: EngineOverride.AUTOMATIC
-  val chosen = EngineChoice.choose(model, store.device, override)
+  val installed by store.installed.collectAsStateWithLifecycle()
+  val chosen = EngineChoice.choose(model, device)
+  val inUse = installed.firstOrNull { it.model.id == model.id }?.artifact
   val download = downloads[model.id]
-  val files = model.artifacts.filter { it.fileName in downloaded }
+  // llama.cpp's GPU and CPU builds are one file.
+  val files = model.artifacts.filter { it.fileName in downloaded }.distinctBy { it.fileName }
   var confirmingDelete by rememberSaveable { mutableStateOf(false) }
   val subtitle = when {
     chosen == null -> stringResource(R.string.local_models_unavailable)
 
-    chosen.fileName in downloaded -> stringResource(R.string.local_models_downloaded, buildLabel(context, chosen))
+    chosen == inUse -> stringResource(R.string.local_models_runs_with, buildLabel(context, chosen))
 
     else -> listOfNotNull(
       buildLabel(context, chosen),
-      files.firstOrNull()?.let { stringResource(R.string.local_models_downloaded, buildLabel(context, it)) },
+      inUse?.let { stringResource(R.string.local_models_runs_with, buildLabel(context, it)) },
     ).joinToString("\n")
   }
   SettingsRow(title = model.name, subtitle = subtitle) {
@@ -214,7 +212,6 @@ private fun ModelEntry(model: CatalogModel, localModels: LocalModels, preference
 
     null -> Unit
   }
-  EngineControl(model, store.device, override) { preferences.setLocalModelEngine(model.id, it) }
   if (confirmingDelete) {
     DeleteDialog(model, files.sumOf { it.sizeBytes }, localModels) { confirmingDelete = false }
   }
@@ -287,48 +284,5 @@ private fun DownloadProgress(download: DownloadState.Running) {
       color = pipkinColors.foregroundMuted,
       fontSize = PipkinTokens.FontSize.sm,
     )
-  }
-}
-
-/** Automatic or one of the engines [model] has a build of that runs on [device]; hidden when there's no choice. */
-@Composable
-private fun EngineControl(
-  model: CatalogModel,
-  device: DeviceProfile,
-  override: EngineOverride,
-  onSelect: (EngineOverride) -> Unit,
-) {
-  val engines = EngineChoice.engines(model, device)
-  if (engines.size < 2) return
-  val colors = pipkinColors
-  val options = listOf(EngineOverride.AUTOMATIC) + EngineOverride.entries.filter { it.engine in engines }
-  // The control moves under its label, and scrolls, when longer translations don't fit beside it.
-  FlowRow(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s12),
-    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
-    verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
-    itemVerticalAlignment = Alignment.CenterVertically,
-  ) {
-    Text(
-      text = stringResource(R.string.local_models_engine),
-      color = colors.foregroundMuted,
-      fontSize = PipkinTokens.FontSize.sm,
-    )
-    SegmentedControl(
-      options = options,
-      selected = override,
-      onSelect = onSelect,
-      modifier = Modifier.horizontalScroll(rememberScrollState()),
-    ) { option, isSelected ->
-      Text(
-        text = stringResource(option.label),
-        color = if (isSelected) colors.foreground else colors.foregroundMuted,
-        fontSize = PipkinTokens.FontSize.meta,
-        maxLines = 1,
-        softWrap = false,
-      )
-    }
   }
 }

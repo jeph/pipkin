@@ -47,7 +47,7 @@ internal class LocalModels(
 
   val store = ModelStore(context, scope, preferences, keepAlive)
   val runtime =
-    LocalModelRuntime(context, scope, keepAlive, store.installed, preferences.localModelIdleUnloadMinutes) { apiKey }
+    LocalModelRuntime(context, scope, keepAlive, store.installed, preferences) { apiKey }
 
   init {
     scope.launch { enabled.collect(runtime::serve) }

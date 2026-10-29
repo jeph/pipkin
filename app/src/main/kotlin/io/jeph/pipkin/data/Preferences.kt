@@ -1,11 +1,11 @@
 package io.jeph.pipkin.data
 
 import android.content.Context
+import android.os.Build
 import androidx.core.content.edit
 import io.jeph.pipkin.agent.AgentRegistry
 import io.jeph.pipkin.agent.IdleStop
 import io.jeph.pipkin.host.GitDiffMode
-import io.jeph.pipkin.localmodel.catalog.EngineOverride
 import io.jeph.pipkin.localmodel.catalog.LocalModelSettings
 import io.jeph.pipkin.ui.files.ExplorerSort
 import io.jeph.pipkin.ui.files.SortKey
@@ -24,6 +24,10 @@ import org.json.JSONObject
 @Suppress("TooManyFunctions") // One setter per setting, beside the readers they share.
 internal class Preferences(context: Context) {
   private val prefs = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+
+  /** Android's build and Pipkin's version, which [localModelFailedBuilds] are kept for. */
+  private val softwareVersion =
+    "${Build.FINGERPRINT} ${context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode}"
   private val setupCompleteState = MutableStateFlow(prefs.getBoolean(SETUP_COMPLETE, false))
   private val setupCommandCopiedForState = MutableStateFlow(prefs.getString(SETUP_COMMAND_COPIED_FOR, null))
   private val setupPagesPassedState = MutableStateFlow(readStringSet(SETUP_PAGES_PASSED))
@@ -53,7 +57,13 @@ internal class Preferences(context: Context) {
   private val disabledExtensionsState = MutableStateFlow(readStringSet(DISABLED_EXTENSIONS))
   private val inAppNotificationsState = MutableStateFlow(prefs.getBoolean(IN_APP_NOTIFICATIONS, true))
   private val localModelsEnabledState = MutableStateFlow(prefs.getBoolean(LOCAL_MODELS_ENABLED, false))
-  private val localModelEnginesState = MutableStateFlow(readEnumMap(LOCAL_MODEL_ENGINES, EngineOverride.entries))
+  private val localModelFailedBuildsState = MutableStateFlow(
+    if (prefs.getString(LOCAL_MODEL_FAILED_BUILDS_ON, null) == softwareVersion) {
+      readStringSet(LOCAL_MODEL_FAILED_BUILDS)
+    } else {
+      emptySet()
+    },
+  )
   private val localModelIdleUnloadMinutesState = MutableStateFlow(
     prefs.getInt(LOCAL_MODEL_IDLE_UNLOAD_MINUTES, LocalModelSettings.DEFAULT_IDLE_UNLOAD_MINUTES)
       .coerceIn(LocalModelSettings.IDLE_UNLOAD_MINUTES),
@@ -133,8 +143,11 @@ internal class Preferences(context: Context) {
   /** Whether Pipkin offers on-device models to Pi; off until the user turns the experiment on. */
   val localModelsEnabled: StateFlow<Boolean> = localModelsEnabledState.asStateFlow()
 
-  /** The engine the user picked for each local model, by catalog id; a model without one is chosen automatically. */
-  val localModelEngines: StateFlow<Map<String, EngineOverride>> = localModelEnginesState.asStateFlow()
+  /**
+   * The [io.jeph.pipkin.localmodel.catalog.kind]s of build, such as `litert/gpu`, that failed to load a model on this
+   * phone, so Pipkin picks another. They're forgotten when Android or Pipkin is updated, which may fix them.
+   */
+  val localModelFailedBuilds: StateFlow<Set<String>> = localModelFailedBuildsState.asStateFlow()
 
   /** How many minutes a loaded local model may sit unused before its memory is given back. */
   val localModelIdleUnloadMinutes: StateFlow<Int> = localModelIdleUnloadMinutesState.asStateFlow()
@@ -302,15 +315,14 @@ internal class Preferences(context: Context) {
     localModelsEnabledState.value = enabled
   }
 
-  /** Sets the engine [modelId] runs with; [EngineOverride.AUTOMATIC] forgets the choice. */
-  fun setLocalModelEngine(modelId: String, override: EngineOverride) {
-    val updated = if (override == EngineOverride.AUTOMATIC) {
-      localModelEnginesState.value - modelId
-    } else {
-      localModelEnginesState.value + (modelId to override)
+  /** Adds [kind] to [localModelFailedBuilds]. */
+  fun addLocalModelFailedBuild(kind: String) {
+    val updated = localModelFailedBuildsState.value + kind
+    prefs.edit {
+      putString(LOCAL_MODEL_FAILED_BUILDS, JSONArray(updated).toString())
+      putString(LOCAL_MODEL_FAILED_BUILDS_ON, softwareVersion)
     }
-    prefs.edit { putString(LOCAL_MODEL_ENGINES, JSONObject(updated.mapValues { it.value.name }).toString()) }
-    localModelEnginesState.value = updated
+    localModelFailedBuildsState.value = updated
   }
 
   /** Sets [localModelIdleUnloadMinutes], kept within [LocalModelSettings.IDLE_UNLOAD_MINUTES]. */
@@ -404,7 +416,8 @@ internal class Preferences(context: Context) {
     const val DISABLED_EXTENSIONS = "disabledExtensions"
     const val IN_APP_NOTIFICATIONS = "inAppNotifications"
     const val LOCAL_MODELS_ENABLED = "localModelsEnabled"
-    const val LOCAL_MODEL_ENGINES = "localModelEngines"
+    const val LOCAL_MODEL_FAILED_BUILDS = "localModelFailedBuilds"
+    const val LOCAL_MODEL_FAILED_BUILDS_ON = "localModelFailedBuildsOn"
     const val LOCAL_MODEL_IDLE_UNLOAD_MINUTES = "localModelIdleUnloadMinutes"
   }
 }

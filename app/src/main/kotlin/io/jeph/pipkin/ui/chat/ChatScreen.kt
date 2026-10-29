@@ -214,12 +214,7 @@ private fun ChatContent(
         )
       },
       dialog = { PendingDialogCard(controller, timeline) },
-      steering = {
-        Column {
-          LocalModelActivityPill(process, timeline.model)
-          PendingSteeringBox(controller, timeline, compact = tight)
-        }
-      },
+      steering = { PendingSteeringBox(controller, timeline, compact = tight) },
       composer = {
         Composer(
           controller = controller,
@@ -262,7 +257,7 @@ private fun StreamArea(
       onOpenProviders = onOpenProviders,
       onOpenOnboarding = onOpenOnboarding,
       onRestart = process::restart,
-      backgroundTasks = backgroundTasks,
+      lastTurn = TurnStatus(backgroundTasks, localModelActivity(process, timeline.model)),
       subagents = subagents,
     )
     // A dialog card or the steering box fills the space over the composer, so snackbars move up under the header.

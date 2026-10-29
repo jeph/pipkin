@@ -32,12 +32,13 @@ A model takes about as much memory as its download while it runs, plus some for 
 
 ## How Pipkin runs a model
 
-Pipkin has two engines that run models, and for each model picks the faster one your phone supports among the builds that can hold the agent's instructions and tools, which take about 7,000 tokens before a chat even starts:
+Pipkin has two engines that run models: **LiteRT-LM**, Google's engine for phones, and **llama.cpp**. For each model it picks the fastest build your phone can run, among the builds that can hold the agent's instructions and tools, which take about 7,000 tokens before a chat even starts:
 
-- **LiteRT-LM**, Google's engine for phones. It can use the phone's GPU when the phone has the driver it needs, or the CPU. Some of its builds also run on a phone's NPU (its AI chip), but those hold too short a conversation for the agent, so Pipkin picks one only when LiteRT-LM has no other build for your phone and you've chosen LiteRT-LM yourself.
-- **llama.cpp**, which runs a model on the CPU. Pipkin uses it for models whose LiteRT-LM builds are too small for the agent or that LiteRT-LM has no build of.
+1. A build for the phone's NPU (its AI chip), which LiteRT-LM has for a few phones. Most of these hold too short a conversation for the agent, so Pipkin only picks one when no other build runs.
+2. A build for the phone's GPU: LiteRT-LM's when the phone has the GPU driver it needs, otherwise llama.cpp's, which runs on Qualcomm's Adreno GPUs.
+3. The CPU, the slowest, when nothing else runs.
 
-Each model's row under **Models** says which engine it runs with, on which part of the phone, and how big its download is. If a model has builds for both engines, you can pick one under **Engine**; **Automatic** goes back to Pipkin's choice. Download again after switching, since each engine has its own file.
+Each model's row under **Models** says which engine it runs with, on which part of the phone, and how big its download is. If a GPU or NPU build fails to load on your phone, the chat says so, and Pipkin doesn't use that kind of build again until Android or Pipkin is updated. Send the message again to use another build; if it needs a different file, the model's row offers to download it.
 
 ## One model at a time
 
@@ -46,7 +47,7 @@ Your phone runs one model at a time. When a chat sends a message to a local mode
 - If no model is loaded, Pipkin loads it first, which takes a few seconds to a minute.
 - If another chat is using a model, this chat waits its turn. If the other chat uses a different model, Pipkin unloads it once that chat's reply is done, and loads this one.
 
-While a chat waits or the model works, a line above the message box shows what's happening: waiting for another chat, loading the model, reading your message and the conversation so far, or writing the reply and how fast.
+While a chat waits or the model works, the line under the reply, beside its timer, shows what's happening: waiting for another chat, loading the model, reading your message and the conversation so far, or writing the reply and how fast.
 
 The **Status** card under **Settings → Experimental → Local models** shows which model is loaded, on which engine, and how much conversation it can hold. Tap **Unload** to give its memory back right away; a chat that's using it stops with an error. Pipkin also unloads a model that hasn't been used for five minutes; change that under **Minutes before an unused model unloads**.
 

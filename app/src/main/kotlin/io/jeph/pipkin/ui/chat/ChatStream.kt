@@ -92,8 +92,7 @@ private const val LAUNCHER_MASK_SCALE = 1.5f
  * Keeps the end in view while the user is at the bottom; dragging away stops following. Opens where [view] says the
  * chat was left, with the replies it has parsed, and records where it is when it leaves. While Pi starts under a
  * history already shown, a pinned [LoadingPill] replaces the banner. [onRestart] retries a failed start and restarts
- * an exited Pi. The last run's footer shows the [backgroundTasks] the chat still waits on, and the open run's the
- * subagents it waits on. [subagents] is what the `subagent` tool rows show and open.
+ * an exited Pi. The last run's footer shows its [lastTurn] status, and the open run's the subagents it waits on. [subagents] is what the `subagent` tool rows show and open.
  */
 @Suppress("LongParameterList") // One parameter per thing the stream shows or hands back to the chat.
 @Composable
@@ -105,7 +104,7 @@ internal fun ChatStream(
   onOpenProviders: () -> Unit,
   onOpenOnboarding: () -> Unit,
   onRestart: () -> Unit,
-  backgroundTasks: Int,
+  lastTurn: TurnStatus,
   subagents: StreamSubagents,
   modifier: Modifier = Modifier,
 ) {
@@ -139,7 +138,7 @@ internal fun ChatStream(
       banner,
       follow,
       view,
-      backgroundTasks,
+      lastTurn,
       subagents,
       onRestart,
       onOpenOnboarding,
@@ -224,7 +223,7 @@ private fun StreamList(
   banner: AgentProcessState?,
   follow: State<Boolean>,
   view: ChatView,
-  backgroundTasks: Int,
+  lastTurn: TurnStatus,
   subagents: StreamSubagents,
   onRestart: () -> Unit,
   onOpenOnboarding: () -> Unit,
@@ -279,7 +278,7 @@ private fun StreamList(
       StreamItem(
         item = item,
         markdownCache = view.markdown,
-        backgroundTasks = if (item.key == lastFooterKey) backgroundTasks else 0,
+        turn = if (item.key == lastFooterKey) lastTurn else TurnStatus.None,
         subagents = subagents,
         expanded = view.expanded,
         onOpenTool = onOpenTool,
@@ -371,15 +370,15 @@ private class BottomAnchor(
 }
 
 /**
- * [backgroundTasks] is what a [TimelineItem.TurnFooter] shows the chat still waits on, beside the [subagents] the open
- * run waits on; [expanded] holds the keys of the folds whose steps are listed and the long prompts shown whole, which
- * tapping their toggle adds or removes.
+ * [turn] is what a [TimelineItem.TurnFooter] shows beside its time, beside the [subagents] the open run waits on;
+ * [expanded] holds the keys of the folds whose steps are listed and the long prompts shown whole, which tapping their
+ * toggle adds or removes.
  */
 @Composable
 private fun StreamItem(
   item: TimelineItem,
   markdownCache: MarkdownCache,
-  backgroundTasks: Int,
+  turn: TurnStatus,
   subagents: StreamSubagents,
   expanded: MutableSet<String>,
   onOpenTool: (key: String) -> Unit,
@@ -413,7 +412,7 @@ private fun StreamItem(
     is TimelineItem.TurnFooter -> {
       // Only the open run's footer has no duration yet, and only that run waits on subagents.
       val waitedOn = if (item.durationMillis == null) subagents.chat.active else 0
-      TurnFooterRow(item, backgroundTasks, modifier, subagents = waitedOn)
+      TurnFooterRow(item, turn, modifier, subagents = waitedOn)
     }
 
     is TimelineItem.ExitBanner -> ExitBannerCard(item, onRestart, modifier)

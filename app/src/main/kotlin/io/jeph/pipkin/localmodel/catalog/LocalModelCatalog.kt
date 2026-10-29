@@ -37,15 +37,12 @@ internal object LocalModelCatalog {
           fileName = "Qwen3-0.6B.litertlm",
           contextSize = 4096,
         ),
-        ModelArtifact(
-          engine = EngineKind.LLAMA,
-          backend = Backend.CPU,
-          url = huggingFace("Qwen/Qwen3-0.6B-GGUF", "Qwen3-0.6B-Q8_0.gguf"),
-          sha256 = "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
-          sizeBytes = 639_446_688,
-          fileName = "Qwen3-0.6B-Q8_0.gguf",
-          contextSize = 32768,
-        ),
+      ) + llamaBuilds(
+        repository = "Qwen/Qwen3-0.6B-GGUF",
+        file = "Qwen3-0.6B-Q8_0.gguf",
+        sha256 = "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
+        sizeBytes = 639_446_688,
+        contextSize = 32768,
       ),
     ),
     CatalogModel(
@@ -53,16 +50,12 @@ internal object LocalModelCatalog {
       name = "Qwen3 1.7B",
       reasoning = true,
       maxTokens = MAX_TOKENS,
-      artifacts = listOf(
-        ModelArtifact(
-          engine = EngineKind.LLAMA,
-          backend = Backend.CPU,
-          url = huggingFace("Qwen/Qwen3-1.7B-GGUF", "Qwen3-1.7B-Q8_0.gguf"),
-          sha256 = "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
-          sizeBytes = 1_834_426_016,
-          fileName = "Qwen3-1.7B-Q8_0.gguf",
-          contextSize = 32768,
-        ),
+      artifacts = llamaBuilds(
+        repository = "Qwen/Qwen3-1.7B-GGUF",
+        file = "Qwen3-1.7B-Q8_0.gguf",
+        sha256 = "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
+        sizeBytes = 1_834_426_016,
+        contextSize = 32768,
       ),
     ),
     CatalogModel(
@@ -70,16 +63,12 @@ internal object LocalModelCatalog {
       name = "Qwen3 4B",
       reasoning = true,
       maxTokens = MAX_TOKENS,
-      artifacts = listOf(
-        ModelArtifact(
-          engine = EngineKind.LLAMA,
-          backend = Backend.CPU,
-          url = huggingFace("Qwen/Qwen3-4B-GGUF", "Qwen3-4B-Q4_K_M.gguf"),
-          sha256 = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
-          sizeBytes = 2_497_280_256,
-          fileName = "Qwen3-4B-Q4_K_M.gguf",
-          contextSize = 32768,
-        ),
+      artifacts = llamaBuilds(
+        repository = "Qwen/Qwen3-4B-GGUF",
+        file = "Qwen3-4B-Q4_K_M.gguf",
+        sha256 = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
+        sizeBytes = 2_497_280_256,
+        contextSize = 32768,
       ),
     ),
     CatalogModel(
@@ -118,15 +107,12 @@ internal object LocalModelCatalog {
           fileName = "gemma-4-E2B-it.litertlm",
           contextSize = 32768,
         ),
-        ModelArtifact(
-          engine = EngineKind.LLAMA,
-          backend = Backend.CPU,
-          url = huggingFace("ggml-org/gemma-4-E2B-it-GGUF", "gemma-4-E2B-it-Q4_0.gguf"),
-          sha256 = "8e30dff3ac4c8434c49a7036fa15564bdbb6044e42bf04550bf1a096ad7e6a52",
-          sizeBytes = 2_841_481_184,
-          fileName = "gemma-4-E2B-it-Q4_0.gguf",
-          contextSize = 32768,
-        ),
+      ) + llamaBuilds(
+        repository = "ggml-org/gemma-4-E2B-it-GGUF",
+        file = "gemma-4-E2B-it-Q4_0.gguf",
+        sha256 = "8e30dff3ac4c8434c49a7036fa15564bdbb6044e42bf04550bf1a096ad7e6a52",
+        sizeBytes = 2_841_481_184,
+        contextSize = 32768,
       ),
     ),
   )
@@ -152,3 +138,20 @@ private const val MEDIATEK_MT6993 = "MT6993"
 private const val GOOGLE_TENSOR_G5 = "Tensor G5"
 
 private fun huggingFace(repository: String, file: String) = "https://huggingface.co/$repository/resolve/main/$file"
+
+/**
+ * A GGUF file's builds for llama.cpp: one file that runs on the GPU or the CPU, chosen when the model loads, so it's
+ * downloaded once for both.
+ */
+private fun llamaBuilds(repository: String, file: String, sha256: String, sizeBytes: Long, contextSize: Int) =
+  listOf(Backend.GPU, Backend.CPU).map { backend ->
+    ModelArtifact(
+      engine = EngineKind.LLAMA,
+      backend = backend,
+      url = huggingFace(repository, file),
+      sha256 = sha256,
+      sizeBytes = sizeBytes,
+      fileName = file,
+      contextSize = contextSize,
+    )
+  }

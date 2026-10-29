@@ -52,6 +52,7 @@ import io.jeph.pipkin.ui.chat.ChatStream
 import io.jeph.pipkin.ui.chat.ChatView
 import io.jeph.pipkin.ui.chat.StreamSubagents
 import io.jeph.pipkin.ui.chat.ToolCallSheet
+import io.jeph.pipkin.ui.chat.TurnStatus
 import io.jeph.pipkin.ui.chat.elapsedText
 import io.jeph.pipkin.ui.components.HeaderBarHeight
 import io.jeph.pipkin.ui.components.HeaderButton
@@ -429,7 +430,7 @@ private fun TranscriptRows(state: TimelineState, taskKey: String?, view: ChatVie
     onOpenProviders = {},
     onOpenOnboarding = {},
     onRestart = {},
-    backgroundTasks = 0,
+    lastTurn = TurnStatus.None,
     // A subagent starts no subagents of its own.
     subagents = StreamSubagents(ChatSubagents.None, onOpen = {}, taskKey = taskKey),
   )

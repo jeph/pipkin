@@ -9,10 +9,12 @@ import android.os.Process
 import android.util.Log
 import io.jeph.pipkin.AppStrings
 import io.jeph.pipkin.R
+import io.jeph.pipkin.localmodel.engine.Backend
 import io.jeph.pipkin.localmodel.engine.EngineConfig
 import io.jeph.pipkin.localmodel.engine.IInferenceListener
 import io.jeph.pipkin.localmodel.engine.IInferenceProcess
 import io.jeph.pipkin.localmodel.engine.InferenceService
+import io.jeph.pipkin.ui.settings.label
 import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -37,7 +39,12 @@ internal data class ModelEndpoint(val modelId: String, val modelPath: String, va
  * there; unloading kills the process. Android may also kill it under memory pressure, without warning, which shows here
  * as the binder dying: the state becomes [RuntimeState.Failed] and the next request loads the model again.
  */
-internal class InferenceProcess(context: Context, private val installed: () -> List<InstalledModel>) : ModelHost {
+internal class InferenceProcess(
+  context: Context,
+  private val installed: () -> List<InstalledModel>,
+  /** Told of a GPU or NPU build that failed to load, so it isn't chosen again. */
+  private val onBuildFailed: (ModelArtifact) -> Unit,
+) : ModelHost {
   private val context = context.applicationContext
   private val stateFlow = MutableStateFlow<RuntimeState>(RuntimeState.Stopped)
   private val lock = Any()
@@ -90,15 +97,28 @@ internal class InferenceProcess(context: Context, private val installed: () -> L
       // Nobody waits for this model any more; a half-loaded process would hold its memory and show as loading.
       unload()
       throw cancelled
+    } catch (died: LocalModelException) {
+      // A GPU or NPU driver that crashes takes the process with it, every time, so that's the build failing too.
+      if (config.backend == Backend.CPU) throw died
+      failed(model, AppStrings.get(R.string.local_model_error_crashed))
     }
-    if (result.optString("type") != "ready") {
-      val message = result.optString("message")
-      unload()
-      stateFlow.value = RuntimeState.Failed(modelId, message)
-      throw LocalModelException(LocalModelException.Reason.LOAD_FAILED, modelId, message)
-    }
+    if (result.optString("type") != "ready") failed(model, result.optString("message"))
     synchronized(lock) { bound.ready = true }
     stateFlow.value = RuntimeState.Ready(modelId, config.engine, config.backend, config.contextSize)
+  }
+
+  /**
+   * Gives up on [model]'s load, which failed for [reason]. A GPU or NPU build is reported to [onBuildFailed], so the
+   * next load picks another build; the CPU is the last resort, so a CPU build stays.
+   */
+  private fun failed(model: InstalledModel, reason: String): Nothing {
+    val modelId = model.model.id
+    unload()
+    stateFlow.value = RuntimeState.Failed(modelId, reason)
+    val backend = model.artifact.backend
+    if (backend == Backend.CPU) throw LocalModelException(LocalModelException.Reason.LOAD_FAILED, modelId, reason)
+    onBuildFailed(model.artifact)
+    throw LocalModelException(LocalModelException.Reason.BUILD_FAILED, modelId, reason, model.artifact)
   }
 
   /** Kills the process, if any, and clears what the status shows, including why the last load failed. */
@@ -201,14 +221,26 @@ internal class LocalModelException(
   private val reason: Reason,
   private val modelId: String,
   private val detail: String = "",
+  /** The build that failed, for [Reason.BUILD_FAILED]. */
+  private val build: ModelArtifact? = null,
 ) : Exception() {
-  enum class Reason { NOT_INSTALLED, LOAD_FAILED, PROCESS_DIED }
+  enum class Reason { NOT_INSTALLED, LOAD_FAILED, BUILD_FAILED, PROCESS_DIED }
 
   /** Read where it lands, so it follows the app's language then. */
   override val message: String
     get() = when (reason) {
       Reason.NOT_INSTALLED -> AppStrings.get(R.string.local_model_error_not_installed, modelId)
+
       Reason.LOAD_FAILED -> AppStrings.get(R.string.local_model_error_load_failed, modelId, detail)
+
+      Reason.BUILD_FAILED -> AppStrings.get(
+        R.string.local_model_error_build_failed,
+        modelId,
+        AppStrings.get(checkNotNull(build).engine.label),
+        AppStrings.get(build.backend.label),
+        detail,
+      )
+
       Reason.PROCESS_DIED -> AppStrings.get(R.string.local_model_error_stopped, modelId)
     }
 }

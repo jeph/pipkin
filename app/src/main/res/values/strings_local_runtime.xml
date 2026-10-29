@@ -9,4 +9,9 @@
     <string name="local_model_error_connection">Pipkin lost its connection to <xliff:g id="model" example="qwen3-0.6b">%1$s</xliff:g>: <xliff:g id="reason" example="Connection refused">%2$s</xliff:g></string>
     <!-- %1$s is the model's id. -->
     <string name="local_model_error_stopped">Android stopped <xliff:g id="model" example="qwen3-0.6b">%1$s</xliff:g>, probably to free memory. Send again to load it again.</string>
+    <!-- %1$s is the model's id; %2$s is the engine, such as LiteRT-LM; %3$s is the processor it ran on, such as GPU;
+         %4$s is the engine's reason, in English. -->
+    <string name="local_model_error_build_failed"><xliff:g id="model" example="gemma-4-e2b">%1$s</xliff:g> couldn\'t run with <xliff:g id="engine" example="LiteRT-LM">%2$s</xliff:g> on this phone\'s <xliff:g id="processor" example="GPU">%3$s</xliff:g>: <xliff:g id="reason" example="Can not find OpenCL library">%4$s</xliff:g>. Pipkin won\'t use that on this phone again. Send again to use another build, or download one in Settings › Local models.</string>
+    <!-- Why a model couldn't load when its process crashed while loading it. -->
+    <string name="local_model_error_crashed">the engine crashed while loading it</string>
 </resources>

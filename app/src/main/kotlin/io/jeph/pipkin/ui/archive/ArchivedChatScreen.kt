@@ -43,6 +43,7 @@ import io.jeph.pipkin.ui.chat.ChatStream
 import io.jeph.pipkin.ui.chat.ChatView
 import io.jeph.pipkin.ui.chat.StreamSubagents
 import io.jeph.pipkin.ui.chat.ToolCallSheet
+import io.jeph.pipkin.ui.chat.TurnStatus
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.ui.components.LucideIcon
@@ -240,7 +241,7 @@ private fun TranscriptBody(
         onOpenProviders = {},
         onOpenOnboarding = {},
         onRestart = {},
-        backgroundTasks = 0,
+        lastTurn = TurnStatus.None,
         // No Pi runs an archived chat, so every subagent it shows has finished, or was interrupted.
         subagents = remember(onOpenSubagent) { StreamSubagents(ChatSubagents.None, onOpenSubagent) },
       )
