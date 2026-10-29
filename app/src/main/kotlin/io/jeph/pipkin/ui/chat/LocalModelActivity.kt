@@ -46,11 +46,13 @@ private fun activityText(activity: SessionActivity): String {
       }
     }
 
-    is SessionActivity.Loading -> stringResource(
-      R.string.chat_local_loading,
-      LocalModelCatalog.name(activity.modelId),
-      NumberFormat.getPercentInstance(locale).format(activity.progress),
-    )
+    is SessionActivity.Loading -> activity.progress?.let {
+      stringResource(
+        R.string.chat_local_loading,
+        LocalModelCatalog.name(activity.modelId),
+        NumberFormat.getPercentInstance(locale).format(it),
+      )
+    } ?: stringResource(R.string.chat_local_loading_unknown, LocalModelCatalog.name(activity.modelId))
 
     // LiteRT-LM doesn't say how far it has read, so its prompt's size stays unknown.
     is SessionActivity.ReadingPrompt -> when {

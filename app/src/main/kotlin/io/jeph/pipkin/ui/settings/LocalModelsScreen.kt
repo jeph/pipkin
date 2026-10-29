@@ -137,10 +137,9 @@ private fun statusSummary(state: RuntimeState): String {
   return when (state) {
     RuntimeState.Stopped -> stringResource(R.string.local_models_stopped_summary)
 
-    is RuntimeState.Loading -> stringResource(
-      R.string.local_models_loading_summary,
-      NumberFormat.getPercentInstance(locale).format(state.progress),
-    )
+    is RuntimeState.Loading -> state.progress?.let {
+      stringResource(R.string.local_models_loading_summary, NumberFormat.getPercentInstance(locale).format(it))
+    } ?: stringResource(R.string.local_models_loading_summary_unknown)
 
     is RuntimeState.Ready -> stringResource(
       R.string.local_models_ready_summary,

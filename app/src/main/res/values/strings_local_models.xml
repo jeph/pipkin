@@ -15,6 +15,8 @@
     <string name="local_models_loading">Loading %1$s</string>
     <!-- %1$s: how much of the model has loaded, as a percentage formatted for the locale, such as "40%". -->
     <string name="local_models_loading_summary">%1$s loaded</string>
+    <!-- Shown while a model loads, for an engine that doesn't report how much has loaded. -->
+    <string name="local_models_loading_summary_unknown">The first load of a model can take a few minutes.</string>
     <!-- %1$s: the model's name, such as "Qwen3 0.6B". -->
     <string name="local_models_ready">%1$s is ready</string>
     <!-- %1$s: the engine running the model, such as "LiteRT-LM". %2$s: the processor it runs on, such as "GPU".
@@ -76,6 +78,8 @@
     <!-- %1$s: the model's name, such as "Qwen3 0.6B". %2$s: how much has loaded, as a percentage formatted for the
          locale, such as "40%". -->
     <string name="chat_local_loading">Loading %1$s, %2$s</string>
+    <!-- %1$s: the model's name, such as "Gemma 4 E2B". Shown while it loads, before the engine reports how much. -->
+    <string name="chat_local_loading_unknown">Loading %1$s</string>
     <!-- Shown while the model reads the prompt, for an engine that doesn't report how far it has got. -->
     <string name="chat_local_reading_unknown">Reading the prompt</string>
     <!-- %1$s: prompt tokens read so far. %2$s: the prompt's tokens in all. Both formatted for the locale. -->

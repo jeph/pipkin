@@ -26,7 +26,6 @@ import java.io.IOException
  */
 internal class LiteRtEngine(private val context: Context) : InferenceEngine {
   override fun start(config: EngineConfig, onProgress: (Float) -> Unit) {
-    onProgress(0f)
     val started = SystemClock.elapsedRealtime()
     val model = readModel(config.modelPath)
     // A model compiled for a fixed context can't hold more, whatever the catalog asks for.
@@ -55,7 +54,6 @@ internal class LiteRtEngine(private val context: Context) : InferenceEngine {
     } catch (failure: IOException) {
       throw EngineException("port_unavailable", "Couldn't serve on port ${config.port}: ${failure.message}", failure)
     }
-    onProgress(1f)
   }
 
   private fun backend(config: EngineConfig): LiteRtBackend = when (config.backend) {

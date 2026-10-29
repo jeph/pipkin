@@ -1,9 +1,12 @@
 package io.jeph.pipkin.localmodel
 
+import android.app.ActivityManager
+import android.app.ApplicationExitInfo
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Build
 import android.os.IBinder
 import android.os.Process
 import android.util.Log
@@ -22,6 +25,7 @@ import java.security.SecureRandom
 import java.util.Base64
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,7 +73,7 @@ internal class InferenceProcess(
     unloadAndWait()
     val model = installed().firstOrNull { it.model.id == modelId }
       ?: throw LocalModelException(LocalModelException.Reason.NOT_INSTALLED, modelId)
-    stateFlow.value = RuntimeState.Loading(modelId, 0f)
+    stateFlow.value = RuntimeState.Loading(modelId, progress = null)
     val config = EngineConfig(
       engine = model.artifact.engine,
       modelPath = model.file.absolutePath,
@@ -84,10 +88,13 @@ internal class InferenceProcess(
     val listener = object : IInferenceListener.Stub() {
       override fun onEvent(eventJson: String) {
         val event = JSONObject(eventJson)
-        when (event.optString("type")) {
-          "progress" -> stateFlow.value = RuntimeState.Loading(modelId, event.optDouble("value").toFloat())
-          else -> bound.outcome.complete(event)
+        if (event.optString("type") != "progress") {
+          bound.outcome.complete(event)
+          return
         }
+        // llama.cpp's GPU backend compiles its kernels before any weights load, so 0 says no more than nothing.
+        val progress = event.optDouble("value").toFloat().takeIf { it > 0f }
+        stateFlow.value = RuntimeState.Loading(modelId, progress)
       }
     }
     val result = try {
@@ -98,8 +105,9 @@ internal class InferenceProcess(
       unload()
       throw cancelled
     } catch (died: LocalModelException) {
-      // A GPU or NPU driver that crashes takes the process with it, every time, so that's the build failing too.
-      if (config.backend == Backend.CPU) throw died
+      // A GPU or NPU driver that crashes takes the process with it, every time, so that's the build failing too. Any
+      // other death, such as Android freeing memory, says nothing about the build, so the next message tries it again.
+      if (config.backend == Backend.CPU || !crashedNatively(bound.pid)) throw died
       failed(model, AppStrings.get(R.string.local_model_error_crashed), buildAtFault = true)
     }
     if (result.optString("type") != "ready") {
@@ -123,6 +131,22 @@ internal class InferenceProcess(
     }
     onBuildFailed(model.artifact)
     throw LocalModelException(LocalModelException.Reason.BUILD_FAILED, modelId, reason, model.artifact)
+  }
+
+  /**
+   * Whether the process [pid] ended in a native crash, as Android records why each of the app's processes ended. The
+   * record can land a moment after the binder reports the death, so this waits briefly for it. Android 10 keeps no
+   * record, so a death there is never blamed on the build.
+   */
+  private suspend fun crashedNatively(pid: Int): Boolean {
+    if (pid == 0 || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+    val activityManager = context.getSystemService(ActivityManager::class.java)
+    repeat(EXIT_INFO_ATTEMPTS) {
+      val exit = activityManager.getHistoricalProcessExitReasons(context.packageName, pid, 1).firstOrNull()
+      if (exit != null) return exit.reason == ApplicationExitInfo.REASON_CRASH_NATIVE
+      delay(EXIT_INFO_POLL_MILLIS)
+    }
+    return false
   }
 
   /** Kills the process, if any, and clears what the status shows, including why the last load failed. */
@@ -158,7 +182,10 @@ internal class InferenceProcess(
     val outcome = CompletableDeferred<JSONObject>()
     val dead = CompletableDeferred<Unit>()
     var ready = false
-    private var pid = 0
+
+    /** The process's id once bound, or 0. */
+    var pid = 0
+      private set
     private var isBound = true
 
     override fun onServiceConnected(name: ComponentName, binder: IBinder) {
@@ -198,6 +225,8 @@ internal class InferenceProcess(
   private companion object {
     const val TAG = "PipkinLocalModels"
     const val DEATH_TIMEOUT_MILLIS = 5_000L
+    const val EXIT_INFO_ATTEMPTS = 20
+    const val EXIT_INFO_POLL_MILLIS = 100L
     const val KEY_BYTES = 24
     const val FAST_CORE_SHARE = 0.7
 

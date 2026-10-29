@@ -11,8 +11,8 @@ import org.json.JSONObject
 internal interface InferenceEngine {
   /**
    * Loads [config]'s model and serves `GET /health` and `POST /v1/chat/completions` on 127.0.0.1:[EngineConfig.port],
-   * requiring `Authorization: Bearer` [EngineConfig.apiKey]. Returns once the server answers; reports load progress
-   * from 0 to 1 through [onProgress]. Throws [EngineException] when the model can't be loaded or served.
+   * requiring `Authorization: Bearer` [EngineConfig.apiKey]. Returns once the server answers; an engine that can tell
+   * how much of the model has loaded reports it, from 0 to 1, through [onProgress]. Throws [EngineException] when the model can't be loaded or served.
    */
   fun start(config: EngineConfig, onProgress: (Float) -> Unit)
 }

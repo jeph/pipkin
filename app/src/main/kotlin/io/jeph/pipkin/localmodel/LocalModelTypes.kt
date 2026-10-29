@@ -36,7 +36,8 @@ internal data class InstalledModel(val model: CatalogModel, val artifact: ModelA
 internal sealed interface RuntimeState {
   data object Stopped : RuntimeState
 
-  data class Loading(val modelId: String, val progress: Float) : RuntimeState
+  /** [progress] is from 0 to 1, or null until the engine reports some: LiteRT-LM never does. */
+  data class Loading(val modelId: String, val progress: Float?) : RuntimeState
 
   data class Ready(val modelId: String, val engine: EngineKind, val backend: Backend, val contextSize: Int) :
     RuntimeState
@@ -49,7 +50,8 @@ internal sealed interface SessionActivity {
   /** Behind [position] other requests; [waitingFor] is the model another chat holds, when that's what it waits on. */
   data class Queued(val modelId: String, val waitingFor: String?, val position: Int) : SessionActivity
 
-  data class Loading(val modelId: String, val progress: Float) : SessionActivity
+  /** [progress] is from 0 to 1, or null when unknown, as for [RuntimeState.Loading]. */
+  data class Loading(val modelId: String, val progress: Float?) : SessionActivity
 
   data class ReadingPrompt(val processed: Int, val total: Int, val cached: Int) : SessionActivity
 
