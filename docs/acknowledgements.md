@@ -25,6 +25,11 @@ The license texts for everything Pipkin ships are in the app under **Settings â†
 - **[Lucide](https://lucide.dev)** provides the interface icons, **[Material Icon Theme](https://github.com/material-extensions/vscode-material-icon-theme)** the file-type icons, and **[Lobe Icons](https://github.com/lobehub/lobe-icons)** the provider logos.
 - **[Manrope](https://github.com/googlefonts/manrope)** is the interface font, and **[JetBrains Mono](https://github.com/JetBrains/JetBrainsMono)** the code font.
 
+## Local models
+
+- **[llama.cpp](https://github.com/ggml-org/llama.cpp)**, with [ggml](https://github.com/ggml-org/ggml), [KleidiAI](https://github.com/ARM-software/kleidiai), and the [OpenCL headers](https://github.com/KhronosGroup/OpenCL-Headers), and **[LiteRT-LM](https://github.com/google-ai-edge/LiteRT-LM)** run [local models](/docs/local-models/) on the phone.
+- The models themselves come from **[Qwen](https://huggingface.co/Qwen)**, **[Google](https://huggingface.co/google)**, and **[Mistral AI](https://huggingface.co/mistralai)**, in builds by their makers and by **[Unsloth](https://huggingface.co/unsloth)**, **[LiteRT Community](https://huggingface.co/litert-community)**, and **[ggml](https://huggingface.co/ggml-org)**. Pipkin downloads them when you ask; their licenses are listed under [Model licenses](/docs/local-models/#model-licenses).
+
 ## The bundled extensions and host
 
 - **[pi-web-access](https://github.com/nicobailon/pi-web-access)**: Pipkin's web search and page fetching extension is a modified copy. It uses [Mozilla Readability](https://github.com/mozilla/readability), [Defuddle](https://github.com/kepano/defuddle), [linkedom](https://github.com/WebReflection/linkedom), [Turndown](https://github.com/mixmark-io/turndown), [undici](https://github.com/nodejs/undici), [unpdf](https://github.com/unjs/unpdf), the [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk), and [p-limit](https://github.com/sindresorhus/p-limit).

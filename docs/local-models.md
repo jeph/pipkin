@@ -21,10 +21,15 @@ When the download finishes, the model shows up in a chat's model list like any o
 | --- | --- | --- |
 | **Qwen3 0.6B** | about 0.6 GB, or 1.2 GB on a MediaTek Dimensity 9500 | The smallest and fastest. Runs on almost any phone. |
 | **Qwen3 1.7B** | about 1.8 GB | Better answers, slower. |
-| **Qwen3 4B** | about 2.5 GB | The most capable, and the slowest. Needs a phone with plenty of memory. |
+| **Qwen3 4B** | about 2.5 GB | Better answers again, and slower. Needs a phone with plenty of memory. |
+| **Qwen3 8B** | about 5 GB | The largest. Only for phones with a lot of memory, such as 16 GB; on others, Android may stop it or other apps while it runs. |
+| **Qwen3.5 2B** | about 1.3 GB | A newer design: most of its layers don't keep more memory as the conversation grows, so long chats need less than with Qwen3. |
+| **Qwen3.5 4B** | about 2.7 GB | The larger Qwen3.5, with the same lighter memory use in long chats. |
 | **Gemma 4 E2B** | 2 to 2.8 GB, depending on the phone | Google's small model. On a phone with the GPU driver it needs, it runs on the GPU. |
+| **Gemma 4 E4B** | 3 to 3.7 GB, depending on the phone | Gemma 4 E2B's larger sibling, on the GPU when the phone has the driver, like it. |
+| **Ministral 3 3B** | about 2.1 GB | Mistral's small model. It answers without thinking first. |
 
-All of them can think before they answer, like larger models with reasoning.
+All except Ministral 3 3B can think before they answer, like larger models with reasoning. All of them are released under the Apache License 2.0; see [Model licenses](#model-licenses).
 
 ### Memory
 
@@ -60,6 +65,17 @@ Models are downloaded from [Hugging Face](https://huggingface.co), only when you
 A download keeps going while you use other apps, with Pipkin's notification showing. If it's interrupted, for example when the phone loses its connection, tap **Try again** and it picks up where it stopped. **Cancel** stops a download and deletes what it got so far.
 
 Before it starts, Pipkin checks there's room for the whole model, and leaves a little space free besides.
+
+## Model licenses
+
+Pipkin doesn't include any model; each one is downloaded from its publisher's Hugging Face repository, where its model card and license are:
+
+| Model | Made by | Files from | License |
+| --- | --- | --- | --- |
+| Qwen3 0.6B, 1.7B, 4B, 8B | [Qwen](https://huggingface.co/Qwen) | [Qwen](https://huggingface.co/Qwen), and [LiteRT Community](https://huggingface.co/litert-community) for Qwen3 0.6B's LiteRT-LM builds | Apache License 2.0 |
+| Qwen3.5 2B, 4B | [Qwen](https://huggingface.co/Qwen) | [Unsloth](https://huggingface.co/unsloth) | Apache License 2.0 |
+| Gemma 4 E2B, E4B | [Google](https://huggingface.co/google) | [LiteRT Community](https://huggingface.co/litert-community), and [ggml](https://huggingface.co/ggml-org) for Gemma 4 E2B's llama.cpp build | Apache License 2.0 |
+| Ministral 3 3B | [Mistral AI](https://huggingface.co/mistralai) | [Mistral AI](https://huggingface.co/mistralai) | Apache License 2.0 |
 
 ## Where the files are
 

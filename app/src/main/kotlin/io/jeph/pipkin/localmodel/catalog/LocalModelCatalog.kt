@@ -72,6 +72,47 @@ internal object LocalModelCatalog {
       ),
     ),
     CatalogModel(
+      id = "qwen3-8b",
+      name = "Qwen3 8B",
+      reasoning = true,
+      maxTokens = MAX_TOKENS,
+      artifacts = llamaBuilds(
+        repository = "Qwen/Qwen3-8B-GGUF",
+        file = "Qwen3-8B-Q4_K_M.gguf",
+        sha256 = "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
+        sizeBytes = 5_027_783_488,
+        contextSize = CONTEXT,
+      ),
+    ),
+    // Qwen3.5's LiteRT-LM builds keep 4,096 tokens, too few for Pi's prompt, so it runs on llama.cpp from Unsloth's
+    // GGUFs. Most of its layers keep a fixed-size state rather than a cache that grows with the conversation.
+    CatalogModel(
+      id = "qwen3.5-2b",
+      name = "Qwen3.5 2B",
+      reasoning = true,
+      maxTokens = MAX_TOKENS,
+      artifacts = llamaBuilds(
+        repository = "unsloth/Qwen3.5-2B-GGUF",
+        file = "Qwen3.5-2B-Q4_K_M.gguf",
+        sha256 = "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223",
+        sizeBytes = 1_280_835_840,
+        contextSize = CONTEXT,
+      ),
+    ),
+    CatalogModel(
+      id = "qwen3.5-4b",
+      name = "Qwen3.5 4B",
+      reasoning = true,
+      maxTokens = MAX_TOKENS,
+      artifacts = llamaBuilds(
+        repository = "unsloth/Qwen3.5-4B-GGUF",
+        file = "Qwen3.5-4B-Q4_K_M.gguf",
+        sha256 = "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
+        sizeBytes = 2_740_937_888,
+        contextSize = CONTEXT,
+      ),
+    ),
+    CatalogModel(
       id = "gemma-4-e2b",
       name = "Gemma 4 E2B",
       reasoning = true,
@@ -114,6 +155,48 @@ internal object LocalModelCatalog {
         contextSize = CONTEXT,
       ),
     ),
+    // LiteRT-LM's builds only: its GGUF is about 4.8 GB, and as llama.cpp's GPU build comes before LiteRT-LM's CPU one,
+    // a phone whose GPU can't run LiteRT-LM's would download it rather than the 3.7 GB CPU build.
+    CatalogModel(
+      id = "gemma-4-e4b",
+      name = "Gemma 4 E4B",
+      reasoning = true,
+      maxTokens = MAX_TOKENS,
+      artifacts = listOf(
+        ModelArtifact(
+          engine = EngineKind.LITERT,
+          backend = Backend.GPU,
+          url = huggingFace(GEMMA_4_E4B_LITERT, "gemma-4-E4B-it-gpu.litertlm"),
+          sha256 = "4912bb5a9c30993c51a7711f763212077458529312175df0573a78323a2bb7ff",
+          sizeBytes = 2_969_059_328,
+          fileName = "gemma-4-E4B-it-gpu.litertlm",
+          contextSize = CONTEXT,
+        ),
+        ModelArtifact(
+          engine = EngineKind.LITERT,
+          backend = Backend.CPU,
+          url = huggingFace(GEMMA_4_E4B_LITERT, "gemma-4-E4B-it.litertlm"),
+          sha256 = "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
+          sizeBytes = 3_659_530_240,
+          fileName = "gemma-4-E4B-it.litertlm",
+          contextSize = CONTEXT,
+        ),
+      ),
+    ),
+    // Mistral's own GGUF. Its LiteRT-LM build keeps 4,096 tokens, too few for Pi's prompt.
+    CatalogModel(
+      id = "ministral-3-3b",
+      name = "Ministral 3 3B",
+      reasoning = false,
+      maxTokens = MAX_TOKENS,
+      artifacts = llamaBuilds(
+        repository = "mistralai/Ministral-3-3B-Instruct-2512-GGUF",
+        file = "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
+        sha256 = "9ed150d4367e68df0ac8e1540f6ddc65b42d0ee26378329d1ecbca60f93fc5f8",
+        sizeBytes = 2_147_023_008,
+        contextSize = CONTEXT,
+      ),
+    ),
   )
 
   fun model(id: String): CatalogModel? = models.firstOrNull { it.id == id }
@@ -136,6 +219,7 @@ private const val CONTEXT = EngineChoice.AGENT_CONTEXT
 private const val MAX_TOKENS = 8192
 
 private const val GEMMA_4_E2B_LITERT = "litert-community/gemma-4-E2B-it-litert-lm"
+private const val GEMMA_4_E4B_LITERT = "litert-community/gemma-4-E4B-it-litert-lm"
 
 /** `Build.SOC_MODEL` of MediaTek's Dimensity 9500, the SoC the MT6993 NPU build is compiled for. */
 private const val MEDIATEK_MT6993 = "MT6993"

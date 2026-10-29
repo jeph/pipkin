@@ -142,6 +142,11 @@ internal fun serverArguments(config: EngineConfig): List<String> = listOf(
   // the model, stopped, and a 4B model's cache for Pi's prompt alone outgrows any budget a phone could spare. 0 turns
   // them off; leaving the option out allows 8 GiB.
   "--cache-ram", "0",
+  // A model whose layers keep a fixed-size state, such as Qwen3.5, can't step back through it, so the slot saves
+  // checkpoints of it in RAM as it reads, at user messages and just before the prompt's end, and the next request resumes
+  // from the latest one it still matches. Pi's turns only add to the conversation, so the last request's are the ones
+  // that get used; the default keeps 32, which for Qwen3.5 4B, at about 50 MiB each, would grow to 1.6 GiB.
+  "--ctx-checkpoints", "4",
   // Weights the CPU kernels read as the file lays them out, such as the token embeddings, stay in the page cache, which
   // Android can drop and read again; KleidiAI and ggml copy the rest into their own layouts in the process's memory,
   // or the GPU's.
