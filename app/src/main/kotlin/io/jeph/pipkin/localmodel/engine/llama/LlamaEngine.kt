@@ -134,11 +134,6 @@ internal fun serverArguments(config: EngineConfig): List<String> = listOf(
   "--parallel", "1",
   "--jinja",
   "--reasoning-format", "deepseek",
-  // An 8-bit KV cache holds twice the context of the default 16-bit one in the same memory, at a negligible loss of
-  // quality. llama.cpp quantizes the V cache only with flash attention.
-  "--cache-type-k", "q8_0",
-  "--cache-type-v", "q8_0",
-  "--flash-attn", "on",
   // The slot reuses the cached prompt's longest common prefix by default; this also reuses chunks of 256 tokens or
   // more after a change in the middle, such as a compacted or edited message, by shifting their KV entries.
   "--cache-reuse", "256",
@@ -154,7 +149,23 @@ internal fun serverArguments(config: EngineConfig): List<String> = listOf(
   "--no-ui",
   "--no-slots",
   "--log-colors", "off",
-) + deviceArguments(config.backend)
+) + cacheArguments(config.backend) + deviceArguments(config.backend)
+
+/**
+ * The KV cache's type and flash attention, which differ by processor. On the CPU, an 8-bit cache holds twice the context
+ * of the default 16-bit one in the same memory, at a negligible loss of quality, and each token reads half the bytes,
+ * which is what limits a phone CPU's writing; llama.cpp quantizes the V cache only with flash attention. On an Adreno 840,
+ * ggml-opencl's flash attention over an 8-bit cache wrote half as fast as over a 16-bit one 4,096 tokens into the
+ * conversation, and slower still further in, so the GPU keeps 16-bit at twice the memory: about 2.4 GB rather than 1.2
+ * for Qwen3 4B's 16,384 tokens. Flash attention there is `auto`: ggml-opencl declines it over a 16-bit cache on Adreno
+ * 7xx, whose compiler crashes building it, and `on` would then run every layer's attention on the CPU, where `auto`
+ * turns it off and the GPU attends without it.
+ */
+private fun cacheArguments(backend: Backend): List<String> = if (backend == Backend.GPU) {
+  listOf("--cache-type-k", "f16", "--cache-type-v", "f16", "--flash-attn", "auto")
+} else {
+  listOf("--cache-type-k", "q8_0", "--cache-type-v", "q8_0", "--flash-attn", "on")
+}
 
 /**
  * On the GPU, every layer goes to the device of ggml's OpenCL backend, leaving the CPU the token embeddings and any

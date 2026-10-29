@@ -34,7 +34,7 @@ class ServerArgumentsTest {
   }
 
   @Test
-  fun oneSlotKeepsAnEightBitCacheAndReasonsSeparately() {
+  fun oneSlotOnTheCpuKeepsAnEightBitCacheAndReasonsSeparately() {
     val options = serverArguments(config).options()
 
     assertEquals("1", options["--parallel"])
@@ -44,6 +44,17 @@ class ServerArgumentsTest {
     assertEquals("deepseek", options["--reasoning-format"])
     assertTrue("--jinja" in options)
     assertTrue("--no-ui" in options)
+  }
+
+  @Test
+  fun theGpuKeepsASixteenBitCacheAndLetsLlamaChooseFlashAttention() {
+    // An 8-bit cache halves the Adreno 840's writing speed, and forcing flash attention on puts every layer's attention
+    // on the CPU on an Adreno 7xx.
+    val options = serverArguments(config.copy(backend = Backend.GPU)).options()
+
+    assertEquals("f16", options["--cache-type-k"])
+    assertEquals("f16", options["--cache-type-v"])
+    assertEquals("auto", options["--flash-attn"])
   }
 
   @Test
