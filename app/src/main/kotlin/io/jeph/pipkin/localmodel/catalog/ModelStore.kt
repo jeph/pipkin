@@ -76,7 +76,7 @@ internal class ModelStore(
 
   init {
     scope.launch {
-      val (hardware, files) = withContext(Dispatchers.IO) { DeviceProfile.current() to scan() }
+      val (hardware, files) = withContext(Dispatchers.IO) { DeviceProfile.current(preferences) to scan() }
       hardwareState.value = hardware
       downloadedState.value = files
     }

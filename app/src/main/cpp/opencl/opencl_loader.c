@@ -15,6 +15,8 @@
 #include <dlfcn.h>
 #include <pthread.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define CL_FUNCTIONS(X)           \
   X(clGetPlatformIDs)             \
@@ -63,6 +65,12 @@ static struct {
 static pthread_once_t driver_once = PTHREAD_ONCE_INIT;
 
 static void load_driver(void) {
+  // A model on the CPU never touches the driver, so a driver that crashes as it sets up can't take the CPU down too.
+  const char * wanted = getenv("PIPKIN_OPENCL");
+  if (wanted != NULL && strcmp(wanted, "off") == 0) {
+    __android_log_print(ANDROID_LOG_INFO, "PipkinOpenCL", "OpenCL is off for this process");
+    return;
+  }
   // Android 12 and later let an app load it only when the manifest lists it in <uses-native-library>.
   void * library = dlopen("libOpenCL.so", RTLD_NOW | RTLD_LOCAL);
   if (library == NULL) {

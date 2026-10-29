@@ -1,5 +1,6 @@
 package io.jeph.pipkin.localmodel.engine.llama
 
+import android.system.Os
 import io.jeph.pipkin.localmodel.engine.Backend
 import io.jeph.pipkin.localmodel.engine.EngineConfig
 import io.jeph.pipkin.localmodel.engine.EngineException
@@ -31,6 +32,8 @@ internal class LlamaEngine : InferenceEngine {
     if (config.backend == Backend.GPU && LlamaServer.gpuName() == null) {
       throw EngineException("backend_unsupported", "llama.cpp runs on the GPU only with an Adreno GPU's OpenCL driver")
     }
+    // Read by the OpenCL loader (app/src/main/cpp/opencl) before ggml first asks it for a platform.
+    if (config.backend == Backend.CPU) Os.setenv("PIPKIN_OPENCL", "off", true)
     val exitStatus = AtomicInteger(RUNNING)
     val server = Thread(
       null,
@@ -39,7 +42,8 @@ internal class LlamaEngine : InferenceEngine {
       SERVER_STACK_BYTES,
     )
     server.start()
-    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(LOAD_TIMEOUT_SECONDS)
+    val timeoutSeconds = if (config.backend == Backend.GPU) GPU_LOAD_TIMEOUT_SECONDS else LOAD_TIMEOUT_SECONDS
+    val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
     var reported = -1f
     // llama-server binds its port before it loads the model, and exits if it can't, so once the weights are in, a 200
     // from the port is this server's rather than another process's still holding it.
@@ -52,7 +56,7 @@ internal class LlamaEngine : InferenceEngine {
       }
       if (System.nanoTime() > deadline) {
         LlamaServer.terminate()
-        throw EngineException("load_failed", "llama-server didn't load the model in $LOAD_TIMEOUT_SECONDS s")
+        throw EngineException("load_timeout", "llama-server didn't load the model in $timeoutSeconds s")
       }
       val progress = LlamaServer.loadProgress()
       if (progress != reported) {
@@ -103,6 +107,9 @@ internal class LlamaEngine : InferenceEngine {
   private companion object {
     const val RUNNING = Int.MIN_VALUE
     const val LOAD_TIMEOUT_SECONDS = 120L
+
+    /** Longer, since the first load on a GPU also compiles ggml-opencl's kernels for it. */
+    const val GPU_LOAD_TIMEOUT_SECONDS = 300L
     const val POLL_MILLIS = 100L
     const val HEALTH_TIMEOUT_MILLIS = 1000
 

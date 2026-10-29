@@ -257,7 +257,7 @@ private fun StreamArea(
       onOpenProviders = onOpenProviders,
       onOpenOnboarding = onOpenOnboarding,
       onRestart = process::restart,
-      lastTurn = TurnStatus(backgroundTasks, localModelActivity(process, timeline.model)),
+      lastTurn = TurnStatus(backgroundTasks, process, timeline.model),
       subagents = subagents,
     )
     // A dialog card or the steering box fills the space over the composer, so snackbars move up under the header.

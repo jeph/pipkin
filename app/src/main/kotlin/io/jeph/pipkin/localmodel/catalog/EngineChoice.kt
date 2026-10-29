@@ -1,6 +1,7 @@
 package io.jeph.pipkin.localmodel.catalog
 
 import android.os.Build
+import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.localmodel.CatalogModel
 import io.jeph.pipkin.localmodel.ModelArtifact
 import io.jeph.pipkin.localmodel.engine.Backend
@@ -32,11 +33,17 @@ internal data class DeviceProfile(
   }
 
   companion object {
-    /** Asks the OpenCL driver for the GPU, so call it off the main thread. */
-    fun current(): DeviceProfile = DeviceProfile(
-      socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else null,
-      gpu = OpenClProbe.gpuName(),
-    )
+    /**
+     * This phone, with the [gpu] OpenCL named when the [preferences] last asked under this Android build, else asking
+     * the driver now, which loads it, so call this off the main thread.
+     */
+    fun current(preferences: Preferences): DeviceProfile {
+      val gpu = preferences.localModelGpu() ?: OpenClProbe.gpuName().orEmpty().also(preferences::setLocalModelGpu)
+      return DeviceProfile(
+        socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else null,
+        gpu = gpu.ifEmpty { null },
+      )
+    }
 
     private const val ADRENO = "Adreno"
   }

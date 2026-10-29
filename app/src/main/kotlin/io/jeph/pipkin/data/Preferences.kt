@@ -315,6 +315,22 @@ internal class Preferences(context: Context) {
     localModelsEnabledState.value = enabled
   }
 
+  /**
+   * The name OpenCL gives the phone's GPU, empty when there's no driver, as found under this Android build; null when
+   * it hasn't been looked up since Android was updated, which may bring a new driver.
+   */
+  fun localModelGpu(): String? = prefs.getString(LOCAL_MODEL_GPU, null)?.takeIf {
+    prefs.getString(LOCAL_MODEL_GPU_ON, null) == Build.FINGERPRINT
+  }
+
+  /** Saves the [localModelGpu] [name] found under this Android build. Called from any thread. */
+  fun setLocalModelGpu(name: String) {
+    prefs.edit {
+      putString(LOCAL_MODEL_GPU, name)
+      putString(LOCAL_MODEL_GPU_ON, Build.FINGERPRINT)
+    }
+  }
+
   /** Adds [kind] to [localModelFailedBuilds]. */
   fun addLocalModelFailedBuild(kind: String) {
     val updated = localModelFailedBuildsState.value + kind
@@ -418,6 +434,8 @@ internal class Preferences(context: Context) {
     const val LOCAL_MODELS_ENABLED = "localModelsEnabled"
     const val LOCAL_MODEL_FAILED_BUILDS = "localModelFailedBuilds"
     const val LOCAL_MODEL_FAILED_BUILDS_ON = "localModelFailedBuildsOn"
+    const val LOCAL_MODEL_GPU = "localModelGpu"
+    const val LOCAL_MODEL_GPU_ON = "localModelGpuOn"
     const val LOCAL_MODEL_IDLE_UNLOAD_MINUTES = "localModelIdleUnloadMinutes"
   }
 }

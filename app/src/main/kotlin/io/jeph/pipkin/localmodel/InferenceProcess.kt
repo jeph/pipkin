@@ -100,23 +100,27 @@ internal class InferenceProcess(
     } catch (died: LocalModelException) {
       // A GPU or NPU driver that crashes takes the process with it, every time, so that's the build failing too.
       if (config.backend == Backend.CPU) throw died
-      failed(model, AppStrings.get(R.string.local_model_error_crashed))
+      failed(model, AppStrings.get(R.string.local_model_error_crashed), buildAtFault = true)
     }
-    if (result.optString("type") != "ready") failed(model, result.optString("message"))
+    if (result.optString("type") != "ready") {
+      failed(model, result.optString("message"), buildAtFault = result.optString("code") in BUILD_FAULTS)
+    }
     synchronized(lock) { bound.ready = true }
     stateFlow.value = RuntimeState.Ready(modelId, config.engine, config.backend, config.contextSize)
   }
 
   /**
-   * Gives up on [model]'s load, which failed for [reason]. A GPU or NPU build is reported to [onBuildFailed], so the
-   * next load picks another build; the CPU is the last resort, so a CPU build stays.
+   * Gives up on [model]'s load, which failed for [reason]. When the build is [buildAtFault] rather than, say, slow or
+   * short of a port, a GPU or NPU build is reported to [onBuildFailed], so the next load picks another build; the CPU
+   * is the last resort, so a CPU build stays.
    */
-  private fun failed(model: InstalledModel, reason: String): Nothing {
+  private fun failed(model: InstalledModel, reason: String, buildAtFault: Boolean): Nothing {
     val modelId = model.model.id
     unload()
     stateFlow.value = RuntimeState.Failed(modelId, reason)
-    val backend = model.artifact.backend
-    if (backend == Backend.CPU) throw LocalModelException(LocalModelException.Reason.LOAD_FAILED, modelId, reason)
+    if (!buildAtFault || model.artifact.backend == Backend.CPU) {
+      throw LocalModelException(LocalModelException.Reason.LOAD_FAILED, modelId, reason)
+    }
     onBuildFailed(model.artifact)
     throw LocalModelException(LocalModelException.Reason.BUILD_FAILED, modelId, reason, model.artifact)
   }
@@ -196,6 +200,9 @@ internal class InferenceProcess(
     const val DEATH_TIMEOUT_MILLIS = 5_000L
     const val KEY_BYTES = 24
     const val FAST_CORE_SHARE = 0.7
+
+    /** The engines' failure codes that mean the build can't run here, as opposed to a timeout or a busy port. */
+    val BUILD_FAULTS = setOf("load_failed", "backend_unsupported")
 
     fun freePort(): Int = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }
 

@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
+import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.ImagePart
 import io.jeph.pipkin.agent.NoticeKind
 import io.jeph.pipkin.agent.StepFigure
@@ -72,6 +73,7 @@ import java.text.NumberFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.delay
+import org.json.JSONObject
 
 /**
  * A tool call's or thinking block's one-line row: the tool's icon, the bold title and a muted summary, in monospace for
@@ -240,9 +242,14 @@ private val NoticeKind.icon: Int
 
 /**
  * What the chat's last run footer shows beyond its time: the [backgroundTasks] the chat still waits on, and what the
- * phone's model is doing for the open run, as [localModel] says, when the chat uses one.
+ * phone's model is doing for the open run when the [chat]'s [model] is a local one. The footer reads the model's
+ * activity itself, so its updates, several a second while the model writes, recompose that row alone.
  */
-internal data class TurnStatus(val backgroundTasks: Int = 0, val localModel: String? = null) {
+internal data class TurnStatus(
+  val backgroundTasks: Int = 0,
+  val chat: AgentProcess? = null,
+  val model: JSONObject? = null,
+) {
   companion object {
     val None = TurnStatus()
   }
@@ -273,9 +280,10 @@ internal fun TurnFooterRow(
     }
     SimmeringPot(size = PipkinTokens.IconSize.sm)
     RunningElapsed(item.startedAt)
-    if (duration == null && status.localModel != null) {
+    val localModel = status.chat?.takeIf { duration == null }?.let { localModelActivity(it, status.model) }
+    if (localModel != null) {
       FooterText(
-        text = status.localModel,
+        text = localModel,
         // Announced as it changes, since it's the chat's only sign of progress until the reply starts.
         modifier = Modifier.weight(1f, fill = false).semantics { liveRegion = LiveRegionMode.Polite },
         maxLines = 1,
