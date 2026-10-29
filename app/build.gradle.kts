@@ -356,9 +356,9 @@ val syntaxSources = tasks.register<SyntaxSources>("syntaxSources") {
 
 /**
  * Downloads each of [urls] into [sourcesDir]/<name>, checked against [sha256s]; every archive wraps its files in one
- * directory, which is dropped. The licences of what the library builds in are static assets under
- * `src/main/assets/licenses`: llama-cpp.txt, kleidiai.txt, and llama.cpp's vendored cpp-httplib.txt, nlohmann-json.txt,
- * stb-image.txt, miniaudio.txt and rotate-bits.txt; update them with the pins.
+ * directory, which is dropped. The licences of what the native libraries build in are static assets under
+ * `src/main/assets/licenses`: llama-cpp.txt, kleidiai.txt, opencl-headers.txt, and llama.cpp's vendored
+ * cpp-httplib.txt, nlohmann-json.txt, stb-image.txt, miniaudio.txt and rotate-bits.txt; update them with the pins.
  */
 abstract class LlamaSources : PinnedSources() {
   @get:Input
@@ -381,20 +381,23 @@ abstract class LlamaSources : PinnedSources() {
 
 val llamaSourcesDir = layout.buildDirectory.dir("llama/sources")
 
-// The llama.cpp release the local models run on, and the KleidiAI release its CPU backend pins (ggml's
-// KLEIDIAI_COMMIT_TAG), which ggml would otherwise download, unchecked, while CMake configures.
+// The llama.cpp release the local models run on, the KleidiAI release its CPU backend pins (ggml's
+// KLEIDIAI_COMMIT_TAG), which ggml would otherwise download, unchecked, while CMake configures, and Khronos's OpenCL
+// headers, which its OpenCL backend and the OpenCL probe compile against.
 val llamaSources = tasks.register<LlamaSources>("llamaSources") {
-  description = "Fetches llama.cpp and the KleidiAI kernels for the local models' native build."
+  description = "Fetches llama.cpp, the KleidiAI kernels and the OpenCL headers for the local models' native build."
   urls.set(
     mapOf(
       "llama.cpp" to "https://github.com/ggml-org/llama.cpp/archive/refs/tags/v0.8.0.tar.gz",
       "kleidiai" to "https://github.com/ARM-software/kleidiai/releases/download/v1.32.0/kleidiai-v1.32.0-src.tar.gz",
+      "opencl-headers" to "https://github.com/KhronosGroup/OpenCL-Headers/archive/refs/tags/v2026.05.29.tar.gz",
     ),
   )
   sha256s.set(
     mapOf(
       "llama.cpp" to "51b1e025d7b12e83fa55736e65bc254acd9d23e49f546be7531368fef82210ee",
       "kleidiai" to "a48d373e7c5d721a0aecbf5ddaf0bdf245bc8064e6b84086f13db0e102b553a6",
+      "opencl-headers" to "d9e6c48357de5002da11ce45de600e0c3ffe6ab4f628a3b9fe2b38603161658a",
     ),
   )
   sourcesDir.set(llamaSourcesDir)
@@ -416,14 +419,16 @@ android {
     // Release builds get both from .github/workflows/release.yml; local builds keep these placeholders.
     versionCode = providers.gradleProperty("pipkin.versionCode").map(String::toInt).getOrElse(1)
     versionName = providers.gradleProperty("pipkin.versionName").getOrElse("0.0.0-dev")
-    // 64-bit phones and the emulator; every ABI adds the grammars' and llama.cpp's whole native libraries.
+    // 64-bit phones and the emulator; every ABI adds the grammars' and llama.cpp's whole native libraries, and arm64
+    // also llama.cpp's OpenCL backend.
     ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     externalNativeBuild {
       cmake {
         arguments += "-DTREE_SITTER_SOURCES=${syntaxSourcesDir.get().asFile}"
         arguments += "-DLLAMA_SOURCES=${llamaSourcesDir.get().asFile}"
-        // Only the app's two libraries: llama.cpp's tools and examples would build for nothing.
-        targets += listOf("pipkin-syntax", "pipkin-llama")
+        arguments += "-DOPENCL_HEADERS=${llamaSourcesDir.get().dir("opencl-headers").asFile}"
+        // Only the app's libraries: llama.cpp's tools and examples would build for nothing.
+        targets += listOf("pipkin-syntax", "pipkin-llama", "pipkin-opencl-probe")
       }
     }
   }

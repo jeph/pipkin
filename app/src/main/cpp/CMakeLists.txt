@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
-# pipkin-syntax, the tree-sitter grammars, and pipkin-llama in llama/, llama.cpp's server for local models.
+# pipkin-syntax, the tree-sitter grammars; pipkin-llama in llama/, llama.cpp's server for local models; and
+# pipkin-opencl-probe in opencl/, which finds the GPU that OpenCL reports.
 project(pipkin LANGUAGES C CXX)
 
 # The pinned sources fetched by Gradle's fetchTreeSitterSources task.
@@ -68,4 +69,5 @@ target_compile_options(pipkin-syntax PRIVATE -Wall -Wextra -Werror -Wno-unused-p
 # would lag behind a streaming reply.
 set_source_files_properties(${TS}/tree-sitter/lib/src/lib.c ${GRAMMAR_FILES} PROPERTIES COMPILE_OPTIONS "-O2;-w")
 
+add_subdirectory(opencl)
 add_subdirectory(llama)
