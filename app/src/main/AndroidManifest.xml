@@ -119,5 +119,13 @@
         <receiver
             android:name=".host.HostResultReceiver"
             android:exported="false" />
+        <!-- LiteRT-LM's GPU backend runs on the vendor's OpenCL driver, which an app can only load once it asks for
+             it here. Optional, so phones without one still install Pipkin. -->
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libvndksupport.so"
+            android:required="false" />
     </application>
 </manifest>

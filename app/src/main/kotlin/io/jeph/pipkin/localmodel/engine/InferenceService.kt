@@ -14,7 +14,7 @@ import org.json.JSONObject
 /**
  * Hosts one model in the `:inference` process, apart from the UI's, so that Android killing a model under memory
  * pressure leaves the chats on screen, and so that unloading a model is killing this process. The main process binds
- * it with `BIND_IMPORTANT`, which keeps it as important as the main process while that runs in the foreground.
+ * it with `BIND_NOT_PERCEPTIBLE`, so Android kills background apps before the model, and the model before Termux.
  */
 internal class InferenceService : Service() {
   private val started = AtomicBoolean(false)

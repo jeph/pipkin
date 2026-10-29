@@ -28,7 +28,7 @@ All of them can think before they answer, like larger models with reasoning.
 
 ### Memory
 
-A model takes about as much memory as its download while it runs, plus some for the conversation, on top of what Android and your other apps use. If the phone runs short, Android may stop the model, or other apps, to make room. Start with Qwen3 0.6B, and try the larger models on a phone with more memory, such as 12 GB or more.
+A model takes about as much memory as its download while it runs, plus some for the conversation, on top of what Android and your other apps use. Pipkin loads a model even when that's more than is free: if the phone runs short, Android first closes apps you aren't using, then stops the model, and keeps Termux, where the agent runs. A stopped model loads again with your next message. Start with Qwen3 0.6B, and try the larger models on a phone with more memory, such as 12 GB or more.
 
 ## How Pipkin runs a model
 

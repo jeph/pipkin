@@ -5,7 +5,6 @@ import io.jeph.pipkin.localmodel.CatalogModel
 import io.jeph.pipkin.localmodel.ModelArtifact
 import io.jeph.pipkin.localmodel.engine.Backend
 import io.jeph.pipkin.localmodel.engine.EngineKind
-import java.io.File
 
 /** Which engine the user wants a model run with; [AUTOMATIC] leaves it to [EngineChoice]. Saved by name. */
 internal enum class EngineOverride(val engine: EngineKind?) {
@@ -17,16 +16,25 @@ internal enum class EngineOverride(val engine: EngineKind?) {
 /**
  * What [EngineChoice] needs to know about the phone, gathered once so the choice itself is a pure function the tests
  * can run for any phone. [socModel] is `Build.SOC_MODEL`, which Android reports from API 31; [hasOpenCl] says whether
- * the vendor ships an OpenCL driver, which LiteRT-LM's GPU backend runs on.
+ * Pipkin can load the vendor's OpenCL driver, which LiteRT-LM's GPU backend runs on.
  */
 internal data class DeviceProfile(val socModel: String?, val hasOpenCl: Boolean) {
   companion object {
     fun current(): DeviceProfile = DeviceProfile(
       socModel = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Build.SOC_MODEL else null,
-      hasOpenCl = OPEN_CL_PATHS.any { File(it).exists() },
+      hasOpenCl = canLoadOpenCl(),
     )
 
-    private val OPEN_CL_PATHS = listOf("/vendor/lib64/libOpenCL.so", "/system/vendor/lib64/libOpenCL.so")
+    /**
+     * Loading the library is the only reliable test: a phone may ship `libOpenCL.so` without making it public to apps,
+     * which the manifest's `uses-native-library` asks for, and then LiteRT-LM can't find it either.
+     */
+    private fun canLoadOpenCl(): Boolean = try {
+      System.loadLibrary("OpenCL")
+      true
+    } catch (_: UnsatisfiedLinkError) {
+      false
+    }
   }
 }
 

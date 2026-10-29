@@ -1,13 +1,11 @@
 package io.jeph.pipkin.localmodel
 
-import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
 import android.os.Process
-import android.text.format.Formatter
 import android.util.Log
 import io.jeph.pipkin.AppStrings
 import io.jeph.pipkin.R
@@ -64,7 +62,6 @@ internal class InferenceProcess(context: Context, private val installed: () -> L
     unloadAndWait()
     val model = installed().firstOrNull { it.model.id == modelId }
       ?: throw LocalModelException(LocalModelException.Reason.NOT_INSTALLED, modelId)
-    checkMemory(model)
     stateFlow.value = RuntimeState.Loading(modelId, 0f)
     val config = EngineConfig(
       engine = model.artifact.engine,
@@ -104,9 +101,10 @@ internal class InferenceProcess(context: Context, private val installed: () -> L
     stateFlow.value = RuntimeState.Ready(modelId, config.engine, config.backend, config.contextSize)
   }
 
+  /** Kills the process, if any, and clears what the status shows, including why the last load failed. */
   override fun unload() {
-    val bound = synchronized(lock) { current.also { current = null } } ?: return
-    bound.stop()
+    val bound = synchronized(lock) { current.also { current = null } }
+    bound?.stop()
     stateFlow.value = RuntimeState.Stopped
   }
 
@@ -121,27 +119,12 @@ internal class InferenceProcess(context: Context, private val installed: () -> L
     val bound = Bound(ModelEndpoint(config.modelAlias, config.modelPath, config.port, config.apiKey))
     synchronized(lock) { current = bound }
     val intent = Intent(context, InferenceService::class.java)
-    // BIND_IMPORTANT raises the process to the main process's importance, which AgentService keeps in the foreground
-    // while chats work, so Android treats the model like the app the user is using.
-    val flags = Context.BIND_AUTO_CREATE or Context.BIND_IMPORTANT
+    // BIND_NOT_PERCEPTIBLE ranks the process just below perceptible ones such as Termux's foreground service, and far
+    // above background apps: under memory pressure Android kills those first, then the model, and only then Termux,
+    // which runs Pi. It keeps the scheduling of the main process, which AgentService keeps in the foreground.
+    val flags = Context.BIND_AUTO_CREATE or Context.BIND_NOT_PERCEPTIBLE
     check(context.bindService(intent, bound, flags)) { "Couldn't bind the inference service" }
     return bound
-  }
-
-  /** Refuses a model that can't fit beside what's running: loading it would only get some process killed. */
-  private fun checkMemory(model: InstalledModel) {
-    val memory = ActivityManager.MemoryInfo()
-    context.getSystemService(ActivityManager::class.java).getMemoryInfo(memory)
-    val needed = model.file.length() + KV_AND_BUFFERS_BYTES
-    val free = memory.availMem - memory.threshold
-    if (free < needed) {
-      val sizes = AppStrings.get(
-        R.string.local_model_error_memory_sizes,
-        Formatter.formatShortFileSize(context, needed),
-        Formatter.formatShortFileSize(context, free.coerceAtLeast(0)),
-      )
-      throw LocalModelException(LocalModelException.Reason.NOT_ENOUGH_MEMORY, model.model.id, sizes)
-    }
   }
 
   private inner class Bound(val endpoint: ModelEndpoint) : ServiceConnection {
@@ -191,10 +174,6 @@ internal class InferenceProcess(context: Context, private val installed: () -> L
   private companion object {
     const val TAG = "PipkinLocalModels"
     const val DEATH_TIMEOUT_MILLIS = 5_000L
-
-    /** A rough allowance for the context cache and working buffers on top of the weights. */
-    const val KV_AND_BUFFERS_BYTES = 512L * 1024 * 1024
-    const val MEGABYTE_SHIFT = 20
     const val KEY_BYTES = 24
     const val FAST_CORE_SHARE = 0.7
 
@@ -223,13 +202,12 @@ internal class LocalModelException(
   private val modelId: String,
   private val detail: String = "",
 ) : Exception() {
-  enum class Reason { NOT_INSTALLED, NOT_ENOUGH_MEMORY, LOAD_FAILED, PROCESS_DIED }
+  enum class Reason { NOT_INSTALLED, LOAD_FAILED, PROCESS_DIED }
 
   /** Read where it lands, so it follows the app's language then. */
   override val message: String
     get() = when (reason) {
       Reason.NOT_INSTALLED -> AppStrings.get(R.string.local_model_error_not_installed, modelId)
-      Reason.NOT_ENOUGH_MEMORY -> AppStrings.get(R.string.local_model_error_memory, modelId, detail)
       Reason.LOAD_FAILED -> AppStrings.get(R.string.local_model_error_load_failed, modelId, detail)
       Reason.PROCESS_DIED -> AppStrings.get(R.string.local_model_error_stopped, modelId)
     }
