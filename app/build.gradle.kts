@@ -500,15 +500,36 @@ java {
 detekt {
   buildUponDefaultConfig.set(true)
   config.setFrom(rootProject.file("config/detekt.yml"))
+  failOnSeverity.set(dev.detekt.gradle.extensions.FailOnSeverity.Info)
 }
 
+// detekt only prints a count when the code it analyzes doesn't compile against its classpath, then skips the rules that
+// need types there; that silently weakens the check, so it fails the task instead.
 tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
   jvmTarget.set("21")
+  val analysisErrors = StringBuilder()
+  logging.addStandardOutputListener { text ->
+    if ("compiler errors found during analysis" in text) analysisErrors.append(text)
+  }
+  doLast {
+    if (analysisErrors.isEmpty()) return@doLast
+    throw GradleException("detekt couldn't analyze all of $name's sources: ${analysisErrors.trim()}")
+  }
 }
 
-// The debug variant's tasks rather than detektMain and detektTest: only a variant's classpath has the Java that AIDL
-// generates for the :inference process's binder, without which detekt can't resolve InferenceProcess and
-// InferenceService and skips the rules that need types there.
+// The debug variant's tasks rather than detektMain and detektTest, so that src/debug is checked too. The variant's
+// classpath lacks the Java that AIDL generates for the :inference process's binder, which kotlinc compiles from source,
+// so detektDebug also gets javac's classes; without them it can't resolve InferenceProcess and InferenceService. The
+// plugin sets the classpath as a convention, which adding to would drop, so this sets the plugin's entries again.
+tasks.withType<dev.detekt.gradle.Detekt>().named { it == "detektDebug" }.configureEach {
+  val kotlinCompile = tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileDebugKotlin")
+  classpath.setFrom(
+    kotlinCompile.map { it.destinationDirectory },
+    kotlinCompile.map { it.libraries },
+    tasks.named("compileDebugJavaWithJavac"),
+  )
+}
+
 tasks.named("check") {
   dependsOn("detektDebug", "detektDebugUnitTest", hostCheck)
 }
