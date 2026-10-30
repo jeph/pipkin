@@ -76,7 +76,7 @@ internal class LoopbackHttp(port: Int, private val handler: (HttpRequest, HttpRe
   private fun watchForHangUp(input: InputStream, request: HttpRequest) {
     connections.execute {
       try {
-        while (input.read() >= 0) Unit
+        while (input.read() >= 0) continue
       } catch (_: IOException) {
         // A reset is a hang-up too.
       }
@@ -122,7 +122,7 @@ internal class LoopbackHttp(port: Int, private val handler: (HttpRequest, HttpRe
       val size = readLine(input)?.substringBefore(';')?.trim()?.toLongOrNull(HEX)
         ?: throw HttpException(STATUS_BAD_REQUEST, "Malformed chunk")
       if (size == 0L) {
-        while (readLine(input)?.isNotEmpty() == true) Unit
+        while (readLine(input)?.isNotEmpty() == true) continue
         return body.toByteArray()
       }
       if (body.size() + size > MAX_BODY_BYTES) throw HttpException(STATUS_TOO_LARGE, "Request body too large")
