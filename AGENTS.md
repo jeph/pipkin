@@ -44,7 +44,9 @@ Leave code you change better than you found it, and limit the cleanup to that co
 
 ## Checks
 
-A task isn't done until `./gradlew check` passes. It runs ktlint, detekt, Android lint, the unit tests, and the host's type check, lint, and tests, and every release build runs it first, so a failure on `dev` blocks the next release. Fix any failure it reports, including ones in code you didn't change, rather than leaving it for later. Fix the code instead of silencing a check: don't add `@Suppress`, lint or detekt baselines, ignore comments, or configuration that turns a rule off.
+A task isn't done until `./gradlew check` passes. It runs ktlint, detekt, Android lint, the unit tests, and the host's type check, lint, and tests, and every release build runs it first, so a failure on `dev` blocks the next release. ktlint and detekt fail it on any finding, and detekt also fails when it can't resolve the code it analyzes, since it would otherwise skip its type-aware rules there. Fix any failure it reports, including ones in code you didn't change, rather than leaving it for later.
+
+Fix the code instead of silencing a check. Suppressing a rule is a last resort, for a finding that the code can't avoid without getting worse. Then suppress only that finding, as narrowly as you can: an `@Suppress("RuleName")` or an ignore comment on the one declaration or line, with a comment saying why the rule doesn't fit there. Don't add lint or detekt baselines, suppress a rule for a whole file, or turn a rule off in configuration to get a check passing.
 
 ## Text the user sees
 
