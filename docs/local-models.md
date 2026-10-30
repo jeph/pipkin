@@ -56,7 +56,7 @@ While a chat waits or the model works, the line under the reply, beside its time
 
 The **Status** card under **Settings → Providers and models → Local models** shows which model is loaded, on which engine, and how much conversation it can hold. Tap **Unload** to give its memory back right away; a chat that's using it stops with an error. Pipkin also unloads a model that hasn't been used for five minutes; change that under **Minutes before an unused model unloads**.
 
-A local model can hold a shorter conversation than a provider's. When a chat gets near the limit, the agent compacts it, summarising the older messages, as it does for any model; `/compact` does it on demand.
+A local model can hold a shorter conversation than a provider's: 32,768 tokens when your phone has the memory for the model and that much conversation, which Pipkin counts as at most half the phone's memory, and 16,384 otherwise. A model's reply can be up to an eighth of that. When a chat gets near the limit, the agent compacts it, summarising the older messages, as it does for any model; `/compact` does it on demand. With 16,384 tokens, most of which the agent's instructions and tools take, that happens every few messages.
 
 ## Downloads
 

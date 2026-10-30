@@ -32,7 +32,7 @@ class ModelDownloaderTest {
     sha256 = sha256,
     sizeBytes = bytes.size.toLong(),
     fileName = "model.litertlm",
-    contextSize = 4096,
+    contextLimit = 4096,
   )
 
   /** Serves [content], from the offset asked for unless [ignoresRange]; records each offset asked for. */

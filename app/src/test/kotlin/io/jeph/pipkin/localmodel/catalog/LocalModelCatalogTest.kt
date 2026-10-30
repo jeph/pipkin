@@ -29,7 +29,7 @@ class LocalModelCatalogTest {
       assertTrue(artifact.url, artifact.url.endsWith("/" + artifact.fileName))
       assertTrue(artifact.sha256, Regex("[0-9a-f]{64}").matches(artifact.sha256))
       assertTrue(artifact.fileName, artifact.sizeBytes > 0)
-      assertTrue(artifact.fileName, artifact.contextSize > 0)
+      assertTrue(artifact.fileName, artifact.contextLimit > 0)
     }
   }
 
@@ -42,7 +42,7 @@ class LocalModelCatalogTest {
 
   @Test
   fun everyModelRunsSomewhereWithoutAnNpu() {
-    val anyPhone = DeviceProfile(socModel = null, gpu = null)
+    val anyPhone = DeviceProfile(socModel = null, gpu = null, memoryBytes = 4_000_000_000L)
     for (model in models) {
       assertTrue(model.id, EngineChoice.choose(model, anyPhone) != null)
     }

@@ -78,7 +78,7 @@ internal class InferenceProcess(
       engine = model.artifact.engine,
       modelPath = model.file.absolutePath,
       modelAlias = modelId,
-      contextSize = model.artifact.contextSize,
+      contextSize = model.contextSize,
       threads = performanceCores(),
       backend = model.artifact.backend,
       port = freePort(),

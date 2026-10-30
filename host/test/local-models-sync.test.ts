@@ -2,13 +2,18 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type Dirs, installRealPi, makeDirs, removeDirs, runMode } from "./harness.js";
+import type { Api, Message, Model } from "@earendil-works/pi-ai";
+import { clampMaxTokensToContext } from "@earendil-works/pi-ai/api/simple-options";
+import { normalizeContext } from "@earendil-works/pi-ai/utils/transcript";
+
+const FREE_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
 
 const SYNC = {
   baseUrl: "http://127.0.0.1:47325/v1",
   apiKey: "local-key",
   models: [
-    { id: "qwen3-0.6b", name: "Qwen3 0.6B", reasoning: true, contextWindow: 32_768, maxTokens: 8192 },
-    { id: "gemma-4-e2b", name: "Gemma 4 E2B", reasoning: true, contextWindow: 4096, maxTokens: 2048 },
+    { id: "qwen3-0.6b", name: "Qwen3 0.6B", reasoning: true, contextWindow: 32_768, maxTokens: 4096 },
+    { id: "gemma-4-e2b", name: "Gemma 4 E2B", reasoning: true, contextWindow: 16_384, maxTokens: 2048 },
   ],
 };
 
@@ -62,10 +67,24 @@ describe("local_models_sync mode", () => {
       enabled: true,
       modelOverrides: {
         "openai/gpt": keep,
-        "pipkin-local/qwen3-0.6b": { reserveTokens: 8192, keepRecentTokens: 8192 },
-        "pipkin-local/gemma-4-e2b": { reserveTokens: 1024, keepRecentTokens: 1024 },
+        "pipkin-local/qwen3-0.6b": { reserveTokens: 8192, keepRecentTokens: 2048 },
+        "pipkin-local/gemma-4-e2b": { reserveTokens: 6144, keepRecentTokens: 1024 },
       },
     });
+  });
+
+  it("compacts before pi-ai would cut a reply below the model's maxTokens", async () => {
+    await runMode("local_models_sync", dirs, SYNC);
+    const overrides = (await json("settings.json")).compaction as { modelOverrides: Record<string, { reserveTokens: number }> };
+    for (const model of SYNC.models) {
+      const { reserveTokens } = overrides.modelOverrides[`pipkin-local/${model.id}`]!;
+      // Pi compacts once the prompt passes the window less reserveTokens, so this is the largest prompt a reply gets.
+      const prompt = model.contextWindow - reserveTokens;
+      const usage = { input: prompt, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: prompt, cost: FREE_COST };
+      const message = { role: "assistant", content: [], usage, stopReason: "stop", timestamp: 0 } as unknown as Message;
+      const context = normalizeContext({ messages: [message] });
+      expect(clampMaxTokensToContext(model as unknown as Model<Api>, context, model.maxTokens)).toBe(model.maxTokens);
+    }
   });
 
   it("removes the provider and its overrides when no models are left", async () => {

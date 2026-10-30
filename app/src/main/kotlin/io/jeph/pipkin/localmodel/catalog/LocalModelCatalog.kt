@@ -16,7 +16,7 @@ internal object LocalModelCatalog {
       id = "qwen3-0.6b",
       name = "Qwen3 0.6B",
       reasoning = true,
-      maxTokens = MAX_TOKENS,
+      cacheBytesPerToken = attentionCache(layers = 28, kvHeads = 8, headDim = 128),
       artifacts = listOf(
         ModelArtifact(
           engine = EngineKind.LITERT,
@@ -25,7 +25,7 @@ internal object LocalModelCatalog {
           sha256 = "cc87c8a3df6eb680266a385c22fc3e867824495ff676583716ebe77e6ddd6c97",
           sizeBytes = 1_202_913_280,
           fileName = "Qwen3-0.6B.mediatek.mt6993.litertlm",
-          contextSize = 4096,
+          contextLimit = 4096,
           socModels = setOf(MEDIATEK_MT6993),
         ),
         ModelArtifact(
@@ -35,53 +35,49 @@ internal object LocalModelCatalog {
           sha256 = "c5f39b4191926786c3e6668b62af4d6eb15248dfc7a5348252a9b406f33f2108",
           sizeBytes = 613_722_264,
           fileName = "Qwen3-0.6B.litertlm",
-          contextSize = 4096,
+          contextLimit = 4096,
         ),
       ) + llamaBuilds(
         repository = "Qwen/Qwen3-0.6B-GGUF",
         file = "Qwen3-0.6B-Q8_0.gguf",
         sha256 = "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031",
         sizeBytes = 639_446_688,
-        contextSize = CONTEXT,
       ),
     ),
     CatalogModel(
       id = "qwen3-1.7b",
       name = "Qwen3 1.7B",
       reasoning = true,
-      maxTokens = MAX_TOKENS,
+      cacheBytesPerToken = attentionCache(layers = 28, kvHeads = 8, headDim = 128),
       artifacts = llamaBuilds(
         repository = "Qwen/Qwen3-1.7B-GGUF",
         file = "Qwen3-1.7B-Q8_0.gguf",
         sha256 = "061b54daade076b5d3362dac252678d17da8c68f07560be70818cace6590cb1a",
         sizeBytes = 1_834_426_016,
-        contextSize = CONTEXT,
       ),
     ),
     CatalogModel(
       id = "qwen3-4b",
       name = "Qwen3 4B",
       reasoning = true,
-      maxTokens = MAX_TOKENS,
+      cacheBytesPerToken = attentionCache(layers = 36, kvHeads = 8, headDim = 128),
       artifacts = llamaBuilds(
         repository = "Qwen/Qwen3-4B-GGUF",
         file = "Qwen3-4B-Q4_K_M.gguf",
         sha256 = "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5",
         sizeBytes = 2_497_280_256,
-        contextSize = CONTEXT,
       ),
     ),
     CatalogModel(
       id = "qwen3-8b",
       name = "Qwen3 8B",
       reasoning = true,
-      maxTokens = MAX_TOKENS,
+      cacheBytesPerToken = attentionCache(layers = 36, kvHeads = 8, headDim = 128),
       artifacts = llamaBuilds(
         repository = "Qwen/Qwen3-8B-GGUF",
         file = "Qwen3-8B-Q4_K_M.gguf",
         sha256 = "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785",
         sizeBytes = 5_027_783_488,
-        contextSize = CONTEXT,
       ),
     ),
     // Qwen3.5's LiteRT-LM builds keep 4,096 tokens, too few for Pi's prompt, so it runs on llama.cpp from Unsloth's
@@ -90,33 +86,31 @@ internal object LocalModelCatalog {
       id = "qwen3.5-2b",
       name = "Qwen3.5 2B",
       reasoning = true,
-      maxTokens = MAX_TOKENS,
+      cacheBytesPerToken = attentionCache(layers = 6, kvHeads = 2, headDim = 256),
       artifacts = llamaBuilds(
         repository = "unsloth/Qwen3.5-2B-GGUF",
         file = "Qwen3.5-2B-Q4_K_M.gguf",
         sha256 = "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223",
         sizeBytes = 1_280_835_840,
-        contextSize = CONTEXT,
       ),
     ),
     CatalogModel(
       id = "qwen3.5-4b",
       name = "Qwen3.5 4B",
       reasoning = true,
-      maxTokens = MAX_TOKENS,
+      cacheBytesPerToken = attentionCache(layers = 8, kvHeads = 4, headDim = 256),
       artifacts = llamaBuilds(
         repository = "unsloth/Qwen3.5-4B-GGUF",
         file = "Qwen3.5-4B-Q4_K_M.gguf",
         sha256 = "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4",
         sizeBytes = 2_740_937_888,
-        contextSize = CONTEXT,
       ),
     ),
     CatalogModel(
       id = "gemma-4-e2b",
       name = "Gemma 4 E2B",
       reasoning = true,
-      maxTokens = MAX_TOKENS,
+      cacheBytesPerToken = attentionCache(layers = 7, kvHeads = 1, headDim = 512),
       artifacts = listOf(
         ModelArtifact(
           engine = EngineKind.LITERT,
@@ -126,7 +120,7 @@ internal object LocalModelCatalog {
           sizeBytes = 3_113_545_589,
           fileName = "gemma-4-E2B-it_Google_Tensor_G5.litertlm",
           // An NPU build's context is fixed when it's compiled; the model card benchmarks this one at 4,096.
-          contextSize = 4096,
+          contextLimit = 4096,
           socModels = setOf(GOOGLE_TENSOR_G5),
         ),
         ModelArtifact(
@@ -136,7 +130,7 @@ internal object LocalModelCatalog {
           sha256 = "a53a59001894c58e6bdb5b9b227709f91a2e3e556baa7d85acf9c55402ba5cf5",
           sizeBytes = 2_008_432_640,
           fileName = "gemma-4-E2B-it-gpu.litertlm",
-          contextSize = CONTEXT,
+          contextLimit = EngineChoice.LONG_CONTEXT,
         ),
         ModelArtifact(
           engine = EngineKind.LITERT,
@@ -145,14 +139,13 @@ internal object LocalModelCatalog {
           sha256 = "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
           sizeBytes = 2_588_147_712,
           fileName = "gemma-4-E2B-it.litertlm",
-          contextSize = CONTEXT,
+          contextLimit = EngineChoice.LONG_CONTEXT,
         ),
       ) + llamaBuilds(
         repository = "ggml-org/gemma-4-E2B-it-GGUF",
         file = "gemma-4-E2B-it-Q4_0.gguf",
         sha256 = "8e30dff3ac4c8434c49a7036fa15564bdbb6044e42bf04550bf1a096ad7e6a52",
         sizeBytes = 2_841_481_184,
-        contextSize = CONTEXT,
       ),
     ),
     // LiteRT-LM's builds only: its GGUF is about 4.8 GB, and as llama.cpp's GPU build comes before LiteRT-LM's CPU one,
@@ -161,7 +154,7 @@ internal object LocalModelCatalog {
       id = "gemma-4-e4b",
       name = "Gemma 4 E4B",
       reasoning = true,
-      maxTokens = MAX_TOKENS,
+      cacheBytesPerToken = attentionCache(layers = 7, kvHeads = 2, headDim = 512),
       artifacts = listOf(
         ModelArtifact(
           engine = EngineKind.LITERT,
@@ -170,7 +163,7 @@ internal object LocalModelCatalog {
           sha256 = "4912bb5a9c30993c51a7711f763212077458529312175df0573a78323a2bb7ff",
           sizeBytes = 2_969_059_328,
           fileName = "gemma-4-E4B-it-gpu.litertlm",
-          contextSize = CONTEXT,
+          contextLimit = EngineChoice.LONG_CONTEXT,
         ),
         ModelArtifact(
           engine = EngineKind.LITERT,
@@ -179,7 +172,7 @@ internal object LocalModelCatalog {
           sha256 = "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
           sizeBytes = 3_659_530_240,
           fileName = "gemma-4-E4B-it.litertlm",
-          contextSize = CONTEXT,
+          contextLimit = EngineChoice.LONG_CONTEXT,
         ),
       ),
     ),
@@ -188,13 +181,12 @@ internal object LocalModelCatalog {
       id = "ministral-3-3b",
       name = "Ministral 3 3B",
       reasoning = false,
-      maxTokens = MAX_TOKENS,
+      cacheBytesPerToken = attentionCache(layers = 26, kvHeads = 8, headDim = 128),
       artifacts = llamaBuilds(
         repository = "mistralai/Ministral-3-3B-Instruct-2512-GGUF",
         file = "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
         sha256 = "9ed150d4367e68df0ac8e1540f6ddc65b42d0ee26378329d1ecbca60f93fc5f8",
         sizeBytes = 2_147_023_008,
-        contextSize = CONTEXT,
       ),
     ),
   )
@@ -209,14 +201,14 @@ internal object LocalModelCatalog {
 }
 
 /**
- * The conversation a build that isn't compiled for a fixed one holds: as much as Pi needs and no more, though the models
- * allow 32,768 tokens or more, since llama.cpp keeps the whole context's cache in memory from the start, and the bigger
- * a model's footprint the sooner Android stops other apps, then the model, to free memory.
+ * What a model's attention cache takes per token of context at 16 bits: a key and a value for each of its [layers] that
+ * attend to the whole conversation. Layers that keep a fixed-size state (Qwen3.5) or attend to a fixed window (Gemma 4)
+ * don't grow with the context, so they aren't counted. The numbers come from each model's `config.json`.
  */
-private const val CONTEXT = EngineChoice.AGENT_CONTEXT
+private fun attentionCache(layers: Int, kvHeads: Int, headDim: Int): Long =
+  2L * layers * kvHeads * headDim * BYTES_PER_16_BIT_VALUE
 
-/** The most a reply may take, which Pi is told as each model's `maxTokens`. */
-private const val MAX_TOKENS = 8192
+private const val BYTES_PER_16_BIT_VALUE = 2
 
 private const val GEMMA_4_E2B_LITERT = "litert-community/gemma-4-E2B-it-litert-lm"
 private const val GEMMA_4_E4B_LITERT = "litert-community/gemma-4-E4B-it-litert-lm"
@@ -233,7 +225,7 @@ private fun huggingFace(repository: String, file: String) = "https://huggingface
  * A GGUF file's builds for llama.cpp: one file that runs on the GPU or the CPU, chosen when the model loads, so it's
  * downloaded once for both.
  */
-private fun llamaBuilds(repository: String, file: String, sha256: String, sizeBytes: Long, contextSize: Int) =
+private fun llamaBuilds(repository: String, file: String, sha256: String, sizeBytes: Long) =
   listOf(Backend.GPU, Backend.CPU).map { backend ->
     ModelArtifact(
       engine = EngineKind.LLAMA,
@@ -242,6 +234,6 @@ private fun llamaBuilds(repository: String, file: String, sha256: String, sizeBy
       sha256 = sha256,
       sizeBytes = sizeBytes,
       fileName = file,
-      contextSize = contextSize,
+      contextLimit = EngineChoice.LONG_CONTEXT,
     )
   }

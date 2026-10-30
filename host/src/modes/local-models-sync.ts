@@ -29,10 +29,19 @@ const COMPAT = {
 const FREE = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
 
 /**
- * Pi's defaults reserve 16384 tokens for the reply and keep 20000 recent ones when compacting, more than a phone's
- * whole context. A quarter of the window each leaves room to work and to summarize with the same model.
+ * pi-ai caps each request's `max_tokens` at the context window less the prompt and this margin
+ * (`CONTEXT_SAFETY_TOKENS` in its `clampMaxTokensToContext`), so a reply only gets its whole `maxTokens` while the
+ * prompt leaves both free.
  */
-const COMPACTION_SHARE = 4;
+const PI_AI_CONTEXT_MARGIN = 4096;
+
+/**
+ * Pi's defaults reserve 16384 tokens for the reply and keep 20000 recent ones when compacting, more than a phone's
+ * whole context. Compacting once the reply and pi-ai's margin no longer fit means a reply is never cut short before
+ * then. What compaction keeps has to fit in what's left of the context after Pi's system prompt and tools, about
+ * 7,000 tokens, and the summary, or compacting frees nothing: a sixteenth of the context, 1,024 tokens of 16,384.
+ */
+const KEPT_SHARE = 16;
 
 /** Pi's settings manager members its public API has no setter for: per-model compaction overrides. */
 interface CompactionWriter {
@@ -101,9 +110,11 @@ async function saveCompaction(settings: PiSettings, models: readonly ModelDef[])
     if (key.startsWith(`${LOCAL_PROVIDER}/`)) delete overrides[key];
   }
   for (const model of models) {
-    if (model.contextWindow === undefined) continue;
-    const share = Math.floor(model.contextWindow / COMPACTION_SHARE);
-    overrides[`${LOCAL_PROVIDER}/${model.id}`] = { reserveTokens: share, keepRecentTokens: share };
+    if (model.contextWindow === undefined || model.maxTokens === undefined) continue;
+    overrides[`${LOCAL_PROVIDER}/${model.id}`] = {
+      reserveTokens: model.maxTokens + PI_AI_CONTEXT_MARGIN,
+      keepRecentTokens: Math.floor(model.contextWindow / KEPT_SHARE),
+    };
   }
   if (Object.keys(overrides).length > 0) compaction.modelOverrides = overrides;
   else delete compaction.modelOverrides;

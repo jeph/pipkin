@@ -15,22 +15,37 @@ internal data class ModelArtifact(
   val sha256: String,
   val sizeBytes: Long,
   val fileName: String,
-  /** The context the engine is started with, which Pi is told as the model's context window. */
-  val contextSize: Int,
+  /**
+   * The most context the engine can start this build with: fixed when the build is compiled for one, as NPU builds are.
+   * [EngineChoice][io.jeph.pipkin.localmodel.catalog.EngineChoice] decides how much of it this phone gets.
+   */
+  val contextLimit: Int,
   val socModels: Set<String> = emptySet(),
 )
 
-/** A model Pipkin offers, with every build of it; [id] is its model id under the `pipkin-local` provider in Pi. */
+/**
+ * A model Pipkin offers, with every build of it; [id] is its model id under the `pipkin-local` provider in Pi.
+ * [cacheBytesPerToken] is what its attention cache takes per token of context at 16 bits, which decides whether a phone
+ * has the memory for a longer context.
+ */
 internal data class CatalogModel(
   val id: String,
   val name: String,
   val reasoning: Boolean,
-  val maxTokens: Int,
+  val cacheBytesPerToken: Long,
   val artifacts: List<ModelArtifact>,
 )
 
-/** A model whose chosen [artifact] is downloaded and verified at [file]. */
-internal data class InstalledModel(val model: CatalogModel, val artifact: ModelArtifact, val file: File)
+/**
+ * A model whose chosen [artifact] is downloaded and verified at [file], run with [contextSize] tokens of context, which
+ * Pi is told as the model's context window.
+ */
+internal data class InstalledModel(
+  val model: CatalogModel,
+  val artifact: ModelArtifact,
+  val file: File,
+  val contextSize: Int,
+)
 
 /** What the `:inference` process is doing. */
 internal sealed interface RuntimeState {

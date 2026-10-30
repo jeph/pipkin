@@ -76,16 +76,13 @@ internal class LocalModels(
     }
   }
 
-  private fun modelConfig(installed: InstalledModel): ModelConfig {
-    val context = installed.artifact.contextSize
-    return ModelConfig(
-      id = installed.model.id,
-      name = installed.model.name,
-      reasoning = installed.model.reasoning,
-      contextWindow = context.toLong(),
-      maxTokens = minOf(installed.model.maxTokens, context / MAX_TOKENS_SHARE).toLong(),
-    )
-  }
+  private fun modelConfig(installed: InstalledModel): ModelConfig = ModelConfig(
+    id = installed.model.id,
+    name = installed.model.name,
+    reasoning = installed.model.reasoning,
+    contextWindow = installed.contextSize.toLong(),
+    maxTokens = (installed.contextSize / REPLY_SHARE).toLong(),
+  )
 
   private companion object {
     const val TAG = "PipkinLocalModels"
@@ -97,8 +94,12 @@ internal class LocalModels(
     const val RETRY_MILLIS = 30_000L
     const val KEY_BYTES = 24
 
-    /** A reply may take at most a quarter of the context, as Pi's compaction reserves for it. */
-    const val MAX_TOKENS_SHARE = 4
+    /**
+     * A reply may take at most an eighth of the context: 2,048 tokens of 16,384, or 4,096 of 32,768. Pi's system prompt
+     * and tools take about 7,000 tokens, and the host keeps the reply and pi-ai's 4,096-token margin free on top of the
+     * conversation, so a larger share would leave too little of a 16,384-token context for the conversation itself.
+     */
+    const val REPLY_SHARE = 8
 
     fun randomKey(): String =
       Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(KEY_BYTES).also(SecureRandom()::nextBytes))

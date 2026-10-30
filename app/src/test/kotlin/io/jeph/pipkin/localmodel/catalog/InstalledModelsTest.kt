@@ -8,8 +8,8 @@ import org.junit.Test
 
 class InstalledModelsTest {
   private val qwen = checkNotNull(LocalModelCatalog.model("qwen3-0.6b"))
-  private val emulator = DeviceProfile(socModel = "", gpu = null)
-  private val adreno = DeviceProfile(socModel = "SM8850", gpu = "QUALCOMM Adreno(TM) 840")
+  private val emulator = DeviceProfile(socModel = "", gpu = null, memoryBytes = 4 * GB)
+  private val adreno = DeviceProfile(socModel = "SM8850", gpu = "QUALCOMM Adreno(TM) 840", memoryBytes = 12 * GB)
   private val dir = File("/models")
 
   private fun installed(files: Set<String>, device: DeviceProfile = emulator) =
@@ -37,18 +37,29 @@ class InstalledModelsTest {
   }
 
   @Test
+  fun theContextGrowsWithThePhonesMemory() {
+    val gguf = setOf("Qwen3-0.6B-Q8_0.gguf")
+    assertEquals(EngineChoice.AGENT_CONTEXT, installed(gguf).single().contextSize)
+    assertEquals(EngineChoice.LONG_CONTEXT, installed(gguf, emulator.copy(memoryBytes = 8 * GB)).single().contextSize)
+  }
+
+  @Test
   fun anotherDownloadedBuildIsListedWhenTheChosenOneIsnt() {
     assertEquals("Qwen3-0.6B.litertlm", installed(setOf("Qwen3-0.6B.litertlm")).single().artifact.fileName)
   }
 
   @Test
   fun anNpuBuildForAnotherPhoneIsntListed() {
-    val pixel = DeviceProfile(socModel = "Tensor G5", gpu = null)
+    val pixel = DeviceProfile(socModel = "Tensor G5", gpu = null, memoryBytes = 12 * GB)
     assertTrue(installed(setOf("Qwen3-0.6B.mediatek.mt6993.litertlm"), device = pixel).isEmpty())
   }
 
   @Test
   fun aModelWithNothingDownloadedIsntListed() {
     assertTrue(installed(emptySet()).isEmpty())
+  }
+
+  private companion object {
+    const val GB = 1_000_000_000L
   }
 }

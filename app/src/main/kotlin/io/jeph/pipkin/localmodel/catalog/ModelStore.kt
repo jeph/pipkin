@@ -76,7 +76,7 @@ internal class ModelStore(
 
   init {
     scope.launch {
-      val (hardware, files) = withContext(Dispatchers.IO) { DeviceProfile.current(preferences) to scan() }
+      val (hardware, files) = withContext(Dispatchers.IO) { DeviceProfile.current(context, preferences) to scan() }
       hardwareState.value = hardware
       downloadedState.value = files
     }
@@ -169,8 +169,9 @@ internal class ModelStore(
 
 /**
  * Each model of [models] with a file among [downloaded] that runs on [device], with the build [EngineChoice] picks
- * among the downloaded ones: the best for the phone when it's downloaded, else one the user fetched before. An NPU
- * build for another phone's SoC, or a build that failed to load here, isn't listed.
+ * among the downloaded ones, the best for the phone when it's downloaded, else one the user fetched before, and the
+ * context it gives that build here. An NPU build for another phone's SoC, or a build that failed to load here, isn't
+ * listed.
  */
 internal fun installedModels(
   models: List<CatalogModel>,
@@ -179,5 +180,6 @@ internal fun installedModels(
   dir: File,
 ): List<InstalledModel> = models.mapNotNull { model ->
   val local = model.copy(artifacts = model.artifacts.filter { it.fileName in downloaded })
-  EngineChoice.choose(local, device)?.let { InstalledModel(model, it, File(dir, it.fileName)) }
+  val artifact = EngineChoice.choose(local, device) ?: return@mapNotNull null
+  InstalledModel(model, artifact, File(dir, artifact.fileName), EngineChoice.contextSize(model, artifact, device))
 }
