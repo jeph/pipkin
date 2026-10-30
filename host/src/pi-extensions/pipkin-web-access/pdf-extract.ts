@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 /**
  * PDF Content Extractor
  *
@@ -31,10 +31,8 @@ import { getWebSearchConfigPath } from "./utils.ts";
 
 export interface PDFExtractResult {
 	title: string;
-	/** The same Markdown written to outputPath, retained for page answering. */
+	/** The same Markdown written to outputPath. */
 	content: string;
-	pages: number;
-	chars: number;
 	outputPath: string;
 }
 
@@ -371,8 +369,6 @@ async function writeMarkdownResult(options: {
 	return {
 		title: options.title,
 		content,
-		pages: options.pages,
-		chars: content.length,
 		outputPath,
 	};
 }

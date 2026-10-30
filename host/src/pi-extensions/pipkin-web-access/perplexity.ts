@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import type { ExtractedContent } from "./extract.ts";
@@ -22,6 +22,8 @@ export interface SearchResult {
 	title: string;
 	url: string;
 	snippet: string;
+	/** "generated" when the snippet is text from the provider's own answer around a citation, not text from the page. */
+	snippetSource?: "generated";
 }
 
 export interface SearchResponse {
@@ -31,6 +33,7 @@ export interface SearchResponse {
 }
 
 export interface SearchOptions {
+	model?: string;
 	numResults?: number;
 	recencyFilter?: "day" | "week" | "month" | "year";
 	domainFilter?: string[];

@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export type WebSearchWorkflow = "none" | "summary-review" | "auto-summary";

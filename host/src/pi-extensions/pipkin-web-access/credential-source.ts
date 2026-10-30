@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { exec, execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { promisify } from "node:util";

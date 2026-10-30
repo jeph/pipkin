@@ -1,9 +1,10 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 // Host-neutral contract for the web tools. The Pi extension (index.ts) and the
 // MCP server (mcp-server.ts) both drive tools through WebToolCore so tool
 // behavior lives in one place; each host keeps its own schemas and transport.
 
 import type { FindMode } from "./content-find.ts";
+import type { PageExtraction } from "./field-extract.ts";
 import type { RecencyFilter } from "./source-check.ts";
 
 export type WebToolContent =
@@ -33,10 +34,12 @@ export type WebSearchStructuredContent = {
 
 export type FetchContentStructuredContent = {
 	responseId: string | null;
-	urls: Array<{ url: string; title: string; content: string; error: string | null; mimeType?: string; status?: number; duration?: number }>;
+	/** In extract mode, each fetched URL also has its `extraction`: typed fields per name, or why extraction failed. */
+	urls: Array<{ url: string; title: string; content: string; error: string | null; mimeType?: string; status?: number; duration?: number; extraction?: PageExtraction }>;
 };
 
 export interface WebSearchCallParams {
+	model?: string;
 	query?: string;
 	queries?: string[];
 	numResults?: number;

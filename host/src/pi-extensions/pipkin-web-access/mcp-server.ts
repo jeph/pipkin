@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 // MCP server exposing the web tools over any transport. Tool behavior lives in
 // the WebToolCore; this module only lists tools, validates arguments at the
 // boundary, forwards cancellation, and maps results to MCP content.

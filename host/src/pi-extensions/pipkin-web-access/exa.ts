@@ -1,16 +1,18 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
-import type { ExtractedContent } from "./extract.ts";
+import type { ExtractedContent, ExtractOptions } from "./extract.ts";
 import type { SearchOptions, SearchResponse } from "./perplexity.ts";
 import { hasCredentialSource, redactCredential, resolveCredential } from "./credential-source.ts";
-import { fetchWithCredentialRedirects, getWebSearchConfigPath, resolveApiBaseUrl } from "./utils.ts";
+import { loadFetchContentDomainPolicy, loadSsrfConfig, validateRemoteUrl } from "./ssrf-protection.ts";
+import { fetchWithCredentialRedirects, getWebSearchConfigPath, isRecord, resolveApiBaseUrl } from "./utils.ts";
 
 const EXA_API_BASE_URL = "https://api.exa.ai";
 const EXA_MCP_URL = "https://mcp.exa.ai/mcp";
 const CONFIG_PATH = getWebSearchConfigPath();
 const EXA_MCP_ADVANCED_TOOL = "web_search_advanced_exa";
 const EXA_MCP_BASIC_TOOL = "web_search_exa";
+const CONTENTS_TIMEOUT_MS = 60_000;
 
 interface WebSearchConfig {
 	exaApiKey?: unknown;
@@ -26,11 +28,13 @@ interface ExaSearchResponse {
 		text?: string;
 		highlights?: unknown;
 		highlightScores?: number[];
+		entities?: unknown;
 	}>;
 }
 
 interface ExaMcpRpcResponse {
 	result?: {
+		_meta?: Record<string, unknown>;
 		content?: Array<{ type?: string; text?: string }>;
 		isError?: boolean;
 	};
@@ -40,15 +44,15 @@ interface ExaMcpRpcResponse {
 	};
 }
 
-export type ExaSearchResult = SearchResponse | null;
-
 export interface ExaSearchOptions extends SearchOptions {
 	includeContent?: boolean;
-	/** Restrict results to an Exa content category (e.g. "research paper", "news", "pdf"). */
+	/** Restrict results to an Exa content category (e.g. "publication", "news", "company"). */
 	category?: string;
 }
 
-type McpParsedResult = { title: string; url: string; content: string };
+type McpParsedResult = { title: string; url: string; content: string; publishedDate?: string; author?: string };
+
+const MAX_LISTED_AUTHORS = 3;
 
 let cachedConfig: WebSearchConfig | null = null;
 
@@ -155,6 +159,38 @@ function fallbackSourceLabel(url: string | undefined, index: number): string {
 	return `Source ${index + 1}`;
 }
 
+function nonEmptyString(value: unknown): string | null {
+	return typeof value === "string" && value.trim().length > 0 && value.trim() !== "N/A" ? value.trim() : null;
+}
+
+function publicationProperties(entities: unknown): Record<string, unknown> | null {
+	const entity: unknown = Array.isArray(entities) ? entities.find(item => isRecord(item) && item.type === "publication") : undefined;
+	return isRecord(entity) && isRecord(entity.properties) ? entity.properties : null;
+}
+
+function listAuthors(names: string[]): string | null {
+	if (names.length === 0) return null;
+	const listed = names.slice(0, MAX_LISTED_AUTHORS).join(", ");
+	return names.length > MAX_LISTED_AUTHORS ? `${listed} et al.` : listed;
+}
+
+/** One line of the date, authors and, for Exa's `publication` category, the citation count and DOI. */
+function formatResultMetadata(item: { publishedDate?: string; author?: string; entities?: unknown }): string {
+	const paper = publicationProperties(item.entities);
+	const parts: string[] = [];
+	const date = (nonEmptyString(item.publishedDate) ?? nonEmptyString(paper?.date))?.slice(0, 10)
+		?? (typeof paper?.year === "number" ? String(paper.year) : null);
+	if (date) parts.push(`Published: ${date}`);
+	const paperAuthors = Array.isArray(paper?.authors) ? paper.authors.flatMap(author => nonEmptyString(isRecord(author) ? author.name : null) ?? []) : [];
+	// Exa's top-level `author` joins every paper author with ", ".
+	const authors = listAuthors(paperAuthors) ?? listAuthors(nonEmptyString(item.author)?.split(", ").map(name => name.trim()).filter(Boolean) ?? []);
+	if (authors) parts.push(`Authors: ${authors}`);
+	if (typeof paper?.citationCount === "number") parts.push(`Citations: ${paper.citationCount}`);
+	const doi = nonEmptyString(paper?.doi);
+	if (doi) parts.push(`DOI: ${doi}`);
+	return parts.length > 0 ? `\n${parts.join(" | ")}` : "";
+}
+
 function buildAnswerFromSearchResults(results: ExaSearchResponse["results"]): string {
 	if (!results?.length) return "";
 	const parts: string[] = [];
@@ -167,7 +203,7 @@ function buildAnswerFromSearchResults(results: ExaSearchResponse["results"]): st
 			: typeof item.text === "string" ? item.text.trim().slice(0, 1000) : "";
 		if (!content) continue;
 		const sourceTitle = item.title || fallbackSourceLabel(item.url, i);
-		parts.push(`${content}\nSource: ${sourceTitle} (${item.url})`);
+		parts.push(`${content}\nSource: ${sourceTitle} (${item.url})${formatResultMetadata(item)}`);
 	}
 	return parts.join("\n\n");
 }
@@ -275,6 +311,13 @@ export async function callExaMcp(
 		throw new Error(`Exa MCP error${code}: ${message}`);
 	}
 
+	// The free endpoint answers a rate limit with HTTP 200 and this flag, not a 429.
+	if (parsed.result?._meta?.["ai.exa/rateLimited"] === true) {
+		throw new Error(
+			`Exa's free MCP search hit its rate limit. Add "exaApiKey" to ${CONFIG_PATH} or set EXA_API_KEY for unthrottled Exa search.`,
+		);
+	}
+
 	if (parsed.result?.isError) {
 		const message = parsed.result.content
 			?.find(item => item.type === "text" && typeof item.text === "string")
@@ -299,17 +342,24 @@ function parseMcpResults(text: string): McpParsedResult[] | null {
 		const title = block.match(/^Title: (.+)/m)?.[1]?.trim() ?? "";
 		const url = block.match(/^URL: (.+)/m)?.[1]?.trim() ?? "";
 		let content = "";
+		let contentStart = block.length;
 		const textStart = block.indexOf("\nText: ");
 		if (textStart >= 0) {
 			content = block.slice(textStart + 7).trim();
+			contentStart = textStart;
 		} else {
 			const hlMatch = block.match(/\nHighlights:\s*\n/);
 			if (hlMatch?.index != null) {
 				content = block.slice(hlMatch.index + hlMatch[0].length).trim();
+				contentStart = hlMatch.index;
 			}
 		}
 		content = content.replace(/\n---\s*$/, "").trim();
-		return { title, url, content };
+		// Read metadata from the header only, so a quoted "Author:" line in the page text is not taken as the source's.
+		const header = block.slice(0, contentStart);
+		const publishedDate = header.match(/^Published: (.+)/m)?.[1]?.trim();
+		const author = header.match(/^Author: (.+)/m)?.[1]?.trim();
+		return { title, url, content, publishedDate, author };
 	}).filter(result => result.url.length > 0);
 	return parsed.length > 0 ? parsed : null;
 }
@@ -322,7 +372,7 @@ function buildAnswerFromMcpResults(results: McpParsedResult[]): string {
 		const snippet = result.content.replace(/\s+/g, " ").trim().slice(0, 500);
 		if (!snippet) continue;
 		const sourceTitle = result.title || fallbackSourceLabel(result.url, i);
-		parts.push(`${snippet}\nSource: ${sourceTitle} (${result.url})`);
+		parts.push(`${snippet}\nSource: ${sourceTitle} (${result.url})${formatResultMetadata(result)}`);
 	}
 	return parts.join("\n\n");
 }
@@ -360,23 +410,17 @@ function isAbortMessage(message: string): boolean {
 function parseJsonMcpResults(text: string): ExaSearchResponse["results"] | null {
 	try {
 		const results = (JSON.parse(text) as ExaSearchResponse).results;
-		return Array.isArray(results) && results.length > 0 ? results : null;
+		return Array.isArray(results) ? results : null;
 	} catch {
 		return null;
 	}
 }
 
 /**
- * Calls one Exa MCP search tool and normalizes its payload. `web_search_advanced_exa`
+ * Normalizes one Exa MCP search tool's payload. `web_search_advanced_exa`
  * returns the raw Exa search JSON; `web_search_exa` returns a formatted text block.
  */
-async function searchWithExaMcpTool(
-	tool: string,
-	args: Record<string, unknown>,
-	options: ExaSearchOptions,
-): Promise<SearchResponse | null> {
-	const text = await callExaMcp(tool, args, options.signal);
-
+function toMcpSearchResponse(text: string, options: ExaSearchOptions): SearchResponse {
 	const jsonResults = parseJsonMcpResults(text);
 	if (jsonResults) {
 		return toSearchResponse(
@@ -387,7 +431,9 @@ async function searchWithExaMcpTool(
 	}
 
 	const textResults = parseMcpResults(text);
-	if (!textResults) return null;
+	if (!textResults) {
+		throw new Error(`Exa MCP returned no parseable results: ${text.trim().slice(0, 200)}`);
+	}
 
 	return toSearchResponse(
 		buildAnswerFromMcpResults(textResults),
@@ -401,22 +447,25 @@ async function searchWithFilteredExaMcp(
 	query: string,
 	options: ExaSearchOptions,
 	basicArgs: Record<string, unknown>,
-): Promise<SearchResponse | null> {
+): Promise<SearchResponse> {
+	let text: string;
 	try {
-		return await searchWithExaMcpTool(EXA_MCP_ADVANCED_TOOL, {
+		text = await callExaMcp(EXA_MCP_ADVANCED_TOOL, {
 			...exaSearchArgs(query, options),
 			enableHighlights: true,
 			textMaxCharacters: options.includeContent ? 50000 : 3000,
-		}, options);
+		}, options.signal);
 	} catch (err) {
 		if (isAbortMessage(err instanceof Error ? err.message : String(err))) throw err;
 		// The basic tool ignores every argument except query/numResults, so the
 		// filters degrade into the query text.
-		return searchWithExaMcpTool(EXA_MCP_BASIC_TOOL, basicArgs, options);
+		return toMcpSearchResponse(await callExaMcp(EXA_MCP_BASIC_TOOL, basicArgs, options.signal), options);
 	}
+	// An unreadable advanced reply is not retried on the basic tool, which would drop the filters.
+	return toMcpSearchResponse(text, options);
 }
 
-async function searchWithExaMcp(query: string, options: ExaSearchOptions = {}): Promise<SearchResponse | null> {
+async function searchWithExaMcp(query: string, options: ExaSearchOptions = {}): Promise<SearchResponse> {
 	const activityId = activityMonitor.logStart({ type: "api", query });
 	const basicArgs = { query: buildMcpQuery(query, options), numResults: options.numResults ?? 5 };
 	const filtered = !!options.includeContent || !!options.recencyFilter || !!options.domainFilter?.length || !!options.category;
@@ -424,7 +473,7 @@ async function searchWithExaMcp(query: string, options: ExaSearchOptions = {}): 
 	try {
 		const response = filtered
 			? await searchWithFilteredExaMcp(query, options, basicArgs)
-			: await searchWithExaMcpTool(EXA_MCP_BASIC_TOOL, basicArgs, options);
+			: toMcpSearchResponse(await callExaMcp(EXA_MCP_BASIC_TOOL, basicArgs, options.signal), options);
 		activityMonitor.logComplete(activityId, 200);
 		return response;
 	} catch (err) {
@@ -450,7 +499,7 @@ export function hasExaApiKey(): boolean {
 	});
 }
 
-export async function searchWithExa(query: string, options: ExaSearchOptions = {}): Promise<ExaSearchResult> {
+export async function searchWithExa(query: string, options: ExaSearchOptions = {}): Promise<SearchResponse> {
 	const apiKey = await getApiKey(options.signal);
 	if (!apiKey) {
 		return searchWithExaMcp(query, options);
@@ -495,5 +544,72 @@ export async function searchWithExa(query: string, options: ExaSearchOptions = {
 		}
 		if (redactedMessage === message) throw err;
 		throw new Error(redactedMessage);
+	}
+}
+
+/**
+ * Read one page through Exa's /contents endpoint with the configured Exa key.
+ * Opt-in via `fetchRouting.providers`; returns null when Exa has no text for the page.
+ */
+export async function extractWithExa(
+	url: string,
+	signal?: AbortSignal,
+	options: Pick<ExtractOptions, "timeoutMs" | "lookup"> = {},
+): Promise<ExtractedContent | null> {
+	const apiKey = await getApiKey(signal);
+	if (!apiKey) throw new Error("Exa fetch requires exaApiKey or EXA_API_KEY");
+	const activityId = activityMonitor.logStart({ type: "fetch", url });
+	const timeoutMs = options.timeoutMs ?? CONTENTS_TIMEOUT_MS;
+	const timeoutSignal = AbortSignal.timeout(timeoutMs);
+	try {
+		const ssrf = loadSsrfConfig();
+		await validateRemoteUrl(url, {
+			allowRanges: ssrf.allowRanges,
+			trustEnvProxy: ssrf.trustEnvProxy,
+			domainPolicy: loadFetchContentDomainPolicy(),
+			...(options.lookup ? { lookup: options.lookup } : {}),
+		});
+		const response = await fetchWithCredentialRedirects(`${getApiBaseUrl()}/contents`, {
+			method: "POST",
+			headers: exaApiHeaders(apiKey),
+			body: JSON.stringify({ urls: [url], text: true }),
+			signal: signal ? AbortSignal.any([timeoutSignal, signal]) : timeoutSignal,
+		}, ["x-api-key"]);
+		if (!response.ok) {
+			throw new Error(`Exa contents error ${response.status}: ${redactCredential(await response.text(), apiKey).slice(0, 300)}`);
+		}
+		const data: unknown = await response.json();
+		if (!isRecord(data) || !Array.isArray(data.results)) {
+			throw new Error("Exa contents returned an unexpected response shape");
+		}
+		const failed = Array.isArray(data.statuses)
+			? data.statuses.find((status): status is Record<string, unknown> => isRecord(status) && status.status === "error")
+			: undefined;
+		if (failed) {
+			const detail = isRecord(failed.error) ? failed.error : {};
+			const tag = typeof detail.tag === "string" ? detail.tag : "unknown error";
+			const httpStatus = typeof detail.httpStatusCode === "number" ? ` (HTTP ${detail.httpStatusCode})` : "";
+			throw new Error(`Exa could not read ${url}: ${tag}${httpStatus}`);
+		}
+		const page: unknown = data.results[0];
+		const content = isRecord(page) && typeof page.text === "string" ? page.text.trim() : "";
+		activityMonitor.logComplete(activityId, response.status);
+		if (!content) return null;
+		return {
+			url,
+			title: isRecord(page) && typeof page.title === "string" ? page.title.trim() : "",
+			content,
+			error: null,
+		};
+	} catch (err) {
+		if (signal?.aborted) {
+			activityMonitor.logComplete(activityId, 0);
+			throw new Error("Aborted");
+		}
+		const message = timeoutSignal.aborted || (err instanceof Error && err.name === "TimeoutError")
+			? `Exa contents request timed out after ${Math.round(timeoutMs / 1000)}s`
+			: redactCredential(err instanceof Error ? err.message : String(err), apiKey);
+		activityMonitor.logError(activityId, message);
+		throw new Error(message);
 	}
 }

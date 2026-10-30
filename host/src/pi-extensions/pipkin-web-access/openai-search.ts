@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
@@ -70,6 +70,12 @@ interface CurrentModelSearchTarget {
 	useCodexEndpoint: boolean;
 }
 
+function isAzureResponsesUrl(url: URL): boolean {
+	return url.protocol === "https:" &&
+		[".openai.azure.com", ".cognitiveservices.azure.com", ".services.ai.azure.com"].some((suffix) => url.hostname.endsWith(suffix)) &&
+		/^\/openai\/v1(?:\/responses)?\/?$/u.test(url.pathname);
+}
+
 function resolveCurrentModelSearchTarget(model: CurrentModel): CurrentModelSearchTarget {
 	const url = new URL(model.baseUrl);
 	if (url.protocol !== "https:") throw new Error("Current model base URL must use HTTPS");
@@ -89,7 +95,12 @@ function resolveCurrentModelSearchTarget(model: CurrentModel): CurrentModelSearc
 		return { responsesUrl: CODEX_RESPONSES_URL, useCodexEndpoint: true };
 	}
 
-	throw new Error("Current model is not backed by an official OpenAI Responses endpoint");
+	if ((model.api === "openai-responses" || model.api === "azure-openai-responses") && isAzureResponsesUrl(url)) {
+		url.pathname = "/openai/v1/responses";
+		return { responsesUrl: url.toString(), useCodexEndpoint: false };
+	}
+
+	throw new Error("Current model is not backed by an official OpenAI or Azure Responses endpoint");
 }
 
 // The active model draws on a ChatGPT subscription: openai-codex, or openai signed in
@@ -102,10 +113,11 @@ export function isOpenAISubscriptionModelSelected(ctx?: Pick<ExtensionContext, "
 
 export function isCurrentModelHostedSearchEligible(ctx?: Pick<ExtensionContext, "model">): boolean {
 	const model = ctx?.model;
-	if (!model || !/^gpt-/iu.test(model.id)) return false;
+	if (!model) return false;
 	try {
 		resolveCurrentModelSearchTarget(model);
-		return true;
+		// Azure model IDs are deployment names, which need not use a GPT prefix.
+		return /^gpt-/iu.test(model.id) || isAzureResponsesUrl(new URL(model.baseUrl));
 	} catch {
 		return false;
 	}
@@ -331,11 +343,11 @@ async function resolvePiAuth(ctx: ExtensionContext, responsesUrl: string, provid
 	return undefined;
 }
 
-export async function resolveOpenAIAuth(ctx?: ExtensionContext, signal?: AbortSignal): Promise<OpenAIAuth | undefined> {
+export async function resolveOpenAIAuth(ctx?: ExtensionContext, signal?: AbortSignal, model?: string): Promise<OpenAIAuth | undefined> {
 	const config = loadConfig();
 	const responsesUrl = resolveConfiguredResponsesUrl(config.openaiResponsesUrl);
 	const useProviderBaseUrl = resolveUseProviderBaseUrl(config);
-	const modelOverride = resolveConfiguredSearchModel(config.openaiSearchModel);
+	const modelOverride = model ?? resolveConfiguredSearchModel(config.openaiSearchModel);
 	const providers = resolveConfiguredSearchProviders(config.openaiSearchProviders);
 	if (ctx) {
 		const auth = await resolvePiAuth(ctx, responsesUrl, providers, modelOverride, config.openaiResponsesUrl !== undefined, useProviderBaseUrl);
@@ -384,13 +396,14 @@ export async function isOpenAISearchAvailable(ctx?: ExtensionContext): Promise<b
 async function resolveCurrentModelAuth(ctx: ExtensionContext, signal?: AbortSignal): Promise<OpenAIAuth> {
 	const model = ctx.model;
 	if (!model || !isCurrentModelHostedSearchEligible(ctx)) {
-		throw new Error("Current model is not eligible for official OpenAI Hosted web search");
+		throw new Error("Current model is not eligible for OpenAI or Azure hosted web search");
 	}
-	const target = resolveCurrentModelSearchTarget(model);
 	const resolved = await ctx.modelRegistry.getApiKeyAndHeaders(model);
 	if (signal?.aborted) signal.throwIfAborted();
 	if (!resolved.ok) throw new Error(`OpenAI current model authentication failed: ${resolved.error}`);
 	if (!resolved.apiKey) throw new Error("OpenAI current model authentication failed: API key unavailable");
+	// Resolve the destination together with credentials; auth may override baseUrl.
+	const target = resolveCurrentModelSearchTarget({ ...model, baseUrl: resolved.baseUrl ?? model.baseUrl });
 	return {
 		provider: "openai",
 		apiKey: resolved.apiKey,
@@ -547,7 +560,7 @@ function extractSnippetAround(text: string, start: unknown, end: unknown): strin
 	return snippet.length > 300 ? `${snippet.slice(0, 297)}...` : snippet;
 }
 
-function addResult(results: SearchResult[], seen: Set<string>, url: unknown, title: unknown, snippet = ""): void {
+function addResult(results: SearchResult[], seen: Set<string>, url: unknown, title: unknown, snippet = "", generated = false): void {
 	if (typeof url !== "string" || url.trim().length === 0) return;
 	const cleanUrl = cleanSourceUrl(url);
 	if (seen.has(cleanUrl)) return;
@@ -556,6 +569,7 @@ function addResult(results: SearchResult[], seen: Set<string>, url: unknown, tit
 		title: typeof title === "string" && title.trim().length > 0 ? title : cleanUrl,
 		url: cleanUrl,
 		snippet,
+		...(generated && snippet ? { snippetSource: "generated" as const } : {}),
 	});
 }
 
@@ -580,6 +594,7 @@ function extractSearchResults(output: unknown[], numResults: number | undefined)
 					(annotation as { url?: unknown }).url,
 					(annotation as { title?: unknown }).title,
 					extractSnippetAround(text, (annotation as { start_index?: unknown }).start_index, (annotation as { end_index?: unknown }).end_index),
+					true,
 				);
 			}
 		}
@@ -716,9 +731,13 @@ async function runOpenAISearch(
 	ctx?: Pick<ExtensionContext, "sessionManager">,
 ): Promise<SearchResponse> {
 	const useAlphaSearch = isAlphaSearchEnabled();
-	if (useAlphaSearch) options.signal?.throwIfAborted();
 	const useCodexEndpoint = auth.useCodexEndpoint ?? (auth.provider === "openai-codex" || isCodexJwt(auth.apiKey));
 	const responsesUrl = useCodexEndpoint && !auth.useProviderBaseUrl ? CODEX_RESPONSES_URL : auth.responsesUrl;
+	const isAzure = isAzureResponsesUrl(new URL(responsesUrl));
+	if (isAzure && useAlphaSearch) {
+		throw new OpenAIAlphaSearchUnsupportedError("Azure OpenAI does not support Codex alpha/search; disable openaiUseAlphaSearch to use hosted web_search");
+	}
+	if (useAlphaSearch) options.signal?.throwIfAborted();
 	const requestUrl = useAlphaSearch ? resolveAlphaSearchUrl(responsesUrl) : responsesUrl;
 	const body = useAlphaSearch ? buildAlphaSearchBody(query, options, auth.model) : {
 		model: auth.model,
@@ -749,6 +768,15 @@ async function runOpenAISearch(
 		ctx,
 	);
 
+	if (isAzure) {
+		for (const name of ["Authorization", "api-key", "OpenAI-Beta", "chatgpt-account-id", "originator"]) requestHeaders.delete(name);
+		if (decodeJwtPayload(auth.apiKey)) {
+			requestHeaders.set("Authorization", `Bearer ${auth.apiKey}`);
+		} else {
+			requestHeaders.set("api-key", auth.apiKey);
+		}
+	}
+
 	try {
 		const response = await fetchWithCredentialRedirects(requestUrl, {
 			method: "POST",
@@ -757,7 +785,7 @@ async function runOpenAISearch(
 			signal: options.signal
 				? AbortSignal.any([AbortSignal.timeout(SEARCH_TIMEOUT_MS), options.signal])
 				: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-		}, ["Authorization", "x-opencode-session", "x-opencode-client", "chatgpt-account-id", ...Object.keys(auth.headers)]);
+		}, ["Authorization", "api-key", "x-opencode-session", "x-opencode-client", "chatgpt-account-id", ...Object.keys(auth.headers)]);
 
 		if (!response.ok) {
 			activityMonitor.logError(activityId, `HTTP ${response.status}`);
@@ -805,7 +833,7 @@ export async function searchWithOpenAI(
 	options: SearchOptions = {},
 	ctx?: ExtensionContext,
 ): Promise<SearchResponse> {
-	const auth = await resolveOpenAIAuth(ctx, options.signal);
+	const auth = await resolveOpenAIAuth(ctx, options.signal, options.model);
 	if (!auth) {
 		throw new Error(
 			"OpenAI web search unavailable. Either:\n" +

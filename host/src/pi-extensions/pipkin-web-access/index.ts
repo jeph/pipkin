@@ -1,13 +1,13 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import type { AgentToolResult, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Box, Text, truncateToWidth, type KeyId } from "@earendil-works/pi-tui";
-import { Type } from "typebox";
+import { Type, type TOptional, type TString } from "typebox";
 import type { ExtractedContent } from "./extract.ts";
 import { normalizeFetchContentParams } from "./fetch-params.ts";
 import { answerFromPage } from "./page-query.ts";
 import { rewriteSearchQuery } from "./query-rewrite.ts";
 import { clearCloneCache, releaseClonesUnusedSince, touchClones } from "./github-extract.ts";
-import { ALL_SEARCH_PROVIDERS, getAllowedSearchProviders, getConfiguredSearchRouting, providerLabel, RESOLVED_SEARCH_PROVIDERS, search, type AttributedSearchResponse, type ProviderAvailability, type SearchProvider, type SearchProviderSelection, type ResolvedSearchProvider } from "./gemini-search.ts";
+import { ALL_SEARCH_PROVIDERS, getAllowedSearchProviders, getConfiguredSearchRouting, parseProviderArgument, RESOLVED_SEARCH_PROVIDERS, search, type AttributedSearchResponse, type ProviderAvailability, type SearchProvider, type SearchProviderSelection, type ResolvedSearchProvider } from "./gemini-search.ts";
 export type { ProviderAvailability } from "./gemini-search.ts";
 import { formatSeconds, getWebSearchConfigDir, resolveCuratorNetworkConfig, runWithProxy } from "./utils.ts";
 import {
@@ -51,6 +51,7 @@ import { isSearch1APIAvailable } from "./search1api.ts";
 import { isSearchinfinityAvailable } from "./searchinfinity.ts";
 import { isQueritAvailable } from "./querit.ts";
 import { isTavilyAvailable } from "./tavily.ts";
+import { isTabstackAvailable } from "./tabstack.ts";
 import { isYouAvailable } from "./you.ts";
 import { isFirecrawlAvailable } from "./firecrawl.ts";
 import { isJinaSearchAvailable } from "./jina-search.ts";
@@ -73,13 +74,16 @@ import { isSerplyAvailable } from "./serply.ts";
 import { isKeenableAvailable } from "./keenable.ts";
 import { isCeramicAvailable } from "./ceramic.ts";
 import { isLinkupAvailable } from "./linkup.ts";
+import { isNineRouterAvailable } from "./ninerouter.ts";
+import { isCloudflareSearchAvailable } from "./cloudflare-search.ts";
+import { isSearchApiAvailable } from "./searchapi.ts";
 import { isDeepSeekAvailable } from "./deepseek.ts";
 import { isBaizhiAvailable } from "./baizhi.ts";
 import { isZaiAvailable } from "./zai.ts";
 import { isValyuAvailable } from "./valyu.ts";
 import { isXcrawlAvailable } from "./xcrawl.ts";
 import { buildSearchErrorPlan, type SearchErrorDetails, type SearchErrorPlan } from "./render-search-error.ts";
-import { findModelWithProviderRouting, isModelInScope, splitThinkingSuffix } from "./summary-model-scope.ts";
+import { findModelWithProviderRouting, isModelInScope, resolveHelperModelSelector } from "./summary-model-scope.ts";
 import { registerCuratorRunLifecycle, resolveWebSearchWorkflow, type WebSearchWorkflow } from "./curator-run.ts";
 import { registerWebToolActivation } from "./tool-activation.ts";
 import {
@@ -151,6 +155,20 @@ const fetchContentOutputSchema = Type.Object({
 		mimeType: Type.Optional(Type.String()),
 		status: Type.Optional(Type.Number()),
 		duration: Type.Optional(Type.Number()),
+		extraction: Type.Optional(Type.Union([
+			Type.Object({
+				fields: Type.Record(Type.String(), Type.Object({
+					status: Type.Union([Type.Literal("extracted"), Type.Literal("uncertain"), Type.Literal("null")], { description: "null means not on the page" }),
+					value: Type.Optional(Type.Unknown({ description: "Typed value when extracted" })),
+					guess: Type.Optional(Type.Unknown({ description: "Unconfirmed value when uncertain" })),
+					confidence: Type.Optional(Type.Number()),
+					line: Type.Optional(Type.String({ description: "Page line the text or number value was found on" })),
+					notFound: Type.Optional(Type.Boolean({ description: "Uncertain because the text is not on the page" })),
+				})),
+				cut: Type.Boolean({ description: "Only the first part of the page was read" }),
+			}),
+			Type.Object({ error: Type.String({ description: "Why extraction failed for this fetched page" }) }),
+		], { description: "Extract mode only, for each fetched URL" })),
 	})),
 });
 
@@ -203,6 +221,7 @@ const FETCH_MODE_DESCRIPTIONS: Record<FetchMode, string> = {
 	readable: "extract readable content as markdown",
 	raw: "return the exact textual body using direct HTTP only",
 	answer: "answer a prompt using only fetched content",
+	extract: "read typed values named in fields",
 };
 
 // Keep primary query indexes stable for curator slots, then interleave additional
@@ -213,13 +232,6 @@ function curatorResultIndex(queryIndex: number, entryIndex: number, queryCount: 
 
 function curatorResultIndexCapacity(queryCount: number): number {
 	return queryCount * RESOLVED_SEARCH_PROVIDERS.length;
-}
-
-function searchProviderSchema(description: string, allowedProviders: readonly ResolvedSearchProvider[]) {
-	return Type.Union([
-		StringEnum(["auto", "all", ...allowedProviders]),
-		Type.Array(StringEnum([...allowedProviders]), { minItems: 1 }),
-	], { description });
 }
 
 function isCommandEnabled(config: WebSearchConfig, name: "websearch" | "curator" | "search" | "google-account"): boolean {
@@ -300,6 +312,19 @@ export function getSummaryInstructions(): string | undefined {
 	return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function readHelperModelKey(key: "summaryModel" | "queryRewriteModel"): string | undefined {
+	const value: unknown = loadConfig()[key];
+	if (value === undefined) return undefined;
+	const message = `${key} in ${WEB_SEARCH_CONFIG_PATH} must be "current", "current:<level>", or "provider/model-id[:<level>]"`;
+	if (typeof value !== "string") throw new Error(message);
+	try {
+		resolveHelperModelSelector(value, key);
+	} catch {
+		throw new Error(message);
+	}
+	return value.trim();
+}
+
 function shouldAutoOpenCuratorBrowser(config: WebSearchConfig): boolean {
 	if (config.autoOpenBrowser === false) return false;
 	if (resolveCuratorNetworkConfig().enabled && config.autoOpenBrowser !== true) return false;
@@ -320,6 +345,7 @@ async function getProviderAvailability(ctx: ExtensionContext): Promise<ProviderA
 		searchinfinity: allowedProviders.has("searchinfinity") && isSearchinfinityAvailable(),
 		querit: allowedProviders.has("querit") && isQueritAvailable(),
 		tavily: allowedProviders.has("tavily") && isTavilyAvailable(),
+		tabstack: allowedProviders.has("tabstack") && isTabstackAvailable(),
 		you: allowedProviders.has("you") && isYouAvailable(),
 		firecrawl: allowedProviders.has("firecrawl") && isFirecrawlAvailable(),
 		jina: allowedProviders.has("jina") && isJinaSearchAvailable(),
@@ -349,6 +375,9 @@ async function getProviderAvailability(ctx: ExtensionContext): Promise<ProviderA
 		keenable: allowedProviders.has("keenable") && isKeenableAvailable(),
 		ceramic: allowedProviders.has("ceramic") && isCeramicAvailable(),
 		linkup: allowedProviders.has("linkup") && isLinkupAvailable(),
+		ninerouter: allowedProviders.has("ninerouter") && isNineRouterAvailable(),
+		cloudflare: allowedProviders.has("cloudflare") && isCloudflareSearchAvailable(),
+		searchapi: allowedProviders.has("searchapi") && isSearchApiAvailable(),
 		deepseek: allowedProviders.has("deepseek") && isDeepSeekAvailable(),
 	};
 	return {
@@ -743,13 +772,9 @@ export default function (pi: ExtensionAPI) {
 		throw new Error(`toolActivation "none" in ${WEB_SEARCH_CONFIG_PATH} requires toolExposure "deferred"`);
 	}
 	const allowedSearchProviders = initConfig.webSearch?.allowedProviders === undefined ? RESOLVED_SEARCH_PROVIDERS : getAllowedSearchProviders();
-	const allEligibleProviders = allowedSearchProviders.filter(provider => ALL_SEARCH_PROVIDERS.includes(provider));
-	const allExcludedProviders = allowedSearchProviders.filter(provider => !ALL_SEARCH_PROVIDERS.includes(provider));
-	const allPolicyDescription = allEligibleProviders.length === 0
-		? `all has no eligible allowed providers; explicit-only allowed providers (${allExcludedProviders.map(providerLabel).join(", ")}) remain excluded`
-		: allExcludedProviders.length > 0
-		? `all searches eligible allowed providers (${allEligibleProviders.map(providerLabel).join(", ")}); explicit-only allowed providers (${allExcludedProviders.map(providerLabel).join(", ")}) remain excluded`
-		: `all searches every eligible allowed provider (${allEligibleProviders.map(providerLabel).join(", ")})`;
+	const modelProviders = allowedSearchProviders.filter(provider => provider === "openai" || provider === "xai" || provider === "mistral" || provider === "gemini");
+	// Depends on config only, never on credentials, so definitions stay byte-stable across environments.
+	const providerDescription = `auto, all, a name, or comma-separated names; omit for the configured default.${initConfig.webSearch?.allowedProviders === undefined ? "" : ` Allowed: ${allowedSearchProviders.join(", ")}.`}`;
 	const curatorRunState = registerCuratorRunLifecycle(pi);
 	const toolNames = resolveToolNames(initConfig);
 	const webSearchEnabled = isToolEnabled(initConfig, "webSearch");
@@ -771,12 +796,9 @@ export default function (pi: ExtensionAPI) {
 	// at tools that are disabled or were renamed after init.
 	const registeredToolNames = registeredFetchToolNames(coreSettings);
 	const storedContentSources = storedContentSourceNames(coreSettings);
-	const searchQueryDescription = webSearchEnabled
-		? `Get content for this query (${toolNames.webSearch})`
-		: "Get content for a stored search query";
 	const fetchContentStorageNote = getSearchContentEnabled
-		? `Full original content is stored for retrieval with ${toolNames.getSearchContent}.`
-		: "Full original content is stored internally, but the retrieval tool is not registered.";
+		? `Full content is stored for retrieval with ${toolNames.getSearchContent}.`
+		: "Full content is stored, but the retrieval tool is not registered.";
 	const fetchModeDescription = fetchModeConfig.allowedModes
 		.map(mode => `${mode}${mode === fetchModeConfig.defaultMode ? " (default)" : ""}: ${FETCH_MODE_DESCRIPTIONS[mode]}`)
 		.join("; ");
@@ -973,16 +995,18 @@ export default function (pi: ExtensionAPI) {
 		if (selectedResults.length === 0) {
 			throw new Error("No selected results available for summary generation");
 		}
+		const configuredSummaryModel = readHelperModelKey("summaryModel");
 		try {
 			return await generateSummaryDraft(
 				selectedResults,
 				summaryContext,
 				signal,
-				modelOverride,
+				modelOverride?.trim() || configuredSummaryModel,
 				feedback,
 				undefined,
 				getSummaryGenerationDeadlineMs(),
 				getSummaryInstructions(),
+				{ preferredFallback: configuredSummaryModel === undefined },
 			);
 		} catch (err) {
 			const isEmptyResponse = err instanceof Error && err.message.includes("Summary model returned empty response");
@@ -1000,13 +1024,12 @@ export default function (pi: ExtensionAPI) {
 
 	async function loadSummaryModelChoices(
 		summaryContext: SummaryGenerationContext,
-	): Promise<{ summaryModels: Array<{ value: string; label: string }>; defaultSummaryModel: string | null }> {
+	): Promise<{ summaryModels: Array<{ value: string; label: string }>; defaultSummaryModel: string | null; preferredFallback: boolean }> {
 		const summaryModels: Array<{ value: string; label: string }> = [];
 		const seen = new Set<string>();
 		const availableValues = new Set<string>();
 
-		const addModel = (provider: string, id: string) => {
-			const value = `${provider}/${id}`;
+		const addModel = (value: string) => {
 			if (seen.has(value)) return;
 			seen.add(value);
 			summaryModels.push({ value, label: value });
@@ -1015,18 +1038,14 @@ export default function (pi: ExtensionAPI) {
 		for (const model of summaryContext.modelRegistry.getAvailable()) {
 			if (!isModelInScope(model, summaryContext.scopedModels)) continue;
 			availableValues.add(`${model.provider}/${model.id}`);
-			addModel(model.provider, model.id);
+			addModel(`${model.provider}/${model.id}`);
 		}
 
-		const currentModelValue = summaryContext.model
-			? `${summaryContext.model.provider}/${summaryContext.model.id}`
-			: null;
-		if (summaryContext.model && currentModelValue && !seen.has(currentModelValue) && isModelInScope(summaryContext.model, summaryContext.scopedModels)) {
-			addModel(summaryContext.model.provider, summaryContext.model.id);
+		if (summaryContext.model && isModelInScope(summaryContext.model, summaryContext.scopedModels)) {
+			addModel(`${summaryContext.model.provider}/${summaryContext.model.id}`);
 		}
 
-		const config = loadConfig();
-		const configuredSummaryModel = typeof config.summaryModel === "string" ? config.summaryModel.trim() : "";
+		const configuredSummaryModel = readHelperModelKey("summaryModel");
 		const preferredDefaults = [
 			{ provider: "anthropic", id: "claude-haiku-4-5" },
 			{ provider: "openai-codex", id: "gpt-5.6-luna" },
@@ -1036,32 +1055,15 @@ export default function (pi: ExtensionAPI) {
 			{ provider: "deepseek", id: "deepseek-v4-flash" },
 		];
 
-		const resolveAvailableModelValue = (selector: string): string | null => {
-			const parsed = splitThinkingSuffix(selector);
-			const slashIndex = parsed.value.indexOf("/");
-			if (slashIndex <= 0 || slashIndex >= parsed.value.length - 1) return null;
-			const model = findModelWithProviderRouting(
-				summaryContext.modelRegistry,
-				parsed.value.slice(0, slashIndex),
-				parsed.value.slice(slashIndex + 1),
-			);
-			if (!model) return null;
-			const value = `${model.provider}/${model.id}`;
-			if (!availableValues.has(value)) return null;
-			if (selector !== value && !seen.has(selector)) {
-				seen.add(selector);
-				summaryModels.push({ value: selector, label: selector });
-			}
-			return selector;
-		};
-
 		let defaultSummaryModel: string | null = null;
-		if (configuredSummaryModel.length > 0) {
-			defaultSummaryModel = availableValues.has(configuredSummaryModel)
-				? configuredSummaryModel
-				: resolveAvailableModelValue(configuredSummaryModel);
-		}
-		if (!defaultSummaryModel) {
+		if (configuredSummaryModel !== undefined) {
+			const spec = resolveHelperModelSelector(configuredSummaryModel, "summary model", summaryContext.model);
+			// With no concrete value to show, list nothing so the curator sends Auto (the configured selector).
+			if (!spec) return { summaryModels: [], defaultSummaryModel: configuredSummaryModel, preferredFallback: false };
+			// The curator groups choices by provider, so `current` must be concrete. Unavailable models stay listed so failures are visible.
+			defaultSummaryModel = `${spec.provider}/${spec.id}${spec.thinkingLevel ? `:${spec.thinkingLevel}` : ""}`;
+			addModel(defaultSummaryModel);
+		} else {
 			for (const preferred of preferredDefaults) {
 				const model = findModelWithProviderRouting(summaryContext.modelRegistry, preferred.provider, preferred.id);
 				const value = model ? `${model.provider}/${model.id}` : null;
@@ -1071,7 +1073,7 @@ export default function (pi: ExtensionAPI) {
 				}
 			}
 		}
-		return { summaryModels, defaultSummaryModel };
+		return { summaryModels, defaultSummaryModel, preferredFallback: configuredSummaryModel === undefined };
 	}
 
 	function resolveSummaryForSubmit(
@@ -1291,7 +1293,7 @@ export default function (pi: ExtensionAPI) {
 					async onRewriteQuery(query, rewriteSignal) {
 						return runWithProxy(pc.proxy, async () => {
 							if (pendingCurates.get(callId) !== pc) throw new Error("Curator session is no longer active.");
-							return rewriteSearchQuery(query, pc.summaryContext, rewriteSignal);
+							return rewriteSearchQuery(query, pc.summaryContext, rewriteSignal, readHelperModelKey("queryRewriteModel"));
 						});
 					},
 				},
@@ -1406,7 +1408,13 @@ export default function (pi: ExtensionAPI) {
 		if (event.parentToolCallId && event.toolName === toolNames.webSearch) nestedSearchCallIds.add(event.toolCallId);
 	});
 
-	pi.on("session_start", async (_event, ctx) => { nestedSearchCallIds.clear(); startSession(ctx); });
+	pi.on("session_start", async (_event, ctx) => {
+		nestedSearchCallIds.clear();
+		startSession(ctx);
+		// Pipkin: no upgrade notice. Pipkin updates this extension with the app, so a note that pi-web-access was updated, with
+		// upstream's highlights and changelog, would describe a package the user never installed. The notice also needs
+		// upstream's package.json and CHANGELOG.md, which aren't copied, and imports getAgentDir from Pi as a value.
+	});
 	pi.on("session_tree", async (_event, ctx) => { nestedSearchCallIds.clear(); startSession(ctx); });
 
 	pi.on("session_shutdown", () => {
@@ -1423,30 +1431,27 @@ export default function (pi: ExtensionAPI) {
 	if (webSearchEnabled) pi.registerTool({
 		name: toolNames.webSearch,
 		label: "Web Search",
-		prepareArguments: (args) => parseStringifiedArrays(args, ["provider", "queries", "domainFilter"]) as never,
+		prepareArguments: (args) => parseStringifiedArrays(args, ["queries", "domainFilter"]) as never,
 		description:
-			`Search the web and return source-linked results or provider answers.${getSearchContentEnabled ? ` Full results are stored for retrieval with ${toolNames.getSearchContent} using the returned responseId.` : ""} For research, prefer queries with 2-4 varied angles over a single query. Omit provider to use the configured default; set it only to override that.`,
+			`Search the web for sources or answers.${getSearchContentEnabled ? ` Full results are stored for retrieval with ${toolNames.getSearchContent} by responseId.` : ""} Prefer 2-4 varied queries.`,
 		promptSnippet:
-			"Use for web research questions. Prefer {queries:[...]} with 2-4 varied angles over a single query for broader coverage. Omit provider unless explicitly overriding the configured default.",
+			"Web research. Prefer {queries:[...]} with 2-4 varied angles; omit provider unless overriding the default.",
 		parameters: Type.Object({
-			query: Type.Optional(Type.String({ description: "Single search query. For research tasks, prefer 'queries' with multiple varied angles instead." })),
-			queries: Type.Optional(Type.Array(Type.String(), { description: "Multiple queries searched concurrently (up to three at a time), each returning source-linked search results or a provider answer. Prefer this for research — vary phrasing, scope, and angle across 2-4 queries to maximize coverage. Good: ['React vs Vue performance benchmarks 2026', 'React vs Vue developer experience comparison', 'React ecosystem size vs Vue ecosystem']. Bad: ['React vs Vue', 'React vs Vue comparison', 'React vs Vue review'] (too similar, redundant results)." })),
-			numResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 20, description: "Results per query (default: 5, max: 20)" })),
-			includeContent: Type.Optional(Type.Boolean({ description: "Fetch full page content (async)" })),
-			recencyFilter: Type.Optional(
-				StringEnum(["day", "week", "month", "year"], { description: "Filter by recency" }),
-			),
-			domainFilter: Type.Optional(Type.Array(Type.String(), { description: "Limit to domains (prefix with - to exclude)" })),
-			category: Type.Optional(Type.String({ description: "Exa only: result category, e.g. news, research paper" })),
-			provider: Type.Optional(searchProviderSchema(`Search provider or non-empty list of allowed providers to search simultaneously; ${allPolicyDescription}; omit this field to use the configured provider, or use auto when none is configured`, allowedSearchProviders)),
+			query: Type.Optional(Type.String()),
+			queries: Type.Optional(Type.Array(Type.String(), { description: "Run concurrently (up to three at a time); vary the angle" })),
+			numResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 20, description: "Default 5" })),
+			includeContent: Type.Optional(Type.Boolean({ description: "Also fetch full page content" })),
+			recencyFilter: Type.Optional(StringEnum(["day", "week", "month", "year"])),
+			domainFilter: Type.Optional(Type.Array(Type.String(), { description: "Prefix - to exclude" })),
+			category: Type.Optional(Type.String({ description: "Exa only, e.g. news" })),
+			...(modelProviders.length > 0 ? { model: Type.Optional(Type.String({ description: `Model ID; needs provider ${modelProviders.join(", ")}` })) } : {}) as { model: TOptional<TString> },
+			provider: Type.Optional(Type.String({ description: providerDescription })),
 			workflow: Type.Optional(
 				StringEnum(["none", "summary-review", "auto-summary"], {
-					description: "Search workflow mode: none = no curator (default), summary-review = open curator with auto summary draft, auto-summary = generate summary without opening curator",
+					description: "Default none; summary-review opens the curator; auto-summary summarizes",
 				}),
 			),
-			proxy: Type.Optional(Type.String({
-				description: "http(s) or socks proxy URL (e.g. http://host:port or socks5h://host:port) used for every outbound request in this call (search APIs and content fetches). Node fetch ignores HTTP(S)_PROXY env vars, so set this (or `proxy` in web-search.json) when direct access is blocked; empty string forces direct access.",
-			})),
+			proxy: Type.Optional(Type.String({ description: "http(s) or socks proxy URL (env proxy vars ignored); \"\" forces direct" })),
 		}),
 		outputSchema: webSearchOutputSchema,
 		exposure: toolExposure,
@@ -1480,6 +1485,13 @@ export default function (pi: ExtensionAPI) {
 					};
 				}
 
+				if (shouldCurate && params.model !== undefined) {
+					return {
+						content: [{ type: "text", text: "Error: model cannot be used with workflow \"summary-review\". Pass workflow \"none\" or \"auto-summary\" to search with a specific model." }],
+						details: { error: "model is not supported with summary-review" },
+					};
+				}
+
 				if (shouldCurate) {
 				closeCurator(callId);
 
@@ -1498,7 +1510,7 @@ export default function (pi: ExtensionAPI) {
 				let cancelled = false;
 
 				const requestedProvider = resolveRequestedProvider(params.provider);
-				const providerFromConfig = (normalizeProviderInput(params.provider) ?? "auto") === "auto";
+				const providerFromConfig = (parseProviderArgument(params.provider) ?? "auto") === "auto";
 				const bootstrap = await loadCuratorBootstrap(requestedProvider, ctx, {
 					numResults: params.numResults,
 					recencyFilter,
@@ -1708,6 +1720,7 @@ export default function (pi: ExtensionAPI) {
 						undefined,
 						getSummaryGenerationDeadlineMs(),
 						getSummaryInstructions(),
+						{ preferredFallback: summaryModelChoices.preferredFallback },
 					);
 					return { approvedSummary: generated.summary, summaryMeta: generated.meta };
 				};
@@ -1973,19 +1986,17 @@ export default function (pi: ExtensionAPI) {
 	if (sourceCheckEnabled) pi.registerTool({
 		name: toolNames.sourceCheck,
 		label: "Source Check",
-		description: "Gather web sources for a claim and return a bounded machine-readable research artifact with exact passage citations for manual review.",
-		promptSnippet: "Gather structured source evidence and passage-level citations for manual semantic review of a claim.",
+		description: "Gather cited web passages about a claim for manual review.",
+		promptSnippet: "Gather source evidence with passage citations for a claim.",
 		parameters: Type.Object({
-			claim: Type.String({ description: "The assertion to gather web sources for." }),
-			queries: Type.Optional(Type.Array(Type.String(), { description: "Search queries (default: the claim)." })),
-			numResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 20, description: "Results per query (default: 5, max: 20)." })),
-			fetchContent: Type.Optional(Type.Boolean({ description: "Fetch up to 5 result pages for exact passage extraction." })),
-			recencyFilter: Type.Optional(StringEnum(["day", "week", "month", "year"], { description: "Filter by recency." })),
-			domainFilter: Type.Optional(Type.Array(Type.String(), { description: "Limit to domains; prefix with - to exclude." })),
-			provider: Type.Optional(searchProviderSchema(`Search provider or non-empty list of allowed providers to search simultaneously; ${allPolicyDescription}`, allowedSearchProviders)),
-			proxy: Type.Optional(Type.String({
-				description: "http(s) or socks proxy URL (e.g. http://host:port or socks5h://host:port) used for every outbound request in this call (search APIs and result-page fetches). Empty string forces direct access.",
-			})),
+			claim: Type.String({ description: "Assertion to check" }),
+			queries: Type.Optional(Type.Array(Type.String(), { description: "Default: the claim" })),
+			numResults: Type.Optional(Type.Integer({ minimum: 1, maximum: 20, description: "Default 5" })),
+			fetchContent: Type.Optional(Type.Boolean({ description: "Fetch top 5 pages for exact passages" })),
+			recencyFilter: Type.Optional(StringEnum(["day", "week", "month", "year"])),
+			domainFilter: Type.Optional(Type.Array(Type.String(), { description: "Prefix - to exclude" })),
+			provider: Type.Optional(Type.String({ description: providerDescription })),
+			proxy: Type.Optional(Type.String({ description: "http(s) or socks proxy URL; \"\" forces direct" })),
 		}),
 		exposure: toolExposure,
 		async execute(_callId, params, signal, _onUpdate, ctx) {
@@ -1996,47 +2007,46 @@ export default function (pi: ExtensionAPI) {
 	if (fetchContentEnabled) pi.registerTool({
 		name: toolNames.fetchContent,
 		label: "Fetch Content",
-		description: `Fetch URL(s). Available modes: ${fetchModeDescription}. Direct image URLs return resized image content when supported by the selected mode. Supports YouTube transcripts, GitHub repositories, PDFs, and local videos when supported by the selected mode. ${fetchContentStorageNote}`,
+		description: `Fetch web pages, PDFs, GitHub repos, images, YouTube and local video, as the mode allows. ${fetchContentStorageNote}`,
 		promptSnippet:
-			"Use to fetch URL content, direct images, GitHub repos, and videos.",
+			`Use to fetch URL content, direct images, GitHub repos, and videos.${fetchModeConfig.allowedModes.includes("extract") ? ' For specific values (a price, version, date or limit), use mode "extract" with fields instead of reading the whole page.' : ""}`,
 		parameters: Type.Object({
-			url: Type.Optional(Type.String({ description: "Single URL to fetch" })),
-			urls: Type.Optional(Type.Array(Type.String(), { description: "Multiple URLs (parallel)" })),
-			forceClone: Type.Optional(Type.Boolean({
-				description: "Force cloning large GitHub repositories that exceed the size threshold",
-			})),
+			url: Type.Optional(Type.String()),
+			urls: Type.Optional(Type.Array(Type.String())),
+			forceClone: Type.Optional(Type.Boolean({ description: "Clone GitHub repos over the size limit" })),
 			prompt: Type.Optional(Type.String({
 				description: fetchModeConfig.allowedModes.includes("answer")
-					? "Question or instruction for video analysis, or the page-local question required by answer mode."
-					: "Question or instruction for video analysis.",
+					? "Question for video analysis or answer mode"
+					: "Question for video analysis",
 			})),
 			mode: Type.Optional(StringEnum(fetchModeConfig.allowedModes, {
-				description: `Fetch mode. ${fetchModeDescription}.`,
+				description: `${fetchModeDescription}.`,
 			})),
 			...(fetchModeConfig.allowedModes.includes("answer") ? {
 				answerModel: Type.Optional(Type.String({
-					description: "Optional provider/model-id override for answer mode. Defaults to fetch.answerProvider + fetch.answerModel when configured, otherwise the current Pi model.",
+					description: "provider/model-id for answer mode",
+				})),
+			} : {}),
+			...(fetchModeConfig.allowedModes.includes("extract") ? {
+				fields: Type.Optional(Type.Record(Type.String(), Type.String(), {
+					description: "For extract: name → \"type\" or \"type: what to find\"; types: text, number, integer, date, time, datetime, duration[.unit], list[.number|.date]",
 				})),
 			} : {}),
 			timestamp: Type.Optional(Type.String({
-				description: "Extract video frame(s) at a timestamp or time range. Single: '1:23:45', '23:45', or '85' (seconds). Range: '23:41-25:00' extracts evenly-spaced frames across that span (default 6). Use frames with ranges to control density; single+frames uses a fixed 5s interval. YouTube requires yt-dlp + ffmpeg; local videos require ffmpeg. Use a range when you know the approximate area but not the exact moment — you'll get a contact sheet to visually identify the right frame.",
+				description: "Video frame time ('1:23:45') or range ('23:41-25:00'); needs ffmpeg",
 			})),
 			frames: Type.Optional(Type.Integer({
 				minimum: 1,
 				maximum: 12,
-				description: "Number of frames to extract. Use with timestamp range for custom density, with single timestamp to get N frames at 5s intervals, or alone to sample across the entire video. Requires yt-dlp + ffmpeg for YouTube, ffmpeg for local video.",
+				description: "Frames over a range, 5s apart from one time, or over the video",
 			})),
-			model: Type.Optional(Type.String({
-				description: "Override the Gemini model for video/YouTube analysis (e.g. 'gemini-3.6-flash'). Defaults to config or gemini-3.6-flash.",
-			})),
+			model: Type.Optional(Type.String({ description: "Gemini model for video analysis" })),
 			auth: Type.Optional(Type.Union([Type.String(), Type.Boolean()], {
-				description: "Opt into an authFetch profile for local browser-cookie fetching. Use a profile name, or true only when exactly one profile exists.",
+				description: "authFetch profile name, or true for the only one",
 			})),
-			proxy: Type.Optional(Type.String({
-				description: "http(s) or socks proxy URL (e.g. http://host:port or socks5h://host:port) used for this fetch. Needed when the target is unreachable directly; localhost and NO_PROXY hosts always bypass the proxy. Empty string forces direct access.",
-			})),
+			proxy: Type.Optional(Type.String({ description: "http(s) or socks proxy URL; \"\" forces direct" })),
 			redirects: Type.Optional(StringEnum(["same-origin"], {
-				description: "Refuse cross-origin redirects: every redirect target must match the requested URL's scheme, hostname and effective port, and extraction paths whose redirect chain cannot be observed are refused instead of used.",
+				description: "Refuse cross-origin redirects",
 			})),
 		}),
 		outputSchema: fetchContentOutputSchema,
@@ -2188,22 +2198,22 @@ export default function (pi: ExtensionAPI) {
 		pi.registerTool({
 		name: toolNames.getSearchContent,
 		label: "Get Search Content",
-		description: `Retrieve bounded pages of full stored search results or fetched content, or find matching passages, from a previous ${storedContentSources} call.`,
+		description: `Page through or search stored content from ${storedContentSources} by responseId.`,
 		promptSnippet:
-			`Use after ${storedContentSources} to retrieve stored content via responseId. Use findText to locate passages without paging through the full content.`,
+			`Use after ${storedContentSources} to read stored content; findText finds passages without paging.`,
 		parameters: Type.Object({
-			responseId: Type.String({ description: `The responseId from ${storedContentSources}` }),
-			query: Type.Optional(Type.String({ description: searchQueryDescription })),
-			queryIndex: Type.Optional(Type.Integer({ minimum: 0, description: "Get content for query at index" })),
-			url: Type.Optional(Type.String({ description: "Get content for this URL" })),
-			urlIndex: Type.Optional(Type.Integer({ minimum: 0, description: "Get content for URL at index" })),
-			offset: Type.Optional(Type.Integer({ minimum: 0, description: "Character offset in stored search or fetched URL content (default 0). Ignored when findText is supplied." })),
-			limit: Type.Optional(Type.Integer({ minimum: 1, maximum: maxInlineContentChars, description: "Requested maximum stored-content characters (default and max use maxInlineContentChars). Search-page continuation guidance shares the global output cap and may reduce returnedChars. Ignored when findText is supplied." })),
+			responseId: Type.String(),
+			query: Type.Optional(Type.String()),
+			queryIndex: Type.Optional(Type.Integer({ minimum: 0 })),
+			url: Type.Optional(Type.String()),
+			urlIndex: Type.Optional(Type.Integer({ minimum: 0 })),
+			offset: Type.Optional(Type.Integer({ minimum: 0 })),
+			limit: Type.Optional(Type.Integer({ minimum: 1, maximum: maxInlineContentChars, description: "Characters, default the maximum" })),
 			findText: Type.Optional(Type.Union([
 				Type.String({ minLength: 1, maxLength: 500 }),
 				Type.Array(Type.String({ minLength: 1, maxLength: 500 }), { minItems: 1, maxItems: 10 }),
-			], { description: "Text or texts to find in the selected stored content. When supplied, offset and limit are ignored." })),
-			findMode: Type.Optional(StringEnum(["exact", "case-insensitive", "fuzzy"], { description: "Matching mode for findText (default: case-insensitive). Requires findText." })),
+			], { description: "Find passages instead of paging" })),
+			findMode: Type.Optional(StringEnum(["exact", "case-insensitive", "fuzzy"])),
 		}),
 		exposure: toolExposure,
 
@@ -2467,7 +2477,7 @@ export default function (pi: ExtensionAPI) {
 							if (commandHandle && !isCommandActive()) {
 								throw new Error("Curator session is no longer active.");
 							}
-							return rewriteSearchQuery(query, summaryContext, rewriteSignal);
+							return rewriteSearchQuery(query, summaryContext, rewriteSignal, readHelperModelKey("queryRewriteModel"));
 						},
 					},
 				);

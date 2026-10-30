@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 const DEFAULT_SAFETY_MARGIN_MS = 100;
 const DEFAULT_MAX_WAIT_MS = 30_000;
 
@@ -71,7 +71,7 @@ function exhaustedBuckets(headers: Headers): BraveRateLimitBucket[] {
 	return parseBraveRateLimitHeaders(headers).filter(bucket => bucket.limit > 0 && bucket.remaining === 0);
 }
 
-function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
+export function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
 	if (signal?.aborted) return Promise.reject(new Error("Aborted"));
 	return new Promise((resolve, reject) => {
 		const cleanup = () => signal?.removeEventListener("abort", onAbort);
@@ -88,7 +88,7 @@ function defaultSleep(ms: number, signal?: AbortSignal): Promise<void> {
 	});
 }
 
-function formatWait(ms: number): string {
+export function formatWait(ms: number): string {
 	const seconds = Math.ceil(ms / 1000);
 	if (seconds < 60) return `${seconds}s`;
 	const minutes = Math.ceil(seconds / 60);

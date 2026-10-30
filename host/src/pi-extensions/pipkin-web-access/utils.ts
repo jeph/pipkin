@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -52,6 +52,31 @@ export function isLoopbackHostname(hostnameValue: string): boolean {
 		|| (isIP(normalized) === 4 && normalized.split(".", 1)[0] === "127");
 }
 
+export function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function allowsHttpBaseUrls(): boolean {
+	const environmentValue = process.env.PI_WEB_ACCESS_ALLOW_HTTP_BASE_URLS;
+	if (environmentValue !== undefined) {
+		const value = environmentValue.trim().toLowerCase();
+		if (value === "true" || value === "1") return true;
+		if (value === "false" || value === "0") return false;
+		throw new Error("Invalid configuration: PI_WEB_ACCESS_ALLOW_HTTP_BASE_URLS must be true, false, 1, or 0");
+	}
+	const path = getWebSearchConfigPath();
+	if (!existsSync(path)) return false;
+	let raw: unknown;
+	try {
+		raw = JSON.parse(readFileSync(path, "utf-8"));
+	} catch (err) {
+		throw new Error(`Failed to parse ${path}: ${err instanceof Error ? err.message : String(err)}`);
+	}
+	const value = isRecord(raw) ? raw.allowHttpBaseUrls : undefined;
+	if (value !== undefined && typeof value !== "boolean") throw new Error(`allowHttpBaseUrls in ${path} must be a boolean`);
+	return value === true;
+}
+
 export function resolveApiBaseUrl(options: ApiBaseUrlOptions): string {
 	const fromEnvironment = options.environmentValue !== undefined;
 	const value = fromEnvironment ? options.environmentValue : options.configuredValue;
@@ -70,7 +95,7 @@ export function resolveApiBaseUrl(options: ApiBaseUrlOptions): string {
 	} catch {
 		throw new Error(`${source} must be an absolute HTTP(S) URL`);
 	}
-	if (url.protocol !== "https:" && (url.protocol !== "http:" || !isLoopbackHostname(url.hostname))) {
+	if (url.protocol !== "https:" && (url.protocol !== "http:" || (!isLoopbackHostname(url.hostname) && !allowsHttpBaseUrls()))) {
 		throw new Error(`${source} must be an absolute HTTPS URL`);
 	}
 	if (url.username || url.password) {
@@ -87,8 +112,9 @@ export function resolveApiBaseUrl(options: ApiBaseUrlOptions): string {
 }
 
 // Other tools commonly set the bare OLLAMA_BASE_URL (a local Ollama server) and DEEPSEEK_BASE_URL
-// (an OpenAI-compatible root ending in /v1), so these providers read PI_-prefixed names instead.
-const PI_PREFIXED_ENVIRONMENT_STEMS = new Set(["ollama", "deepseek"]);
+// (an OpenAI-compatible root ending in /v1), and the Tabstack SDKs read TABSTACK_BASE_URL as a /v1 root,
+// so these providers read PI_-prefixed names instead.
+const PI_PREFIXED_ENVIRONMENT_STEMS = new Set(["ollama", "deepseek", "tabstack"]);
 
 /** Resolve a provider's API root without dropping its endpoint path or a gateway prefix. */
 export function resolveProviderApiUrl(configStem: string, defaultUrl: string, configuredValue: unknown): string {
@@ -242,7 +268,11 @@ export function mapFfmpegError(err: unknown): string {
 	return snippet ? `ffmpeg failed: ${snippet}` : "ffmpeg failed";
 }
 
-const proxyStorage = new AsyncLocalStorage<string | null>();
+// Pi can load this module several times in one process (extension reloads use fresh module
+// instances), while the fetch wrapper below is process-global. Every instance must therefore write
+// the proxy context into the one store the installed wrapper reads.
+const sharedProxyState = globalThis as { [key: symbol]: AsyncLocalStorage<string | null> | undefined };
+const proxyStorage = sharedProxyState[Symbol.for("pi-web-access.proxyStorage")] ??= new AsyncLocalStorage<string | null>();
 
 export function normalizeProxyUrl(value: unknown, source: string): string | null {
 	if (value === undefined || value === null) return null;
@@ -345,13 +375,17 @@ export interface ProxiedRequestInit extends RequestInit {
 
 interface ProxiedFetch {
 	(input: RequestInfo | URL, init?: ProxiedRequestInit): Promise<Response>;
+	__piWebAccessSharedProxyFetch?: boolean;
+	/** Marker set by versions before the shared store. */
 	__piWebAccessProxyFetch?: boolean;
 }
 
 /** Wraps globalThis.fetch so every http(s) call routes through curl while a proxy is active. Idempotent. */
 export function installGlobalProxyFetch(): void {
 	const current = globalThis.fetch as ProxiedFetch;
-	if (typeof current !== "function" || current.__piWebAccessProxyFetch === true) return;
+	// Wrappers from versions before the shared store read their own module's context, so they are
+	// wrapped again rather than trusted; this wrapper passes direct calls through to them unchanged.
+	if (typeof current !== "function" || current.__piWebAccessSharedProxyFetch === true) return;
 	const nativeFetch = current;
 	const wrapped: ProxiedFetch = (async (input: RequestInfo | URL, init?: ProxiedRequestInit) => {
 		// Prefer caller-attached __proxy (survives pLimit context loss) over AsyncLocalStorage.
@@ -375,10 +409,38 @@ export function installGlobalProxyFetch(): void {
 			).arrayBuffer());
 			init = { ...init, method: request.method, headers: request.headers, body, signal: request.signal, redirect: request.redirect };
 		}
-		return fetchViaCurl(url, init ?? {}, proxy);
+		return fetchViaCurl(url, init ?? {}, { command: ["curl"], proxy });
 	});
-	wrapped.__piWebAccessProxyFetch = true;
+	wrapped.__piWebAccessSharedProxyFetch = true;
+	// On top of a pre-fix wrapper, also carry its marker so that copy stops wrapping again.
+	if (current.__piWebAccessProxyFetch === true) wrapped.__piWebAccessProxyFetch = true;
 	globalThis.fetch = wrapped;
+}
+
+/** A fetch for the extension's own page requests that runs the `fetchContent.curl` command instead of
+ * Node's fetch. It uses a proxy the way the proxy transport does: a per-call `__proxy` wins, `""`
+ * connects directly, and loopback and NO_PROXY hosts are never proxied. With no proxy decision,
+ * `envProxy` names the env proxy the SSRF check trusted for the URL. Callers pass a URL. */
+export function createCurlFetch(
+	command: readonly string[],
+	{ maxBytes, envProxy }: { maxBytes: number; envProxy: (url: URL) => string | null },
+): typeof fetch {
+	return async (input: RequestInfo | URL, init?: ProxiedRequestInit) => {
+		const url = new URL(input instanceof Request ? input.url : input);
+		let proxy: string | null;
+		if (init?.__proxy !== undefined || hasScopedProxyDecision()) {
+			const chosen = init?.__proxy ?? getActiveProxy();
+			proxy = chosen && !isProxyBypassedUrl(url) ? chosen : null;
+		} else {
+			proxy = envProxy(url);
+		}
+		return fetchViaCurl(url, init ?? {}, {
+			command,
+			proxy,
+			maxBytes,
+			notFound: `fetchContent.curl command not found: ${command[0]}`,
+		});
+	};
 }
 
 // GET bodies are decoded by --compressed, so their length/encoding headers no longer match.
@@ -410,11 +472,22 @@ function parseHeaderDump(dump: string, keepLengthHeaders: boolean): { status: nu
 
 class CurlTransportError extends Error {}
 
-async function fetchViaCurl(url: URL, init: RequestInit, proxyUrl: string): Promise<Response> {
+interface CurlTransport {
+	/** Executable and any leading arguments, e.g. ["curl"] or ["curl-impersonate", "--impersonate", "chrome146"]. */
+	command: readonly string[];
+	/** Proxy passed with -x, or null to connect directly. */
+	proxy: string | null;
+	/** Error message when the executable is missing; defaults to the proxy transport's message. */
+	notFound?: string;
+	/** Largest body to download; curl stops a bigger one instead of saving all of it. */
+	maxBytes?: number;
+}
+
+async function fetchViaCurl(url: URL, init: RequestInit, transport: CurlTransport): Promise<Response> {
 	let current = url;
 	let currentInit = init;
 	for (let redirects = 0; ; redirects++) {
-		const response = await fetchViaCurlOnce(current, currentInit, proxyUrl);
+		const response = await fetchViaCurlOnce(current, currentInit, transport);
 		const location = response.headers.get("location");
 		if (!location || ![301, 302, 303, 307, 308].includes(response.status)) {
 			if (redirects > 0) Object.defineProperty(response, "redirected", { value: true, configurable: true });
@@ -447,7 +520,7 @@ async function fetchViaCurl(url: URL, init: RequestInit, proxyUrl: string): Prom
 	}
 }
 
-async function fetchViaCurlOnce(url: URL, init: RequestInit, proxyUrl: string): Promise<Response> {
+async function fetchViaCurlOnce(url: URL, init: RequestInit, { command, proxy, notFound, maxBytes }: CurlTransport): Promise<Response> {
 	const method = (init.method ?? "GET").toUpperCase();
 	const headers = new Headers(init.headers);
 
@@ -460,8 +533,15 @@ async function fetchViaCurlOnce(url: URL, init: RequestInit, proxyUrl: string): 
 		"--silent",
 		"--show-error",
 		"--compressed",
+		// The caller checks each redirect, so curl must not follow one, even with -L in the command or ~/.curlrc.
+		"--no-location",
+		// URLs are validated as written, so curl must send [ ] { } literally instead of expanding them into other URLs.
+		"--globoff",
 		"--connect-timeout", "20",
-		"-x", proxyUrl,
+		// An empty proxy also stops curl from using proxy environment variables, which Node's fetch ignores.
+		"-x", proxy ?? "",
+		// The caller already chose the proxy; curl must not send a host direct because of its own NO_PROXY reading.
+		...(proxy ? ["--noproxy", ""] : []),
 		"-D", headerFile,
 		"--output", bodyFile,
 		"--write-out", "%{json}",
@@ -469,6 +549,7 @@ async function fetchViaCurlOnce(url: URL, init: RequestInit, proxyUrl: string): 
 
 	if (method === "HEAD") args.push("--head");
 	else if (method !== "GET") args.push("-X", method);
+	if (maxBytes !== undefined) args.push("--max-filesize", String(maxBytes));
 
 	for (const [name, value] of headers.entries()) {
 		if (value === "") continue;
@@ -501,7 +582,7 @@ async function fetchViaCurlOnce(url: URL, init: RequestInit, proxyUrl: string): 
 				reject(new DOMException("The operation was aborted.", "AbortError"));
 				return;
 			}
-			const child = spawn("curl", args, { windowsHide: true });
+			const child = spawn(command[0], [...command.slice(1), ...args], { windowsHide: true });
 			let out = "";
 			let stderr = "";
 			const onAbort = () => { try { child.kill(); } catch {} };
@@ -513,14 +594,19 @@ async function fetchViaCurlOnce(url: URL, init: RequestInit, proxyUrl: string): 
 			child.once("error", (err: NodeJS.ErrnoException) => {
 				signal?.removeEventListener("abort", onAbort);
 				reject(new CurlTransportError(err.code === "ENOENT"
-					? "curl executable not found on PATH; proxy transport requires curl"
-					: `curl failed to start: ${err.message}`));
+					? notFound ?? "curl executable not found on PATH; proxy transport requires curl"
+					: `${command[0]} failed to start: ${err.message}`));
 			});
 			child.once("close", (code) => {
 				signal?.removeEventListener("abort", onAbort);
 				if (signal?.aborted) return reject(new DOMException("The operation was aborted.", "AbortError"));
-				if (code !== 0 && !out.trim()) {
-					return reject(new CurlTransportError(`curl exited with code ${code ?? "unknown"} via ${redactProxyUrl(proxyUrl)}${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
+				// A failed transfer can still write headers, part of the body and the write-out JSON.
+				// Exit 63 is --max-filesize; report it like the size limit of a Node fetch.
+				if (code === 63 && maxBytes !== undefined) {
+					return reject(new CurlTransportError(`Response too large (over ${Math.round(maxBytes / 1024 / 1024)}MB)`));
+				}
+				if (code !== 0) {
+					return reject(new CurlTransportError(`${command[0]} exited with code ${code ?? "unknown"}${proxy ? ` via ${redactProxyUrl(proxy)}` : ""}${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
 				}
 				resolve(out);
 			});
@@ -543,7 +629,9 @@ async function fetchViaCurlOnce(url: URL, init: RequestInit, proxyUrl: string): 
 
 	const { status, statusText, headers: responseHeaders } = parseHeaderDump(dump, method === "HEAD");
 	if (status === 0) {
-		throw new Error(`Proxy fetch to ${url.toString()} via ${redactProxyUrl(proxyUrl)} returned no HTTP status`);
+		throw new Error(proxy
+			? `Proxy fetch to ${url.toString()} via ${redactProxyUrl(proxy)} returned no HTTP status`
+			: `${command[0]} fetch to ${url.toString()} returned no HTTP status`);
 	}
 
 	let finalUrl = url.toString();

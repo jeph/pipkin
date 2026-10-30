@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { activityMonitor } from "./activity.ts";
@@ -165,9 +165,9 @@ async function resolvePiAuth(
 	return undefined;
 }
 
-export async function resolveXaiAuth(ctx?: ExtensionContext, signal?: AbortSignal): Promise<XaiAuth | undefined> {
+export async function resolveXaiAuth(ctx?: ExtensionContext, signal?: AbortSignal, model?: string): Promise<XaiAuth | undefined> {
 	const config = loadConfig();
-	const modelOverride = resolveConfiguredSearchModel(config.xaiSearchModel);
+	const modelOverride = model ?? resolveConfiguredSearchModel(config.xaiSearchModel);
 	const tools = resolveConfiguredSearchTools(config.xaiSearchTools);
 	if (ctx && resolveConfiguredResponsesUrl(config.xaiResponsesUrl) === undefined) {
 		const auth = await resolvePiAuth(ctx, modelOverride, tools);
@@ -257,7 +257,7 @@ function buildInput(query: string, options: SearchOptions, tools: readonly XaiSe
 	return `${lines.join(" ")}\n\n${query}`;
 }
 
-function addResult(results: SearchResult[], seen: Set<string>, url: unknown, title: unknown, snippet = ""): void {
+function addResult(results: SearchResult[], seen: Set<string>, url: unknown, title: unknown, snippet = "", generated = false): void {
 	if (typeof url !== "string" || url.trim().length === 0) return;
 	if (seen.has(url)) return;
 	seen.add(url);
@@ -265,6 +265,7 @@ function addResult(results: SearchResult[], seen: Set<string>, url: unknown, tit
 		title: typeof title === "string" && title.trim().length > 0 ? title : url,
 		url,
 		snippet,
+		...(generated && snippet ? { snippetSource: "generated" as const } : {}),
 	});
 }
 
@@ -335,6 +336,7 @@ function extractSearchResults(output: unknown[], citations: unknown, numResults:
 					(annotation as { url?: unknown }).url,
 					(annotation as { title?: unknown }).title,
 					extractSnippetAround(text, (annotation as { start_index?: unknown }).start_index, (annotation as { end_index?: unknown }).end_index),
+					true,
 				);
 			}
 		}
@@ -368,7 +370,7 @@ export async function searchWithXai(
 	const tools = resolveConfiguredSearchTools(config.xaiSearchTools);
 	const customUrl = resolveConfiguredResponsesUrl(config.xaiResponsesUrl);
 	const timeoutMs = resolveConfiguredSearchTimeoutMs(config.xaiSearchTimeoutMs);
-	const auth = await resolveXaiAuth(ctx, options.signal);
+	const auth = await resolveXaiAuth(ctx, options.signal, options.model);
 	if (!auth) {
 		if (customUrl) {
 			throw new Error(

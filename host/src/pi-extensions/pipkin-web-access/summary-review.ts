@@ -1,8 +1,8 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import type { ModelThinkingLevel, ThinkingLevel } from "@earendil-works/pi-ai";
 import type { complete, Api, Message, Model } from "@earendil-works/pi-ai/compat";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { findModelWithProviderRouting, isModelInScope, splitThinkingSuffix, type SummaryThinkingLevel } from "./summary-model-scope.ts";
+import { findModelWithProviderRouting, isModelInScope, resolveHelperModelSelector, type SummaryThinkingLevel } from "./summary-model-scope.ts";
 import type { QueryResultData } from "./storage.ts";
 
 type ProviderHeaders = Record<string, string | null>;
@@ -31,6 +31,8 @@ export interface SummaryMeta {
 }
 
 export type SummaryGenerationContext = Pick<ExtensionContext, "model" | "modelRegistry" | "sessionManager" | "scopedModels">;
+
+type SummaryModelFailure = { model: string; reason: string; message: string };
 
 function estimateTokens(text: string): number {
 	const trimmed = text.trim();
@@ -207,20 +209,7 @@ export function buildDeterministicSummary(results: QueryResultData[]): { summary
 	};
 }
 
-function parseModelSelector(value: string): { provider: string; id: string; thinkingLevel?: SummaryThinkingLevel } {
-	const selector = splitThinkingSuffix(value);
-	const slashIndex = selector.value.indexOf("/");
-	if (slashIndex <= 0 || slashIndex >= selector.value.length - 1) {
-		throw new Error(`Invalid summary model: ${value}. Use provider/model-id.`);
-	}
-	return {
-		provider: selector.value.slice(0, slashIndex),
-		id: selector.value.slice(slashIndex + 1),
-		thinkingLevel: selector.thinkingLevel,
-	};
-}
-
-async function resolveThinkingLevel(model: Model<Api>, requested?: SummaryThinkingLevel): Promise<ModelThinkingLevel | undefined> {
+export async function resolveThinkingLevel(model: Model<Api>, requested?: SummaryThinkingLevel): Promise<ModelThinkingLevel | undefined> {
 	if (!requested) return undefined;
 	const { clampThinkingLevel } = await import("@earendil-works/pi-ai");
 	return clampThinkingLevel(model, requested as ModelThinkingLevel);
@@ -228,15 +217,20 @@ async function resolveThinkingLevel(model: Model<Api>, requested?: SummaryThinki
 
 async function resolveSummaryModelCandidates(
 	ctx: SummaryGenerationContext,
-	modelOverride?: string,
-): Promise<{ candidates: Array<{ model: Model<Api>; apiKey?: string; headers?: ProviderHeaders; thinkingLevel?: SummaryThinkingLevel }>; errors: string[] }> {
+	modelOverride: string | undefined,
+	preferredFallback: boolean,
+): Promise<{ candidates: Array<{ model: Model<Api>; apiKey?: string; headers?: ProviderHeaders; thinkingLevel?: SummaryThinkingLevel }>; failures: SummaryModelFailure[] }> {
 	const specs: Array<{ provider: string; id: string; thinkingLevel?: SummaryThinkingLevel }> = [];
+	const failures: SummaryModelFailure[] = [];
 	const normalizedOverride = typeof modelOverride === "string" ? modelOverride.trim() : "";
-	if (normalizedOverride.length > 0) specs.push(parseModelSelector(normalizedOverride));
-	specs.push(...PREFERRED_SUMMARY_MODELS);
+	if (normalizedOverride.length > 0) {
+		const spec = resolveHelperModelSelector(normalizedOverride, "summary model", ctx.model);
+		if (spec) specs.push(spec);
+		else failures.push({ model: normalizedOverride, reason: "no active Pi session model", message: `Summary model not found: ${normalizedOverride} (no active Pi session model)` });
+	}
+	if (preferredFallback) specs.push(...PREFERRED_SUMMARY_MODELS);
 
 	const candidates: Array<{ model: Model<Api>; apiKey?: string; headers?: ProviderHeaders; thinkingLevel?: SummaryThinkingLevel }> = [];
-	const errors: string[] = [];
 	const seen = new Set<string>();
 	for (const spec of specs) {
 		const value = `${spec.provider}/${spec.id}`;
@@ -245,21 +239,29 @@ async function resolveSummaryModelCandidates(
 
 		const model = findModelWithProviderRouting(ctx.modelRegistry, spec.provider, spec.id);
 		if (!model) {
-			errors.push(`Summary model not found: ${value}`);
+			failures.push({ model: value, reason: "not found", message: `Summary model not found: ${value}` });
 			continue;
 		}
 		if (!isModelInScope(model, ctx.scopedModels)) {
-			errors.push(`Summary model is not enabled: ${value}`);
+			failures.push({ model: value, reason: "not enabled", message: `Summary model is not enabled: ${value}` });
 			continue;
 		}
 		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
 		if (!auth.ok) {
-			errors.push(`No API key available for summary model ${value}`);
+			failures.push({ model: value, reason: "no API key", message: `No API key available for summary model ${value}` });
 			continue;
 		}
 		candidates.push({ model, apiKey: auth.apiKey, headers: auth.headers, thinkingLevel: spec.thinkingLevel });
 	}
-	return { candidates, errors };
+	return { candidates, failures };
+}
+
+function summaryUnavailableReason(failures: SummaryModelFailure[], preferredFallback: boolean): string {
+	if (failures.length === 0) return "summary-model-unavailable";
+	if (failures.length === 1) return `summary-model-unavailable: ${failures[0].message}`;
+	const list = failures.map(failure => `${failure.model} (${failure.reason})`).join(", ");
+	const hint = preferredFallback ? "; set summaryModel in web-search.json to a model you can use" : "";
+	return `summary-model-unavailable: none of the ${failures.length} summary models could be used: ${list}${hint}`;
 }
 
 function buildFallbackSummary(
@@ -308,6 +310,7 @@ export async function generateSummaryDraft(
 	completeFn?: CompleteFunction,
 	deadlineMs = SUMMARY_GENERATION_DEADLINE_MS,
 	instructions?: string,
+	options: { preferredFallback?: boolean } = {},
 ): Promise<{ summary: string; meta: SummaryMeta }> {
 	if (!ctx || !ctx.modelRegistry) {
 		throw new Error("Summary generation context unavailable");
@@ -375,14 +378,14 @@ export async function generateSummaryDraft(
 				piAiCompat = await raceSummaryOperation(import("@earendil-works/pi-ai/compat"));
 			}
 			if (!usesRegistryStreamSimple) completeFn ??= usesRegistryComplete ? registry.complete!.bind(registry) as CompleteFunction : piAiCompat!.complete;
-			resolved = await raceSummaryOperation(resolveSummaryModelCandidates(ctx, modelOverride));
+			resolved = await raceSummaryOperation(resolveSummaryModelCandidates(ctx, modelOverride, options.preferredFallback ?? true));
 		} catch (err) {
 			checkSummaryDeadline();
 			const message = err instanceof Error ? err.message : String(err);
 			return buildFallbackSummary(results, `summary-model-settings-error: ${message}`, Date.now() - generationStartedAt);
 		}
 
-		let lastError = resolved.errors.at(-1);
+		const failures = resolved.failures;
 		for (const { model, apiKey, headers, thinkingLevel } of resolved.candidates) {
 			const startedAt = Date.now();
 			try {
@@ -451,13 +454,14 @@ export async function generateSummaryDraft(
 			} catch (err) {
 				checkSummaryDeadline();
 				if (isAbortError(err)) throw err;
-				lastError = err instanceof Error ? err.message : String(err);
+				const message = err instanceof Error ? err.message : String(err);
+				failures.push({ model: `${model.provider}/${model.id}`, reason: message, message });
 			}
 		}
 
 		return buildFallbackSummary(
 			results,
-			lastError ? `summary-model-unavailable: ${lastError}` : "summary-model-unavailable",
+			summaryUnavailableReason(failures, options.preferredFallback ?? true),
 			Date.now() - generationStartedAt,
 		);
 	} catch (err) {

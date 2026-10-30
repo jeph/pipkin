@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.44.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { existsSync, readFileSync } from "node:fs";
 import { activityMonitor } from "./activity.ts";
 import { normalizeDomain } from "./domain-filter-normalization.ts";
@@ -214,7 +214,7 @@ export function isMistralAvailable(): boolean {
 
 export async function searchWithMistral(query: string, options: SearchOptions = {}): Promise<SearchResponse> {
 	const config = loadConfig();
-	const model = resolveSearchModel(config.mistralSearchModel);
+	const model = options.model ?? resolveSearchModel(config.mistralSearchModel);
 	const tool = resolveSearchTool(config.mistralSearchTool);
 	const numResults = normalizeCount(options.numResults);
 	const apiKey = await getApiKey(options.signal);

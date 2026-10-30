@@ -60,7 +60,7 @@ const licenses: Record<string, string> = {
     `TypeBox ${typeboxVersion} (https://github.com/sinclairzx81/typebox), MIT License. ` +
     `Bundled into the Pipkin web access extension.\n\n${typeboxLicense}`,
   "pi-web-access":
-    "pi-web-access 0.39.0 (https://github.com/nicobailon/pi-web-access), MIT License. " +
+    "pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License. " +
     `Pipkin's web access extension is a modified copy.\n\n${webAccessLicense}`,
   "rpiv-todo":
     "@juicesharp/rpiv-todo 2.13.8 (https://github.com/juicesharp/rpiv-mono), MIT License. " +
