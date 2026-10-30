@@ -4,6 +4,8 @@ import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -30,6 +32,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.res.ResourcesCompat
@@ -38,6 +42,7 @@ import io.github.sagernet.libghostty.GhosttyTerminalView
 import io.github.sagernet.libghostty.GhosttyTheme
 import io.github.sagernet.libghostty.compose.GhosttyDialogs
 import io.github.sagernet.libghostty.compose.GhosttyTerminal
+import io.github.sagernet.libghostty.compose.GhosttyTerminalState
 import io.github.sagernet.libghostty.compose.rememberGhosttyTerminalState
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
@@ -118,7 +123,7 @@ private fun TerminalPane(session: TerminalSession, modifier: Modifier) {
       session = session.terminal,
       state = terminalState,
       // The view clears its background with drawColor, which fills past its bounds over the header unless clipped.
-      modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds(),
+      modifier = Modifier.weight(1f).fillMaxWidth().clipToBounds().keepTouchesFromPanels(terminalState),
       theme = theme,
       darkColorScheme = colors.isDark,
       typeface = typeface,
@@ -147,6 +152,20 @@ private fun TerminalPane(session: TerminalSession, modifier: Modifier) {
   }
   GhosttyDialogs(terminalState)
 }
+
+/**
+ * Keeps a touch that starts on the terminal from sliding the pane to its sidebar or file explorer, which would take
+ * a sideways drag that selects text or moves a selection handle: libghostty's view doesn't claim its own drags. The
+ * claim goes in as the touch lands, before the panels see it move, and Compose's view interop then gives the whole
+ * touch to the view. The header and key bar still slide the panels.
+ */
+private fun Modifier.keepTouchesFromPanels(terminalState: GhosttyTerminalState): Modifier =
+  pointerInput(terminalState) {
+    awaitEachGesture {
+      awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+      terminalState.view?.parent?.requestDisallowInterceptTouchEvent(true)
+    }
+  }
 
 /** Compose's keyboard controller only hides a keyboard a Compose text field opened, not this view's. */
 private fun GhosttyTerminalView.hideIme() {

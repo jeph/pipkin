@@ -293,7 +293,7 @@ private fun SidePanelOpenedEffect(panel: Panel) {
 /**
  * Three layers as wide as the pane that slide together: the sidebar at offset 0, the pane's screen at its width and
  * the file explorer at twice it. A horizontal drag anywhere in the pane moves between neighbours; children with their
- * own horizontal scroll see the drag first and consume it.
+ * own horizontal scroll see the drag first and consume it, and the terminal keeps every touch that starts on it.
  */
 @Composable
 private fun MobilePanels(
