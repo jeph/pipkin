@@ -506,8 +506,11 @@ tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
   jvmTarget.set("21")
 }
 
+// The debug variant's tasks rather than detektMain and detektTest: only a variant's classpath has the Java that AIDL
+// generates for the :inference process's binder, without which detekt can't resolve InferenceProcess and
+// InferenceService and skips the rules that need types there.
 tasks.named("check") {
-  dependsOn("detektMain", "detektTest", hostCheck)
+  dependsOn("detektDebug", "detektDebugUnitTest", hostCheck)
 }
 
 dependencies {
