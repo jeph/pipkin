@@ -1,33 +1,19 @@
 import { connect } from "node:net";
 import { Connection } from "./connection.js";
-import { HostError, installedPiVersion, grantedSharedStorage, readHostEnv } from "./env.js";
+import { installedPiVersion, grantedSharedStorage, readHostEnv } from "./env.js";
 import { isObject, type JsonObject } from "./framing.js";
-import type { ModeContext } from "./mode.js";
-import { authStatus } from "./modes/auth-status.js";
-import { createBackup, deleteBackup, listBackups, restoreBackup } from "./modes/backups.js";
+import { failure, type ModeContext } from "./mode.js";
+import { createBackup, restoreBackup } from "./modes/backups.js";
 import { browse } from "./modes/browse.js";
-import { defaultModel } from "./modes/default-model.js";
-import { deleteSessions } from "./modes/delete-sessions.js";
 import { ensure } from "./modes/ensure.js";
 import { files } from "./modes/files.js";
 import { git } from "./modes/git.js";
-import { localModelsSync } from "./modes/local-models-sync.js";
 import { login } from "./modes/login.js";
-import { logout } from "./modes/logout.js";
-import { modelDefaults } from "./modes/model-defaults.js";
 import { packageInstall } from "./modes/package-install.js";
-import { providerModels } from "./modes/provider-models.js";
-import { providerRemove } from "./modes/provider-remove.js";
-import { providerSave } from "./modes/provider-save.js";
 import { rpc } from "./modes/rpc.js";
-import { saveAttachments } from "./modes/save-attachments.js";
-import { sessionMessages } from "./modes/session-messages.js";
-import { sessions } from "./modes/sessions.js";
-import { subagentSessions } from "./modes/subagent-sessions.js";
-import { subscriptionModels } from "./modes/subscription-models.js";
-import { subscriptionSave } from "./modes/subscription-save.js";
 import { terminal } from "./modes/terminal.js";
 import { updateExtensions } from "./modes/update-extensions.js";
+import { utility } from "./modes/utility.js";
 
 const PROTOCOL = 1;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -36,11 +22,6 @@ const ABORT_GRACE_MS = 5000;
 
 const EXIT_USAGE = 64;
 const EXIT_NO_REQUEST = 2;
-
-function failure(error: unknown): JsonObject {
-  if (error instanceof HostError) return { type: "pipkin_result", ok: false, error: error.message, code: error.code, i18n: error.i18n };
-  return { type: "pipkin_result", ok: false, error: error instanceof Error ? error.message : String(error), code: "failed" };
-}
 
 /** Runs a non-rpc mode and reports its outcome as the single `pipkin_result` line. */
 async function respond(ctx: ModeContext, run: (ctx: ModeContext) => Promise<JsonObject>): Promise<void> {
@@ -113,54 +94,22 @@ async function main(): Promise<void> {
       return;
     case "ensure":
       return respond(ctx, ensure);
-    case "sessions":
-      return respond(ctx, sessions);
-    case "session_messages":
-      return respond(ctx, sessionMessages);
-    case "subagent_sessions":
-      return respond(ctx, subagentSessions);
-    case "delete_sessions":
-      return respond(ctx, deleteSessions);
     case "files":
       return respond(ctx, files);
     case "git":
       return respond(ctx, git);
+    case "utility":
+      return respond(ctx, utility);
     case "browse":
       return respond(ctx, browse);
-    case "save_attachments":
-      return respond(ctx, saveAttachments);
-    case "auth_status":
-      return respond(ctx, authStatus);
     case "login":
       return respond(ctx, login);
-    case "logout":
-      return respond(ctx, logout);
-    case "provider_models":
-      return respond(ctx, providerModels);
-    case "model_defaults":
-      return respond(ctx, modelDefaults);
-    case "provider_save":
-      return respond(ctx, providerSave);
-    case "provider_remove":
-      return respond(ctx, providerRemove);
-    case "local_models_sync":
-      return respond(ctx, localModelsSync);
-    case "subscription_models":
-      return respond(ctx, subscriptionModels);
-    case "subscription_save":
-      return respond(ctx, subscriptionSave);
     case "package_install":
       return respond(ctx, packageInstall);
-    case "default_model":
-      return respond(ctx, defaultModel);
-    case "backups":
-      return respond(ctx, listBackups);
     case "backup_create":
       return respond(ctx, createBackup);
     case "backup_restore":
       return respond(ctx, restoreBackup);
-    case "backup_delete":
-      return respond(ctx, deleteBackup);
     case "update_extensions":
       return respond(ctx, updateExtensions);
     case "hello":

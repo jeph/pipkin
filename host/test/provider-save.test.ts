@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type Dirs, installRealPi, makeDirs, removeDirs, runMode } from "./harness.js";
+import { type Dirs, installRealPi, makeDirs, removeDirs, runOp } from "./harness.js";
 
 const SAVE = {
   id: "codex-lb",
@@ -35,7 +35,7 @@ describe("provider_save mode", () => {
   it("adds the provider and keeps other providers and keys", async () => {
     const other = { baseUrl: "http://localhost:11434/v1", api: "openai-completions", apiKey: "x", models: [{ id: "llama" }] };
     await writeFile(modelsPath, JSON.stringify({ extra: true, providers: { local: other } }));
-    expect(await runMode("provider_save", dirs, SAVE)).toEqual({ type: "pipkin_result", ok: true, data: {} });
+    expect(await runOp("provider_save", dirs, SAVE)).toEqual({ type: "pipkin_result", ok: true, data: {} });
     expect(await saved()).toEqual({
       extra: true,
       providers: {
@@ -72,7 +72,7 @@ describe("provider_save mode", () => {
       { id: "gpt-a", reasoning: false, cost: { input: 3, output: 4, cacheRead: 0.1, cacheWrite: 0 } },
       { id: "new", input: ["text", "image"] },
     ];
-    expect(await runMode("provider_save", dirs, { ...SAVE, models })).toMatchObject({ ok: true });
+    expect(await runOp("provider_save", dirs, { ...SAVE, models })).toMatchObject({ ok: true });
     expect(await saved()).toEqual({
       providers: {
         "codex-lb": {
@@ -108,7 +108,7 @@ describe("provider_save mode", () => {
     { cost: { input: 1, output: 2 } },
   ])("rejects the model field %j without writing", async (field) => {
     await writeFile(modelsPath, "{}");
-    const result = await runMode("provider_save", dirs, { ...SAVE, models: [{ id: "gpt-a", ...field }] });
+    const result = await runOp("provider_save", dirs, { ...SAVE, models: [{ id: "gpt-a", ...field }] });
     expect(result).toMatchObject({ ok: false, code: "bad_params" });
     expect(await readFile(modelsPath, "utf8")).toBe("{}");
   });
@@ -116,20 +116,20 @@ describe("provider_save mode", () => {
   it.each([{ models: ["gpt-a"] }, { models: [{ id: "a" }, { id: "a" }] }, { models: undefined }])(
     "rejects malformed models %j",
     async (params) => {
-      expect(await runMode("provider_save", dirs, { ...SAVE, ...params })).toMatchObject({ ok: false, code: "bad_params" });
+      expect(await runOp("provider_save", dirs, { ...SAVE, ...params })).toMatchObject({ ok: false, code: "bad_params" });
     },
   );
 
   it("saves a keyless provider with a placeholder key Pi accepts, which the editor sees as no key", async () => {
-    expect(await runMode("provider_save", dirs, { ...SAVE, apiKey: "" })).toMatchObject({ ok: true });
+    expect(await runOp("provider_save", dirs, { ...SAVE, apiKey: "" })).toMatchObject({ ok: true });
     expect(await saved()).toMatchObject({ providers: { "codex-lb": { apiKey: "none" } } });
-    const status = await runMode("auth_status", dirs, {});
+    const status = await runOp("auth_status", dirs, {});
     expect(status.data).toMatchObject({ custom: [expect.objectContaining({ id: "codex-lb", apiKey: "" })] });
   });
 
   it("rejects invalid models.json without writing", async () => {
     await writeFile(modelsPath, "{ not json");
-    expect(await runMode("provider_save", dirs, SAVE)).toEqual({
+    expect(await runOp("provider_save", dirs, SAVE)).toEqual({
       type: "pipkin_result",
       ok: false,
       code: "models_invalid",
@@ -140,17 +140,17 @@ describe("provider_save mode", () => {
   });
 
   it.each(["Bad", "-lead", "has space", "a".repeat(41), ""])("rejects the provider id %j", async (id) => {
-    expect(await runMode("provider_save", dirs, { ...SAVE, id })).toMatchObject({ ok: false, code: "bad_id" });
+    expect(await runOp("provider_save", dirs, { ...SAVE, id })).toMatchObject({ ok: false, code: "bad_id" });
   });
 
   it("rejects a built-in provider id", async () => {
-    expect(await runMode("provider_save", dirs, { ...SAVE, id: "anthropic" })).toMatchObject({ ok: false, code: "builtin_id" });
+    expect(await runOp("provider_save", dirs, { ...SAVE, id: "anthropic" })).toMatchObject({ ok: false, code: "builtin_id" });
   });
 
   it("removes a provider and keeps the rest", async () => {
-    await runMode("provider_save", dirs, SAVE);
-    await runMode("provider_save", dirs, { ...SAVE, id: "second" });
-    expect(await runMode("provider_remove", dirs, { id: "codex-lb" })).toMatchObject({ ok: true });
+    await runOp("provider_save", dirs, SAVE);
+    await runOp("provider_save", dirs, { ...SAVE, id: "second" });
+    expect(await runOp("provider_remove", dirs, { id: "codex-lb" })).toMatchObject({ ok: true });
     expect(await saved()).toEqual({ providers: { second: expect.any(Object) } });
   });
 });

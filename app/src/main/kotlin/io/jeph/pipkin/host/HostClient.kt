@@ -7,6 +7,7 @@ import io.jeph.pipkin.termux.TermuxIdentity
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.Base64
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,8 +22,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Suspend API over `host.mjs` modes. Each call launches one host process, sends one
- * `pipkin_request` and, except for [openRpc], reads lines until `pipkin_result`.
+ * Suspend API over `host.mjs` modes. The one-off operations go to one shared `utility` host ([utilityCall]), which
+ * stays up until none has come for [UTILITY_IDLE_MILLIS]. Every other call launches a host process of its own,
+ * sends one `pipkin_request` and, except for [openRpc], reads lines until `pipkin_result`.
  * Throws [HostFailure] when the host could not run and [HostRejected] when it refused.
  *
  * A launch waits until Pipkin is in the [foreground]. In the background Android may refuse to start Termux, and in
@@ -31,11 +33,12 @@ import org.json.JSONObject
  * are only seen on screen.
  */
 @Suppress("TooManyFunctions") // One typed wrapper per host mode, beside the launch code they share.
-internal class HostClient(context: Context, private val foreground: Flow<Boolean>) {
+internal class HostClient(context: Context, private val foreground: Flow<Boolean>, scope: CoroutineScope) {
   private val context = context.applicationContext
   private val helloState = MutableStateFlow<HostHello?>(null)
   private val failureState = MutableStateFlow<HostFailure?>(null)
   private val installingState = MutableStateFlow(false)
+  private val utility = SharedHost(scope, UTILITY_IDLE_MILLIS, ::openUtility)
 
   /**
    * The bundled `pi/package.json`: Pi and the packages Pipkin's extensions import; `ensure` installs it, `rpc` requires
@@ -87,6 +90,8 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
           .put("pipkinExtensions", JSONArray(extensions))
       }
       val data = call("ensure", params, ENSURE_TIMEOUT_MILLIS, progress(onProgress))
+      // The utility host keeps the Pi it imported first, which may be the one this install replaced.
+      withContext(Dispatchers.Main.immediate) { utility.restart() }
       val version = data.getString("piVersion")
       helloState.update { it?.copy(piVersion = version) }
       return version
@@ -97,18 +102,18 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
 
   /** Newest first. */
   suspend fun sessions(): List<SessionInfo> =
-    call("sessions", JSONObject()).optJSONArray("sessions").objects().map(SessionInfo::from)
+    utilityCall("sessions", JSONObject()).optJSONArray("sessions").objects().map(SessionInfo::from)
 
   /** Deletes the session files at [paths]; one that is already gone counts as deleted. */
   suspend fun deleteSessions(paths: List<String>) {
-    call("delete_sessions", JSONObject().put("paths", JSONArray(paths)))
+    utilityCall("delete_sessions", JSONObject().put("paths", JSONArray(paths)))
   }
 
   /** A session's messages as Pi's RPC `get_messages` reports them, read without starting Pi. */
   suspend fun sessionMessages(path: String): JSONArray =
-    call("session_messages", JSONObject().put("path", path)).optJSONArray("messages") ?: JSONArray()
+    utilityCall("session_messages", JSONObject().put("path", path)).optJSONArray("messages") ?: JSONArray()
 
-  suspend fun authStatus(): AuthStatus = AuthStatus.from(call("auth_status", JSONObject()))
+  suspend fun authStatus(): AuthStatus = AuthStatus.from(utilityCall("auth_status", JSONObject()))
 
   /** Starts a host only for its hello, so [lastHello] reports Termux as it is now, such as its storage access. */
   suspend fun hello() {
@@ -117,7 +122,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
 
   /** The transcripts of the subagents the chat saved at [path] ran, oldest first, read from their files' headers. */
   suspend fun subagentSessions(path: String): List<SubagentSession> =
-    call("subagent_sessions", JSONObject().put("path", path)).optJSONArray("sessions").objects()
+    utilityCall("subagent_sessions", JSONObject().put("path", path)).optJSONArray("sessions").objects()
       .map(SubagentSession::from)
 
   /** Sign-in to a provider Pi ships: OAuth, or Pi prompting for an API key. Cancelling the caller aborts the login. */
@@ -137,31 +142,31 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   }
 
   suspend fun logout(providerId: String) {
-    call("logout", JSONObject().put("providerId", providerId))
+    utilityCall("logout", JSONObject().put("providerId", providerId))
   }
 
   /** The endpoint's models, each prefilled from its own metadata and then Pi's catalogue. */
   suspend fun providerModels(baseUrl: String, apiKey: String, api: String): List<ModelConfig> =
-    call("provider_models", JSONObject().put("baseUrl", baseUrl).put("apiKey", apiKey).put("api", api))
+    utilityCall("provider_models", JSONObject().put("baseUrl", baseUrl).put("apiKey", apiKey).put("api", api))
       .optJSONArray("models").objects().map(ModelConfig::from)
 
   /** Pi's catalogue settings for [ids], in order; an unknown id comes back with only its id. */
   suspend fun modelDefaults(ids: List<String>, api: String): List<ModelConfig> =
-    call("model_defaults", JSONObject().put("ids", JSONArray(ids)).put("api", api))
+    utilityCall("model_defaults", JSONObject().put("ids", JSONArray(ids)).put("api", api))
       .optJSONArray("models").objects().map(ModelConfig::from)
 
   /** The models the stored API key of the Pi provider [providerId] may use as it lists them; null when it has no list. */
   suspend fun subscriptionModels(providerId: String): List<ModelConfig>? =
-    call("subscription_models", JSONObject().put("providerId", providerId))
+    utilityCall("subscription_models", JSONObject().put("providerId", providerId))
       .optJSONArray("models")?.objects()?.map(ModelConfig::from)
 
   suspend fun providerSave(provider: ProviderConfig) {
-    call("provider_save", provider.toJson())
+    utilityCall("provider_save", provider.toJson())
   }
 
   /** Writes a subscription's model settings (`modelOverrides`, extra models) and which of its models show. */
   suspend fun subscriptionSave(providerId: String, enabled: List<String>, models: List<ModelConfig>) {
-    call(
+    utilityCall(
       "subscription_save",
       JSONObject()
         .put("providerId", providerId)
@@ -171,7 +176,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   }
 
   suspend fun providerRemove(id: String) {
-    call("provider_remove", JSONObject().put("id", id))
+    utilityCall("provider_remove", JSONObject().put("id", id))
   }
 
   /**
@@ -179,7 +184,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
    * compaction sized to each model's context; an empty list removes the provider. True when Pi's configuration
    * changed, false when it already said all of that.
    */
-  suspend fun localModelsSync(baseUrl: String, apiKey: String, models: List<ModelConfig>): Boolean = call(
+  suspend fun localModelsSync(baseUrl: String, apiKey: String, models: List<ModelConfig>): Boolean = utilityCall(
     "local_models_sync",
     JSONObject()
       .put("baseUrl", baseUrl)
@@ -194,12 +199,12 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
 
   /** Makes new Pi sessions start with this model while it stays available and in scope. */
   suspend fun setDefaultModel(provider: String, modelId: String) {
-    call("default_model", JSONObject().put("provider", provider).put("modelId", modelId))
+    utilityCall("default_model", JSONObject().put("provider", provider).put("modelId", modelId))
   }
 
   /** Makes new Pi sessions start with this thinking level, clamped to their model. */
   suspend fun setDefaultThinkingLevel(level: String) {
-    call("default_model", JSONObject().put("thinkingLevel", level))
+    utilityCall("default_model", JSONObject().put("thinkingLevel", level))
   }
 
   /** Writes [files] (name to bytes) into a new folder in Termux; returns their absolute paths in order. */
@@ -209,12 +214,12 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     files.forEach { (name, bytes) ->
       array.put(JSONObject().put("name", name).put("data", encoder.encodeToString(bytes)))
     }
-    return call("save_attachments", JSONObject().put("files", array)).optJSONArray("paths").strings()
+    return utilityCall("save_attachments", JSONObject().put("files", array)).optJSONArray("paths").strings()
   }
 
   /** The backups folder in Termux and its backups, newest first. */
   suspend fun backups(): Backups {
-    val data = call("backups", JSONObject())
+    val data = utilityCall("backups", JSONObject())
     return Backups(data.optString("dir"), data.optJSONArray("backups").objects().map(BackupInfo::from))
   }
 
@@ -229,7 +234,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   }
 
   suspend fun deleteBackup(name: String) {
-    call("backup_delete", JSONObject().put("name", name))
+    utilityCall("backup_delete", JSONObject().put("name", name))
   }
 
   /** Runs `pi update --extensions`, which updates every package in Pi's settings that isn't pinned to a version. */
@@ -345,6 +350,9 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     }
   }
 
+  /** Starts the `utility` host that answers [utilityCall]s, and returns its channel once it is ready for requests. */
+  private suspend fun openUtility(): HostChannel = openRequestHost("utility", "pipkin_utility_ready")
+
   private suspend fun connect(mode: String): HostChannel {
     if (!foreground.first()) {
       Log.i(TAG, "Host $mode waits until Pipkin is in the foreground")
@@ -360,6 +368,18 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     helloState.value = HostHello.from(channel.hello)
     TermuxIdentity.remember(context)
     return channel
+  }
+
+  /**
+   * Asks the shared `utility` host for one-off operation [op], starting the host when none is running, and returns
+   * the operation's data as [call] does for a host of its own.
+   */
+  private suspend fun utilityCall(op: String, params: JSONObject): JSONObject {
+    val message = JSONObject().put("type", UTILITY_REQUEST).put("op", op).put("params", params)
+    // SharedHost is main-thread confined, and callers come from any dispatcher.
+    val result = withContext(Dispatchers.Main.immediate) { utility.request(message, DEFAULT_TIMEOUT_MILLIS) }
+    HostRejected.from(result)?.let { throw it }
+    return result.optJSONObject("data") ?: JSONObject()
   }
 
   private suspend fun call(
@@ -409,5 +429,9 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     const val EXTENSIONS_UPDATE_TIMEOUT_MILLIS = 15 * 60_000L
     const val LOGIN_TIMEOUT_MILLIS = 10 * 60_000L
     const val REQUEST_HOST_START_TIMEOUT_MILLIS = 15_000L
+    const val UTILITY_REQUEST = "pipkin_utility_request"
+
+    /** Long enough that a visit to the chat list or Settings reuses one host, as the file browser's does. */
+    const val UTILITY_IDLE_MILLIS = 120_000L
   }
 }

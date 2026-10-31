@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type Dirs, installRealPi, makeDirs, removeDirs, runMode } from "./harness.js";
+import { type Dirs, installRealPi, makeDirs, removeDirs, runOp } from "./harness.js";
 import type { Api, Message, Model } from "@earendil-works/pi-ai";
 import { clampMaxTokensToContext } from "@earendil-works/pi-ai/api/simple-options";
 import { normalizeContext } from "@earendil-works/pi-ai/utils/transcript";
@@ -36,7 +36,7 @@ describe("local_models_sync mode", () => {
   it("serves the models under pipkin-local with session affinity, free, text only, beside other providers", async () => {
     const other = { baseUrl: "http://localhost:11434/v1", api: "openai-completions", apiKey: "x", models: [{ id: "llama" }] };
     await writeFile(path.join(dirs.configDir, "models.json"), JSON.stringify({ providers: { ollama: other } }));
-    expect(await runMode("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true });
+    expect(await runOp("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true });
 
     const models = await json("models.json");
     expect(models).toMatchObject({ providers: { ollama: other } });
@@ -62,7 +62,7 @@ describe("local_models_sync mode", () => {
       path.join(dirs.configDir, "settings.json"),
       JSON.stringify({ compaction: { enabled: true, modelOverrides: { "openai/gpt": keep, "pipkin-local/gone": keep } } }),
     );
-    expect(await runMode("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true });
+    expect(await runOp("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true });
     expect((await json("settings.json")).compaction).toEqual({
       enabled: true,
       modelOverrides: {
@@ -74,7 +74,7 @@ describe("local_models_sync mode", () => {
   });
 
   it("compacts before pi-ai would cut a reply below the model's maxTokens", async () => {
-    await runMode("local_models_sync", dirs, SYNC);
+    await runOp("local_models_sync", dirs, SYNC);
     const overrides = (await json("settings.json")).compaction as { modelOverrides: Record<string, { reserveTokens: number }> };
     for (const model of SYNC.models) {
       const { reserveTokens } = overrides.modelOverrides[`pipkin-local/${model.id}`]!;
@@ -88,43 +88,43 @@ describe("local_models_sync mode", () => {
   });
 
   it("removes the provider and its overrides when no models are left", async () => {
-    await runMode("local_models_sync", dirs, SYNC);
-    expect(await runMode("local_models_sync", dirs, { ...SYNC, models: [] })).toMatchObject({ ok: true });
+    await runOp("local_models_sync", dirs, SYNC);
+    expect(await runOp("local_models_sync", dirs, { ...SYNC, models: [] })).toMatchObject({ ok: true });
     expect(await json("models.json")).toEqual({ providers: {} });
     expect((await json("settings.json")).compaction).toEqual({});
   });
 
   it("keeps the local models in scope when enabledModels limits the list", async () => {
     await writeFile(path.join(dirs.configDir, "settings.json"), JSON.stringify({ enabledModels: ["anthropic/*"] }));
-    expect(await runMode("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true });
+    expect(await runOp("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true });
     expect((await json("settings.json")).enabledModels).toEqual(["anthropic/*", "pipkin-local/*"]);
   });
 
   it("answers changed only when it wrote something, and leaves unchanged files alone", async () => {
     await writeFile(path.join(dirs.configDir, "settings.json"), JSON.stringify({ enabledModels: ["anthropic/*"] }));
-    expect(await runMode("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true, data: { changed: true } });
+    expect(await runOp("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true, data: { changed: true } });
     // A trailing space a rewrite would drop shows whether models.json was written again.
     const models = `${(await readFile(path.join(dirs.configDir, "models.json"), "utf8")).trimEnd()} \n`;
     await writeFile(path.join(dirs.configDir, "models.json"), models);
     const settings = await readFile(path.join(dirs.configDir, "settings.json"), "utf8");
 
-    expect(await runMode("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true, data: { changed: false } });
+    expect(await runOp("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true, data: { changed: false } });
     expect(await readFile(path.join(dirs.configDir, "models.json"), "utf8")).toBe(models);
     expect(await readFile(path.join(dirs.configDir, "settings.json"), "utf8")).toBe(settings);
 
     const fewer = { ...SYNC, models: SYNC.models.slice(1) };
-    expect(await runMode("local_models_sync", dirs, fewer)).toMatchObject({ ok: true, data: { changed: true } });
+    expect(await runOp("local_models_sync", dirs, fewer)).toMatchObject({ ok: true, data: { changed: true } });
     const none = { ...SYNC, models: [] };
-    expect(await runMode("local_models_sync", dirs, none)).toMatchObject({ ok: true, data: { changed: true } });
-    expect(await runMode("local_models_sync", dirs, none)).toMatchObject({ ok: true, data: { changed: false } });
+    expect(await runOp("local_models_sync", dirs, none)).toMatchObject({ ok: true, data: { changed: true } });
+    expect(await runOp("local_models_sync", dirs, none)).toMatchObject({ ok: true, data: { changed: false } });
   });
 
   it("answers changed when settings.json lost the scope and overrides, as a restore can", async () => {
     const scoped = JSON.stringify({ enabledModels: ["anthropic/*"] });
     await writeFile(path.join(dirs.configDir, "settings.json"), scoped);
-    await runMode("local_models_sync", dirs, SYNC);
+    await runOp("local_models_sync", dirs, SYNC);
     await writeFile(path.join(dirs.configDir, "settings.json"), scoped);
-    expect(await runMode("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true, data: { changed: true } });
+    expect(await runOp("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true, data: { changed: true } });
     expect(await json("settings.json")).toMatchObject({
       enabledModels: ["anthropic/*", "pipkin-local/*"],
       compaction: { modelOverrides: { "pipkin-local/qwen3-0.6b": { reserveTokens: 8192 } } },

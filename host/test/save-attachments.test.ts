@@ -2,7 +2,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { isObject } from "../src/framing.js";
-import { type Dirs, makeDirs, removeDirs, runMode } from "./harness.js";
+import { type Dirs, makeDirs, removeDirs, runOp } from "./harness.js";
 
 const b64 = (text: string): string => Buffer.from(text).toString("base64");
 
@@ -18,7 +18,7 @@ describe("save_attachments mode", () => {
   });
 
   async function save(files: unknown): Promise<string[]> {
-    const result = await runMode("save_attachments", dirs, { files });
+    const result = await runOp("save_attachments", dirs, { files });
     expect(result).toMatchObject({ ok: true });
     const paths = isObject(result.data) ? result.data.paths : undefined;
     if (!Array.isArray(paths) || !paths.every((p): p is string => typeof p === "string")) throw new Error("no paths");
@@ -60,8 +60,8 @@ describe("save_attachments mode", () => {
   });
 
   it("rejects an empty list and non-base64 data", async () => {
-    expect(await runMode("save_attachments", dirs, { files: [] })).toMatchObject({ ok: false, code: "bad_params" });
-    expect(await runMode("save_attachments", dirs, { files: [{ name: "a", data: "not base64!" }] })).toMatchObject({
+    expect(await runOp("save_attachments", dirs, { files: [] })).toMatchObject({ ok: false, code: "bad_params" });
+    expect(await runOp("save_attachments", dirs, { files: [{ name: "a", data: "not base64!" }] })).toMatchObject({
       ok: false,
       code: "bad_params",
     });

@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { isObject, type JsonObject } from "../src/framing.js";
-import { type Dirs, installRealPi, makeDirs, removeDirs, runMode } from "./harness.js";
+import { type Dirs, installRealPi, makeDirs, removeDirs, runOp } from "./harness.js";
 
 const LB = { baseUrl: "https://example.test/v1", api: "openai-responses", apiKey: "k", models: [{ id: "lb-1" }] };
 const TIERS = [{ inputTokensAbove: 200_000, input: 10, output: 50, cacheRead: 1, cacheWrite: 12.5 }];
@@ -32,7 +32,7 @@ describe("subscription model settings and scope", () => {
   });
 
   async function status(): Promise<JsonObject> {
-    const result = await runMode("auth_status", dirs, {});
+    const result = await runOp("auth_status", dirs, {});
     if (!isObject(result.data)) throw new Error(`auth_status failed: ${JSON.stringify(result)}`);
     return result.data;
   }
@@ -46,7 +46,7 @@ describe("subscription model settings and scope", () => {
   }
 
   async function save(providerId: string, enabled: string[], models: JsonObject[]): Promise<JsonObject> {
-    return await runMode("subscription_save", dirs, { providerId, enabled, models });
+    return await runOp("subscription_save", dirs, { providerId, enabled, models });
   }
 
   async function enabledModels(): Promise<unknown> {
@@ -254,16 +254,16 @@ describe("subscription model settings and scope", () => {
     { providerId: "anthropic", enabled: ["not-a-model"], models: [] },
     { providerId: "anthropic", enabled: [], models: [{ id: "claude-opus-4-8", contextWindow: "big" }] },
   ])("rejects bad params %j", async (params) => {
-    expect(await runMode("subscription_save", dirs, params)).toMatchObject({ ok: false, code: "bad_params" });
+    expect(await runOp("subscription_save", dirs, params)).toMatchObject({ ok: false, code: "bad_params" });
   });
 
   it("keeps a saved custom provider in a non-empty scope, default model first", async () => {
     await writeJson(settingsPath, { enabledModels: ["anthropic/*"], defaultProvider: "anthropic", defaultModel: "claude-opus-4-8" });
     const params = { id: "my-lb", baseUrl: LB.baseUrl, api: LB.api, apiKey: "k", models: [{ id: "lb-1" }] };
-    expect(await runMode("provider_save", dirs, params)).toMatchObject({ ok: true });
+    expect(await runOp("provider_save", dirs, params)).toMatchObject({ ok: true });
     expect(await enabledModels()).toEqual(["anthropic/claude-opus-4-8", "anthropic/*", "my-lb/*"]);
     // Already in scope: nothing changes.
-    expect(await runMode("provider_save", dirs, params)).toMatchObject({ ok: true });
+    expect(await runOp("provider_save", dirs, params)).toMatchObject({ ok: true });
     expect(await enabledModels()).toEqual(["anthropic/claude-opus-4-8", "anthropic/*", "my-lb/*"]);
   });
 
@@ -277,7 +277,7 @@ describe("subscription model settings and scope", () => {
   it("drops a removed provider's patterns", async () => {
     await writeJson(modelsPath, { providers: { "my-lb": LB } });
     await writeJson(settingsPath, { enabledModels: ["my-lb/lb-1", "anthropic/*", "my-lb/*"] });
-    expect(await runMode("provider_remove", dirs, { id: "my-lb" })).toMatchObject({ ok: true });
+    expect(await runOp("provider_remove", dirs, { id: "my-lb" })).toMatchObject({ ok: true });
     expect(await enabledModels()).toEqual(["anthropic/*"]);
   });
 });

@@ -45,6 +45,15 @@ internal class SharedHost(
     }
   }
 
+  /**
+   * Makes the next request start a new host, for when the running one may hold something that has since changed;
+   * the running one ends once it has answered the requests already sent to it.
+   */
+  fun restart() {
+    connection?.retire()
+    connection = null
+  }
+
   /** The open host, or a new one when there is none or it ended; concurrent first requests share one start. */
   private suspend fun connection(): Connection = openLock.withLock {
     connection?.takeIf { it.alive } ?: Connection(open(), scope).also { connection = it }
@@ -60,6 +69,7 @@ internal class SharedHost(
     }
 
     val alive: Boolean get() = reader.isActive
+    private var retired = false
 
     suspend fun request(message: JSONObject, timeoutMillis: Long): JSONObject {
       val id = message.getLong("id")
@@ -75,7 +85,13 @@ internal class SharedHost(
         return withTimeoutOrNull(timeoutMillis) { reply.await() } ?: throw HostFailure.Timeout()
       } finally {
         pending.remove(id)
+        if (retired && pending.isEmpty()) close()
       }
+    }
+
+    fun retire() {
+      retired = true
+      if (pending.isEmpty()) close()
     }
 
     fun close() = channel.close()

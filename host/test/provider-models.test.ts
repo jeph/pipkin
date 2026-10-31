@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { JsonObject } from "../src/framing.js";
-import { type Dirs, installRealPi, makeDirs, removeDirs, runMode } from "./harness.js";
+import { type Dirs, installRealPi, makeDirs, removeDirs, runOp } from "./harness.js";
 
 /** Pi 1.4.0's built-in `openai` entry for gpt-5.5 (other providers list different windows and maps). */
 const GPT_5_5 = {
@@ -135,7 +135,7 @@ describe("provider_models and model_defaults", () => {
 
   /** Runs provider_models against the local endpoint and returns the whole `pipkin_result`. */
   async function fetchModels(): Promise<JsonObject> {
-    return await runMode("provider_models", dirs, { baseUrl, apiKey: "sk-test", api: "openai-responses" });
+    return await runOp("provider_models", dirs, { baseUrl, apiKey: "sk-test", api: "openai-responses" });
   }
 
   it("detects capabilities and fills the rest from Pi's catalogue, sorted by id", async () => {
@@ -189,7 +189,7 @@ describe("provider_models and model_defaults", () => {
 
   it("checks a keyless endpoint with the placeholder key Pi sends in chat", async () => {
     entries = [{ id: "qwen3:0.6b", object: "model" }];
-    expect(await runMode("provider_models", dirs, { baseUrl: `${origin}/open`, apiKey: "", api: "openai-completions" })).toEqual(
+    expect(await runOp("provider_models", dirs, { baseUrl: `${origin}/open`, apiKey: "", api: "openai-completions" })).toEqual(
       success([{ id: "qwen3:0.6b" }]),
     );
   });
@@ -202,28 +202,28 @@ describe("provider_models and model_defaults", () => {
     ["/down", "server_error", "HTTP 502: upstream unavailable"],
     ["/teapot", "http_error", "HTTP 418"],
   ])("reports HTTP errors from %s by cause, with what the server said", async (prefix, code, error) => {
-    const result = await runMode("provider_models", dirs, { baseUrl: origin + prefix, apiKey: "wrong", api: "openai-responses" });
+    const result = await runOp("provider_models", dirs, { baseUrl: origin + prefix, apiKey: "wrong", api: "openai-responses" });
     expect(result).toMatchObject({ ok: false, code, error });
   });
 
   it("rejects a web page in place of the models list", async () => {
-    const result = await runMode("provider_models", dirs, { baseUrl: `${origin}/page`, apiKey: "k", api: "openai-responses" });
+    const result = await runOp("provider_models", dirs, { baseUrl: `${origin}/page`, apiKey: "k", api: "openai-responses" });
     const url = `${origin}/page/models`;
     expect(result).toMatchObject({ ok: false, code: "bad_response", error: `${url} returned a web page, not JSON`, i18n: { key: "provider_web_page", args: { url } } });
   });
 
   it("reads an OpenAI list with null data as no models", async () => {
-    const result = await runMode("provider_models", dirs, { baseUrl: `${origin}/ollama-empty`, apiKey: "", api: "openai-completions" });
+    const result = await runOp("provider_models", dirs, { baseUrl: `${origin}/ollama-empty`, apiKey: "", api: "openai-completions" });
     expect(result).toEqual(success([]));
   });
 
   it.each(["/null-data", "/no-data"])("rejects JSON from %s that isn't an OpenAI list", async (prefix) => {
-    const result = await runMode("provider_models", dirs, { baseUrl: origin + prefix, apiKey: "k", api: "openai-completions" });
+    const result = await runOp("provider_models", dirs, { baseUrl: origin + prefix, apiKey: "k", api: "openai-completions" });
     expect(result).toMatchObject({ ok: false, code: "bad_response", i18n: { key: "provider_no_data_list" } });
   });
 
   it.each(["api.example.com/v1", "ftp://example.com/v1", "https://"])("rejects %s as a base URL", async (url) => {
-    const result = await runMode("provider_models", dirs, { baseUrl: url, apiKey: "k", api: "openai-responses" });
+    const result = await runOp("provider_models", dirs, { baseUrl: url, apiKey: "k", api: "openai-responses" });
     expect(result).toMatchObject({ ok: false, code: "bad_url" });
   });
 
@@ -238,7 +238,7 @@ describe("provider_models and model_defaults", () => {
     closed.close(() => stopped.resolve());
     await stopped.promise;
     const url = `http://127.0.0.1:${address.port}/v1`;
-    expect(await runMode("provider_models", dirs, { baseUrl: url, apiKey: "k", api: "openai-responses" })).toMatchObject({
+    expect(await runOp("provider_models", dirs, { baseUrl: url, apiKey: "k", api: "openai-responses" })).toMatchObject({
       ok: false,
       code: "network",
       error: expect.stringContaining(`Could not reach ${url}`),
@@ -246,7 +246,7 @@ describe("provider_models and model_defaults", () => {
   });
 
   it("reports a server that hangs up partway through its answer as unreachable", async () => {
-    const result = await runMode("provider_models", dirs, { baseUrl: `${origin}/reset`, apiKey: "k", api: "openai-responses" });
+    const result = await runOp("provider_models", dirs, { baseUrl: `${origin}/reset`, apiKey: "k", api: "openai-responses" });
     expect(result).toMatchObject({ ok: false, code: "network", error: expect.stringContaining(`Could not reach ${origin}/reset`) });
   });
 
@@ -258,7 +258,7 @@ describe("provider_models and model_defaults", () => {
       models: [{ id: "gpt-5.5", contextWindow: 5 }, { id: "lb-only", name: "LB only", contextWindow: 9 }],
     };
     await writeFile(path.join(dirs.configDir, "models.json"), JSON.stringify({ providers: { "my-lb": custom } }));
-    const result = await runMode("model_defaults", dirs, { ids: ["mystery", "gpt-5.5", "lb-only", "claude-opus-4-8"], api: "openai-responses" });
+    const result = await runOp("model_defaults", dirs, { ids: ["mystery", "gpt-5.5", "lb-only", "claude-opus-4-8"], api: "openai-responses" });
     expect(result).toEqual(success([
       { id: "mystery" },
       GPT_5_5,
@@ -268,6 +268,6 @@ describe("provider_models and model_defaults", () => {
   });
 
   it("rejects model_defaults without ids", async () => {
-    expect(await runMode("model_defaults", dirs, { api: "openai-responses" })).toMatchObject({ ok: false, code: "bad_params" });
+    expect(await runOp("model_defaults", dirs, { api: "openai-responses" })).toMatchObject({ ok: false, code: "bad_params" });
   });
 });

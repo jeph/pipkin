@@ -8,7 +8,7 @@ import { createGzip } from "node:zlib";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { isObject } from "../src/framing.js";
 import { tarStream, type TarEntry } from "../src/tar.js";
-import { type Dirs, holdConfigLock, makeDirs, removeDirs, runMode } from "./harness.js";
+import { type Dirs, holdConfigLock, makeDirs, removeDirs, runMode, runOp } from "./harness.js";
 
 /** Every entry under `dir`: file contents, symlink targets, folders, with permission bits. */
 async function snapshot(dir: string): Promise<Record<string, string>> {
@@ -126,7 +126,7 @@ describe("configuration backups", () => {
     await writeFile(path.join(backups, ".hidden.tar.gz"), "ignored");
     await writeFile(path.join(backups, "readme.txt"), "ignored");
     // The file that isn't a backup is dated by its modification time, so it is the newest.
-    expect(await runMode("backups", dirs, {})).toMatchObject({
+    expect(await runOp("backups", dirs, {})).toMatchObject({
       ok: true,
       data: {
         dir: backups,
@@ -140,7 +140,7 @@ describe("configuration backups", () => {
   });
 
   it("lists nothing before the first backup", async () => {
-    expect(await runMode("backups", dirs, {})).toMatchObject({ ok: true, data: { backups: [] } });
+    expect(await runOp("backups", dirs, {})).toMatchObject({ ok: true, data: { backups: [] } });
   });
 
   it("gives a second backup in the same second its own name", async () => {
@@ -213,16 +213,16 @@ describe("configuration backups", () => {
   it("only accepts plain backup names from the backups folder", async () => {
     for (const name of ["../config/settings.json", "sub/x.tar.gz", ".hidden.tar.gz", "x.zip"]) {
       expect(await runMode("backup_restore", dirs, { name })).toMatchObject({ ok: false, code: "bad_name" });
-      expect(await runMode("backup_delete", dirs, { name })).toMatchObject({ ok: false, code: "bad_name" });
+      expect(await runOp("backup_delete", dirs, { name })).toMatchObject({ ok: false, code: "bad_name" });
     }
     expect(await runMode("backup_restore", dirs, { name: "missing.tar.gz" })).toMatchObject({ ok: false, code: "not_found" });
   });
 
   it("deletes a backup, and counts one that is already gone as deleted", async () => {
     const name = await backUp();
-    expect(await runMode("backup_delete", dirs, { name })).toMatchObject({ ok: true });
+    expect(await runOp("backup_delete", dirs, { name })).toMatchObject({ ok: true });
     expect(await readdir(backups)).toEqual([]);
-    expect(await runMode("backup_delete", dirs, { name })).toMatchObject({ ok: true });
+    expect(await runOp("backup_delete", dirs, { name })).toMatchObject({ ok: true });
   });
 
   it("finishes a restore that a crash cut short once its backup was unpacked", async () => {

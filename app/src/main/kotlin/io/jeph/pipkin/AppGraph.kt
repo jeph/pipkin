@@ -55,6 +55,7 @@ internal class AppGraph(private val application: Application) {
   val hostClient = HostClient(
     application,
     foreground = ProcessLifecycleOwner.get().lifecycle.currentStateFlow.map { it.isAtLeast(Lifecycle.State.STARTED) },
+    scope = scope,
   )
   val keepAlive = KeepAlive(application)
   val preferences = Preferences(application)

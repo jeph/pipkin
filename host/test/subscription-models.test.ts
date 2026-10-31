@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { createServer, type Server } from "node:http";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { type Dirs, installRealPi, makeDirs, removeDirs, runMode } from "./harness.js";
+import { type Dirs, installRealPi, makeDirs, removeDirs, runOp } from "./harness.js";
 
 /** A Kimi Code `/models` entry for a model Pi 1.4.0 doesn't ship, as the real endpoint serves it. */
 const K3_1_PRO = {
@@ -68,7 +68,7 @@ describe("subscription_models", () => {
 
   it("lists the key's models, with Pi's settings for the ones Pi knows and the endpoint's for the rest", async () => {
     await connect("key-123");
-    const result = await runMode("subscription_models", dirs, { providerId: "kimi-coding" });
+    const result = await runOp("subscription_models", dirs, { providerId: "kimi-coding" });
     expect(requests).toEqual(["Bearer key-123 /kimi/models"]);
     expect(result).toMatchObject({
       ok: true,
@@ -90,34 +90,34 @@ describe("subscription_models", () => {
 
   it("asks OpenRouter for the models its key may use", async () => {
     await connect("key-123");
-    const result = await runMode("subscription_models", dirs, { providerId: "openrouter" });
+    const result = await runOp("subscription_models", dirs, { providerId: "openrouter" });
     expect(requests).toEqual(["Bearer key-123 /openrouter/models/user"]);
     expect(result).toMatchObject({ ok: true, data: { models: [expect.objectContaining({ id: "acme/model-x", name: "Acme: Model X" })] } });
   });
 
   it("reports a key the provider refuses", async () => {
     await connect("revoked");
-    const result = await runMode("subscription_models", dirs, { providerId: "kimi-coding" });
+    const result = await runOp("subscription_models", dirs, { providerId: "kimi-coding" });
     expect(result).toMatchObject({ ok: false, code: "unauthorized", error: "HTTP 401: Invalid Authentication" });
   });
 
   it("needs a stored key", async () => {
-    const result = await runMode("subscription_models", dirs, { providerId: "kimi-coding" });
+    const result = await runOp("subscription_models", dirs, { providerId: "kimi-coding" });
     expect(result).toMatchObject({ ok: false, code: "no_key", i18n: { key: "subscription_no_key" } });
   });
 
   it("has no list for Gemini, whose models come from Pi's catalogue", async () => {
-    expect(await runMode("subscription_models", dirs, { providerId: "google" })).toEqual({ type: "pipkin_result", ok: true, data: {} });
+    expect(await runOp("subscription_models", dirs, { providerId: "google" })).toEqual({ type: "pipkin_result", ok: true, data: {} });
   });
 
   it.each(["anthropic", "vercel-ai-gateway"])("refuses %s, which Pipkin doesn't connect with a key", async (providerId) => {
-    expect(await runMode("subscription_models", dirs, { providerId })).toMatchObject({ ok: false, code: "bad_params" });
+    expect(await runOp("subscription_models", dirs, { providerId })).toMatchObject({ ok: false, code: "bad_params" });
   });
 
   it("gives a model Pi doesn't ship the compat that its provider's like models share when it is saved", async () => {
     const levels = { off: null, minimal: null, low: "low", medium: null, high: "high", xhigh: null, max: "max" };
     const models = [{ id: "k3" }, { id: "k3.1-pro", name: "K3.1 Pro", reasoning: true, thinkingLevelMap: levels }];
-    expect(await runMode("subscription_save", dirs, { providerId: "kimi-coding", enabled: ["k3", "k3.1-pro"], models })).toMatchObject({ ok: true });
+    expect(await runOp("subscription_save", dirs, { providerId: "kimi-coding", enabled: ["k3", "k3.1-pro"], models })).toMatchObject({ ok: true });
     const document = JSON.parse(await readFile(path.join(dirs.configDir, "models.json"), "utf8")) as unknown;
     expect(document).toMatchObject({
       providers: {

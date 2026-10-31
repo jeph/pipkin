@@ -1,7 +1,7 @@
 import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { type Dirs, installRealPi, makeDirs, removeDirs, runMode } from "./harness.js";
+import { type Dirs, installRealPi, makeDirs, removeDirs, runMode, runOp } from "./harness.js";
 
 describe("package_install", () => {
   let dirs: Dirs;
@@ -72,7 +72,7 @@ describe("auth_status npmPackages", () => {
   it("names the npm packages in the global settings, without versions", async () => {
     const packages = ["npm:@gotgenes/pi-anthropic-auth@3.1.0", { source: "npm:pi-web-access" }, "./local", "git:github.com/a/b"];
     await writeFile(path.join(dirs.configDir, "settings.json"), JSON.stringify({ packages }));
-    const status = await runMode("auth_status", dirs, {});
+    const status = await runOp("auth_status", dirs, {});
     expect(status).toMatchObject({ ok: true, data: { npmPackages: ["@gotgenes/pi-anthropic-auth", "pi-web-access"] } });
   });
 });
