@@ -33,6 +33,7 @@ internal class AccountRepository(
   private val statusState = MutableStateFlow<AuthStatus?>(null)
   private val refreshErrorState = MutableStateFlow<String?>(null)
   private val refreshLock = Mutex()
+  private val localModelsReload = PendingReload()
 
   /** Null until the first successful refresh. */
   val status: StateFlow<AuthStatus?> = statusState.asStateFlow()
@@ -93,10 +94,11 @@ internal class AccountRepository(
 
   /**
    * Makes Pi's `pipkin-local` provider list exactly [models], served at [baseUrl]; idle chats restart to see them only
-   * when that changed Pi's configuration, since this runs on every start, while the chat shown first is starting.
+   * when that changed Pi's configuration, since this runs on every start, while the chat shown first is starting, or
+   * when an earlier sync failed, which may have changed it before its answer was lost.
    */
   suspend fun syncLocalModels(baseUrl: String, apiKey: String, models: List<ModelConfig>) {
-    if (hostClient.localModelsSync(baseUrl, apiKey, models)) changed()
+    if (localModelsReload.after { hostClient.localModelsSync(baseUrl, apiKey, models) }) changed()
   }
 
   /** Installs a Pi package with `pi install`; idle chats restart to load it. Cancelling the caller aborts it. */
