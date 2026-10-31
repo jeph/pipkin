@@ -2,6 +2,7 @@ package io.jeph.pipkin.data
 
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -26,6 +27,7 @@ class PendingReloadTest {
     assertFalse(reload.after { false })
   }
 
+  @OptIn(ExperimentalCoroutinesApi::class) // runCurrent, to let the write start before it is cancelled.
   @Test
   fun `a cancelled write leaves the reload to the next one`() = runTest {
     val reload = PendingReload()
