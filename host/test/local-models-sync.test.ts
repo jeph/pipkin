@@ -99,4 +99,35 @@ describe("local_models_sync mode", () => {
     expect(await runMode("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true });
     expect((await json("settings.json")).enabledModels).toEqual(["anthropic/*", "pipkin-local/*"]);
   });
+
+  it("answers changed only when it wrote something, and leaves unchanged files alone", async () => {
+    await writeFile(path.join(dirs.configDir, "settings.json"), JSON.stringify({ enabledModels: ["anthropic/*"] }));
+    expect(await runMode("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true, data: { changed: true } });
+    // A trailing space a rewrite would drop shows whether models.json was written again.
+    const models = `${(await readFile(path.join(dirs.configDir, "models.json"), "utf8")).trimEnd()} \n`;
+    await writeFile(path.join(dirs.configDir, "models.json"), models);
+    const settings = await readFile(path.join(dirs.configDir, "settings.json"), "utf8");
+
+    expect(await runMode("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true, data: { changed: false } });
+    expect(await readFile(path.join(dirs.configDir, "models.json"), "utf8")).toBe(models);
+    expect(await readFile(path.join(dirs.configDir, "settings.json"), "utf8")).toBe(settings);
+
+    const fewer = { ...SYNC, models: SYNC.models.slice(1) };
+    expect(await runMode("local_models_sync", dirs, fewer)).toMatchObject({ ok: true, data: { changed: true } });
+    const none = { ...SYNC, models: [] };
+    expect(await runMode("local_models_sync", dirs, none)).toMatchObject({ ok: true, data: { changed: true } });
+    expect(await runMode("local_models_sync", dirs, none)).toMatchObject({ ok: true, data: { changed: false } });
+  });
+
+  it("answers changed when settings.json lost the scope and overrides, as a restore can", async () => {
+    const scoped = JSON.stringify({ enabledModels: ["anthropic/*"] });
+    await writeFile(path.join(dirs.configDir, "settings.json"), scoped);
+    await runMode("local_models_sync", dirs, SYNC);
+    await writeFile(path.join(dirs.configDir, "settings.json"), scoped);
+    expect(await runMode("local_models_sync", dirs, SYNC)).toMatchObject({ ok: true, data: { changed: true } });
+    expect(await json("settings.json")).toMatchObject({
+      enabledModels: ["anthropic/*", "pipkin-local/*"],
+      compaction: { modelOverrides: { "pipkin-local/qwen3-0.6b": { reserveTokens: 8192 } } },
+    });
+  });
 });

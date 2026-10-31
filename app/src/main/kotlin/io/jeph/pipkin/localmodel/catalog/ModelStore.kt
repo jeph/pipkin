@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -48,6 +49,7 @@ internal class ModelStore(
   private val dir = File(context.noBackupFilesDir, DIRECTORY)
   private val downloader = ModelDownloader(dir, HttpsDownloadSource)
   private val downloadedState = MutableStateFlow<Set<String>>(emptySet())
+  private val scannedState = MutableStateFlow(false)
   private val hardwareState = MutableStateFlow<DeviceProfile?>(null)
   private val downloadsState = MutableStateFlow<Map<String, DownloadState>>(emptyMap())
   private val downloadJobs = mutableMapOf<String, Job>()
@@ -68,17 +70,27 @@ internal class ModelStore(
       hardware?.copy(failedBuilds = failed)
     }.stateIn(scope, SharingStarted.Eagerly, null)
 
-  /** The models downloaded and verified, each with the build chosen for this phone. */
+  private val scannedInstalled: StateFlow<List<InstalledModel>?> =
+    combine(scannedState, downloadedState, device.filterNotNull()) { scanned, files, phone ->
+      if (scanned) installedModels(LocalModelCatalog.models, files, phone, dir) else null
+    }.stateIn(scope, SharingStarted.Eagerly, null)
+
+  /**
+   * The models downloaded and verified, each with the build chosen for this phone, from the first scan of the phone's
+   * files on. Before it finishes [installed] is empty, which here would wrongly mean that no model is downloaded.
+   */
+  val installedOnceScanned: Flow<List<InstalledModel>> = scannedInstalled.filterNotNull()
+
+  /** [installedOnceScanned], empty until the first scan is done. */
   val installed: StateFlow<List<InstalledModel>> =
-    combine(downloadedState, device.filterNotNull()) { files, phone ->
-      installedModels(LocalModelCatalog.models, files, phone, dir)
-    }.stateIn(scope, SharingStarted.Eagerly, emptyList())
+    installedOnceScanned.stateIn(scope, SharingStarted.Eagerly, emptyList())
 
   init {
     scope.launch {
       val (hardware, files) = withContext(Dispatchers.IO) { DeviceProfile.current(context, preferences) to scan() }
       hardwareState.value = hardware
       downloadedState.value = files
+      scannedState.value = true
     }
   }
 

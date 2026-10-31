@@ -53,7 +53,8 @@ interface CompactionWriter {
 /**
  * Makes `models.json`'s `pipkin-local` provider list exactly the given models, served at `baseUrl` with `apiKey`, with
  * compaction overrides sized to each model's context; no models removes the provider. Keeps the models in scope when
- * settings.json `enabledModels` limits the model list.
+ * settings.json `enabledModels` limits the model list. Writes only what differs and answers `changed` when it wrote
+ * anything, since the app syncs on every start and restarts idle chats only after a change.
  */
 export async function localModelsSync(ctx: ModeContext): Promise<JsonObject> {
   const baseUrl = stringParam(ctx.params, "baseUrl");
@@ -63,6 +64,7 @@ export async function localModelsSync(ctx: ModeContext): Promise<JsonObject> {
   const document = await readModelsJson(ctx.env.configDir);
   const pi = await loadPi(ctx.env.root);
   const settings = openSettingsIfValid(ctx, pi);
+  const before = JSON.stringify(document.providers[LOCAL_PROVIDER]);
   if (models.length === 0) {
     delete document.providers[LOCAL_PROVIDER];
   } else {
@@ -74,20 +76,23 @@ export async function localModelsSync(ctx: ModeContext): Promise<JsonObject> {
       models: models.map((model) => ({ ...model, input: TEXT_ONLY, cost: FREE })),
     };
   }
-  await writeModelsJson(ctx.env.configDir, document);
-  if (settings === undefined) return {};
+  const providerChanged = JSON.stringify(document.providers[LOCAL_PROVIDER]) !== before;
+  if (providerChanged) await writeModelsJson(ctx.env.configDir, document);
+  if (settings === undefined) return { changed: providerChanged };
 
-  await saveScope(ctx, pi, settings, models);
-  await saveCompaction(settings, models);
-  return {};
+  const scopeChanged = await saveScope(ctx, pi, settings, models);
+  const compactionChanged = await saveCompaction(settings, models);
+  return { changed: providerChanged || scopeChanged || compactionChanged };
 }
 
-async function saveScope(ctx: ModeContext, pi: PiSdk, settings: PiSettings, models: readonly ModelDef[]): Promise<void> {
-  if (settings.enabledModels.length === 0) return;
+/** Whether it saved new `enabledModels`. */
+async function saveScope(ctx: ModeContext, pi: PiSdk, settings: PiSettings, models: readonly ModelDef[]): Promise<boolean> {
+  if (settings.enabledModels.length === 0) return false;
   if (models.length === 0) {
     const patterns = dropProvider(settings.enabledModels, LOCAL_PROVIDER);
-    if (patterns.length !== settings.enabledModels.length) await saveEnabledModels(settings, patterns);
-    return;
+    if (patterns.length === settings.enabledModels.length) return false;
+    await saveEnabledModels(settings, patterns);
+    return true;
   }
   const runtime = await createRuntime(ctx);
   const saved = models.map((model) => ({ provider: LOCAL_PROVIDER, id: model.id, name: model.name ?? model.id }));
@@ -99,16 +104,18 @@ async function saveScope(ctx: ModeContext, pi: PiSdk, settings: PiSettings, mode
     universe,
     scopeResolver(pi, universe),
   );
-  if (patterns !== undefined) await saveEnabledModels(settings, patterns);
+  if (patterns === undefined) return false;
+  await saveEnabledModels(settings, patterns);
+  return true;
 }
 
-async function saveCompaction(settings: PiSettings, models: readonly ModelDef[]): Promise<void> {
+/** Whether it saved new compaction overrides. */
+async function saveCompaction(settings: PiSettings, models: readonly ModelDef[]): Promise<boolean> {
   const writer = settings.manager as unknown as CompactionWriter;
-  const compaction = (writer.globalSettings.compaction ??= {});
-  const overrides: Record<string, unknown> = { ...compaction.modelOverrides };
-  for (const key of Object.keys(overrides)) {
-    if (key.startsWith(`${LOCAL_PROVIDER}/`)) delete overrides[key];
-  }
+  const current = writer.globalSettings.compaction?.modelOverrides;
+  const overrides = Object.fromEntries(
+    Object.entries(current ?? {}).filter(([key]) => !key.startsWith(`${LOCAL_PROVIDER}/`)),
+  );
   for (const model of models) {
     if (model.contextWindow === undefined || model.maxTokens === undefined) continue;
     overrides[`${LOCAL_PROVIDER}/${model.id}`] = {
@@ -116,11 +123,16 @@ async function saveCompaction(settings: PiSettings, models: readonly ModelDef[])
       keepRecentTokens: Math.floor(model.contextWindow / KEPT_SHARE),
     };
   }
-  if (Object.keys(overrides).length > 0) compaction.modelOverrides = overrides;
-  else delete compaction.modelOverrides;
+  const next = Object.keys(overrides).length > 0 ? overrides : undefined;
+  if (JSON.stringify(next) === JSON.stringify(current)) return false;
+
+  const compaction = (writer.globalSettings.compaction ??= {});
+  if (next === undefined) delete compaction.modelOverrides;
+  else compaction.modelOverrides = next;
   writer.markModified("compaction", "modelOverrides");
   writer.save();
   await settings.manager.flush();
   const [failure] = settings.manager.drainErrors();
   if (failure !== undefined) throw failure.error;
+  return true;
 }

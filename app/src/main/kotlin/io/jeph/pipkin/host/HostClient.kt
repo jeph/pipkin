@@ -176,17 +176,16 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
 
   /**
    * Makes Pi's `pipkin-local` provider serve exactly [models] from Pipkin's local endpoint at [baseUrl] with [apiKey],
-   * compaction sized to each model's context; an empty list removes the provider.
+   * compaction sized to each model's context; an empty list removes the provider. True when Pi's configuration
+   * changed, false when it already said all of that.
    */
-  suspend fun localModelsSync(baseUrl: String, apiKey: String, models: List<ModelConfig>) {
-    call(
-      "local_models_sync",
-      JSONObject()
-        .put("baseUrl", baseUrl)
-        .put("apiKey", apiKey)
-        .put("models", JSONArray(models.map(ModelConfig::toJson))),
-    )
-  }
+  suspend fun localModelsSync(baseUrl: String, apiKey: String, models: List<ModelConfig>): Boolean = call(
+    "local_models_sync",
+    JSONObject()
+      .put("baseUrl", baseUrl)
+      .put("apiKey", apiKey)
+      .put("models", JSONArray(models.map(ModelConfig::toJson))),
+  ).optBoolean("changed")
 
   /** Runs `pi install [source]`, adding a Pi package that chats load when their Pi next starts. */
   suspend fun installPackage(source: String, onProgress: (String) -> Unit) {

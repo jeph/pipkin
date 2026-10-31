@@ -48,13 +48,14 @@ internal class LocalModels(
 
   /**
    * Writes the provider on every start and whenever what it should list changes, since a backup restore, removing the
-   * provider or reinstalling Pi can change models.json behind Pipkin's back. Retries while the Termux host can't be
+   * provider or reinstalling Pi can change models.json behind Pipkin's back. Waits for the first scan of the downloaded
+   * models, so a start doesn't remove the provider and then add it back. Retries while the Termux host can't be
    * reached or refuses, as it does while Pi is being installed. An empty list is only written once a provider was, so
    * a feature that was never on doesn't call the host.
    */
   private fun syncProvider() {
     scope.launch {
-      combine(preferences.localModelsEnabled, store.installed) { on, installed ->
+      combine(preferences.localModelsEnabled, store.installedOnceScanned) { on, installed ->
         if (on) installed.map(::modelConfig) else emptyList()
       }
         .distinctUntilChanged()
