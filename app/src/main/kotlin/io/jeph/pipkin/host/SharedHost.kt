@@ -46,10 +46,9 @@ internal class SharedHost(
   }
 
   /**
-   * Makes the next request start a new host, for when the running one may hold something that has since changed;
-   * the running one ends once it has answered the requests already sent to it.
+   * Ends the running host once it has answered the requests already sent to it; the next request starts a new one.
    */
-  fun restart() {
+  fun retire() {
     connection?.retire()
     connection = null
   }

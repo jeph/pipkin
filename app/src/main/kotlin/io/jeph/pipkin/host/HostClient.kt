@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
@@ -39,6 +40,12 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   private val failureState = MutableStateFlow<HostFailure?>(null)
   private val installingState = MutableStateFlow(false)
   private val utility = SharedHost(scope, UTILITY_IDLE_MILLIS, ::openUtility)
+
+  init {
+    // Android freezes Pipkin in the background, and its idle close with it, which would leave the utility host up in
+    // Termux until Pipkin returns. A request made in the background waits for the foreground anyway.
+    scope.launch { foreground.collect { visible -> if (!visible) utility.retire() } }
+  }
 
   /**
    * The bundled `pi/package.json`: Pi and the packages Pipkin's extensions import; `ensure` installs it, `rpc` requires
@@ -91,7 +98,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
       }
       val data = call("ensure", params, ENSURE_TIMEOUT_MILLIS, progress(onProgress))
       // The utility host keeps the Pi it imported first, which may be the one this install replaced.
-      withContext(Dispatchers.Main.immediate) { utility.restart() }
+      withContext(Dispatchers.Main.immediate) { utility.retire() }
       val version = data.getString("piVersion")
       helloState.update { it?.copy(piVersion = version) }
       return version
