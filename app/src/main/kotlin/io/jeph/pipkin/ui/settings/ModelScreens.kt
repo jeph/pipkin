@@ -1,12 +1,17 @@
 package io.jeph.pipkin.ui.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -16,44 +21,79 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.host.ModelConfig
 import io.jeph.pipkin.ui.components.DialogConfirm
 import io.jeph.pipkin.ui.components.PipkinDialog
+import io.jeph.pipkin.ui.components.SelectionCircle
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.NumberFormat
 
-/** The provider page's models: the add-models button and one row per added model. */
+/**
+ * The provider page's models: the add-models button and one row per added model. Tapping a model opens it; a long
+ * press starts [selection], during which tapping a model selects or deselects it instead.
+ */
 @Composable
 internal fun ModelsSection(
   draft: ModelDraft,
+  selection: ModelSelection,
   emptyText: String,
   onAddModels: () -> Unit,
   onOpenModel: (String) -> Unit,
 ) {
+  val added = draft.added
+  val addedIds = added.mapTo(HashSet()) { it.id }
+  LaunchedEffect(addedIds) { selection.keep(addedIds) }
   Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       FieldLabel(text = stringResource(R.string.provider_models), modifier = Modifier.weight(1f))
       SmallButton(
         label = stringResource(R.string.provider_add_models),
         onClick = onAddModels,
-        enabled = draft.canAddModels,
+        enabled = draft.canAddModels && !selection.active,
       )
     }
-    val added = draft.added
     if (added.isEmpty()) {
       SettingsCaption(text = emptyText)
-    } else {
-      SettingsSection(title = null) {
-        added.forEachIndexed { index, model ->
-          if (index > 0) SettingsDivider()
-          val preview = model.preview()
-          SettingsRow(
-            title = preview.name ?: preview.id,
-            subtitle = if (model.valid) modelSubtitle(preview) else stringResource(R.string.provider_model_invalid),
-            onClick = { onOpenModel(model.id) },
-          ) { Chevron() }
-        }
+      return@Column
+    }
+    SettingsSection(title = null) {
+      added.forEachIndexed { index, model ->
+        if (index > 0) SettingsDivider()
+        ModelRow(model, selection, onOpenModel)
       }
+    }
+  }
+}
+
+/**
+ * One added model; while models are selected, a check circle takes the chevron's place, so no row reflows, and tapping
+ * selects or deselects it.
+ */
+@Composable
+private fun ModelRow(model: ModelForm, selection: ModelSelection, onOpenModel: (String) -> Unit) {
+  val preview = model.preview()
+  val title = preview.name ?: preview.id
+  val selecting = selection.active
+  val selected = model.id in selection.ids
+  val clickLabel = when {
+    !selecting -> null
+    selected -> stringResource(R.string.provider_models_deselect, title)
+    else -> stringResource(R.string.provider_models_select, title)
+  }
+  SettingsRow(
+    title = title,
+    modifier = Modifier
+      .then(if (selected) Modifier.background(pipkinColors.accentSoft) else Modifier)
+      .combinedClickable(
+        onClickLabel = clickLabel,
+        onLongClick = { selection.select(model.id) },
+        onClick = { if (selecting) selection.toggle(model.id) else onOpenModel(model.id) },
+      ),
+    subtitle = if (model.valid) modelSubtitle(preview) else stringResource(R.string.provider_model_invalid),
+  ) {
+    // One width in both modes, so the text beside it wraps the same way when selecting starts.
+    Box(modifier = Modifier.size(PipkinTokens.IconSize.lg), contentAlignment = Alignment.Center) {
+      if (selecting) SelectionCircle(selected) else Chevron()
     }
   }
 }

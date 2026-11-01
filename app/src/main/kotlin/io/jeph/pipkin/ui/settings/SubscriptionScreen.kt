@@ -62,12 +62,12 @@ internal fun SubscriptionScreen(
   val id = form.providerId
   val subscription = subscriptions.firstOrNull { it.id == id }
   val name = subscription?.let { stringResource(it.title) } ?: id
-  val usesApiKey = subscription?.usesApiKey == true
   val signedIn = status?.isSignedIn(id)
   // Reads Pi's files afresh, so changes made outside Pipkin (for example by the agent) show here.
   LaunchedEffect(form) { accounts.refresh() }
   LaunchedEffect(status) { status?.builtin?.firstOrNull { it.id == id }?.let(form::prefill) }
   BackHandler(enabled = form.dirty) { confirmDiscard = true }
+  val selection = rememberModelSelection()
   val signOut: () -> Unit = {
     busy = true
     scope.launch {
@@ -80,14 +80,14 @@ internal fun SubscriptionScreen(
     title = name,
     onBack = { if (form.dirty) confirmDiscard = true else onBack() },
     snackbar = snackbar,
+    topBar = if (selection.active) ({ ModelSelectionBar(selection, form) }) else null,
   ) {
     SubscriptionHeader(id, loading = busy || (signedIn == null && refreshError == null), signedIn) { signingIn = true }
     if (signedIn == true) {
       SubscriptionModels(
         form = form,
-        name = name,
+        selection = selection,
         busy = busy,
-        usesApiKey = usesApiKey,
         onSave = { scope.launch { if (form.save(accounts, failed)) onBack() } },
         onSignOut = signOut,
         onAddModels = onAddModels,
@@ -129,17 +129,20 @@ private fun SubscriptionHeader(id: String, loading: Boolean, signedIn: Boolean?,
 @Composable
 private fun SubscriptionModels(
   form: SubscriptionForm,
-  name: String,
+  selection: ModelSelection,
   busy: Boolean,
-  usesApiKey: Boolean,
   onSave: () -> Unit,
   onSignOut: () -> Unit,
   onAddModels: () -> Unit,
   onOpenModel: (modelId: String) -> Unit,
 ) {
+  val subscription = subscriptions.firstOrNull { it.id == form.providerId }
+  val name = subscription?.let { stringResource(it.title) } ?: form.providerId
+  val usesApiKey = subscription?.usesApiKey == true
   var confirmSignOut by remember { mutableStateOf(false) }
   ModelsSection(
     draft = form,
+    selection = selection,
     emptyText = stringResource(R.string.subscription_models_empty),
     onAddModels = onAddModels,
     onOpenModel = onOpenModel,

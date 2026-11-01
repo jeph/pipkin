@@ -228,6 +228,28 @@
     <string name="provider_discard_text">Your changes aren\'t saved.</string>
     <string name="provider_discard">Discard</string>
     <string name="provider_keep_editing">Keep editing</string>
+    <!-- The provider page's header while models are selected; %1$d: how many. -->
+    <plurals name="provider_models_selected">
+        <item quantity="one">%1$d selected</item>
+        <item quantity="other">%1$d selected</item>
+    </plurals>
+    <string name="provider_models_clear_selection">Clear selection</string>
+    <string name="provider_models_select_all">Select all</string>
+    <!-- What tapping a model does while models are selected; %1$s: the model's name. -->
+    <string name="provider_models_select">Select %1$s</string>
+    <!-- What tapping a selected model does; %1$s: the model's name. -->
+    <string name="provider_models_deselect">Deselect %1$s</string>
+    <string name="provider_models_remove_selected">Remove selected models</string>
+    <!-- %1$d: how many selected models are removed. -->
+    <plurals name="provider_models_remove_title">
+        <item quantity="one">Remove this model?</item>
+        <item quantity="other">Remove %1$d models?</item>
+    </plurals>
+    <plurals name="provider_models_remove_text">
+        <item quantity="one">It comes off this provider when you save. You can add it again from Add models.</item>
+        <item quantity="other">They come off this provider when you save. You can add them again from Add models.</item>
+    </plurals>
+    <string name="provider_models_remove">Remove</string>
 
     <string name="models_search">Search or enter a model ID</string>
     <string name="models_none">The provider lists no models. Enter a model ID above to add one.</string>

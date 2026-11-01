@@ -58,10 +58,12 @@ internal fun ProviderEditorScreen(
   var confirmDiscard by remember { mutableStateOf(false) }
   val leave = { if (form.dirty) confirmDiscard = true else onBack() }
   val loading = loadSavedProvider(form, accounts, failed)
+  val selection = rememberModelSelection()
   BackHandler(enabled = form.dirty) { confirmDiscard = true }
   SettingsPage(
     title = if (form.editing) form.id else stringResource(R.string.provider_title_new),
     onBack = leave,
+    topBar = if (selection.active) ({ ModelSelectionBar(selection, form) }) else null,
   ) {
     if (loading) {
       Box(modifier = Modifier.fillMaxWidth().padding(top = PipkinTokens.Spacing.s48), Alignment.Center) {
@@ -75,6 +77,7 @@ internal fun ProviderEditorScreen(
     ConnectionSection(form = form, onCheck = { scope.launch { form.checkConnection(accounts, failed) } })
     ModelsSection(
       draft = form,
+      selection = selection,
       emptyText = stringResource(modelsEmptyText(form)),
       onAddModels = onAddModels,
       onOpenModel = onOpenModel,

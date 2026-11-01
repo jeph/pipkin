@@ -154,15 +154,19 @@ internal fun AddProviderScreen(onBack: () -> Unit, onAddCompatible: () -> Unit, 
   }
 }
 
-/** Header with a back button over a scrolling, width-capped column of settings cards. */
+/**
+ * Header with a back button, or [topBar] in its place while there is one, over a scrolling, width-capped column of
+ * settings cards.
+ */
 @Composable
 internal fun SettingsPage(
   title: String,
   onBack: () -> Unit,
   snackbar: SnackbarStackState? = null,
+  topBar: (@Composable () -> Unit)? = null,
   content: @Composable ColumnScope.() -> Unit,
 ) {
-  SettingsPageFrame(title, onBack, snackbar) {
+  SettingsPageFrame(title, onBack, snackbar, topBar) {
     Column(
       modifier =
         Modifier
@@ -199,7 +203,7 @@ internal fun LazySettingsPage(
 ) {
   val spacing = PipkinTokens.Spacing
   val background = pipkinColors.surface0
-  SettingsPageFrame(title, onBack, snackbar = null) {
+  SettingsPageFrame(title, onBack, snackbar = null, topBar = null) {
     Column(
       modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding(),
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -229,20 +233,25 @@ private fun SettingsPageFrame(
   title: String,
   onBack: () -> Unit,
   snackbar: SnackbarStackState?,
+  topBar: (@Composable () -> Unit)?,
   body: @Composable () -> Unit,
 ) {
   Box(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
     Column(modifier = Modifier.fillMaxSize()) {
-      HeaderBar(
-        title = title,
-        leading = {
-          HeaderButton(
-            icon = R.drawable.ic_lucide_chevron_left,
-            contentDescription = stringResource(R.string.settings_back),
-            onClick = onBack,
-          )
-        },
-      )
+      if (topBar != null) {
+        topBar()
+      } else {
+        HeaderBar(
+          title = title,
+          leading = {
+            HeaderButton(
+              icon = R.drawable.ic_lucide_chevron_left,
+              contentDescription = stringResource(R.string.settings_back),
+              onClick = onBack,
+            )
+          },
+        )
+      }
       body()
     }
     if (snackbar != null) {
