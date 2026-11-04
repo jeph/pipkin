@@ -542,7 +542,7 @@ dependencies {
   implementation("androidx.lifecycle:lifecycle-process:2.11.0")
   implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
   // Runs .litertlm models in the :inference process (localmodel/engine/litert).
-  implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.1")
+  implementation("com.google.ai.edge.litertlm:litertlm-android:0.19.0")
   implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.46.0")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
   implementation("io.github.sagernet:libghostty-android:0.1.0-alpha02")

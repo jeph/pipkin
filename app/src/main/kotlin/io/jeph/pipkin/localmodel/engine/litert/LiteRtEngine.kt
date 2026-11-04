@@ -28,8 +28,9 @@ internal class LiteRtEngine(private val context: Context) : InferenceEngine {
   override fun start(config: EngineConfig, onProgress: (Float) -> Unit) {
     val started = SystemClock.elapsedRealtime()
     val model = readModel(config.modelPath)
-    // A model compiled for a fixed context can't hold more, whatever the catalog asks for.
-    val maxNumTokens = model.maxContextTokens.takeIf { it > 0 }?.coerceAtMost(config.contextSize) ?: config.contextSize
+    // A model compiled for a fixed context can't hold more, whatever the catalog asks for. A dynamic one takes the size
+    // it's given: LiteRT-LM reports the context it was exported with as its limit, 4,096 for Gemma 4's builds.
+    val maxNumTokens = model.fixedContextTokens?.coerceAtMost(config.contextSize) ?: config.contextSize
     val engine = loading("Couldn't load ${config.modelPath} on ${config.backend.wire}") {
       @OptIn(ExperimentalApi::class)
       ExperimentalFlags.enableBenchmark = true
@@ -45,7 +46,7 @@ internal class LiteRtEngine(private val context: Context) : InferenceEngine {
     Log.i(
       TAG,
       "Loaded ${config.modelAlias} on ${config.backend.wire} in ${SystemClock.elapsedRealtime() - started} ms, " +
-        "$maxNumTokens tokens of ${model.maxContextTokens} the model allows",
+        "$maxNumTokens tokens, the model's context ${model.fixedContextTokens ?: "dynamic"}",
     )
     val chat = ChatServer(engine, config.apiKey, config.modelAlias, maxNumTokens, model.sampling)
     // The server's accept thread keeps it, the chat server and the engine alive for the rest of the process.
@@ -65,11 +66,13 @@ internal class LiteRtEngine(private val context: Context) : InferenceEngine {
     Backend.NPU -> LiteRtBackend.NPU(nativeLibraryDir = context.applicationInfo.nativeLibraryDir)
   }
 
-  private class ModelLimits(val maxContextTokens: Int, val sampling: SamplerParameters?)
+  /** [fixedContextTokens] is null when the model's context is dynamic or it doesn't say. */
+  private class ModelLimits(val fixedContextTokens: Int?, val sampling: SamplerParameters?)
 
   private fun readModel(path: String): ModelLimits = loading("Couldn't read $path") {
     ModelInfo.from(path).use { info ->
-      ModelLimits(info.maxContextTokens(), (info as? ModelInfo.Llm)?.defaultSamplerParams())
+      val fixed = info.maxContextTokens().takeIf { it > 0 && !info.isDynamicContext() }
+      ModelLimits(fixed, (info as? ModelInfo.Llm)?.defaultSamplerParams())
     }
   }
 
