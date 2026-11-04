@@ -91,10 +91,11 @@ internal class ChatController(
   /**
    * Sends the draft; Pi steers a working run with it. A built-in command such as `/compact` runs in
    * Pipkin instead. Returns false when nothing was sent, as while Pi starts: the history shown then is only a copy,
-   * and the prompt or most built-in commands would reach no Pi.
+   * and the prompt or most built-in commands would reach no Pi. So it does while a remote chat's host is lost, where
+   * every tool the agent reached for would fail; the draft stays for when the host is back.
    */
   fun send(): Boolean {
-    if (!canSend || process.state.value.starting) return false
+    if (!canSend || process.state.value.starting || process.remoteOutages.state.value != null) return false
     val builtin = parseBuiltin(draft.text.toString()).takeIf { attachments.isEmpty() }
     if (builtin != null) {
       draft.clearText()

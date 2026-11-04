@@ -198,7 +198,8 @@ private fun ComposerToolbar(
     val contextUsage by controller.process.contextUsage.collectAsStateWithLifecycle()
     ContextMeter(contextUsage, controller.contextDetailsOpen) { controller.contextDetailsOpen = it }
     val processState by controller.process.state.collectAsStateWithLifecycle()
-    val action = primaryAction(controller, working, processState.starting)
+    val outage by controller.process.remoteOutages.state.collectAsStateWithLifecycle()
+    val action = primaryAction(controller, working, blocked = processState.starting || outage != null)
     PrimaryButton(action, onSend = onSend, onStop = controller::abort)
   }
 }
@@ -206,14 +207,15 @@ private fun ComposerToolbar(
 /**
  * Pi answers a prompt within moments by starting its run, so Stop shows from the press on, and stays while the chat
  * [works][io.jeph.pipkin.agent.AgentProcess.working], background tasks included. A photo-only steer greys out Send
- * rather than showing Stop, which a tap meant as sending would otherwise press. So does Pi [starting], which could not
- * take the prompt or most built-in commands yet.
+ * rather than showing Stop, which a tap meant as sending would otherwise press. So does a draft whose send is
+ * [blocked]: by Pi starting, which could not take the prompt or most built-in commands yet, or by a remote chat's host
+ * being lost, as the banner over the stream says. Stop shows again once the draft is empty.
  */
-private fun primaryAction(controller: ChatController, working: Boolean, starting: Boolean): PrimaryAction = when {
+private fun primaryAction(controller: ChatController, working: Boolean, blocked: Boolean): PrimaryAction = when {
   controller.sendingCommand -> PrimaryAction.Sending
   controller.sending -> PrimaryAction.Stop
-  controller.canSend && !starting -> PrimaryAction.Send
-  controller.photosOnlySteer -> PrimaryAction.Idle
+  controller.canSend && !blocked -> PrimaryAction.Send
+  controller.canSend || controller.photosOnlySteer -> PrimaryAction.Idle
   working -> PrimaryAction.Stop
   else -> PrimaryAction.Idle
 }

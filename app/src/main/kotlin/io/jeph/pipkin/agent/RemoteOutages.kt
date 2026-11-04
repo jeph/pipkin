@@ -17,19 +17,19 @@ internal data class RemoteOutage(val hostId: String?, val failure: RemoteFailure
 
 /**
  * Whether the remote host of the chat in [cwd] was lost, as its Pi's `pipkin-remote` extension last said over Pipkin's
- * channel ([TOPIC]), or as the host said when Pi couldn't start there. [remoteHosts] learns each of these too, and
- * gives the host the chat's stand-in folder stands for.
+ * channel ([TOPIC]) after a check or a tool call, or as the host said when Pi couldn't start there. [remoteHosts]
+ * learns each of these too, and gives the host the chat's stand-in folder stands for.
  */
 internal class RemoteOutages(private val cwd: String, private val remoteHosts: RemoteHosts) {
-  /** Not saved: each connection's Pi says so again when a tool call finds the host gone. */
+  /** Not saved: each connection's Pi says so again at its first check. */
   private val stateFlow = MutableStateFlow<RemoteOutage?>(null)
 
-  /** The chat's remote host while a tool call last found it lost; null while it works, and for a local chat. */
+  /** The chat's remote host while it was last found lost; null while it works, and for a local chat. */
   val state: StateFlow<RemoteOutage?> = stateFlow.asStateFlow()
 
   /**
-   * `pipkin-remote` found the chat's host lost or back on a tool call, which [remoteHosts] learns too when it knows the
-   * host; the chat shows it either way, since the host list may not have loaded yet.
+   * `pipkin-remote` found the chat's host lost or back, on a check or a tool call, which [remoteHosts] learns too when
+   * it knows the host; the chat shows it either way, since the host list may not have loaded yet.
    */
   fun onMessage(data: JSONObject) {
     val hostId = hostId()
@@ -53,7 +53,7 @@ internal class RemoteOutages(private val cwd: String, private val remoteHosts: R
 
   /**
    * Forgets the outage: the Pi that saw it is gone, or the user connected the host again, so the chat stops saying
-   * it's lost until a tool call finds it so.
+   * it's lost until a check or a tool call finds it so.
    */
   fun clear() {
     stateFlow.value = null
@@ -66,7 +66,10 @@ internal class RemoteOutages(private val cwd: String, private val remoteHosts: R
   }
 
   companion object {
-    /** The `pipkin-remote` extension's topic: whether the chat's host was reachable on the last tool call. */
+    /**
+     * The `pipkin-remote` extension's topic: from it, whether the chat's host was reachable on the last check or tool
+     * call; to it, `{ action: "check" }` ([AgentProcess.checkRemote]).
+     */
     const val TOPIC = "remote"
   }
 }

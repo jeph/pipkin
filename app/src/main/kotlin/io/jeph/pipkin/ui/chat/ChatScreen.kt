@@ -196,12 +196,6 @@ private fun ChatContent(
     modifier = Modifier.fillMaxSize().background(pipkinColors.surface0).closeContextDetailsOnPress(controller),
   ) {
     ChatHeader(process, controls, Modifier.onUnhandledTap(dismissKeyboard))
-    RemoteBanner(
-      process,
-      Modifier
-        .align(Alignment.CenterHorizontally)
-        .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s4),
-    )
     // The keyboard and a dialog both take the room the steering box and widget panels would use, so then the steering
     // box keeps to one line and a panel to a few.
     val tight = WindowInsets.isImeVisible || timeline.pendingUi != null
@@ -237,8 +231,8 @@ private fun ChatContent(
 }
 
 /**
- * The stream, with the snackbars over its bottom (or its top while a dialog or steering waits) and the slash menu;
- * [subagents] is what its subagent rows show and open.
+ * The stream, with a remote chat's lost-host banner over its top, the snackbars over its bottom (or its top while a
+ * dialog or steering waits) and the slash menu; [subagents] is what its subagent rows show and open.
  */
 @Composable
 private fun StreamArea(
@@ -265,6 +259,12 @@ private fun StreamArea(
       onRestart = process::restart,
       lastTurn = TurnStatus(backgroundTasks, process, timeline.model),
       subagents = subagents,
+    )
+    RemoteBanner(
+      process,
+      Modifier
+        .align(Alignment.TopCenter)
+        .padding(horizontal = PipkinTokens.Spacing.s16, vertical = PipkinTokens.Spacing.s8),
     )
     // A dialog card or the steering box fills the space over the composer, so snackbars move up under the header.
     val raised = timeline.pendingUi != null || timeline.queue.isNotEmpty()

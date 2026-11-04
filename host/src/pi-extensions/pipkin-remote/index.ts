@@ -27,13 +27,17 @@ import {
   type WriteOperations,
 } from "@earendil-works/pi-coding-agent";
 import { HostError } from "../../env.js";
+import { isObject } from "../../framing.js";
 import { errorJson } from "../../remote/errors.js";
 import { accessRemote, mkdirRemote, readRemoteFile, RemoteFileError, remoteHome, writeRemoteFile } from "../../remote/fs.js";
-import { runWatched } from "../../remote/ssh.js";
+import { checkConnection, runWatched } from "../../remote/ssh.js";
 import { pipkinChannel } from "../pipkin-channel.js";
 import { expandRemoteHome, remoteWorkspace, type RemoteWorkspace, toRemotePath } from "./workspace.js";
 
-/** The channel topic: `{ connected, error? }` when a tool call finds the connection gone, or back. */
+/**
+ * The channel topic. To the app: `{ connected, error? }` when a tool call finds the connection gone, or back, and after
+ * every check. From the app: `{ action: "check" }`, which it sends every few seconds while the chat is on screen.
+ */
 export const TOPIC = "remote";
 
 /** Pi's tools that would search the phone's empty stand-in folder; a remote chat searches with `bash` instead. */
@@ -51,28 +55,61 @@ const CONNECTION_CODES: Record<string, true> = {
 
 /**
  * What one Pi process knows across every load of the extension (Pi loads it again for each session and `/reload`):
- * whether the connection last failed, the phone's full-output files the model may read, and the remote home.
+ * whether the connection last failed, the phone's full-output files the model may read, the remote home, and the
+ * workspace the latest load read, which the app's checks reach.
  */
 interface State {
-  /** The code of the connection failure the app was last told about; undefined while the connection works. */
-  down: string | undefined;
+  /** The connection failure the app was last told about; undefined while the connection works. */
+  down: HostError | undefined;
   /** Every `fullOutputPath` this Pi's `bash` returned: cut-off output, kept on the phone. */
   outputs: Set<string>;
   home: Promise<string> | undefined;
+  workspace: RemoteWorkspace | undefined;
+  /** Whether a check is running; one the app asks for meanwhile is dropped, as the running one answers it. */
+  checking: boolean;
 }
 
 const SHARED = Symbol.for("pipkin.remote");
 
+/** The process's [State], made on first use, which is when the app's checks start being answered. */
 function sharedState(): State {
   const global = globalThis as { [SHARED]?: State };
-  global[SHARED] ??= { down: undefined, outputs: new Set(), home: undefined };
-  return global[SHARED];
+  if (global[SHARED] !== undefined) return global[SHARED];
+  const state: State = { down: undefined, outputs: new Set(), home: undefined, workspace: undefined, checking: false };
+  global[SHARED] = state;
+  pipkinChannel().on(TOPIC, (data) => {
+    if (isObject(data) && data.action === "check") void check(state);
+  });
+  return state;
+}
+
+/**
+ * Checks the connection for the app and tells it the outcome, every time: the app takes the banner down when the user
+ * connects, and a host lost again just after must still bring it back. Without a connection, a host only the user can
+ * sign in to isn't connected to again: a password host, or one whose sign-in already needed the user.
+ */
+async function check(state: State): Promise<void> {
+  const workspace = state.workspace;
+  if (workspace === undefined || state.checking) return;
+  state.checking = true;
+  try {
+    const needsUser = workspace.host.auth === "password" || state.down?.code === "remote_not_connected";
+    await checkConnection(workspace, !needsUser);
+    state.down = undefined;
+    pipkinChannel().send(TOPIC, { connected: true });
+  } catch (error) {
+    if (!(error instanceof HostError) || !CONNECTION_CODES[error.code]) return;
+    state.down = error;
+    pipkinChannel().send(TOPIC, { connected: false, error: errorJson(error) });
+  } finally {
+    state.checking = false;
+  }
 }
 
 /** Tells the app the connection is gone, once per kind of failure. */
 function markDown(state: State, error: HostError): void {
-  if (state.down === error.code) return;
-  state.down = error.code;
+  if (state.down?.code === error.code) return;
+  state.down = error;
   pipkinChannel().send(TOPIC, { connected: false, error: errorJson(error) });
 }
 
@@ -346,6 +383,7 @@ export function createPipkinRemote(cwd: string): ExtensionFactory {
     if (workspace === null) return;
     const remote = workspace;
     const state = sharedState();
+    state.workspace = remote;
     registerTools(pi, state, remote);
     pi.on("user_bash", () => ({ operations: remoteBashOperations(state, remote) }));
     pi.on("session_start", () => deactivateLocalSearch(pi));

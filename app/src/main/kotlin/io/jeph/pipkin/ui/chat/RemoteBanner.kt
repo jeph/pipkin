@@ -4,17 +4,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -24,9 +26,13 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
+import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.RemoteHost
 import io.jeph.pipkin.ui.components.LucideIcon
@@ -35,16 +41,20 @@ import io.jeph.pipkin.ui.remote.rememberRemoteConnector
 import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.delay
 
 /**
- * The warning under a remote chat's header while a tool call last found its host lost: why, in the host's words, and
- * Connect when only the user can sign in or check the host's key. A connect that works takes the banner down at once;
- * the next tool call would say the host is back anyway.
+ * The warning floating over a remote chat's stream while its host is lost: why, in the host's words, and Connect when
+ * only the user can sign in or check the host's key. The chat checks the host while it's on screen
+ * ([RemoteChecks]), so the warning comes up within seconds of the host going, before anyone sends a message, and goes
+ * once it answers again; until then the composer won't send. A connect that works takes it down at once.
  */
 @Composable
 internal fun RemoteBanner(process: AgentProcess, modifier: Modifier = Modifier) {
+  RemoteChecks(process)
   val outage by process.remoteOutages.state.collectAsStateWithLifecycle()
-  // Ahead of the banner, so a connect's failure stays up when a tool call takes the banner down meanwhile.
+  // Ahead of the banner, so a connect's failure stays up when a check takes the banner down meanwhile.
   val connector = rememberRemoteConnector()
   RemoteConnectDialogs(connector)
   val shown = outage ?: return
@@ -58,30 +68,57 @@ internal fun RemoteBanner(process: AgentProcess, modifier: Modifier = Modifier) 
     else -> stringResource(R.string.remote_banner_disconnected, name)
   }
   val colors = pipkinColors
+  val connectTo = host?.takeIf { failure?.needsConnect == true && !connector.connecting }
+  // The Connect button brings its own padding.
+  val end = if (connectTo == null) PipkinTokens.Spacing.s16 else PipkinTokens.Spacing.s4
   Row(
     modifier = modifier
       .widthIn(max = PipkinTokens.contentMaxWidth)
-      .fillMaxWidth()
-      .clip(RoundedCornerShape(PipkinTokens.Radius.lg))
-      .background(colors.warningSoft)
+      .shadow(BANNER_ELEVATION, BANNER_SHAPE)
+      .clip(BANNER_SHAPE)
+      // Opaque, so it covers the stream's text under it rather than showing it through.
+      .background(colors.warningSoft.compositeOver(colors.surface1))
       .semantics { liveRegion = LiveRegionMode.Polite }
       .heightIn(min = 44.dp)
-      .padding(start = PipkinTokens.Spacing.s12, end = PipkinTokens.Spacing.s4),
+      .padding(start = PipkinTokens.Spacing.s12, end = end),
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     LucideIcon(icon = R.drawable.ic_lucide_wifi_off, contentDescription = null, tint = colors.dotWarning)
     Text(
       text = text,
-      modifier = Modifier.weight(1f).padding(vertical = 10.dp),
+      // Not filling: a short warning makes a short pill.
+      modifier = Modifier.weight(1f, fill = false).padding(vertical = 10.dp),
       color = colors.dotWarning,
       fontSize = PipkinTokens.FontSize.base,
       fontWeight = FontWeight.SemiBold,
       lineHeight = 19.sp,
     )
-    if (host != null && failure?.needsConnect == true && !connector.connecting) {
+    if (connectTo != null) {
       BannerTextButton(stringResource(R.string.remote_connect)) {
-        connector.connect(host.id, host.name, onConnected = process.remoteOutages::clear)
+        connector.connect(connectTo.id, connectTo.name, onConnected = process.remoteOutages::clear)
+      }
+    }
+  }
+}
+
+/**
+ * While a remote chat's Pi runs and Pipkin is in front, asks its `pipkin-remote` every [CHECK_INTERVAL] whether the
+ * host still answers: once at once, then on and on. A tool call alone finds the host lost only once someone sent a
+ * message and the agent reached for it.
+ */
+@Composable
+private fun RemoteChecks(process: AgentProcess) {
+  val remote = rememberFolderNames().isRemote(process.cwd)
+  val state by process.state.collectAsStateWithLifecycle()
+  val running = state == AgentProcessState.Ready
+  val lifecycle = LocalLifecycleOwner.current.lifecycle
+  LaunchedEffect(process, remote, running, lifecycle) {
+    if (!remote || !running) return@LaunchedEffect
+    lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+      while (true) {
+        process.checkRemote()
+        delay(CHECK_INTERVAL)
       }
     }
   }
@@ -107,3 +144,10 @@ private fun BannerTextButton(label: String, onClick: () -> Unit) {
     fontWeight = FontWeight.Bold,
   )
 }
+
+/** How often an on-screen remote chat checks its host; with the check's own 5 s, a lost host shows within 15 s. */
+private val CHECK_INTERVAL = 10.seconds
+
+/** Rounded to a pill at one line's height, and still a rounded card when the reason wraps. */
+private val BANNER_SHAPE = RoundedCornerShape(22.dp)
+private val BANNER_ELEVATION = 6.dp

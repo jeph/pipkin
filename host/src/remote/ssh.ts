@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import { type HostError, withoutHostVariables } from "../env.js";
-import { bashMissing, classifySshFailure, errorCode, isBashMissing, sessionsFull, sshMissing, unreachable } from "./errors.js";
+import { bashMissing, classifySshFailure, errorCode, isBashMissing, notConnected, sessionsFull, sshMissing, unreachable } from "./errors.js";
 import { configWord, destination, type Host } from "./hosts.js";
 import { controlPath, knownHostsFile, type RemotePaths, socketsDir, sshConfigFile } from "./paths.js";
 import { quote, remoteScript, watched } from "./script.js";
@@ -500,4 +500,29 @@ export async function runScript(remote: Remote, script: string, options: RunOpti
  */
 export function runWatched(remote: Remote, command: string, cwd: string, options: Omit<RunOptions, "stdin"> = {}): Promise<RunResult> {
   return runScript(remote, watched(command, cwd), { ...options, stdin: "open" });
+}
+
+/** How long [checkConnection] lets a fresh connection take: past `ConnectTimeout` (15 s), whose error says more. */
+const CHECK_CONNECT_TIMEOUT_MS = 30_000;
+
+/**
+ * Checks that [remote] can be reached now, rejecting with the `HostError` a call would get when it can't. Through a live
+ * master it runs a no-op ([answers]), so a frozen server or a dead network fails within seconds, though keepalives
+ * would take 45 s; the master is left to them, so a check that only came back late ends nothing. Without a master it
+ * connects as a call would, unless [connect] is false, for a host only the user can sign in to: trying again and again
+ * would only fill the server's log with refused sign-ins.
+ */
+export async function checkConnection(remote: Remote, connect: boolean): Promise<void> {
+  if (await isConnected(remote)) {
+    if (await answers(remote)) return;
+    // A master that ended meanwhile is no frozen server; without it, the check is a connect's.
+    if (await isConnected(remote)) throw unreachable(remote.host.name, "Connection timed out");
+  }
+  if (!connect) throw notConnected(remote.host.name);
+  try {
+    await runScript(remote, "true", { timeoutMs: CHECK_CONNECT_TIMEOUT_MS });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError") throw unreachable(remote.host.name, "Connection timed out");
+    throw error;
+  }
 }

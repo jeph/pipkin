@@ -49,9 +49,9 @@ A few things work differently in a remote chat:
 
 ## Connections
 
-Pipkin keeps one connection per host and shares it between chats, the file explorer, git, and terminals. It closes 10 minutes after anything last used it. A host that signs in with Pipkin's key connects again on its own when it's next needed, and so does one from your `~/.ssh/config` whose key needs no passphrase. A host that asks for a password or passphrase has to be connected again, and the chat, picker, or terminal offers **Connect**.
+Pipkin keeps one connection per host and shares it between chats, the file explorer, git, and terminals. It closes 10 minutes after anything last used it, and a remote chat on screen counts as using it. A host that signs in with Pipkin's key connects again on its own when it's next needed, and so does one from your `~/.ssh/config` whose key needs no passphrase. A host that asks for a password or passphrase has to be connected again, and the chat, picker, or terminal offers **Connect**.
 
-If the network drops or the host stops answering, Pipkin gives up on the connection after about 45 seconds. A chat shows a warning under its header until the host can be reached again, and a terminal ends with the reason and **Restart shell**. **Settings → Remote hosts** shows which hosts are connected, and **Disconnect** closes a host's connection.
+While a remote chat is on screen, Pipkin checks every few seconds that its host still answers. If the network drops or the host stops answering, a warning floats over the top of the chat within about 15 seconds, and you can't send a message until the host can be reached again; anything you type stays in the message box. A terminal ends with the reason and **Restart shell**. **Settings → Remote hosts** shows which hosts are connected, and **Disconnect** closes a host's connection.
 
 ## Make a new key
 

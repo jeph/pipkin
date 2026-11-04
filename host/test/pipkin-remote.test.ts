@@ -55,6 +55,8 @@ describe.skipIf(unavailable !== null)(`pipkin-remote against a throwaway sshd${u
   let sent: unknown[];
   /** Every model request, as the script saw it. */
   let turns: Turn[];
+  /** What the extension listens to on the `remote` topic, as the app's messages would reach it. */
+  let fromApp: ((data: unknown) => void)[];
   const environment = { PI_CODING_AGENT_DIR: process.env.PI_CODING_AGENT_DIR, PREFIX: process.env.PREFIX };
 
   /** Each prompt is a JSON tool call, which the model makes; then it's done. */
@@ -72,18 +74,29 @@ describe.skipIf(unavailable !== null)(`pipkin-remote against a throwaway sshd${u
     return result;
   }
 
-  /** Makes every `ssh` the extension runs fail as a refused connection would, until the returned function undoes it. */
-  async function breakSsh(): Promise<() => Promise<void>> {
+  /**
+   * Makes every `ssh` the extension runs fail as `ssh` does with [line], a refused connection by default, until the
+   * returned function undoes it.
+   */
+  async function breakSsh(line = "ssh: connect to host 127.0.0.1 port 22: Connection refused"): Promise<() => Promise<void>> {
     const ssh = path.join(fixture.dirs.prefix, "bin", "ssh");
     const real = path.join(fixture.dirs.prefix, "bin", "ssh.real");
     await rm(real, { force: true });
     await symlink(await readlink(ssh), real);
     await rm(ssh);
-    await writeFile(ssh, "#!/bin/sh\necho 'ssh: connect to host 127.0.0.1 port 22: Connection refused' >&2\nexit 255\n", { mode: 0o755 });
+    await writeFile(ssh, `#!/bin/sh\necho ${quote(line)} >&2\nexit 255\n`, { mode: 0o755 });
     return async () => {
       await rm(ssh);
       await symlink(await readlink(real), ssh);
     };
+  }
+
+  /** Asks for a check as the app does, and waits for what the extension tells the app. */
+  async function check(ms = 10_000): Promise<unknown> {
+    const before = sent.length;
+    for (const handler of fromApp) handler({ action: "check" });
+    await eventually(() => sent.length > before, ms);
+    return sent.at(-1);
   }
 
   beforeAll(async () => {
@@ -103,6 +116,7 @@ describe.skipIf(unavailable !== null)(`pipkin-remote against a throwaway sshd${u
   beforeEach(async () => {
     sent = [];
     turns = [];
+    fromApp = [];
     const ui = fakeUi(installChannel());
     const global = globalThis as Record<symbol, unknown>;
     delete global[STATE];
@@ -110,7 +124,10 @@ describe.skipIf(unavailable !== null)(`pipkin-remote against a throwaway sshd${u
       send: (topic: string, data: unknown) => {
         if (topic === "remote") sent.push(data);
       },
-      on: () => () => undefined,
+      on: (topic: string, handler: (data: unknown) => void) => {
+        if (topic === "remote") fromApp.push(handler);
+        return () => undefined;
+      },
     };
     const dir = { cwd: fixture.standIn, agentDir: fixture.dirs.configDir, sessionsDir: path.join(fixture.dirs.configDir, "sessions") };
     ({ session } = await makeParent(dir, script, {
@@ -316,6 +333,91 @@ describe.skipIf(unavailable !== null)(`pipkin-remote against a throwaway sshd${u
     }
     expect((await call("bash", { command: "echo back" })).isError).toBe(false);
     expect(sent.at(-1)).toEqual({ connected: true });
+  });
+
+  it("answers each check the app asks for, connecting a key host that has no connection", async () => {
+    const remote = { paths: fixture.paths, host: fixture.host };
+    await disconnect(remote);
+    expect(await check()).toEqual({ connected: true });
+    expect(await isConnected(remote)).toBe(true);
+    // Again, though nothing changed: the app may have taken its banner down meanwhile.
+    expect(await check()).toEqual({ connected: true });
+    expect(sent).toHaveLength(2);
+  });
+
+  it("finds a frozen server lost within seconds, with no call running, and back once it answers", async () => {
+    const remote = { paths: fixture.paths, host: fixture.host };
+    await call("bash", { command: "true" });
+    expect(await isConnected(remote)).toBe(true);
+    let frozen: number[] = [];
+    try {
+      frozen = await processTree(fixture.sshd.pid);
+      signalEach(frozen, "SIGSTOP");
+      const started = Date.now();
+      expect(await check()).toEqual({
+        connected: false,
+        error: {
+          code: "remote_unreachable",
+          message: "Couldn't reach testbox: Connection timed out",
+          i18n: { key: "remote_unreachable", args: { host: "testbox", detail: "Connection timed out" } },
+        },
+      });
+      // The no-op's own timeout, far short of the keepalives' 45 s.
+      expect(Date.now() - started).toBeLessThan(9_000);
+      // The master is left to the keepalives: a check that came back late mustn't end a command still running.
+      expect(await isConnected(remote)).toBe(true);
+    } finally {
+      signalEach(frozen, "SIGCONT");
+    }
+    expect(await check()).toEqual({ connected: true });
+  });
+
+  it("doesn't connect a password host the user hasn't signed in", async () => {
+    const remote = { paths: fixture.paths, host: fixture.host };
+    const renamed = { ...fixture.host, name: "pwhost", auth: "password" as const };
+    await updateHosts(fixture.paths, (hosts) => ({ hosts: hosts.map((host) => (host.id === renamed.id ? renamed : host)), result: undefined }));
+    try {
+      await disconnect(remote);
+      // A new Pi for the chat, which reads the host as it is now.
+      session.dispose();
+      const dir = { cwd: fixture.standIn, agentDir: fixture.dirs.configDir, sessionsDir: path.join(fixture.dirs.configDir, "sessions") };
+      const recording = (globalThis as Record<symbol, unknown>)[CHANNEL];
+      const ui = fakeUi(installChannel());
+      (globalThis as Record<symbol, unknown>)[CHANNEL] = recording;
+      delete (globalThis as Record<symbol, unknown>)[STATE];
+      // The first Pi's extension, whose host still signs in with Pipkin's key, is gone with its session.
+      fromApp = [];
+      ({ session } = await makeParent(dir, script, { extensions: [createPipkinRemote(fixture.standIn)], tools: ["bash"], ui }));
+      const repair = await breakSsh();
+      try {
+        expect(await check()).toEqual({
+          connected: false,
+          error: { code: "remote_not_connected", message: "Not connected to pwhost. Connect to sign in.", i18n: { key: "remote_not_connected", args: { host: "pwhost" } } },
+        });
+      } finally {
+        await repair();
+      }
+    } finally {
+      await updateHosts(fixture.paths, (hosts) => ({ hosts: hosts.map((host) => (host.id === renamed.id ? fixture.host : host)), result: undefined }));
+    }
+  });
+
+  it("keeps a changed host key's warning while the key is wrong, and clears it once the key is fixed", async () => {
+    const remote = { paths: fixture.paths, host: fixture.host };
+    await disconnect(remote);
+    const repair = await breakSsh("Host key for 127.0.0.1 has changed and you have requested strict checking.");
+    try {
+      await call("bash", { command: "true" });
+      const changed = sent.at(-1);
+      expect(changed).toMatchObject({ connected: false, error: { code: "remote_host_key_changed" } });
+      // Each check connects again; a changed key fails before signing in, so it says so again without a refused sign-in.
+      expect(await check()).toEqual(changed);
+    } finally {
+      await repair();
+    }
+    // Fixed outside Pipkin's Connect, as in a terminal: the next check connects.
+    expect(await check()).toEqual({ connected: true });
+    expect(await isConnected(remote)).toBe(true);
   });
 });
 

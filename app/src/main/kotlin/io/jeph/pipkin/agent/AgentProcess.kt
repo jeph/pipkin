@@ -375,13 +375,22 @@ internal class AgentProcess(
     cancelled.forEach { respondUi(it, UiAnswer.Cancelled) }
   }
 
-  private suspend fun sendSubagents(data: JSONObject) {
+  private suspend fun sendSubagents(data: JSONObject) = sendChannel(SUBAGENTS_TOPIC, data)
+
+  /**
+   * Asks `pipkin-remote` to check that the chat's remote host answers now; it tells [remoteOutages] what it found. A
+   * local chat's Pi has no listener, so nothing answers.
+   */
+  suspend fun checkRemote() = sendChannel(RemoteOutages.TOPIC, JSONObject().put("action", "check"))
+
+  /** Sends [data] on [topic] to the extension listening there; nothing when no Pi runs. */
+  private suspend fun sendChannel(topic: String, data: JSONObject) {
     val channel = connection?.channel ?: return
-    val line = JSONObject().put("type", HostProtocol.CHANNEL).put("topic", SUBAGENTS_TOPIC).put("data", data)
+    val line = JSONObject().put("type", HostProtocol.CHANNEL).put("topic", topic).put("data", data)
     try {
       channel.sendLine(line.toString())
     } catch (_: IOException) {
-      // Pi is gone, and its subagents with it.
+      // Pi is gone, and the extensions with it.
     }
   }
 

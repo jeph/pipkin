@@ -88,14 +88,16 @@ export function classifySshFailure(stderr: string, context: FailureContext): Hos
   }
   if (own.some((line) => AUTH_REFUSED.test(line))) {
     if (context.interactive || context.auth === "key") return authFailed(host);
-    return new HostError("remote_not_connected", `Not connected to ${host}. Connect to sign in.`, {
-      key: "remote_not_connected",
-      args: { host },
-    });
+    return notConnected(host);
   }
   const line = own.find((candidate) => UNREACHABLE.test(candidate));
   if (line !== undefined) return unreachable(host, line.trim());
   return remoteFailed(host, lastLine(own.join("\n")));
+}
+
+/** [host] has no live connection, and only the user can sign in to make one. */
+export function notConnected(host: string): HostError {
+  return new HostError("remote_not_connected", `Not connected to ${host}. Connect to sign in.`, { key: "remote_not_connected", args: { host } });
 }
 
 /** [host] couldn't be reached, for the reason [detail] gives, `ssh`'s own line where it has one. */
