@@ -43,7 +43,7 @@ let making: Promise<string> | undefined;
 
 /**
  * Pipkin's public key line, making the key first if needed: ed25519, no passphrase, mode 600, commented
- * `pipkin@<device model>`. It's made under a temporary name and moved in, public half first, so a key that's there is
+ * `pipkin@<device model>`. It's made under a temporary name and moved in, private half first, so a key that's there is
  * always whole.
  */
 export function ensureKey(paths: RemotePaths): Promise<string> {
