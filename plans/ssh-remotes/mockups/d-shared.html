@@ -1,0 +1,87 @@
+<!doctype html><html><head><meta charset=utf-8><style>
+@font-face{font-family:Manrope;src:url(manrope.ttf);font-weight:200 800}
+@font-face{font-family:Mono;src:url(mono.ttf)}
+:root{--s0:#F6F7FB;--s1:#EBEEF7;--s2:#DFE3F0;--s3:#CCD2E6;--fg:#111633;--mu:#565D7A;--xm:#959BB5;--bd:#D9DEED;--ac:#2F4BD8;--acs:rgba(47,75,216,.09);--ok:#157A4A;--warn:#875700;--bad:#C42B3C}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Manrope;color:var(--fg);background:#E4E7F1}
+.board{padding:44px 48px 52px;display:inline-block;background:#E4E7F1}
+.board h1{font-size:30px;font-weight:800;letter-spacing:-.02em}
+.board .lede{font-size:16px;color:var(--mu);margin:6px 0 30px;max-width:1240px;line-height:1.5}
+.row{display:flex;gap:44px;align-items:flex-start}
+.cell{width:390px}
+.cap{font-size:14.5px;color:var(--mu);margin-top:22px;line-height:1.5;padding:0 6px}
+.cap b{color:var(--fg)}
+.phone{width:390px;height:844px;border-radius:46px;background:var(--s0);position:relative;overflow:hidden;box-shadow:0 0 0 9px #1b1d26,0 24px 60px rgba(17,22,51,.28);display:flex;flex-direction:column}
+.status{height:42px;flex:none;display:flex;justify-content:space-between;align-items:center;padding:6px 30px 0;font-size:14px;color:var(--fg)}
+.navbar{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:120px;height:4px;border-radius:2px;background:#111633;opacity:.75;z-index:50}
+.sbh{display:flex;align-items:center;gap:10px;padding:10px 12px 10px 20px;min-height:64px}
+.sbh .t{flex:1;font-size:26px;font-weight:800;letter-spacing:-.025em}
+.hbtn{width:36px;height:36px;border-radius:18px;background:var(--s1);display:flex;align-items:center;justify-content:center;color:var(--fg);flex:none}
+.hbtn.plain{background:none}
+.list{flex:1;padding:0 12px;overflow:hidden}
+.ws{display:flex;align-items:center;gap:12px;padding:10px 8px 10px 10px;border-radius:18px;border:1.5px solid transparent;margin-bottom:4px}
+.ws.shown{border-color:rgba(47,75,216,.55);background:var(--acs)}
+.ws.dim{opacity:.55}
+.tile{width:36px;height:36px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex:none;position:relative}
+.badge{position:absolute;right:-5px;bottom:-5px;width:18px;height:18px;border-radius:9px;background:var(--s0);display:flex;align-items:center;justify-content:center;color:var(--mu);box-shadow:0 0 0 1.5px var(--s0)}
+.ws .txt{flex:1;min-width:0}
+.ws .nm{font-size:15.5px;font-weight:650}
+.ws .sub{font-size:12.5px;color:var(--mu);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:5px;margin-top:2px}
+.ws .btns{display:flex;gap:2px;color:var(--mu)}
+.ws .b{width:32px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.ws.shown .b.new{background:var(--ac);color:#fff}
+.add{display:flex;align-items:center;gap:12px;padding:10px;border-radius:18px;border:1.5px dashed var(--s3);color:var(--mu);font-size:15px;font-weight:600;margin-top:6px}
+.add .tile{background:var(--s1);color:var(--mu)}
+.foot{margin:0 12px 22px;border-radius:22px;background:var(--s1);min-height:60px;display:flex;align-items:center;gap:6px;padding:0 10px 0 16px;flex:none}
+.foot .h{flex:1;display:flex;align-items:center;gap:10px;font-size:14px;font-weight:600}
+.dot{width:8px;height:8px;border-radius:4px;display:inline-block;flex:none}
+.ok{background:var(--ok)} .off{background:var(--xm)} .warnd{background:var(--warn)}
+.sec{font-size:13px;font-weight:700;color:var(--mu);letter-spacing:.02em;padding:14px 12px 6px;display:flex;align-items:center;gap:8px}
+.sec .r{margin-left:auto;font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:6px}
+.scrim{position:absolute;inset:0;background:rgba(17,22,51,.38);z-index:10}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--s0);border-radius:28px 28px 0 0;z-index:20;display:flex;flex-direction:column;padding-bottom:22px}
+.handle{width:36px;height:4px;border-radius:2px;background:var(--s3);margin:10px auto 6px}
+.search{margin:6px 16px 4px;height:44px;border-radius:22px;background:var(--s1);display:flex;align-items:center;gap:10px;padding:0 16px;color:var(--xm);font-size:15px}
+.tabs{display:flex;padding:4px 8px 0;border-bottom:1px solid var(--bd)}
+.tab{flex:1;text-align:center;font-size:13.5px;color:var(--mu);padding:12px 4px 10px;border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;justify-content:center;gap:5px}
+.tab.on{color:var(--fg);font-weight:600;border-color:var(--ac)}
+.tab.plus{flex:none;width:44px;color:var(--ac)}
+.srow{display:flex;align-items:center;gap:14px;padding:13px 20px;font-size:15.5px}
+.srow.accent{color:var(--ac)}
+.srow .ico{color:var(--mu);display:flex}
+.srow.accent .ico{color:var(--ac)}
+.pathbar{border-top:1px solid var(--bd);display:flex;align-items:center;gap:12px;padding:12px 18px 4px;font-size:15px}
+.btn{margin:10px 16px 0;height:50px;border-radius:25px;background:var(--ac);color:#fff;font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn.sec2{background:var(--s1);color:var(--fg)}
+.note{padding:14px 20px;font-size:14.5px;color:var(--mu);line-height:1.5}
+.appbar{display:flex;align-items:center;gap:18px;padding:18px 20px 22px;font-size:24px;font-weight:800;letter-spacing:-.02em}
+.card{background:var(--s1);border-radius:22px;margin:0 16px 12px;overflow:hidden}
+.card .it{padding:16px 20px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:14px}
+.card .it:last-child{border-bottom:none}
+.card .ti{font-size:16px;font-weight:600}
+.card .de{font-size:13.5px;color:var(--mu);margin-top:3px;line-height:1.45}
+.label{font-size:13.5px;font-weight:700;color:var(--mu);padding:10px 30px 8px}
+.field{background:var(--s0);border:1.5px solid var(--bd);border-radius:14px;padding:9px 14px;margin-top:6px}
+.field .fl{font-size:12px;color:var(--mu)} .field .fv{font-size:16px;margin-top:1px}
+.field.focus{border-color:var(--ac)}
+.mono{font-family:Mono;font-size:12.5px;line-height:1.55;word-break:break-all}
+.radio{width:22px;height:22px;border-radius:11px;border:2px solid var(--s3);flex:none;display:flex;align-items:center;justify-content:center}
+.radio.on{border-color:var(--ac)} .radio.on::after{content:"";width:11px;height:11px;border-radius:6px;background:var(--ac)}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 10px 5px 9px;font-size:12.5px;font-weight:650}
+.dialog{position:absolute;left:24px;right:24px;top:210px;background:var(--s0);border-radius:28px;z-index:30;padding:24px 22px 18px}
+.dialog h2{font-size:20px;font-weight:750;margin:12px 0 8px}
+.dialog p{font-size:14.5px;color:var(--mu);line-height:1.5}
+.dbtns{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.tbtn{padding:11px 18px;border-radius:22px;font-weight:700;font-size:15px;color:var(--ac)}
+.tbtn.fill{background:var(--ac);color:#fff}
+.chathead{display:flex;align-items:center;gap:10px;padding:6px 12px 10px;border-bottom:1px solid var(--bd)}
+.banner{margin:10px 14px 0;border-radius:16px;background:rgba(135,87,0,.10);color:var(--warn);display:flex;align-items:center;gap:10px;padding:11px 14px;font-size:14px;font-weight:600}
+.msg-u{align-self:flex-end;background:var(--s1);border-radius:20px 20px 6px 20px;padding:11px 15px;font-size:15px;max-width:78%;margin:14px 14px 0 auto}
+.msg-a{padding:12px 18px 0;font-size:15px;line-height:1.55}
+.tool{margin:10px 14px 0;border:1px solid var(--bd);border-radius:16px;overflow:hidden}
+.tool .th{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--s1);font-size:13.5px;font-weight:650}
+.tool .tb{padding:10px 12px;font-family:Mono;font-size:12px;color:var(--mu);line-height:1.6;background:var(--s0)}
+.composer{margin:auto 12px 26px;border-radius:26px;background:var(--s1);padding:14px 10px 10px 18px;flex:none}
+.composer .ph{color:var(--xm);font-size:15.5px}
+.composer .cr{display:flex;align-items:center;gap:8px;margin-top:12px}
+</style></head><body><div class="board"><h1>Shared by every concept</h1><div class="lede">Adding a host, the first-connection check, and a chat in a remote workspace look the same whichever concept you pick. Git, files and the terminal keep their screens; the header just says where they run.</div><div class="row"><div class="cell"><div class="phone"><div class="status"><span>11:31</span><span style="display:flex;gap:6px;align-items:center"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 12 0 3a12 12 0 0 1 16 0z" fill="#111633"/></svg><svg width="14" height="12" viewBox="0 0 14 12"><path d="M14 0v12H0z" fill="#111633"/></svg><svg width="9" height="14" viewBox="0 0 9 14"><rect x="0" y="1" width="9" height="13" rx="1.5" fill="#111633"/><rect x="2.5" y="0" width="4" height="2" rx="1" fill="#111633"/></svg></span></div><div class="appbar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg><span>Add host</span></div><div class="card" style="padding:14px 16px 16px"><div class="field"><div class="fl">Name</div><div class="fv">devbox</div></div><div class="field focus"><div class="fl">Address</div><div class="fv">jeph@devbox.lan</div></div><div class="field"><div class="fl">Port</div><div class="fv">22</div></div></div><div class="label">Sign in with</div><div class="card"><div class="it" style="align-items:flex-start"><div class="radio on" style="margin-top:2px"></div><div style="flex:1"><div class="ti">Pipkin's key</div><div class="de">Add this line to ~/.ssh/authorized_keys on the host.</div><div style="margin-top:10px;background:var(--s0);border-radius:12px;padding:10px 12px;display:flex;gap:10px;align-items:flex-start"><div class="mono" style="flex:1;color:var(--fg)">ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIK9q…Wm4 pipkin@pixel-9</div><span style="color:var(--ac);display:flex"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span></div></div></div><div class="it"><div class="radio"></div><div style="flex:1"><div class="ti">Password</div><div class="de">Asked each time Pipkin connects.</div></div></div><div class="it"><div class="radio"></div><div style="flex:1"><div class="ti">Use my ~/.ssh/config</div><div class="de">For a host Termux already knows, with your own keys or jump hosts.</div></div></div></div><div style="flex:1"></div><div class="btn" style="margin-bottom:30px">Connect</div><div class="navbar"></div></div><div class="cap"><b>Add host.</b> Name, address, port. Pipkin generates a key and shows the line to paste on the server; password and an existing ~/.ssh/config entry are the alternatives.</div></div><div class="cell"><div class="phone"><div class="status"><span>11:31</span><span style="display:flex;gap:6px;align-items:center"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 12 0 3a12 12 0 0 1 16 0z" fill="#111633"/></svg><svg width="14" height="12" viewBox="0 0 14 12"><path d="M14 0v12H0z" fill="#111633"/></svg><svg width="9" height="14" viewBox="0 0 9 14"><rect x="0" y="1" width="9" height="13" rx="1.5" fill="#111633"/><rect x="2.5" y="0" width="4" height="2" rx="1" fill="#111633"/></svg></span></div><div class="appbar"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg><span>Add host</span></div><div class="card" style="height:220px"></div><div class="card" style="height:300px"></div><div class="scrim"></div><div class="dialog"><span style="color:var(--ac);display:flex"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><h2>First connection to devbox</h2><p>Pipkin hasn't seen this host before. Check that the fingerprint matches the host's key, for example with <span class="mono">ssh-keygen -lf</span> on it.</p><div style="margin-top:14px;background:var(--s1);border-radius:14px;padding:12px 14px"><div style="font-size:12.5px;color:var(--mu);font-weight:700">ED25519</div><div class="mono" style="margin-top:4px">SHA256:q3N4uY8bT0kR2vQe7xJp1cLmZs9WfH6aDgK5oVnBiE</div></div><div class="dbtns"><span class="tbtn">Cancel</span><span class="tbtn fill">Trust and connect</span></div></div><div class="navbar"></div></div><div class="cap"><b>Host key check.</b> OpenSSH's unknown-host prompt, shown as a dialog instead of a yes/no in a terminal.</div></div><div class="cell"><div class="phone"><div class="status"><span>11:31</span><span style="display:flex;gap:6px;align-items:center"><svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 12 0 3a12 12 0 0 1 16 0z" fill="#111633"/></svg><svg width="14" height="12" viewBox="0 0 14 12"><path d="M14 0v12H0z" fill="#111633"/></svg><svg width="9" height="14" viewBox="0 0 9 14"><rect x="0" y="1" width="9" height="13" rx="1.5" fill="#111633"/><rect x="2.5" y="0" width="4" height="2" rx="1" fill="#111633"/></svg></span></div><div class="chathead"><div class="hbtn plain"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg></div><div style="flex:1;min-width:0"><div style="font-size:17px;font-weight:750">Fix flaky auth test</div><div style="font-size:12.5px;color:var(--mu);display:flex;align-items:center;gap:5px;margin-top:1px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2"/><rect width="20" height="8" x="2" y="14" rx="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>devbox · ~/src/api</div></div><div class="hbtn plain"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg></div><div class="hbtn plain"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg></div><div class="hbtn" style="font-size:14px;font-weight:700">2</div></div><div class="banner"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/></svg><span style="flex:1">Lost connection to devbox. Reconnecting…</span></div><div class="msg-u">Run the auth tests and fix whatever is flaky</div><div class="msg-a">Running the suite on devbox first.</div><div class="tool"><div class="th"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg><span style="flex:1">bash</span><span style="color:var(--mu);font-weight:600">devbox</span></div><div class="tb">$ pnpm vitest run test/auth<br>✓ session.test.ts (12)<br>✗ refresh.test.ts (1 failed)</div></div><div class="msg-a">One failure in <span class="mono" style="font-size:13.5px">refresh.test.ts</span>: the token expiry uses the wall clock. Reading the test next.</div><div class="composer"><div class="ph">Message Pi</div><div class="cr"><span class="pill" style="background:var(--s2);color:var(--fg)">GPT-6-Astra</span><span style="flex:1"></span><div class="hbtn" style="background:var(--ac);color:#fff"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg></div></div></div><div class="navbar"></div></div><div class="cap"><b>Remote chat.</b> The header shows host and path; tool cards name the host; a dropped connection shows a banner while Pipkin reconnects.</div></div></div></div></body></html>
