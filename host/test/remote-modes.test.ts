@@ -211,6 +211,21 @@ describe.skipIf(unavailable !== null)(`remote_connect against a throwaway sshd${
     expect(await runOp("remote_status", dirs, { ids: [id] })).toMatchObject({ data: { connected: { [id]: false } } });
   });
 
+  it("replaces Pipkin's key, closing the old key's connection; the host refuses until it has the new line", async () => {
+    expect((await connect(dirs, id, () => "yes")).result).toMatchObject({ ok: true });
+    const old = stringAt(await runOp("remote_key", dirs, {}), "data", "publicKey");
+    const line = stringAt(await runOp("remote_key_new", dirs, {}), "data", "publicKey");
+    expect(line).toMatch(/^ssh-ed25519 \S+ pipkin@/);
+    expect(line.split(" ")[1]).not.toBe(old.split(" ")[1]);
+    expect((await stat(path.join(dirs.base, "pipkin", "ssh", "id_ed25519"))).mode & 0o777).toBe(0o600);
+    expect(await runOp("remote_hosts", dirs, {})).toMatchObject({ data: { publicKey: line } });
+    expect(await runOp("remote_status", dirs, { ids: [id] })).toMatchObject({ data: { connected: { [id]: false } } });
+
+    expect((await connect(dirs, id, () => "yes")).result).toMatchObject({ ok: false, code: "remote_auth_failed" });
+    await writeFile(path.join(dirs.base, "sshd", "authorized_keys"), `${line}\n`);
+    expect((await connect(dirs, id, () => "yes")).result).toMatchObject({ ok: true });
+  });
+
   it("asks for the key's passphrase, and refuses a wrong one without asking again", async () => {
     await run("ssh-keygen", ["-q", "-p", "-P", "", "-N", "secret", "-f", path.join(dirs.base, "pipkin", "ssh", "id_ed25519")]);
     const wrong = await connect(dirs, id, (prompt) => (prompt.kind === "host_key" ? "yes" : "wrong"));

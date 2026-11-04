@@ -30,7 +30,7 @@ If the key a host sends later doesn't match the one you trusted, Pipkin refuses 
 2. Tap the machine row under the search field, which reads **This phone** at first, and pick the host. You can also add a host from that menu.
 3. Browse to the folder, or type its path, and tap **Add as workspace**.
 
-The workspace shows in the sidebar beside your other workspaces, with a server badge and the host's name before its path, such as `devbox · ~/src/api`. Chats you start in it work on that folder.
+The workspace shows in the sidebar beside your other workspaces, with a server badge, and the host's name on its own line between the folder's name and its path. Chats you start in it work on that folder.
 
 ## What runs where
 
@@ -52,6 +52,12 @@ A few things work differently in a remote chat:
 Pipkin keeps one connection per host and shares it between chats, the file explorer, git, and terminals. It closes 10 minutes after anything last used it. A host that signs in with Pipkin's key connects again on its own when it's next needed, and so does one from your `~/.ssh/config` whose key needs no passphrase. A host that asks for a password or passphrase has to be connected again, and the chat, picker, or terminal offers **Connect**.
 
 If the network drops or the host stops answering, Pipkin gives up on the connection after about 45 seconds. A chat shows a warning under its header until the host can be reached again, and a terminal ends with the reason and **Restart shell**. **Settings → Remote hosts** shows which hosts are connected, and **Disconnect** closes a host's connection.
+
+## Make a new key
+
+Pipkin uses one key for every host that signs in with Pipkin's key. **Settings → Remote hosts → Pipkin's key** shows its name, its fingerprint, and the hosts that use it, with **Copy public key**.
+
+If someone else may have a copy of the key, tap **Make a new key**. Pipkin deletes the old key on the phone, makes a new one, and closes the connections of the hosts that used it. Those hosts refuse Pipkin until you replace the old Pipkin line in their `~/.ssh/authorized_keys` with the new one, which Pipkin shows you to copy. Pipkin doesn't change `authorized_keys` itself, so remove the old line on each host to stop the old key working there.
 
 ## Remove a host
 

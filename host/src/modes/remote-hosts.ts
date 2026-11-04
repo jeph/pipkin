@@ -4,7 +4,7 @@ import type { ModeContext } from "../mode.js";
 import { stringArrayParam, stringParam } from "../params.js";
 import { hostUnknown } from "../remote/errors.js";
 import { findHost, type Host, loadHosts, newHostId, updateHosts, validateHost } from "../remote/hosts.js";
-import { ensureKey, publicKey } from "../remote/key.js";
+import { ensureKey, publicKey, replaceKey } from "../remote/key.js";
 import { remotePaths, type RemotePaths } from "../remote/paths.js";
 import { createStandIn, listStandIns } from "../remote/stand-ins.js";
 import { disconnect, forgetHostKey, isConnected, sshInstalled } from "../remote/ssh.js";
@@ -69,6 +69,18 @@ export async function remoteHostRemove(ctx: ModeContext): Promise<JsonObject> {
 /** `{ publicKey }`, making Pipkin's key first if needed. */
 export async function remoteKey(ctx: ModeContext): Promise<JsonObject> {
   return { publicKey: await ensureKey(pathsOf(ctx)) };
+}
+
+/**
+ * `{ publicKey }` of a new key that replaces Pipkin's key. Every host that signs in with the key is disconnected, so
+ * nothing keeps using a connection the old key opened; each refuses Pipkin until the user adds the new line.
+ */
+export async function remoteKeyNew(ctx: ModeContext): Promise<JsonObject> {
+  const paths = pathsOf(ctx);
+  const line = await replaceKey(paths);
+  const keyHosts = (await loadHosts(paths)).filter((host) => host.auth === "key");
+  await Promise.all(keyHosts.map((host) => disconnect({ paths, host })));
+  return { publicKey: line };
 }
 
 /** `{ connected: { <id>: boolean } }` for each of `ids`, from `ssh -O check`; false for a host that's gone. */

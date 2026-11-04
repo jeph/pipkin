@@ -271,6 +271,9 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   /** Pipkin's public key line, made first if needed. */
   suspend fun remoteKey(): String = utilityCall("remote_key", JSONObject()).optString("publicKey")
 
+  /** The public line of a new key that replaces Pipkin's key; every host signing in with the key is disconnected. */
+  suspend fun remoteNewKey(): String = utilityCall("remote_key_new", JSONObject()).getString("publicKey")
+
   /** Whether each of [ids] has a live connection. */
   suspend fun remoteStatus(ids: List<String>): Map<String, Boolean> {
     val connected = utilityCall("remote_status", JSONObject().put("ids", JSONArray(ids))).optJSONObject("connected")

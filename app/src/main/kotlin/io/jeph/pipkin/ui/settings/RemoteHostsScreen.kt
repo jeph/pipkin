@@ -78,6 +78,7 @@ internal fun RemoteHostsScreen(onBack: () -> Unit, onAdd: () -> Unit, onOpenHost
       onClick = onAdd,
     )
     refreshError?.let { SettingsCaption(text = it, color = pipkinColors.destructive) }
+    RemoteKeySection(remoteHosts)
   }
 }
 

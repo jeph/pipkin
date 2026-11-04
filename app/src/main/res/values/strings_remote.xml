@@ -125,4 +125,29 @@
     <string name="remote_install_text">Pipkin reaches other machines with OpenSSH from Termux\'s packages. Install it first; nothing is installed on the hosts.</string>
     <string name="remote_install_action">Install OpenSSH</string>
     <string name="remote_installing">Installing OpenSSH…</string>
+
+    <!-- Pipkin's key, at the bottom of Settings › Remote hosts -->
+    <string name="remote_key_section">Pipkin\'s key</string>
+    <!-- %1$d: how many hosts sign in with Pipkin's key; %2$s: their names, as a list such as "devbox, mac and api". -->
+    <plurals name="remote_key_used_by">
+        <item quantity="one">Used by <xliff:g id="names" example="devbox">%2$s</xliff:g></item>
+        <item quantity="other">Used by <xliff:g id="count" example="3">%1$d</xliff:g> hosts: <xliff:g id="names" example="devbox, dev-box2 and mac">%2$s</xliff:g></item>
+    </plurals>
+    <string name="remote_key_unused">No host signs in with it yet.</string>
+    <string name="remote_key_new">Make a new key</string>
+    <string name="remote_key_new_detail">Replaces the key on this phone. Hosts need the new one in <xliff:g id="file">~/.ssh/authorized_keys</xliff:g>.</string>
+    <string name="remote_key_new_title">Make a new key?</string>
+    <!-- %1$d: how many hosts sign in with Pipkin's key; %2$s: their names, as a list such as "devbox and mac". -->
+    <plurals name="remote_key_new_text">
+        <item quantity="one">Pipkin deletes the key on this phone and makes a new one. <xliff:g id="names" example="devbox">%2$s</xliff:g> refuses Pipkin until you add the new public key to its <xliff:g id="file">~/.ssh/authorized_keys</xliff:g>, and its connection closes now.</item>
+        <item quantity="other">Pipkin deletes the key on this phone and makes a new one. <xliff:g id="names" example="devbox and mac">%2$s</xliff:g> refuse Pipkin until you add the new public key to their <xliff:g id="file">~/.ssh/authorized_keys</xliff:g>, and their connections close now.</item>
+    </plurals>
+    <string name="remote_key_new_text_unused">Pipkin deletes the key on this phone and makes a new one. No host signs in with it yet.</string>
+    <string name="remote_key_new_confirm">Make new key</string>
+    <string name="remote_key_made_title">New key made</string>
+    <!-- %1$s: the names of the hosts that sign in with Pipkin's key, as a list such as "devbox and mac". -->
+    <string name="remote_key_made_text">Add this line to <xliff:g id="file">~/.ssh/authorized_keys</xliff:g> on <xliff:g id="names" example="devbox and mac">%1$s</xliff:g>, replacing the old Pipkin line.</string>
+    <string name="remote_key_made_text_unused">Add this line to <xliff:g id="file">~/.ssh/authorized_keys</xliff:g> on a host to let Pipkin sign in there.</string>
+    <string name="remote_done">Done</string>
+    <string name="remote_key_new_failed">Couldn\'t make a new key.</string>
 </resources>

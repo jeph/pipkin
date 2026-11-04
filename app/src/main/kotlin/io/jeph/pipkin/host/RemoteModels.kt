@@ -1,6 +1,8 @@
 package io.jeph.pipkin.host
 
 import java.io.IOException
+import java.security.MessageDigest
+import java.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -69,6 +71,24 @@ internal const val DEFAULT_SSH_PORT = 22
  */
 internal fun remoteAddress(address: String, port: Int?): String =
   if (port == null || port == DEFAULT_SSH_PORT) address else "$address:$port"
+
+/**
+ * The fingerprint `ssh-keygen -l` shows for the public key [line] (`ssh-ed25519 AAAA… comment`): `SHA256:` and the
+ * unpadded base64 of the key's SHA-256. Null when the line holds no key.
+ */
+internal fun keyFingerprint(line: String): String? {
+  val blob = line.trim().split(' ').getOrNull(1) ?: return null
+  val bytes = try {
+    Base64.getDecoder().decode(blob)
+  } catch (_: IllegalArgumentException) {
+    return null
+  }
+  val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+  return "SHA256:" + Base64.getEncoder().withoutPadding().encodeToString(digest)
+}
+
+/** The comment after the public key [line]'s key, which names the phone for Pipkin's key: `pipkin@Pixel 9`. */
+internal fun keyComment(line: String): String = line.trim().split(' ', limit = 3).getOrNull(2).orEmpty()
 
 /** A remote folder: the host [hostId] names and the absolute [path] on it. */
 internal data class RemotePath(val hostId: String, val path: String) {

@@ -62,6 +62,16 @@ class FolderNamesTest {
   }
 
   @Test
+  fun theHostAndThePathOnItAreAlsoGivenApart() {
+    assertEquals("devbox", names.hostName(api.cwd))
+    assertEquals("~/src/api", names.machinePath(api.cwd))
+    assertEquals("Removed host", names.hostName(orphan.cwd))
+    assertEquals("/srv/www", names.machinePath(orphan.cwd))
+    assertNull(names.hostName("$home/src/app"))
+    assertEquals("~/src/app", names.machinePath("$home/src/app"))
+  }
+
+  @Test
   fun theStandInOfARemoteFolderIsFoundWhateverItsTrailingSlash() {
     assertEquals(api.cwd, names.standIn("h1", "/home/me/src/api/"))
     assertNull(names.standIn("h1", "/home/me/src"))

@@ -17,6 +17,7 @@ import {
   remoteHosts,
   remoteHostSave,
   remoteKey,
+  remoteKeyNew,
   remoteStatus,
   remoteWorkspace,
 } from "./remote-hosts.js";
@@ -53,6 +54,7 @@ const OPERATIONS: Record<string, (ctx: ModeContext) => Promise<JsonObject>> = {
   remote_host_save: remoteHostSave,
   remote_host_remove: remoteHostRemove,
   remote_key: remoteKey,
+  remote_key_new: remoteKeyNew,
   remote_status: remoteStatus,
   remote_disconnect: remoteDisconnect,
   remote_forget_host_key: remoteForgetHostKey,

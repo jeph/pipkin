@@ -129,6 +129,17 @@ internal class RemoteHosts(
     return key
   }
 
+  /**
+   * Replaces Pipkin's key with a new one and returns its public line. The hosts that sign in with the key are
+   * disconnected, and refuse Pipkin until the user adds the new line to their `authorized_keys`.
+   */
+  suspend fun newKey(): String {
+    val key = hostClient.remoteNewKey()
+    publish(state.value.copy(publicKey = key))
+    load()
+    return key
+  }
+
   /** The stand-in folder for [path] on host [hostId], which the app uses as the workspace's folder. */
   suspend fun workspace(hostId: String, path: String): String {
     val cwd = hostClient.remoteWorkspace(hostId, path)

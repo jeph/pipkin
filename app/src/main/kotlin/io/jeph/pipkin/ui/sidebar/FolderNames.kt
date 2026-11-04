@@ -51,9 +51,17 @@ internal class FolderNames(
    * folder, after the host's name for a remote one.
    */
   fun path(cwd: String, subfolder: String = ""): String {
+    val host = hostName(cwd) ?: return machinePath(cwd, subfolder)
+    return host + separator + machinePath(cwd, subfolder)
+  }
+
+  /** The name of the host the workspace [cwd] is on, or null for a folder on the phone. */
+  fun hostName(cwd: String): String? = remote(cwd)?.let { it.host?.name ?: removedHost }
+
+  /** [path] without the host's name: the path on the machine the workspace [cwd] is on, with `~` for its home. */
+  fun machinePath(cwd: String, subfolder: String = ""): String {
     val remote = remote(cwd) ?: return tildePath(joinPath(cwd, subfolder), home)
-    val host = remote.host?.name ?: removedHost
-    return host + separator + remotePath(joinPath(remote.path, subfolder), remote.host?.home)
+    return remotePath(joinPath(remote.path, subfolder), remote.host?.home)
   }
 
   /** The absolute path of [relative] in the workspace [cwd], on the remote for a stand-in: what Copy path copies. */

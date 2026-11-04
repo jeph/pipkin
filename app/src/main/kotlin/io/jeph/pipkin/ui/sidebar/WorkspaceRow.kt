@@ -50,8 +50,9 @@ import java.text.BreakIterator
 
 /**
  * A workspace's row: a letter tile in the workspace's colour (the simmering pot while Pi works in one of its chats),
- * with a server badge for a remote workspace, its name over its [status], and its actions and New chat. [names] names
- * the folder [cwd] and its path. The row is outlined in cobalt while the sidebar's pane shows one of its chats or tabs.
+ * with a server badge for a remote workspace, its name over its host for a remote one and its [status], and its
+ * actions and New chat. [names] names the folder [cwd], its host and its path. The row is outlined in cobalt while the
+ * sidebar's pane shows one of its chats or tabs.
  * Tapping it shows the workspace; long-press opens its actions.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -67,7 +68,8 @@ internal fun WorkspaceRow(
 ) {
   val colors = pipkinColors
   val name = names.name(cwd)
-  val folder = names.path(cwd)
+  val host = names.hostName(cwd)
+  val folder = names.machinePath(cwd)
   Row(
     modifier = Modifier
       .fillMaxWidth()
@@ -99,7 +101,7 @@ internal fun WorkspaceRow(
       letter = remember(name) { tileLetter(name) },
       tint = tileColor(cwd, colors),
       working = status.activity != WorkspaceActivity.Idle,
-      remote = names.isRemote(cwd),
+      remote = host != null,
     )
     Column(modifier = Modifier.weight(1f)) {
       Text(
@@ -110,10 +112,32 @@ internal fun WorkspaceRow(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
+      host?.let { HostLine(it) }
       // The home folder's name is its path, `~`, so the line would only repeat it.
       StatusLine(status, folder.takeIf { it != name })
     }
     WorkspaceButtons(name, shown, onActions, onNewChat)
+  }
+}
+
+/** The host a remote workspace is on, on a line of its own so a long path can't cut it off. */
+@Composable
+private fun HostLine(host: String) {
+  val colors = pipkinColors
+  Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(HOST_ICON_GAP)) {
+    LucideIcon(
+      icon = R.drawable.ic_lucide_server,
+      contentDescription = null,
+      modifier = Modifier.size(HOST_ICON_SIZE),
+      tint = colors.foregroundMuted,
+    )
+    Text(
+      text = host,
+      color = colors.foregroundMuted,
+      fontSize = SUBTITLE_SIZE,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+    )
   }
 }
 
@@ -313,3 +337,5 @@ private const val SHOWN_BORDER_ALPHA = 0.55f
 private val BADGE_OFFSET = 4.dp
 private val BADGE_RADIUS = 4.dp
 private val BADGE_PADDING = 1.dp
+private val HOST_ICON_SIZE = 12.dp
+private val HOST_ICON_GAP = 4.dp
