@@ -250,8 +250,8 @@ val syntaxSourcePins = listOf(
   ),
   SyntaxSource(
     "perl",
-    "https://github.com/tree-sitter-perl/tree-sitter-perl/releases/download/v2.0.3/tree-sitter-perl.tar.gz",
-    "45b8ca11204800f47495383fb7f094b79064f670b19cb4e3a634464fb64c5047",
+    "https://github.com/tree-sitter-perl/tree-sitter-perl/releases/download/v2.0.4/tree-sitter-perl.tar.gz",
+    "5a2b2ea7e5c3899d65337f1a893e32bf6e1d1aee7650e393df04dc0ca96bfe4c",
   ),
   SyntaxSource(
     "php",
