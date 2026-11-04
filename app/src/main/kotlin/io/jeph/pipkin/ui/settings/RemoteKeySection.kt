@@ -75,7 +75,7 @@ internal fun RemoteKeySection(remoteHosts: RemoteHosts) {
   )
   error?.let { SettingsCaption(text = it, color = pipkinColors.destructive) }
   if (confirming) {
-    NewKeyDialog(keyHosts.size, names, onDismiss = { confirming = false }) {
+    NewKeyDialog(usedByHosts = keyHosts.isNotEmpty(), onDismiss = { confirming = false }) {
       confirming = false
       making = true
       scope.launch {
@@ -91,7 +91,7 @@ internal fun RemoteKeySection(remoteHosts: RemoteHosts) {
       }
     }
   }
-  made?.let { newKey -> KeyMadeDialog(newKey, names.takeIf { keyHosts.isNotEmpty() }, onDismiss = { made = null }) }
+  made?.let { newKey -> KeyMadeDialog(newKey, usedByHosts = keyHosts.isNotEmpty(), onDismiss = { made = null }) }
 }
 
 /** The card itself: who the key is, Copy public key, and Make a new key, off while one is being made. */
@@ -124,39 +124,31 @@ private fun KeyCard(key: String, usedBy: String, making: Boolean, onNewKey: () -
   }
 }
 
-/** Asks before replacing the key, naming the [keyHosts] hosts ([names]) that refuse Pipkin until updated. */
+/** Asks before replacing the key, saying the hosts that use it, if [usedByHosts], refuse Pipkin until updated. */
 @Composable
-private fun NewKeyDialog(keyHosts: Int, names: String, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+private fun NewKeyDialog(usedByHosts: Boolean, onDismiss: () -> Unit, onConfirm: () -> Unit) {
   PipkinDialog(
     title = stringResource(R.string.remote_key_new_title),
-    text = if (keyHosts == 0) {
-      stringResource(R.string.remote_key_new_text_unused)
-    } else {
-      pluralStringResource(R.plurals.remote_key_new_text, keyHosts, keyHosts, names)
-    },
+    text = stringResource(if (usedByHosts) R.string.remote_key_new_text else R.string.remote_key_new_text_unused),
     icon = R.drawable.ic_lucide_key_round,
     confirm = DialogConfirm(
       label = stringResource(R.string.remote_key_new_confirm),
       onClick = onConfirm,
-      destructive = keyHosts > 0,
+      destructive = usedByHosts,
     ),
     dismissLabel = stringResource(R.string.remote_cancel),
     onDismiss = onDismiss,
   )
 }
 
-/** The new key's line to copy, and where it goes: the hosts named [names], or null when no host uses the key. */
+/** The new key's line to copy, and, if [usedByHosts], that the hosts that used the old key need it. */
 @Composable
-private fun KeyMadeDialog(newKey: String, names: String?, onDismiss: () -> Unit) {
+private fun KeyMadeDialog(newKey: String, usedByHosts: Boolean, onDismiss: () -> Unit) {
   val context = LocalContext.current
   val label = stringResource(R.string.remote_key_label)
   PipkinDialog(
     title = stringResource(R.string.remote_key_made_title),
-    text = if (names == null) {
-      stringResource(R.string.remote_key_made_text_unused)
-    } else {
-      stringResource(R.string.remote_key_made_text, names)
-    },
+    text = stringResource(if (usedByHosts) R.string.remote_key_made_text else R.string.remote_key_made_text_unused),
     icon = R.drawable.ic_lucide_key_round,
     confirm = DialogConfirm(
       label = stringResource(R.string.remote_copy_key),
