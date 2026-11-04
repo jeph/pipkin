@@ -545,7 +545,10 @@ dependencies {
   implementation("com.google.ai.edge.litertlm:litertlm-android:0.19.0")
   implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.46.0")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+  // Lint ranks the 0.1.0-20260909 main snapshot above alpha02 by name, but that snapshot is the older build.
+  //noinspection GradleDependency
   implementation("io.github.sagernet:libghostty-android:0.1.0-alpha02")
+  //noinspection GradleDependency
   implementation("io.github.sagernet:libghostty-android-compose:0.1.0-alpha02")
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.json:json:20260814")
