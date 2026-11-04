@@ -1,4 +1,4 @@
-Zig 0.16.0 standard library (https://codeberg.org/ziglang/zig), MIT License. Built into libghostty-android's terminal library.
+Zig 0.17.0 standard library (https://codeberg.org/ziglang/zig), MIT License. Built into libghostty-android's terminal library.
 
 The MIT License (Expat)
 

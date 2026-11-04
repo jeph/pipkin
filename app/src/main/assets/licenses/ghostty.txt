@@ -1,4 +1,4 @@
-Ghostty, commit 4540d499ae463ad7b90f28f6f852f64f844c160f (https://github.com/ghostty-org/ghostty), MIT License. Built into libghostty-android's terminal library.
+Ghostty v1.4.0, commit 83fb95624b0439ee660c2679b43b38c8b63769cd (https://github.com/ghostty-org/ghostty), MIT License. Built into libghostty-android's terminal library.
 
 MIT License
 

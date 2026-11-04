@@ -1,4 +1,4 @@
-libghostty-android, commit c3480d97482367876d999bbad2d1b1dab03695a4 (https://github.com/SagerNet/libghostty-android), MIT License. The terminal.
+libghostty-android 0.1.0-alpha02, commit abd1e1f12f8e3679f2f7ea1ecb4c9b91e40494ff (https://github.com/SagerNet/libghostty-android), MIT License. The terminal.
 
 MIT License
 

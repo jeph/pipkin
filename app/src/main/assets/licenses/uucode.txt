@@ -1,4 +1,4 @@
-uucode, commit 2826a37a4562284fdacd8fa029d49509cc9bffcd (https://github.com/jacobsandlund/uucode), MIT License, with Bjoern Hoehrmann's UTF-8 decoder (MIT License). Built into libghostty-android's terminal library by Ghostty.
+uucode, commit ea62149739404a73c202b48a33bf6dd2af4bd9b0 (https://github.com/jacobsandlund/uucode), MIT License, with Bjoern Hoehrmann's UTF-8 decoder (MIT License). Built into libghostty-android's terminal library by Ghostty.
 
 # uucode license
 

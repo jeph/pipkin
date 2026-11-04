@@ -545,9 +545,8 @@ dependencies {
   implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.1")
   implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.46.0")
   implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-  // The snapshot of main at c3480d9, which aligns IME input with Termux; 0.1.0-alpha01 predates it.
-  implementation("io.github.sagernet:libghostty-android:0.1.0-20260909.143535-10")
-  implementation("io.github.sagernet:libghostty-android-compose:0.1.0-20260909.143535-10")
+  implementation("io.github.sagernet:libghostty-android:0.1.0-alpha02")
+  implementation("io.github.sagernet:libghostty-android-compose:0.1.0-alpha02")
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.json:json:20260814")
   // Virtual time for the local model scheduler's reservations and idle unload.
