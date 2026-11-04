@@ -4,6 +4,7 @@ import android.os.SystemClock
 import android.util.Log
 import io.jeph.pipkin.AppStrings
 import io.jeph.pipkin.R
+import io.jeph.pipkin.data.RemoteHosts
 import io.jeph.pipkin.data.SessionRepository
 import io.jeph.pipkin.host.HostChannel
 import io.jeph.pipkin.host.HostClient
@@ -50,10 +51,15 @@ internal sealed interface AgentProcessState {
 
   /**
    * Pi could not start. [failure] is set when Termux could not run the host (onboarding may fix it);
-   * [code] is the host's refusal code (`cwd_missing`, `pi_version`, …) when it refused.
+   * [code] is the host's refusal code (`cwd_missing`, `pi_version`, …) when it refused, and [remote] says which host
+   * when the refusal is that the chat's remote host can't be reached.
    */
-  data class Failed(val message: String, val failure: HostFailure? = null, val code: String? = null) :
-    AgentProcessState
+  data class Failed(
+    val message: String,
+    val failure: HostFailure? = null,
+    val code: String? = null,
+    val remote: RemoteOutage? = null,
+  ) : AgentProcessState
 }
 
 /** A reply to a dialog `extension_ui_request` (Pi `docs/rpc-extension-ui.md`). */
@@ -84,6 +90,8 @@ internal class AgentProcess(
   sessionPath: String?,
   scope: CoroutineScope,
   private val sessions: SessionRepository,
+  /** Where a remote chat learns its host from, and tells what Pi's tool calls found of the host's connection. */
+  remoteHosts: RemoteHosts,
   /** [io.jeph.pipkin.data.BundledExtension.id]s the user turned off, which each new Pi leaves out. */
   private val disabledExtensions: StateFlow<Set<String>>,
 ) : ManagedProcess {
@@ -236,6 +244,9 @@ internal class AgentProcess(
   /** Whether the chat's `subagent` tool is another extension's, whose calls are ordinary tool calls to Pipkin. */
   val subagentsStandingAside: StateFlow<Boolean> = subagentsStandingAsideState.asStateFlow()
 
+  /** Whether the chat's remote host was lost; the user connecting it again [RemoteOutages.clear]s that. */
+  val remoteOutages = RemoteOutages(cwd, remoteHosts)
+
   /** The runs subagent screens follow, with their transcripts as they run. */
   val liveSubagents = LiveSubagents(processScope, ::sendSubagents)
 
@@ -281,8 +292,7 @@ internal class AgentProcess(
     startJob?.cancel()
     connection?.close()
     connection = null
-    backgroundTasksState.value = 0
-    clearSubagents()
+    forgetChannel()
     timeline.clearDialogs()
     stateFlow.value = AgentProcessState.Starting
   }
@@ -292,8 +302,7 @@ internal class AgentProcess(
     startJob?.cancel()
     connection?.close()
     connection = null
-    backgroundTasksState.value = 0
-    clearSubagents()
+    forgetChannel()
     job.cancel()
   }
 
@@ -511,7 +520,8 @@ internal class AgentProcess(
     while (true) {
       val rejection = attempt() ?: return
       if (rejection.code != PI_VERSION || installed) {
-        stateFlow.value = AgentProcessState.Failed(rejection.error, code = rejection.code)
+        val remote = remoteOutages.refused(rejection)
+        stateFlow.value = AgentProcessState.Failed(rejection.error, code = rejection.code, remote = remote)
         return
       }
       installed = true
@@ -532,8 +542,7 @@ internal class AgentProcess(
   /** One connection; returns the host's refusal, or null once [state] is Ready, Exited or Failed. */
   private suspend fun attempt(): HostRejected? {
     stateFlow.value = AgentProcessState.Starting
-    backgroundTasksState.value = 0
-    clearSubagents()
+    forgetChannel()
     val disabled = disabledExtensions.value
     if (disabled != extensionUiConfiguration) {
       takeDownExtensionUi()
@@ -625,8 +634,7 @@ internal class AgentProcess(
     Log.w(TAG, "Pi stopped: exitRecord=${exit != null} code=$code signal=$signal")
     val stderr = exit?.optString("stderr").orEmpty()
     stateFlow.value = AgentProcessState.Exited(code, signal, stderr)
-    backgroundTasksState.value = 0
-    clearSubagents()
+    forgetChannel()
     timeline.showExit(code, stderr)
   }
 
@@ -662,7 +670,16 @@ internal class AgentProcess(
 
         else -> liveSubagents.onMessage(data)
       }
+
+      RemoteOutages.TOPIC -> remoteOutages.onMessage(data)
     }
+  }
+
+  /** Forgets what the last connection's Pi said over Pipkin's channel, none of which outlives that Pi. */
+  private fun forgetChannel() {
+    backgroundTasksState.value = 0
+    remoteOutages.clear()
+    clearSubagents()
   }
 
   /** Forgets what the last connection's Pi said about its subagents, noting when the active ones were cut off. */

@@ -1,6 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { remotePaths } from "../src/remote/paths.js";
+import { createStandIn } from "../src/remote/stand-ins.js";
 import { type Dirs, installRealPi, makeDirs, removeDirs, runOp } from "./harness.js";
 
 describe("modes backed by the Pi SDK", () => {
@@ -58,6 +60,22 @@ describe("modes backed by the Pi SDK", () => {
         sessions: expect.arrayContaining([
           expect.objectContaining({ id: "kept", cwd: dirs.home, cwdExists: true }),
           expect.objectContaining({ id: "lost", cwd: gone, cwdExists: false }),
+        ]),
+      },
+    });
+  });
+
+  it("names the host and remote folder of a session in a remote workspace's stand-in", async () => {
+    const hostId = "0123456789ab";
+    const cwd = await createStandIn(remotePaths(dirs.configDir, dirs.prefix, dirs.home).remotes, hostId, "/srv/api");
+    await writeSession(cwd, "remote", [USER, ASSISTANT]);
+    await writeSession(dirs.home, "local", [USER, ASSISTANT]);
+    const listed = await runOp("sessions", dirs, {});
+    expect(listed).toMatchObject({
+      data: {
+        sessions: expect.arrayContaining([
+          expect.objectContaining({ id: "remote", cwd, cwdExists: true, remote: { hostId, path: "/srv/api" } }),
+          expect.not.objectContaining({ remote: expect.anything() }),
         ]),
       },
     });

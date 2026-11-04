@@ -6,6 +6,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import io.jeph.pipkin.R
+import io.jeph.pipkin.ui.sidebar.FolderNames
 
 /**
  * Tells the user a chat's work ended while the chat was off screen: in the [inbox] always, and while Pipkin is in the
@@ -17,7 +18,7 @@ internal class TurnNotifications(
   application: Application,
   private val visibility: AppVisibility,
   private val inbox: ChatInbox,
-  private val home: () -> String?,
+  private val names: () -> FolderNames,
 ) {
   private val context: Context = application
   private val manager = context.getSystemService(NotificationManager::class.java)
@@ -52,7 +53,7 @@ internal class TurnNotifications(
         else -> R.string.turn_notification_finished
       },
     )
-    val notification = ChatNotification.builder(context, CHANNEL, process, home().orEmpty())
+    val notification = ChatNotification.builder(context, CHANNEL, process, names())
       .setContentTitle(ChatNotification.title(context, process, outcome))
       .setContentText(text)
       .setStyle(Notification.BigTextStyle().bigText(text))

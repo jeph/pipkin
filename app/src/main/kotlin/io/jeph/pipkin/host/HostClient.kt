@@ -214,14 +214,18 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     utilityCall("default_model", JSONObject().put("thinkingLevel", level))
   }
 
-  /** Writes [files] (name to bytes) into a new folder in Termux; returns their absolute paths in order. */
-  suspend fun saveAttachments(files: List<Pair<String, ByteArray>>): List<String> {
+  /**
+   * Writes [files] (name to bytes) into a new folder where the agent of the chat in [cwd] can read them, and returns
+   * their absolute paths in order: in Termux, or on the SSH host when [cwd] is a remote workspace's stand-in.
+   */
+  suspend fun saveAttachments(cwd: String, files: List<Pair<String, ByteArray>>): List<String> {
     val encoder = Base64.getEncoder()
     val array = JSONArray()
     files.forEach { (name, bytes) ->
       array.put(JSONObject().put("name", name).put("data", encoder.encodeToString(bytes)))
     }
-    return utilityCall("save_attachments", JSONObject().put("files", array)).optJSONArray("paths").strings()
+    val params = JSONObject().put("cwd", cwd).put("files", array)
+    return utilityCall("save_attachments", params).optJSONArray("paths").strings()
   }
 
   /** The backups folder in Termux and its backups, newest first. */
@@ -249,6 +253,60 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     call("update_extensions", JSONObject(), EXTENSIONS_UPDATE_TIMEOUT_MILLIS, progress(onProgress))
   }
 
+  /** The remote hosts, Pipkin's public key, every stand-in folder, and whether Termux has OpenSSH. */
+  suspend fun remoteHosts(): RemoteHostsState = RemoteHostsState.from(utilityCall("remote_hosts", JSONObject()))
+
+  /**
+   * Adds [host] (with no id) or updates it; returns it as saved. A field the host refuses throws [HostRejected] with
+   * code `remote_host_invalid`, its text's `field` argument naming the field.
+   */
+  suspend fun remoteHostSave(host: RemoteHost): RemoteHost =
+    RemoteHost.from(utilityCall("remote_host_save", JSONObject().put("host", host.toJson())).getJSONObject("host"))
+
+  /** Disconnects host [id] and forgets it; its stand-in folders stay, so archived chats keep their labels. */
+  suspend fun remoteHostRemove(id: String) {
+    utilityCall("remote_host_remove", JSONObject().put("id", id))
+  }
+
+  /** Pipkin's public key line, made first if needed. */
+  suspend fun remoteKey(): String = utilityCall("remote_key", JSONObject()).optString("publicKey")
+
+  /** Whether each of [ids] has a live connection. */
+  suspend fun remoteStatus(ids: List<String>): Map<String, Boolean> {
+    val connected = utilityCall("remote_status", JSONObject().put("ids", JSONArray(ids))).optJSONObject("connected")
+      ?: return emptyMap()
+    return connected.keys().asSequence().associateWith(connected::optBoolean)
+  }
+
+  suspend fun remoteDisconnect(id: String) {
+    utilityCall("remote_disconnect", JSONObject().put("id", id))
+  }
+
+  /** Forgets the host keys Pipkin accepted for host [id], so the next connect asks about its key again. */
+  suspend fun remoteForgetHostKey(id: String) {
+    utilityCall("remote_forget_host_key", JSONObject().put("id", id))
+  }
+
+  /** The stand-in folder in Termux for [path] on host [hostId], made if needed. */
+  suspend fun remoteWorkspace(hostId: String, path: String): String =
+    utilityCall("remote_workspace", JSONObject().put("hostId", hostId).put("path", path)).getString("cwd")
+
+  /**
+   * Connects host [hostId], handing what `ssh` asks (its host key, a password, a key's passphrase) to [ui]; the
+   * connection stays up afterwards for everything else. Cancelling the caller ends the connect, as a null answer does.
+   */
+  suspend fun connectRemote(hostId: String, ui: RemoteConnectUi) {
+    call("remote_connect", JSONObject().put("hostId", hostId), REMOTE_CONNECT_TIMEOUT_MILLIS) { channel, line ->
+      if (line.optString("type") != HostProtocol.REMOTE_PROMPT) return@call
+      ui.onPrompt(RemotePrompt.from(line), RemoteReply(channel, line.opt("id") ?: JSONObject.NULL))
+    }
+  }
+
+  /** Installs Termux's OpenSSH (`pkg install openssh`), which remote hosts need. */
+  suspend fun installOpenSsh(onProgress: (String) -> Unit) {
+    call("remote_install", JSONObject(), PACKAGE_INSTALL_TIMEOUT_MILLIS, progress(onProgress))
+  }
+
   /**
    * Hands each progress line to [onProgress] in the app's language. Lines are shown only until the next arrives, so each
    * is resolved as it comes.
@@ -259,13 +317,16 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     }
   }
 
-  /** Opens a folder browser session; close it to end the host. Cancelling the caller closes it too. */
-  suspend fun openFolderBrowser(): FolderBrowser {
+  /**
+   * Opens a folder browser session on the phone, or on the remote host [hostId]; close it to end the host. Cancelling
+   * the caller closes it too.
+   */
+  suspend fun openFolderBrowser(hostId: String?): FolderBrowser {
     val channel = connect("browse")
     var started = false
     try {
-      sendRequest(channel, JSONObject())
-      return FolderBrowser.start(channel).also { started = true }
+      sendRequest(channel, if (hostId == null) JSONObject() else JSONObject().put("hostId", hostId))
+      return FolderBrowser.start(channel, remote = hostId != null).also { started = true }
     } finally {
       if (!started) channel.close()
     }
@@ -288,12 +349,13 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
    * `pipkin_exit` line. A refusal (`pi_version`, `cwd_missing`) arrives instead as a
    * `pipkin_result` line; see [HostRejected.from], which is `pi_version` when an extension [ensure] installed is out of
    * date too. Pi loads the bundled extensions not in [disabledExtensions], which are
-   * [io.jeph.pipkin.data.BundledExtension.id]s.
+   * [io.jeph.pipkin.data.BundledExtension.id]s, and always the ones Settings has no switch for.
    */
   suspend fun openRpc(cwd: String, sessionPath: String?, disabledExtensions: Set<String>): HostChannel {
     // The first call reads every extension's source to fingerprint it.
     val params = withContext(Dispatchers.IO) {
-      val extensions = extensionFingerprints.filterKeys { it.id !in disabledExtensions }
+      // The host loads pipkin-remote, the one without a switch, only in a remote workspace, so every chat sends it.
+      val extensions = extensionFingerprints.filterKeys { it.switch == null || it.id !in disabledExtensions }
         .map { (extension, sha256) ->
           JSONObject()
             .put("name", extension.id)
@@ -435,6 +497,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
     const val PACKAGE_INSTALL_TIMEOUT_MILLIS = 15 * 60_000L
     const val EXTENSIONS_UPDATE_TIMEOUT_MILLIS = 15 * 60_000L
     const val LOGIN_TIMEOUT_MILLIS = 10 * 60_000L
+    const val REMOTE_CONNECT_TIMEOUT_MILLIS = 10 * 60_000L
     const val REQUEST_HOST_START_TIMEOUT_MILLIS = 15_000L
     const val UTILITY_REQUEST = "pipkin_utility_request"
 

@@ -49,6 +49,10 @@ import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.terminal.TerminalState
 import io.jeph.pipkin.ui.components.PillButton
+import io.jeph.pipkin.ui.components.PillTone
+import io.jeph.pipkin.ui.remote.RemoteConnectDialogs
+import io.jeph.pipkin.ui.remote.rememberRemoteConnector
+import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.PaneControls
@@ -132,7 +136,7 @@ private fun TerminalPane(session: TerminalSession, modifier: Modifier) {
       // bar's keyboard button raises it.
       focusOnAttach = false,
     )
-    StatusBar(state, onRestart = session::start)
+    StatusBar(state, session.cwd, onRestart = session::start)
     TerminalKeyBar(
       extraKeys = terminalState.extraKeys,
       shift = shift,
@@ -186,19 +190,34 @@ private fun GhosttyTerminalView.tapKey(keyCode: Int, shift: Boolean) {
 private const val TERMINAL_FONT_SIZE_SP = 12f
 private const val GHOSTTY_PALETTE_SIZE = 256
 
-/** Says the shell is starting, or why it stopped with a way to start another. */
+/**
+ * Says the shell is starting, or why it stopped with a way to start another. A remote shell whose connection failed
+ * only because the user must sign in or check the host's key offers Connect, which starts another once connected.
+ */
 @Composable
-private fun StatusBar(state: TerminalState, onRestart: () -> Unit) {
+private fun StatusBar(state: TerminalState, cwd: String, onRestart: () -> Unit) {
+  val remote = (state as? TerminalState.Exited)?.remote
   val message = when (state) {
     TerminalState.Running -> return
 
     TerminalState.Starting -> stringResource(R.string.terminal_starting)
 
-    is TerminalState.Exited -> state.code?.let { stringResource(R.string.terminal_exited_code, it) }
+    is TerminalState.Exited -> remote?.text?.localized()
+      ?: state.code?.let { stringResource(R.string.terminal_exited_code, it) }
       ?: stringResource(R.string.terminal_exited)
 
     is TerminalState.Failed -> state.message
   }
+  val folder = rememberFolderNames().remote(cwd)
+  val remoteHosts = LocalContext.current.appGraph.remoteHosts
+  // A lost connection seen only here still marks the host disconnected, as the explorer's and picker's do.
+  LaunchedEffect(folder?.hostId, remote?.code) {
+    val code = remote?.code ?: return@LaunchedEffect
+    if (folder != null) remoteHosts.noteFailure(folder.hostId, code)
+  }
+  val connector = rememberRemoteConnector()
+  RemoteConnectDialogs(connector)
+  val host = folder?.host?.takeIf { remote?.needsConnect == true }
   val colors = pipkinColors
   Row(
     modifier = Modifier
@@ -215,8 +234,18 @@ private fun StatusBar(state: TerminalState, onRestart: () -> Unit) {
       fontSize = PipkinTokens.FontSize.sm,
       modifier = Modifier.weight(1f),
     )
+    if (host != null) {
+      PillButton(
+        label = stringResource(R.string.remote_connect),
+        onClick = { connector.connect(host.id, host.name, onConnected = onRestart) },
+      )
+    }
     if (state != TerminalState.Starting) {
-      PillButton(label = stringResource(R.string.terminal_restart), onClick = onRestart)
+      PillButton(
+        label = stringResource(R.string.terminal_restart),
+        onClick = onRestart,
+        tone = if (host != null) PillTone.Tonal else PillTone.Primary,
+      )
     }
   }
 }

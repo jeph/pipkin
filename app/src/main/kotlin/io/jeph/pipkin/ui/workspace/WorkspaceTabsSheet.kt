@@ -56,8 +56,7 @@ import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.components.SwipeAway
 import io.jeph.pipkin.ui.components.scrollFades
 import io.jeph.pipkin.ui.sidebar.pathTextStyle
-import io.jeph.pipkin.ui.sidebar.projectName
-import io.jeph.pipkin.ui.sidebar.tildePath
+import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.workspace.Pane
@@ -86,8 +85,7 @@ internal fun WorkspaceTabsSheet(
 ) {
   val graph = LocalContext.current.appGraph
   val tabs = rememberWorkspaceTabs(pane, cwd)
-  val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
+  val names = rememberFolderNames()
   val archiving = remember(actions) { TabArchiving(actions) }
   val closing = remember(actions) { TabClosing(actions) }
   var menu by remember { mutableStateOf<TabMenu?>(null) }
@@ -108,7 +106,7 @@ internal fun WorkspaceTabsSheet(
     val show = { tab: WorkspaceTab -> dismiss { if (!graph.tabs.show(pane, tab)) onSwapPanes() } }
     val closed = closedAs
     val actionTiles = if (closed != null) closed.actions else shownTab.current
-    TabsSheetTitle(name = projectName(cwd, home), path = tildePath(cwd, home))
+    TabsSheetTitle(name = names.name(cwd), path = names.path(cwd), remote = names.isRemote(cwd))
     TabsLabels()
     TabList(
       tabs = closed?.tabs ?: tabs,
@@ -145,11 +143,11 @@ internal fun WorkspaceTabsSheet(
 }
 
 /**
- * The workspace's name in bold over its folder; a long path keeps its end, the folder that tells workspaces apart. The
- * home folder's name is its path, `~`, so it has no second line.
+ * The workspace's name in bold over its folder, after a server icon for a [remote] one; a long path keeps its end, the
+ * folder that tells workspaces apart. The home folder's name is its path, `~`, so it has no second line.
  */
 @Composable
-private fun TabsSheetTitle(name: String, path: String) {
+private fun TabsSheetTitle(name: String, path: String, remote: Boolean) {
   val colors = pipkinColors
   Column(
     modifier = Modifier.padding(
@@ -175,7 +173,7 @@ private fun TabsSheetTitle(name: String, path: String) {
       horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
     ) {
       LucideIcon(
-        icon = R.drawable.ic_lucide_folder,
+        icon = if (remote) R.drawable.ic_lucide_server else R.drawable.ic_lucide_folder,
         contentDescription = null,
         size = PipkinTokens.IconSize.sm,
         tint = colors.foregroundMuted,

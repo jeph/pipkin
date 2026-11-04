@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Remote hosts: other machines Pipkin opens workspaces on over SSH. "SSH", "OpenSSH", "Termux" and file names such as
+    ~/.ssh/config are names and aren't translated.
+-->
+<resources xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
+    <!-- Stands in for the name of a host the user removed, before the remote path of a workspace or archived chat on it. -->
+    <string name="remote_host_removed">Removed host</string>
+
+    <!-- The folder picker's machine menu -->
+    <string name="remote_machine_phone">This phone</string>
+    <string name="remote_machine_phone_detail">Termux and phone storage</string>
+    <!-- Content description of the row that opens the machine menu. %1$s: the machine shown now, such as "This phone" or a host's name. -->
+    <string name="remote_machine_choose">Machine: <xliff:g id="machine" example="devbox">%1$s</xliff:g>. Choose another</string>
+    <string name="remote_connected">Connected</string>
+    <string name="remote_not_connected">Not connected</string>
+    <string name="remote_add_host">Add host</string>
+    <!-- The place tabs of a remote host: its home folder and the root of its file system. -->
+    <string name="remote_place_home">Home</string>
+    <string name="remote_place_root">Root</string>
+    <!-- %1$s: the host's name, such as devbox. -->
+    <string name="remote_unreachable_title">Can\'t reach <xliff:g id="host" example="devbox">%1$s</xliff:g></string>
+    <!-- %1$s: the host's name. -->
+    <string name="remote_connect_needed_title">Connect to <xliff:g id="host" example="devbox">%1$s</xliff:g></string>
+    <!-- %1$s: the host's name. -->
+    <string name="remote_key_changed_title"><xliff:g id="host" example="devbox">%1$s</xliff:g>\'s key has changed</string>
+    <!-- %1$s: the host's name. Shown when the host answers but every SSH session it allows is in use. -->
+    <string name="remote_sessions_full_title"><xliff:g id="host" example="devbox">%1$s</xliff:g> is busy</string>
+    <string name="remote_host_gone">This host was removed in Settings.</string>
+    <string name="remote_try_again">Try again</string>
+    <string name="remote_edit_host">Edit host</string>
+    <string name="remote_connect">Connect</string>
+    <string name="remote_disconnect">Disconnect</string>
+    <string name="remote_cancel">Cancel</string>
+    <string name="remote_close">Close</string>
+
+    <!-- Connecting: the questions OpenSSH asks, as dialogs -->
+    <!-- %1$s: the host's name. -->
+    <string name="remote_host_key_title">First connection to <xliff:g id="host" example="devbox">%1$s</xliff:g></string>
+    <string name="remote_host_key_text">Pipkin hasn\'t seen this host before. Check that the fingerprint matches the host\'s key, for example with <xliff:g id="command">ssh-keygen -lf</xliff:g> on it.</string>
+    <string name="remote_host_key_trust">Trust and connect</string>
+    <!-- %1$s: the host's name. -->
+    <string name="remote_password_title">Password for <xliff:g id="host" example="devbox">%1$s</xliff:g></string>
+    <string name="remote_password_hint">Password</string>
+    <string name="remote_passphrase_title">Key passphrase</string>
+    <string name="remote_passphrase_hint">Passphrase</string>
+    <!-- Title over a question OpenSSH asks in its own words, shown under it. %1$s: the host's name. -->
+    <string name="remote_question_title"><xliff:g id="host" example="devbox">%1$s</xliff:g> asks</string>
+    <string name="remote_answer">Continue</string>
+    <string name="remote_show_secret">Show</string>
+    <string name="remote_hide_secret">Hide</string>
+    <!-- %1$s: the host's name. -->
+    <string name="remote_connect_failed_title">Couldn\'t connect to <xliff:g id="host" example="devbox">%1$s</xliff:g></string>
+    <!-- Shown while Pipkin connects. %1$s: the host's name. -->
+    <string name="remote_connecting">Connecting to <xliff:g id="host" example="devbox">%1$s</xliff:g>…</string>
+
+    <!-- The banner over a remote chat whose connection dropped. %1$s: the host's name. -->
+    <string name="remote_banner_reconnecting">Lost connection to <xliff:g id="host" example="devbox">%1$s</xliff:g>. Reconnecting…</string>
+    <!-- %1$s: the host's name. -->
+    <string name="remote_banner_disconnected">Lost connection to <xliff:g id="host" example="devbox">%1$s</xliff:g>.</string>
+
+    <!-- Settings › Remote hosts -->
+    <!-- The Settings section holding the Remote hosts row. -->
+    <string name="remote_settings_section">Other machines</string>
+    <string name="remote_hosts_title">Remote hosts</string>
+    <string name="remote_hosts_none">None added</string>
+    <!-- Over the reason, when Pipkin couldn't ask Termux for the hosts and whether OpenSSH is installed. -->
+    <string name="remote_hosts_failed">Couldn\'t read the remote hosts</string>
+    <!-- %d: how many hosts the user added. -->
+    <plurals name="remote_hosts_count">
+        <item quantity="one"><xliff:g id="count" example="1">%d</xliff:g> host</item>
+        <item quantity="other"><xliff:g id="count" example="3">%d</xliff:g> hosts</item>
+    </plurals>
+    <string name="remote_hosts_empty">Add a host to open folders on another machine over SSH. Pi keeps running on this phone; its tools, the files, git and terminals work on the host.</string>
+    <!-- A host's line in the list: %1$s its address, such as me@devbox.lan; %2$s whether it is connected. -->
+    <string name="remote_host_subtitle"><xliff:g id="address" example="me@devbox.lan">%1$s</xliff:g> · <xliff:g id="status" example="Connected">%2$s</xliff:g></string>
+
+    <!-- The host editor -->
+    <string name="remote_name">Name</string>
+    <string name="remote_name_hint">devbox</string>
+    <string name="remote_address">Address</string>
+    <string name="remote_address_hint">me@devbox.lan</string>
+    <!-- The address field when the host comes from the user's ~/.ssh/config: the name of its Host entry there. -->
+    <string name="remote_alias">Host in <xliff:g id="file">~/.ssh/config</xliff:g></string>
+    <string name="remote_alias_hint">devbox</string>
+    <string name="remote_port">Port</string>
+    <string name="remote_sign_in">Sign in with</string>
+    <string name="remote_auth_key">Pipkin\'s key</string>
+    <string name="remote_auth_key_detail">Add this line to <xliff:g id="file">~/.ssh/authorized_keys</xliff:g> on the host.</string>
+    <string name="remote_auth_password">Password</string>
+    <string name="remote_auth_password_detail">Asked each time Pipkin connects.</string>
+    <string name="remote_auth_config">Use my <xliff:g id="file">~/.ssh/config</xliff:g></string>
+    <string name="remote_auth_config_detail">For a host Termux already knows, with your own keys or jump hosts.</string>
+    <string name="remote_copy_key">Copy public key</string>
+    <!-- The clipboard label of Pipkin's public key line. -->
+    <string name="remote_key_label">Pipkin public key</string>
+    <string name="remote_save">Save</string>
+    <string name="remote_save_failed">Couldn\'t save the host.</string>
+    <string name="remote_status">Status</string>
+    <string name="remote_forget_key">Forget host key</string>
+    <!-- %1$s: the host's name. -->
+    <string name="remote_forget_key_title">Forget <xliff:g id="host" example="devbox">%1$s</xliff:g>\'s key?</string>
+    <string name="remote_forget_key_text">The next connect asks you to check the host\'s key again. Do this only when you know why the key changed, for example because the server was reinstalled.</string>
+    <!-- %1$s: the host's name. -->
+    <string name="remote_key_changed_warning">The key <xliff:g id="host" example="devbox">%1$s</xliff:g> sent doesn\'t match the one you accepted before. Someone may be intercepting the connection, or the server was reinstalled.</string>
+    <string name="remote_remove">Remove host</string>
+    <!-- %1$s: the host's name. -->
+    <string name="remote_remove_title">Remove <xliff:g id="host" example="devbox">%1$s</xliff:g>?</string>
+    <string name="remote_remove_text">Pipkin forgets how to reach it. Nothing on the host changes.</string>
+    <!-- Followed by what happens to the chats in those workspaces. %d: how many of the host's workspaces are in the sidebar. -->
+    <plurals name="remote_remove_workspaces">
+        <item quantity="one">Its workspace leaves the sidebar.</item>
+        <item quantity="other">Its <xliff:g id="count" example="3">%d</xliff:g> workspaces leave the sidebar.</item>
+    </plurals>
+    <!-- After remote_remove_workspaces, when those workspaces have chats. %d: how many chats removing the host archives. -->
+    <plurals name="remote_remove_chats">
+        <item quantity="one">Its chat is archived, and adding a workspace back won\'t restore it.</item>
+        <item quantity="other">Its <xliff:g id="count" example="3">%d</xliff:g> chats are archived, and adding a workspace back won\'t restore them.</item>
+    </plurals>
+    <!-- While Pipkin reads the list of chats, to say how many removing the host archives. -->
+    <string name="remote_remove_counting">Counting the chats in its workspaces…</string>
+
+    <!-- Installing OpenSSH, before the first host -->
+    <string name="remote_install_title">Install OpenSSH</string>
+    <string name="remote_install_text">Pipkin reaches other machines with OpenSSH from Termux\'s packages. Install it first; nothing is installed on the hosts.</string>
+    <string name="remote_install_action">Install OpenSSH</string>
+    <string name="remote_installing">Installing OpenSSH…</string>
+</resources>

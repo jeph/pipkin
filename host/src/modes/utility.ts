@@ -10,6 +10,16 @@ import { modelDefaults } from "./model-defaults.js";
 import { providerModels } from "./provider-models.js";
 import { providerRemove } from "./provider-remove.js";
 import { providerSave } from "./provider-save.js";
+import {
+  remoteDisconnect,
+  remoteForgetHostKey,
+  remoteHostRemove,
+  remoteHosts,
+  remoteHostSave,
+  remoteKey,
+  remoteStatus,
+  remoteWorkspace,
+} from "./remote-hosts.js";
 import { saveAttachments } from "./save-attachments.js";
 import { sessionMessages } from "./session-messages.js";
 import { sessions } from "./sessions.js";
@@ -39,6 +49,14 @@ const OPERATIONS: Record<string, (ctx: ModeContext) => Promise<JsonObject>> = {
   default_model: defaultModel,
   backups: listBackups,
   backup_delete: deleteBackup,
+  remote_hosts: remoteHosts,
+  remote_host_save: remoteHostSave,
+  remote_host_remove: remoteHostRemove,
+  remote_key: remoteKey,
+  remote_status: remoteStatus,
+  remote_disconnect: remoteDisconnect,
+  remote_forget_host_key: remoteForgetHostKey,
+  remote_workspace: remoteWorkspace,
 };
 
 async function answer(ctx: ModeContext, op: unknown, params: unknown): Promise<JsonObject> {

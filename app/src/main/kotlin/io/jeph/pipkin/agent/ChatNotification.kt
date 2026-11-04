@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import io.jeph.pipkin.MainActivity
 import io.jeph.pipkin.R
-import io.jeph.pipkin.ui.sidebar.projectName
+import io.jeph.pipkin.ui.sidebar.FolderNames
 
 /** A chat a notification opens: its project folder and session file. */
 internal data class ChatLocation(val cwd: String, val sessionPath: String)
@@ -49,11 +49,11 @@ internal object ChatNotification {
   }
 
   /**
-   * A notification on [channel] about [process], with its project and model under the title, that opens the chat
-   * when tapped and then goes away.
+   * A notification on [channel] about [process], with its project, named as the sidebar names it with [names], and its
+   * model under the title, that opens the chat when tapped and then goes away.
    */
-  fun builder(context: Context, channel: String, process: AgentProcess, home: String): Notification.Builder {
-    val project = projectName(process.cwd, home)
+  fun builder(context: Context, channel: String, process: AgentProcess, names: FolderNames): Notification.Builder {
+    val project = names.name(process.cwd)
     val model = process.timeline.state.value.model?.optString("id")?.takeIf { it.isNotBlank() }
     val open = Intent(context, MainActivity::class.java)
       .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)

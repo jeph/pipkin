@@ -196,6 +196,12 @@ private fun ChatContent(
     modifier = Modifier.fillMaxSize().background(pipkinColors.surface0).closeContextDetailsOnPress(controller),
   ) {
     ChatHeader(process, controls, Modifier.onUnhandledTap(dismissKeyboard))
+    RemoteBanner(
+      process,
+      Modifier
+        .align(Alignment.CenterHorizontally)
+        .padding(start = PipkinTokens.Spacing.s16, end = PipkinTokens.Spacing.s16, bottom = PipkinTokens.Spacing.s4),
+    )
     // The keyboard and a dialog both take the room the steering box and widget panels would use, so then the steering
     // box keeps to one line and a panel to a few.
     val tight = WindowInsets.isImeVisible || timeline.pendingUi != null

@@ -15,10 +15,12 @@ if [ "${PIPKIN_NO_BASH:-0}" = 1 ]; then
   rm -f /bin/bash /usr/bin/bash
 fi
 
-if [ -n "${PIPKIN_AUTHORIZED_KEY:-}" ]; then
-  printf '%s\n' "$PIPKIN_AUTHORIZED_KEY" >/home/pipkin/.ssh/authorized_keys
-  chown pipkin:pipkin /home/pipkin/.ssh/authorized_keys
-  chmod 600 /home/pipkin/.ssh/authorized_keys
+# Added only when missing, since `start` runs this again and keys added with `authorize` must survive it.
+keys=/home/pipkin/.ssh/authorized_keys
+if [ -n "${PIPKIN_AUTHORIZED_KEY:-}" ] && ! grep -qxF "$PIPKIN_AUTHORIZED_KEY" "$keys" 2>/dev/null; then
+  printf '%s\n' "$PIPKIN_AUTHORIZED_KEY" >>"$keys"
+  chown pipkin:pipkin "$keys"
+  chmod 600 "$keys"
 fi
 
 exec /usr/sbin/sshd -D -e

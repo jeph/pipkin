@@ -4,6 +4,7 @@ FROM debian:trixie-slim
 RUN apt-get update \
   && apt-get install -y --no-install-recommends openssh-server bash git ripgrep file procps ca-certificates \
   && rm -rf /var/lib/apt/lists/* \
+  && rm -f /etc/ssh/ssh_host_* \
   && mkdir -p /run/sshd \
   && useradd --create-home --shell /bin/bash pipkin \
   && echo 'pipkin:pipkin' | chpasswd \

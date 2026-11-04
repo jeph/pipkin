@@ -48,6 +48,9 @@ import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.files.Spinner
 import io.jeph.pipkin.ui.onboarding.PrimaryButton
 import io.jeph.pipkin.ui.onboarding.SecondaryButton
+import io.jeph.pipkin.ui.remote.RemoteConnectDialogs
+import io.jeph.pipkin.ui.remote.rememberRemoteConnector
+import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
@@ -95,6 +98,19 @@ internal fun ChangesPane(
       if (!succeeded) snackbar.show(refreshFailed)
     }
   }
+  val connector = rememberRemoteConnector()
+  RemoteConnectDialogs(connector)
+  val host = rememberFolderNames().remote(workspace.root)?.host
+  val remoteHosts = LocalContext.current.appGraph.remoteHosts
+  val unreachable = workspace.unreachable
+    ?: (workspace.changes as? ChangesContent.Failed)?.remote
+    ?: (workspace.commits as? CommitsContent.Failed)?.remote
+  // A git request that found the connection gone shows the host disconnected in the sidebar and chat banner too.
+  LaunchedEffect(host?.id, unreachable) {
+    if (host != null && unreachable != null) remoteHosts.noteFailure(host.id, unreachable.code)
+  }
+  // Connecting reloads everything, which only failed because the host couldn't be reached.
+  val connect = host?.let { { connector.connect(it.id, it.name, onConnected = refresh) } }
   BoxWithConstraints(modifier = modifier.fillMaxSize()) {
     val commitsMaxHeight = maxHeight / 2
     Column(modifier = Modifier.fillMaxSize()) {
@@ -105,13 +121,14 @@ internal fun ChangesPane(
         onSelectMode = { preferences.setDiffMode(workspace.root, it) },
         onRefresh = refresh,
       )
-      ChangesBody(workspace, wrapLines, Modifier.weight(1f))
+      ChangesBody(workspace, wrapLines, connect, Modifier.weight(1f))
       CommitsSection(
         content = workspace.commits,
         collapsed = commitsCollapsed,
         listMaxHeight = commitsMaxHeight,
         onToggle = { preferences.setCommitsCollapsed(!commitsCollapsed) },
         onOpenCommit = onOpenCommit,
+        onConnect = connect,
       )
     }
   }
@@ -359,10 +376,11 @@ private fun MenuRow(label: String, description: String?, icon: Int?, checked: Bo
 
 /**
  * The diff, or in its place a note: checking the repository during the first load, git's error, the diff being too
- * large, or no changes. A refresh keeps what it replaces until its reply arrives.
+ * large, or no changes. A refresh keeps what it replaces until its reply arrives. An error only connecting the remote
+ * host fixes offers [onConnect].
  */
 @Composable
-private fun ChangesBody(workspace: GitWorkspace, wrapLines: Boolean, modifier: Modifier) {
+private fun ChangesBody(workspace: GitWorkspace, wrapLines: Boolean, onConnect: (() -> Unit)?, modifier: Modifier) {
   when (val content = workspace.changes) {
     ChangesContent.Loading -> DiffNote(stringResource(R.string.git_checking_repository), modifier, loading = true)
 
@@ -371,6 +389,7 @@ private fun ChangesBody(workspace: GitWorkspace, wrapLines: Boolean, modifier: M
         stringResource(R.string.git_refresh_failed)
       },
       modifier,
+      onConnect = onConnect?.takeIf { content.remote?.needsConnect == true },
     )
 
     is ChangesContent.Loaded -> when {

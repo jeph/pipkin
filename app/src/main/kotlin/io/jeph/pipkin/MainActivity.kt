@@ -26,6 +26,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -54,11 +55,14 @@ import io.jeph.pipkin.ui.settings.ModelEditorScreen
 import io.jeph.pipkin.ui.settings.ProviderDrafts
 import io.jeph.pipkin.ui.settings.ProviderEditorScreen
 import io.jeph.pipkin.ui.settings.ProvidersScreen
+import io.jeph.pipkin.ui.settings.RemoteHostEditorScreen
+import io.jeph.pipkin.ui.settings.RemoteHostsScreen
 import io.jeph.pipkin.ui.settings.RunningAgentsScreen
 import io.jeph.pipkin.ui.settings.SettingsScreen
 import io.jeph.pipkin.ui.settings.SubscriptionScreen
 import io.jeph.pipkin.ui.settings.ownsDraft
 import io.jeph.pipkin.ui.settings.usesApiKey
+import io.jeph.pipkin.ui.sidebar.SidebarLinks
 import io.jeph.pipkin.ui.stackTransition
 import io.jeph.pipkin.ui.subagents.ArchivedSubagentScreen
 import io.jeph.pipkin.ui.theme.PipkinTheme
@@ -184,16 +188,7 @@ private fun Screen(
   onSidePanelOpen: (Boolean) -> Unit,
 ) {
   when (val top = shown.last()) {
-    Destination.Main -> MainScreen(
-      actions = actions,
-      requestedChat = requestedChat,
-      onOpenSettings = { navigator.push(Destination.Settings) },
-      onOpenProviders = { navigator.push(Destination.Providers) },
-      onOpenArchive = { navigator.push(Destination.Archive) },
-      onOpenArchivedChat = { navigator.push(Destination.ArchivedChat(it)) },
-      onOpenOnboarding = { navigator.push(Destination.Onboarding) },
-      onSidePanelOpen = onSidePanelOpen,
-    )
+    Destination.Main -> MainPage(navigator, actions, requestedChat, onSidePanelOpen)
 
     Destination.Archive, is Destination.ArchivedChat, is Destination.ArchivedSubagent ->
       ArchivePage(top, navigator, actions, requestedChat)
@@ -201,6 +196,8 @@ private fun Screen(
     Destination.Settings, Destination.Permissions, Destination.Backups, Destination.RunningAgents,
     Destination.LocalModels, Destination.Licenses, is Destination.License,
     -> SettingsPages(top, navigator)
+
+    Destination.RemoteHosts, is Destination.RemoteHostEditor -> RemoteHostPages(top, navigator, actions)
 
     Destination.Providers -> ProvidersScreen(
       onBack = { navigator.pop() },
@@ -253,6 +250,33 @@ private fun Screen(
   }
 }
 
+/** The main screen, whose links push the pages they open; the folder picker's host editor returns to the picker. */
+@Composable
+private fun MainPage(
+  navigator: AppNavigator,
+  actions: ShellActions,
+  requestedChat: MutableStateFlow<ChatLocation?>,
+  onSidePanelOpen: (Boolean) -> Unit,
+) {
+  // Once per navigator, so the sidebar isn't recomposed for a new but equal set of links.
+  val links = remember(navigator) {
+    SidebarLinks(
+      onOpenSettings = { navigator.push(Destination.Settings) },
+      onOpenRemoteHost = { navigator.push(Destination.RemoteHostEditor(it, fromPicker = true)) },
+      onOpenArchive = { navigator.push(Destination.Archive) },
+      onOpenOnboarding = { navigator.push(Destination.Onboarding) },
+    )
+  }
+  MainScreen(
+    actions = actions,
+    requestedChat = requestedChat,
+    links = links,
+    onOpenProviders = { navigator.push(Destination.Providers) },
+    onOpenArchivedChat = { navigator.push(Destination.ArchivedChat(it)) },
+    onSidePanelOpen = onSidePanelOpen,
+  )
+}
+
 /** Opens the models to add for the provider Pi ships [providerId], over its page so Save there keeps them. */
 private fun AppNavigator.pickModels(providerId: String) {
   push(Destination.Subscription(providerId))
@@ -283,8 +307,36 @@ private fun SettingsPages(top: Destination, navigator: AppNavigator) {
       onOpenProviders = { navigator.push(Destination.Providers) },
       onOpenRunningAgents = { navigator.push(Destination.RunningAgents) },
       onOpenPermissions = { navigator.push(Destination.Permissions) },
+      onOpenRemoteHosts = { navigator.push(Destination.RemoteHosts) },
       onOpenBackups = { navigator.push(Destination.Backups) },
       onOpenLicenses = { navigator.push(Destination.Licenses) },
+    )
+  }
+}
+
+/**
+ * The remote hosts list or a host's editor. An editor the folder picker opened returns to it with the host it saved
+ * chosen, so a host just added is browsed at once.
+ */
+@Composable
+private fun RemoteHostPages(top: Destination, navigator: AppNavigator, actions: ShellActions) {
+  val preferences = LocalContext.current.appGraph.preferences
+  when (top) {
+    is Destination.RemoteHostEditor -> RemoteHostEditorScreen(
+      hostId = top.id,
+      actions = actions,
+      onBack = { navigator.pop() },
+      onDone = { hostId ->
+        if (top.fromPicker) preferences.setPickerMachine(hostId)
+        navigator.pop()
+      },
+      onRemoved = { navigator.pop() },
+    )
+
+    else -> RemoteHostsScreen(
+      onBack = { navigator.pop() },
+      onAdd = { navigator.push(Destination.RemoteHostEditor(null)) },
+      onOpenHost = { navigator.push(Destination.RemoteHostEditor(it)) },
     )
   }
 }

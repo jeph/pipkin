@@ -60,6 +60,15 @@ sealed interface Destination {
    * tool call [toolCallId].
    */
   data class ArchivedSubagent(val path: String, val toolCallId: String) : Destination
+
+  /** The remote hosts the user added, reached from Settings. */
+  data object RemoteHosts : Destination
+
+  /**
+   * [id] null adds a remote host; otherwise edits the host with that id. [fromPicker] when the folder picker opened
+   * it, which a new host then returns to with that host chosen.
+   */
+  data class RemoteHostEditor(val id: String?, val fromPicker: Boolean = false) : Destination
 }
 
 /** The screen stack; never empty. Main thread only. */
@@ -101,48 +110,43 @@ class AppNavigator(initial: List<Destination>) {
     /** A stable string per destination, also used as its saveable-state key. */
     fun key(d: Destination): String = when (d) {
       Destination.Main -> MAIN
-
       Destination.Settings -> SETTINGS
-
       Destination.Permissions -> PERMISSIONS
-
       Destination.RunningAgents -> RUNNING_AGENTS
-
       Destination.Backups -> BACKUPS
-
       Destination.LocalModels -> LOCAL_MODELS
-
       Destination.Licenses -> LICENSES
-
       is Destination.License -> LICENSE + d.path
-
       Destination.Onboarding -> ONBOARDING
-
       Destination.Providers -> PROVIDERS
-
       Destination.AddProvider -> ADD_PROVIDER
-
       is Destination.Subscription -> SUBSCRIPTION + d.id
-
       is Destination.ProviderEditor -> PROVIDER + d.id.orEmpty()
-
       Destination.AddModels -> ADD_MODELS
-
       is Destination.ModelEditor -> MODEL + d.modelId
+      Destination.Archive, is Destination.ArchivedChat, is Destination.ArchivedSubagent -> archiveKey(d)
+      Destination.RemoteHosts, is Destination.RemoteHostEditor -> remoteHostKey(d)
+    }
 
-      Destination.Archive -> ARCHIVE
-
+    private fun archiveKey(d: Destination): String = when (d) {
       is Destination.ArchivedChat -> ARCHIVED_CHAT + d.path
 
       // A tool call id has no line break; a path comes last, since it may hold any other character.
       is Destination.ArchivedSubagent -> ARCHIVED_SUBAGENT + d.toolCallId + "\n" + d.path
+
+      else -> ARCHIVE
+    }
+
+    private fun remoteHostKey(d: Destination): String = when (d) {
+      is Destination.RemoteHostEditor -> (if (d.fromPicker) REMOTE_HOST_PICKER else REMOTE_HOST) + d.id.orEmpty()
+      else -> REMOTE_HOSTS
     }
 
     /** The destinations that carry nothing but their key. */
     private val SCREENS = listOf(
       Destination.Main, Destination.Settings, Destination.Permissions, Destination.RunningAgents, Destination.Backups,
       Destination.LocalModels, Destination.Licenses, Destination.Onboarding, Destination.Providers,
-      Destination.AddProvider, Destination.AddModels, Destination.Archive,
+      Destination.AddProvider, Destination.AddModels, Destination.Archive, Destination.RemoteHosts,
     )
 
     private fun destination(key: String): Destination? = when {
@@ -161,6 +165,11 @@ class AppNavigator(initial: List<Destination>) {
       key.startsWith(SUBSCRIPTION) -> Destination.Subscription(key.removePrefix(SUBSCRIPTION))
 
       key.startsWith(PROVIDER) -> Destination.ProviderEditor(key.removePrefix(PROVIDER).ifEmpty { null })
+
+      key.startsWith(REMOTE_HOST) -> Destination.RemoteHostEditor(key.removePrefix(REMOTE_HOST).ifEmpty { null })
+
+      key.startsWith(REMOTE_HOST_PICKER) ->
+        Destination.RemoteHostEditor(key.removePrefix(REMOTE_HOST_PICKER).ifEmpty { null }, fromPicker = true)
 
       else -> null
     }
@@ -183,5 +192,8 @@ class AppNavigator(initial: List<Destination>) {
     private const val ARCHIVE = "archive"
     private const val ARCHIVED_CHAT = "archived-chat:"
     private const val ARCHIVED_SUBAGENT = "archived-subagent:"
+    private const val REMOTE_HOSTS = "remote-hosts"
+    private const val REMOTE_HOST = "remote-host:"
+    private const val REMOTE_HOST_PICKER = "remote-host-picker:"
   }
 }

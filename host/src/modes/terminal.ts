@@ -3,9 +3,14 @@ import { readdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
-import { folderNotFound, withoutHostVariables } from "../env.js";
+import { folderNotFound, type HostError, withoutHostVariables } from "../env.js";
+import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { positiveIntParam, stringParam } from "../params.js";
+import { classifySshFailure, errorJson, sshMissing, unreachable } from "../remote/errors.js";
+import { quote, remoteScript } from "../remote/script.js";
+import { isConnected, type Remote, sessionFailure, sessionScript, sshInstalled } from "../remote/ssh.js";
+import { remoteFolder } from "./remote-folder.js";
 
 /**
  * Runs in the shell `script` starts on its new pseudo-terminal: sizes the terminal, then records its device path so
@@ -14,6 +19,39 @@ import { positiveIntParam, stringParam } from "../params.js";
  */
 const SHELL_COMMAND =
   'stty rows "$PIPKIN_ROWS" cols "$PIPKIN_COLS" && tty > "$PIPKIN_TTY" && unset PIPKIN_ROWS PIPKIN_COLS PIPKIN_TTY && exec login';
+/**
+ * [SHELL_COMMAND] for a remote workspace: the same sizing and recording, then `ssh -tt` running the remote user's login
+ * shell in remote folder [path] ([sessionScript], which waits while the server refuses the master a session), so
+ * resizes reach it as `ssh` forwards the window size. `ssh` never prompts here, as in every background call; its own
+ * messages go to the file named by `PIPKIN_SSH_ERRORS`, so a failed connection can be told from the shell's output.
+ * The remote shell's own errors come through the terminal, as `-tt` merges them there. Run by `sh`, whose quoting
+ * [quote] writes.
+ */
+export function remoteShellCommand(remote: Remote, path: string): string {
+  const session = sessionScript(remote, remoteScript(`cd -- ${quote(path)} && exec "$SHELL" -l`), { flags: ["-tt"] });
+  return [
+    'stty rows "$PIPKIN_ROWS" cols "$PIPKIN_COLS"',
+    'tty > "$PIPKIN_TTY"',
+    'exec 2>"$PIPKIN_SSH_ERRORS"',
+    "unset PIPKIN_ROWS PIPKIN_COLS PIPKIN_TTY PIPKIN_SSH_ERRORS",
+    `{\n${session}\n}`,
+  ].join(" && ");
+}
+
+/**
+ * Why a remote terminal's `ssh` ended, from its exit [code] and what it wrote to [errors], including a server that had
+ * no free session for it; undefined when the remote shell ended it instead, including with a 255 of its own while the
+ * connection stays up. A 255 with no connection left and nothing from `ssh` is a connection lost under the shell, as
+ * [runScript] reports one: a multiplexed client whose master gave up on a silent server says nothing.
+ */
+async function remoteFailure(remote: Remote, code: number | null, errors: string): Promise<HostError | undefined> {
+  if (code !== 255) return undefined;
+  const full = sessionFailure(remote, code, errors);
+  if (full !== undefined) return full;
+  if (await isConnected(remote)) return undefined;
+  return classifySshFailure(errors, { name: remote.host.name, auth: remote.host.auth, interactive: false }) ?? unreachable(remote.host.name, "Connection lost");
+}
+
 /** Output the host holds while Pipkin is not reading; above it the shell waits until Pipkin reads again. */
 const OUTPUT_BACKLOG_LIMIT = 4 * 1024 * 1024;
 const STDERR_TAIL = 16 * 1024;
@@ -211,6 +249,10 @@ class Resizer {
  * After the request the connection stays JSONL both ways: Pipkin sends `input` (base64 bytes) and `resize`
  * (`rows`, `cols`); the host sends `output` (base64 bytes), `busy` (`busy`) whenever work starts or stops running in
  * the shell, and, once the shell has gone, one `pipkin_exit`. Closing the connection ends the shell.
+ *
+ * A remote workspace's stand-in as `cwd` runs the remote user's login shell in the remote folder over `ssh` instead.
+ * Its busy flag stays idle, as the remote's processes can't be seen from here. When the connection fails, the
+ * terminal shows why on a line of its own, and `pipkin_exit` carries it as `error` (`{code, message, i18n}`).
  */
 export async function terminal(ctx: ModeContext): Promise<void> {
   const cwd = stringParam(ctx.params, "cwd");
@@ -221,21 +263,24 @@ export async function terminal(ctx: ModeContext): Promise<void> {
     () => false,
   );
   if (!isDirectory) throw folderNotFound("cwd_missing", cwd);
+  const folder = await remoteFolder(ctx.env, cwd);
+  if (folder !== null && !(await sshInstalled(folder.remote.paths))) throw sshMissing();
 
   const deviceFile = join(ctx.env.root, `terminal-tty-${process.pid}`);
+  const errorsFile = join(ctx.env.root, `terminal-ssh-${process.pid}`);
   const base = withoutHostVariables(process.env);
-  const child = spawn(join(ctx.env.prefix, "bin", "script"), ["-qfec", SHELL_COMMAND, "/dev/null"], {
-    cwd,
-    env: {
-      ...base,
-      TERM: "xterm-256color",
-      COLORTERM: "truecolor",
-      PIPKIN_ROWS: String(rows),
-      PIPKIN_COLS: String(cols),
-      PIPKIN_TTY: deviceFile,
-    },
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  const env: NodeJS.ProcessEnv = {
+    ...base,
+    TERM: "xterm-256color",
+    COLORTERM: "truecolor",
+    PIPKIN_ROWS: String(rows),
+    PIPKIN_COLS: String(cols),
+    PIPKIN_TTY: deviceFile,
+  };
+  // `script` runs its command with `$SHELL`, which may be fish; the remote command is quoted for `sh`.
+  if (folder !== null) Object.assign(env, { SHELL: join(ctx.env.prefix, "bin", "sh"), PIPKIN_SSH_ERRORS: errorsFile });
+  const command = folder === null ? SHELL_COMMAND : remoteShellCommand(folder.remote, folder.path);
+  const child = spawn(join(ctx.env.prefix, "bin", "script"), ["-qfec", command, "/dev/null"], { cwd, env, stdio: ["pipe", "pipe", "pipe"] });
   const { conn } = ctx;
   const { socket } = conn;
 
@@ -261,17 +306,30 @@ export async function terminal(ctx: ModeContext): Promise<void> {
   });
 
   const stopWatching =
-    child.pid === undefined ? () => undefined : watchBusy(child.pid, (busy) => conn.send({ type: "busy", busy }));
+    child.pid === undefined || folder !== null ? () => undefined : watchBusy(child.pid, (busy) => conn.send({ type: "busy", busy }));
+
+  /** For a remote terminal whose connection failed: says why in the terminal, and gives the error for the exit line. */
+  const connectionFailure = async (code: number | null): Promise<JsonObject> => {
+    if (folder === null) return {};
+    const errors = await readFile(errorsFile, "utf8").catch(() => "");
+    await rm(errorsFile, { force: true });
+    const failure = await remoteFailure(folder.remote, code, errors);
+    if (failure === undefined) return {};
+    conn.send({ type: "output", data: Buffer.from(`\r\n${failure.message}\r\n`).toString("base64") });
+    return { error: errorJson(failure) };
+  };
 
   let reported = false;
   const report = (code: number | null, signal: string | null): void => {
     if (reported) return;
     reported = true;
     stopWatching();
-    void rm(deviceFile, { force: true }).finally(() => {
-      conn.send({ type: "pipkin_exit", code, signal, stderr });
+    void (async () => {
+      const failure = await connectionFailure(code).catch(() => ({}));
+      await rm(deviceFile, { force: true }).catch(() => undefined);
+      conn.send({ type: "pipkin_exit", code, signal, stderr, ...failure });
       conn.finish();
-    });
+    })();
   };
   // `close` fires only after stdout ended, so the exit line follows all of the shell's output.
   child.on("close", report);

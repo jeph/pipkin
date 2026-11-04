@@ -21,6 +21,8 @@ import io.jeph.pipkin.agent.UiAnswer
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.ui.components.SnackbarStackState
+import io.jeph.pipkin.ui.sidebar.FolderNames
+import io.jeph.pipkin.ui.sidebar.folderNames
 import io.jeph.pipkin.ui.sidebar.tildePath
 import java.io.IOException
 import java.lang.ref.Reference
@@ -142,7 +144,7 @@ internal class ChatController(
   /** Prompts Pi with [text] and [picked]; returns why that failed, if it did. */
   private suspend fun deliver(text: String, picked: List<Attachment>): String? = failureOf {
     val files = picked.filterIsInstance<Attachment.File>().map { it.name to it.bytes }
-    val paths = if (files.isEmpty()) emptyList() else graph.hostClient.saveAttachments(files)
+    val paths = if (files.isEmpty()) emptyList() else graph.hostClient.saveAttachments(process.cwd, files)
     val typed = text.trim()
     val message = withFilePaths(typed, paths)
     val disposition = process.prompt(message, picked.filterIsInstance<Attachment.Image>().map { it.part })
@@ -205,6 +207,9 @@ internal class ChatController(
 
   /** The Termux home from the last host hello, for `~`-relative paths. */
   val home: String? get() = graph.hostClient.lastHello.value?.home?.takeIf { it.isNotEmpty() }
+
+  /** How workspace folders are named now, which says whether this chat's folder is a stand-in for a remote one. */
+  val folderNames: FolderNames get() = graph.folderNames()
 
   fun copy(text: String) {
     context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Pipkin", text))

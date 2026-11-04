@@ -3,11 +3,16 @@ import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { access, copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rm, stat } from "node:fs/promises";
 import os from "node:os";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, posix, resolve } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { parsePatch, type StructuredPatch } from "diff";
-import type { HostText } from "../env.js";
+import { HostError, type HostText } from "../env.js";
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
+import { readRemoteFile } from "../remote/fs.js";
+import { quote } from "../remote/script.js";
+import { READ_IDLE_MS, runScript, runWatched } from "../remote/ssh.js";
+import { asRemoteError, remoteFolder, type RemoteFolder } from "./remote-folder.js";
 
 /** Paseo's limits: one file's diff text, then the whole diff's. */
 const FILE_LIMIT = 1024 * 1024;
@@ -65,12 +70,34 @@ class TimedOut extends GitError {
   }
 }
 
+/** Starts git for a [Repo], where it lives: in Termux, or on a remote host over SSH. */
+interface GitLauncher {
+  /**
+   * Runs git with [args] and the variables in [env] at the repo's root, handing its output to [io] as it arrives, and
+   * resolves with its exit status. Aborting [io]'s signal kills it, with any helper it started.
+   */
+  launch(args: string[], env: Record<string, string>, io: LaunchIo): Promise<number | null>;
+  /** The text of file [path], relative to the repo's root or absolute; rejects when it can't be read. */
+  readText(path: string): Promise<string>;
+  /**
+   * Makes a temporary folder holding an empty `objects` folder and, when there is one, a copy of index file [index] as
+   * `index`; returns its path.
+   */
+  makeScratch(index: string): Promise<string>;
+  removeScratch(dir: string): Promise<void>;
+}
+
+interface LaunchIo {
+  onStdout: (chunk: Buffer) => void;
+  onStderr: (chunk: Buffer) => void;
+  signal: AbortSignal;
+}
+
 /** A repository the requests run git in. */
 interface Repo {
-  binary: string;
+  /** The workspace root: a local folder, or a remote one for a stand-in. */
   root: string;
-  /** `-c safe.directory=…` for the root and its realpath, so repos on shared storage are readable. */
-  safeArgs: string[];
+  launcher: GitLauncher;
   signal: AbortSignal;
 }
 
@@ -102,32 +129,14 @@ async function isExecutable(path: string): Promise<boolean> {
   }
 }
 
-/**
- * Runs git in [repo], killed after [GIT_TIMEOUT_MS] or when the app hangs up. Git runs in a process group of its
- * own and the whole group is killed, since a helper it started, such as a textconv filter, would otherwise outlive
- * it and keep its output open, so the run would never end.
- */
-function run(repo: Repo, args: string[], options: RunOptions = {}): Promise<RunResult> {
-  const { promise, resolve: done, reject } = Promise.withResolvers<RunResult>();
-  if (repo.signal.aborted) {
-    reject(repo.signal.reason);
-    return promise;
-  }
-  const child = spawn(repo.binary, [...repo.safeArgs, ...args], {
-    cwd: repo.root,
-    env: { ...process.env, ...GIT_ENV, ...options.env },
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
-  });
+/** Runs git in [repo], killed after [GIT_TIMEOUT_MS] or when the app hangs up. */
+async function run(repo: Repo, args: string[], options: RunOptions = {}): Promise<RunResult> {
+  repo.signal.throwIfAborted();
+  const stop = new AbortController();
   let killedFor: "abort" | "timeout" | "overflow" | "truncated" | undefined;
   const kill = (reason: NonNullable<typeof killedFor>): void => {
     killedFor ??= reason;
-    if (child.pid === undefined) return;
-    try {
-      process.kill(-child.pid, "SIGKILL");
-    } catch {
-      // The whole group has already exited.
-    }
+    stop.abort();
   };
   const timer = setTimeout(() => kill("timeout"), GIT_TIMEOUT_MS);
   const onAbort = (): void => kill("abort");
@@ -135,7 +144,7 @@ function run(repo: Repo, args: string[], options: RunOptions = {}): Promise<RunR
 
   const stdout: Buffer[] = [];
   let stdoutBytes = 0;
-  child.stdout.on("data", (chunk: Buffer) => {
+  const onStdout = (chunk: Buffer): void => {
     if (killedFor !== undefined) return;
     if (options.onStdout !== undefined) {
       options.onStdout(chunk);
@@ -152,37 +161,168 @@ function run(repo: Repo, args: string[], options: RunOptions = {}): Promise<RunR
       return;
     }
     stdout.push(chunk);
-  });
+  };
   let stderr = "";
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (chunk: string) => {
-    if (stderr.length < STDERR_LIMIT) stderr += chunk;
-  });
+  const decoder = new StringDecoder("utf8");
+  const onStderr = (chunk: Buffer): void => {
+    if (stderr.length < STDERR_LIMIT) stderr += decoder.write(chunk);
+  };
 
-  const settle = (): void => {
+  let exitCode: number | null;
+  try {
+    exitCode = await repo.launcher.launch(args, { ...GIT_ENV, ...options.env }, { onStdout, onStderr, signal: stop.signal });
+  } catch (error) {
+    // Killing a remote git rejects its run; the reason it was killed is what counts.
+    if (killedFor === undefined) throw error;
+    exitCode = null;
+  } finally {
     clearTimeout(timer);
     repo.signal.removeEventListener("abort", onAbort);
+  }
+  if (killedFor === "abort") throw repo.signal.reason;
+  if (killedFor === "timeout") throw new TimedOut(args[0]);
+  if (killedFor === "overflow") throw new TooLarge();
+  const truncated = killedFor === "truncated";
+  const result = { exitCode, stdout: Buffer.concat(stdout).toString("utf8"), truncated };
+  if (truncated || exitCode === 0 || options.anyExit === true) return result;
+  const stderrText = stderr.trim();
+  if (stderrText !== "") throw new GitError("failed", stderrText);
+  const command = `git ${args[0]}`;
+  const exit = String(exitCode);
+  throw new GitError("failed", `${command} exited with ${exit}.`, { key: "git_exited", args: { command, exit } });
+}
+
+/**
+ * Termux's git [binary] in [root]. Git runs in a process group of its own and the whole group is killed, since a
+ * helper it started, such as a textconv filter, would otherwise outlive it and keep its output open, so the run would
+ * never end.
+ */
+function localLauncher(binary: string, root: string, safeArgs: string[]): GitLauncher {
+  return {
+    launch(args, env, io) {
+      const { promise, resolve: done, reject } = Promise.withResolvers<number | null>();
+      const child = spawn(binary, [...safeArgs, ...args], {
+        cwd: root,
+        env: { ...process.env, ...env },
+        stdio: ["ignore", "pipe", "pipe"],
+        detached: true,
+      });
+      const kill = (): void => {
+        if (child.pid === undefined) return;
+        try {
+          process.kill(-child.pid, "SIGKILL");
+        } catch {
+          // The whole group has already exited.
+        }
+      };
+      io.signal.addEventListener("abort", kill, { once: true });
+      child.stdout.on("data", io.onStdout);
+      child.stderr.on("data", io.onStderr);
+      child.on("error", (error) => {
+        io.signal.removeEventListener("abort", kill);
+        const missing = "code" in error && (error.code === "ENOENT" || error.code === "EACCES");
+        reject(missing ? new GitError("no_git", "git isn't installed in Termux.", { key: "git_missing" }) : error);
+      });
+      child.on("close", (exitCode) => {
+        io.signal.removeEventListener("abort", kill);
+        done(exitCode);
+      });
+      return promise;
+    },
+    readText: (path) => readFile(resolve(root, path), "utf8"),
+    async makeScratch(index) {
+      const dir = await mkdtemp(join(os.tmpdir(), "pipkin-git-"));
+      await mkdir(join(dir, "objects"));
+      try {
+        await copyFile(index, join(dir, "index"));
+      } catch (error) {
+        // A fresh repo has no index until the first `git add`.
+        if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+      }
+      return dir;
+    },
+    removeScratch: (dir) => rm(dir, { recursive: true, force: true }),
   };
-  child.on("error", (error) => {
-    settle();
-    const missing = "code" in error && (error.code === "ENOENT" || error.code === "EACCES");
-    reject(missing ? new GitError("no_git", "git isn't installed in Termux.", { key: "git_missing" }) : error);
-  });
-  child.on("close", (exitCode) => {
-    settle();
-    if (killedFor === "abort") return reject(repo.signal.reason);
-    if (killedFor === "timeout") return reject(new TimedOut(args[0]));
-    if (killedFor === "overflow") return reject(new TooLarge());
-    const truncated = killedFor === "truncated";
-    const result = { exitCode, stdout: Buffer.concat(stdout).toString("utf8"), truncated };
-    if (truncated || exitCode === 0 || options.anyExit === true) return done(result);
-    const stderrText = stderr.trim();
-    if (stderrText !== "") return reject(new GitError("failed", stderrText));
-    const command = `git ${args[0]}`;
-    const exit = String(exitCode);
-    reject(new GitError("failed", `${command} exited with ${exit}.`, { key: "git_exited", args: { command, exit } }));
-  });
-  return promise;
+}
+
+/** What a remote git command writes to stderr, with status [REMOTE_SETUP_FAILED], when it can't start git. */
+const REMOTE_NO_FOLDER = "pipkin: no such folder";
+const REMOTE_NO_GIT = "pipkin: no git";
+const REMOTE_SETUP_FAILED = 127;
+
+function remoteGitMissing(folder: RemoteFolder): GitError {
+  const host = folder.remote.host.name;
+  return new GitError("no_git", `git isn't installed on ${host}.`, { key: "remote_git_missing", args: { host } });
+}
+
+/**
+ * The `bash` command that runs git with [args] and [env] in remote folder [root], as [localLauncher] runs it in
+ * Termux: trusting the root and its real path as safe directories, and saying so when the folder or git is missing.
+ */
+function remoteGitCommand(root: string, args: string[], env: Record<string, string>): string {
+  return [
+    `cd -- ${quote(root)} 2>/dev/null || { echo ${quote(REMOTE_NO_FOLDER)} >&2; exit ${String(REMOTE_SETUP_FAILED)}; }`,
+    `command -v git >/dev/null 2>&1 || { echo ${quote(REMOTE_NO_GIT)} >&2; exit ${String(REMOTE_SETUP_FAILED)}; }`,
+    ...Object.entries(env).map(([name, value]) => `export ${name}=${quote(value)}`),
+    // The real path is captured with an `x` after it, as `$(…)` drops trailing newlines a folder name may end with.
+    `real=$(pwd -P && echo x); real=\${real%x}; real=\${real%$'\\n'}`,
+    `exec git -c safe.directory=${quote(root)} -c "safe.directory=$real" ${args.map(quote).join(" ")}`,
+  ].join("\n");
+}
+
+/**
+ * Git on the remote folder [folder] names. Each run is one `ssh` session under the watchdog, so killing it, by abort,
+ * time limit or overflow, ends git and its helpers on the remote as well.
+ */
+function remoteLauncher(folder: RemoteFolder): GitLauncher {
+  const { remote, path: root } = folder;
+  return {
+    async launch(args, env, io) {
+      let result;
+      try {
+        result = await runWatched(remote, remoteGitCommand(root, args, env), "/", { ...io, idleTimeoutMs: READ_IDLE_MS });
+      } catch (error) {
+        if (io.signal.aborted) throw error;
+        throw asRemoteError(remote, error);
+      }
+      if (result.code === REMOTE_SETUP_FAILED && result.stderr.includes(REMOTE_NO_GIT)) throw remoteGitMissing(folder);
+      if (result.code === REMOTE_SETUP_FAILED && result.stderr.includes(REMOTE_NO_FOLDER)) throw folderMissing(root);
+      return result.code;
+    },
+    async readText(path) {
+      return (await readRemoteFile(remote, posix.resolve(root, path), { idleTimeoutMs: READ_IDLE_MS })).toString("utf8");
+    },
+    async makeScratch(index) {
+      const script = [
+        `i=${quote(index)}`,
+        `d=$(mktemp -d "\${TMPDIR:-/tmp}/pipkin-git-XXXXXX") || exit 1`,
+        `mkdir -- "$d/objects" || { rm -rf -- "$d"; exit 1; }`,
+        // A fresh repo has no index until the first `git add`.
+        `if [ -e "$i" ]; then cp -- "$i" "$d/index" || { rm -rf -- "$d"; exit 1; }; fi`,
+        `printf '%s' "$d"`,
+      ].join("\n");
+      let result;
+      try {
+        result = await runScript(remote, script, { idleTimeoutMs: READ_IDLE_MS });
+      } catch (error) {
+        throw asRemoteError(remote, error);
+      }
+      if (result.code !== 0) throw new GitError("failed", result.stderr.trim() || "Couldn't make a temporary folder.");
+      return result.stdout.toString("utf8");
+    },
+    async removeScratch(dir) {
+      // Left behind when the connection is gone, it's only an index in the remote's temporary folder; failing here
+      // would hide the diff that was already made.
+      await runScript(remote, `rm -rf -- ${quote(dir)}`, { timeoutMs: REMOVE_TIMEOUT_MS }).catch(() => undefined);
+    },
+  };
+}
+
+/** How long removing a remote temporary folder may take. */
+const REMOVE_TIMEOUT_MS = 15_000;
+
+function folderMissing(root: string): GitError {
+  return new GitError("not_repo", `Folder not found: ${root}`, { key: "folder_not_found", args: { path: root } });
 }
 
 /** Whether `<root>/.git` is a folder, or a file as in linked worktrees and submodule checkouts. */
@@ -196,6 +336,8 @@ async function hasDotGit(root: string): Promise<boolean> {
 }
 
 async function openRepo(ctx: ModeContext, root: string): Promise<Repo> {
+  const folder = await remoteFolder(ctx.env, root);
+  if (folder !== null) return { root: folder.path, launcher: remoteLauncher(folder), signal: ctx.signal };
   const binary = join(ctx.env.prefix, "bin", "git");
   if (!(await isExecutable(binary))) throw new GitError("no_git", "git isn't installed in Termux.", { key: "git_missing" });
   let realRoot: string;
@@ -203,11 +345,11 @@ async function openRepo(ctx: ModeContext, root: string): Promise<Repo> {
     if (!isAbsolute(root)) throw new Error();
     realRoot = await realpath(root);
   } catch {
-    throw new GitError("not_repo", `Folder not found: ${root}`, { key: "folder_not_found", args: { path: root } });
+    throw folderMissing(root);
   }
   const safeArgs = ["-c", `safe.directory=${root}`];
   if (realRoot !== root) safeArgs.push("-c", `safe.directory=${realRoot}`);
-  return { binary, root, safeArgs, signal: ctx.signal };
+  return { root, launcher: localLauncher(binary, root, safeArgs), signal: ctx.signal };
 }
 
 /**
@@ -221,7 +363,7 @@ async function currentBranch(repo: Repo): Promise<string | null> {
   for (const path of paths.slice(0, 2)) {
     let headName: string;
     try {
-      headName = (await readFile(resolve(repo.root, path), "utf8")).trim();
+      headName = (await repo.launcher.readText(path)).trim();
     } catch {
       continue;
     }
@@ -252,7 +394,7 @@ async function requireRepo(repo: Repo): Promise<GitPaths> {
   try {
     const { stdout } = await run(repo, ["rev-parse", "--show-toplevel", "--git-path", "index", "--git-path", "objects"]);
     const lines = stdout.split("\n");
-    return { index: resolve(repo.root, lines[1] ?? ""), objects: resolve(repo.root, lines[2] ?? "") };
+    return { index: posix.resolve(repo.root, lines[1] ?? ""), objects: posix.resolve(repo.root, lines[2] ?? "") };
   } catch (error) {
     if (error instanceof GitError && error.code === "failed") throw new GitError("not_repo", error.message, error.i18n);
     throw error;
@@ -601,24 +743,17 @@ async function diffFiles(repo: Repo, revisions: string[], ignoreWhitespace: bool
  */
 async function workTreeDiff(repo: Repo, paths: GitPaths, ignoreWhitespace: boolean): Promise<DiffBody> {
   const from = (await headCommit(repo)) ?? (await emptyTree(repo));
-  const dir = await mkdtemp(join(os.tmpdir(), "pipkin-git-"));
+  const dir = await repo.launcher.makeScratch(paths.index);
   try {
-    const tempIndex = join(dir, "index");
-    const tempObjects = join(dir, "objects");
-    await mkdir(tempObjects);
-    try {
-      await copyFile(paths.index, tempIndex);
-    } catch (error) {
-      // A fresh repo has no index until the first `git add`.
-      if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
-    }
+    const tempIndex = posix.join(dir, "index");
+    const tempObjects = posix.join(dir, "objects");
     // The variable is a `:`-separated list, in which git reads a double-quoted entry C-style.
     const alternate = /[:"]/.test(paths.objects) ? JSON.stringify(paths.objects) : paths.objects;
     const env = { GIT_INDEX_FILE: tempIndex, GIT_OBJECT_DIRECTORY: tempObjects, GIT_ALTERNATE_OBJECT_DIRECTORIES: alternate };
     await run(repo, ["add", "--intent-to-add", "--all"], { env });
     return await diffFiles(repo, [from], ignoreWhitespace, env);
   } finally {
-    await rm(dir, { recursive: true, force: true });
+    await repo.launcher.removeScratch(dir);
   }
 }
 
@@ -641,10 +776,19 @@ function fingerprinted(body: JsonObject, known: unknown): JsonObject {
 
 function failure(error: unknown): JsonObject {
   if (error instanceof GitError) return { error: error.message, code: error.code, errorI18n: error.i18n };
+  // A remote workspace's failed connection, such as `remote_not_connected`, under its own code.
+  if (error instanceof HostError) return { error: error.message, code: error.code, errorI18n: error.i18n };
   return { error: error instanceof Error ? error.message : String(error), code: "failed" };
 }
 
 async function detect(ctx: ModeContext, root: string, trusted: boolean): Promise<JsonObject> {
+  let folder: RemoteFolder | null;
+  try {
+    folder = await remoteFolder(ctx.env, root);
+  } catch (error) {
+    return failure(error);
+  }
+  if (folder !== null) return detectRemote(ctx, folder, trusted);
   const hasGit = await isExecutable(join(ctx.env.prefix, "bin", "git"));
   const dotGit = isAbsolute(root) && (await hasDotGit(root));
   if (!trusted || !hasGit || !dotGit) return { repo: dotGit, git: hasGit };
@@ -654,6 +798,44 @@ async function detect(ctx: ModeContext, root: string, trusted: boolean): Promise
     return { repo: stdout.replace(/\n$/, "") === (await realpath(root)), git: true };
   } catch (error) {
     if (ctx.signal.aborted) throw error;
+    return { repo: false, git: true };
+  }
+}
+
+/**
+ * [detect] for a remote workspace, probing the remote in one round trip. A host that can't be reached answers with the
+ * failure instead of `repo` and `git`, so the app can keep what it knew.
+ */
+async function detectRemote(ctx: ModeContext, folder: RemoteFolder, trusted: boolean): Promise<JsonObject> {
+  const root = folder.path;
+  const script = [
+    "command -v git >/dev/null 2>&1 && g=1 || g=0",
+    `r=${quote(root)}`,
+    // As [hasDotGit]: a folder or a file, not a link.
+    `if [ ! -L "$r/.git" ] && { [ -d "$r/.git" ] || [ -f "$r/.git" ]; }; then d=1; else d=0; fi`,
+    // `cd -P` leaves the real path in `PWD`, which keeps a trailing newline `$(pwd -P)` would drop.
+    `printf '%s %s ' "$g" "$d"`,
+    `cd -P -- "$r" 2>/dev/null && printf '%s' "$PWD"`,
+    "exit 0",
+  ].join("\n");
+  let probe: string;
+  try {
+    probe = (await runScript(folder.remote, script, { signal: ctx.signal, idleTimeoutMs: READ_IDLE_MS })).stdout.toString("utf8");
+  } catch (error) {
+    if (ctx.signal.aborted) throw error;
+    return failure(asRemoteError(folder.remote, error));
+  }
+  const hasGit = probe.startsWith("1");
+  const dotGit = probe.slice(2, 3) === "1";
+  const realRoot = probe.slice(4);
+  if (!trusted || !hasGit || !dotGit) return { repo: dotGit, git: hasGit };
+  try {
+    const repo: Repo = { root, launcher: remoteLauncher(folder), signal: ctx.signal };
+    const { stdout } = await run(repo, ["rev-parse", "--show-toplevel"]);
+    return { repo: stdout.replace(/\n$/, "") === realRoot, git: true };
+  } catch (error) {
+    if (ctx.signal.aborted) throw error;
+    if (error instanceof HostError) return failure(error);
     return { repo: false, git: true };
   }
 }
@@ -736,6 +918,9 @@ async function commitDiff(ctx: ModeContext, root: string, sha: string, ignoreWhi
  *   (at most 500 `{sha, subject, authorTime}`, newest first, of `total`), or `{fingerprint, unchanged: true}`.
  * - `pipkin_git_commit_diff {sha, ignoreWhitespace}` with `pipkin_git_commit_diff_result {files, tooLarge?}`.
  * Failures are `{error, code, errorI18n?}` in the reply: `not_repo`, `no_git`, `commit_not_found` or `failed`.
+ *
+ * A remote workspace's stand-in as `root` runs git on the remote folder it names, with the same replies; a failed
+ * connection is a failure under its own code (`remote_not_connected` and the like), detection's included.
  */
 export async function git(ctx: ModeContext): Promise<JsonObject> {
   ctx.conn.send({ type: "pipkin_git_ready" });

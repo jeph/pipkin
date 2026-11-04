@@ -20,6 +20,7 @@ import {
   type ToolDefinition,
   type ToolInfo,
 } from "@earendil-works/pi-coding-agent";
+import { remoteWorkspace, remoteWorkspaceText } from "../pipkin-remote/workspace.js";
 import type { AgentDefinition, ThinkingLevel } from "./agents.js";
 import { newLog } from "./live.js";
 import {
@@ -229,13 +230,17 @@ async function createChild(
   const cwd = ctx.cwd;
   const agentDir = getAgentDir();
   const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted: ctx.isProjectTrusted() });
-  const prompt = request.agent.prompt;
+  // A remote chat's subagent runs the parent's tools, which work on the remote; its prompt says where that is.
+  const workspace = await remoteWorkspace(cwd);
+  const appended = [request.agent.prompt, workspace === null ? undefined : remoteWorkspaceText(workspace)].filter(
+    (part): part is string => part !== undefined && part !== "",
+  );
   const resourceLoader = new DefaultResourceLoader({
     cwd,
     agentDir,
     settingsManager,
     noExtensions: true,
-    ...(prompt ? { appendSystemPromptOverride: (base: string[]) => [...base, prompt] } : {}),
+    ...(appended.length > 0 ? { appendSystemPromptOverride: (base: string[]) => [...base, ...appended] } : {}),
   });
   await resourceLoader.reload();
   const { session } = await createAgentSession({

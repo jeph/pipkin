@@ -22,15 +22,23 @@ const out = process.env.OUT;
 if (!out) throw new Error("Set OUT to the directory the bundles go in");
 
 const common = { bundle: true, platform: "node", format: "esm", target: "node22", logLevel: "warning" } as const;
+/**
+ * Most UTF-16 units the host bundle may have. `HostLauncher` hands it to F-Droid Termux inside a RUN_COMMAND Intent,
+ * which Android delivers in one binder transaction capped near 512 KiB, and a Parcel stores two bytes per unit; the
+ * rest of the cap is left for the Intent's other extras. Keep it equal to `HostLauncher.SCRIPT_UNIT_LIMIT`.
+ */
+const HOST_SCRIPT_UNIT_LIMIT = 200 * 1024;
 const helperScripts = ["pipkin-setup.sh", "run.sh", "start.sh"];
 
 // The MIT and BSD licences ask every copy to carry its notice, and esbuild drops the notices of the code it bundles,
 // so each bundle with third-party code starts with them.
-const [diffLicense, typeboxLicense, webAccessLicense, todoLicense] = await Promise.all([
+const [diffLicense, typeboxLicense, webAccessLicense, todoLicense, piLicense] = await Promise.all([
   readFile("node_modules/diff/LICENSE", "utf8"),
   readFile("node_modules/typebox/license", "utf8"),
   readFile("src/pi-extensions/pipkin-web-access/LICENSE", "utf8"),
   readFile("src/pi-extensions/pipkin-todo/LICENSE", "utf8"),
+  // Pi's package ships no licence file; the app's copy carries the one from Pi's repository.
+  readFile("../app/src/main/assets/licenses/pi.txt", "utf8"),
 ]);
 const [diffVersion, typeboxVersion] = await Promise.all(["diff", "typebox"].map(packageVersion));
 const paseoNotice =
@@ -41,6 +49,7 @@ const hostNotices = `/*\nBundles jsdiff ${diffVersion}:\n\n${diffLicense}\n${pas
 const todoNotices = `/*\nThe todo tool's texts come from @juicesharp/rpiv-todo 2.13.8:\n\n${todoLicense}*/`;
 const webAccessNotices =
   `/*\nVendored from pi-web-access:\n\n${webAccessLicense}\nBundles typebox:\n\n${typeboxLicense}*/`;
+const remoteNotices = `/*\n${piLicense}*/`;
 
 /** The version of the installed package [name]. */
 async function packageVersion(name: string): Promise<string> {
@@ -70,7 +79,14 @@ const licenses: Record<string, string> = {
 await mkdir(`${out}/termux-helper`, { recursive: true });
 await mkdir(`${out}/licenses`, { recursive: true });
 await Promise.all([
-  build({ ...common, entryPoints: ["src/main.ts"], outfile: `${out}/pipkin-host.mjs`, banner: { js: hostNotices } }),
+  // Minified, so the host fits the Intent; the notices in the banner stay.
+  build({
+    ...common,
+    entryPoints: ["src/main.ts"],
+    outfile: `${out}/pipkin-host.mjs`,
+    banner: { js: hostNotices },
+    minify: true,
+  }),
   build({
     ...common,
     entryPoints: ["src/pi-extensions/pipkin-todo/index.ts"],
@@ -95,6 +111,14 @@ await Promise.all([
   }),
   build({
     ...common,
+    entryPoints: ["src/pi-extensions/pipkin-remote/index.ts"],
+    outfile: `${out}/pipkin-extensions/pipkin-remote.js`,
+    banner: { js: remoteNotices },
+    // Pi resolves these to its own copies when it loads an extension.
+    external: ["@earendil-works/*", "typebox"],
+  }),
+  build({
+    ...common,
     entryPoints: ["src/pi-extensions/pipkin-web-access/index.ts"],
     outfile: `${out}/pipkin-extensions/pipkin-web-access.js`,
     banner: { js: webAccessNotices },
@@ -106,3 +130,8 @@ await Promise.all([
   ...helperScripts.map((name) => copyFile(`src/helper/${name}`, `${out}/termux-helper/${name}`)),
   ...Object.entries(licenses).map(([name, text]) => writeFile(`${out}/licenses/${name}.txt`, text)),
 ]);
+
+const hostUnits = (await readFile(`${out}/pipkin-host.mjs`, "utf8")).length;
+if (hostUnits > HOST_SCRIPT_UNIT_LIMIT) {
+  throw new Error(`pipkin-host.mjs has ${hostUnits} UTF-16 units, over the Intent's ${HOST_SCRIPT_UNIT_LIMIT}`);
+}

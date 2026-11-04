@@ -7,13 +7,11 @@ import org.json.JSONObject
 /**
  * The host ran the operation and refused it; [code] is the host's machine code (`pi_version`, `bad_id`, …) and
  * [englishError] its reason as the host wrote it, for logs. [error] is that reason in the app's language, read when
- * it's shown so it follows a change of language; [message] is the same. [text] is null when the host gave no reason.
+ * it's shown so it follows a change of language; [message] is the same. [text] is null when the host gave no reason;
+ * its arguments may say more, such as the form field a validation failure is about.
  */
-internal class HostRejected(
-  val code: String,
-  val englishError: String,
-  private val text: HostText? = HostText(englishError),
-) : Exception() {
+internal class HostRejected(val code: String, val englishError: String, val text: HostText? = HostText(englishError)) :
+  Exception() {
   val error: String get() = text?.resolve() ?: AppStrings.get(R.string.host_rejected_without_reason)
 
   override val message: String get() = error

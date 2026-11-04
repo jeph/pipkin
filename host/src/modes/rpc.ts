@@ -15,8 +15,11 @@ import { folderNotFound, HostError, installedPiVersion, loadPi, piEntry } from "
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { nullableStringParam, stringParam } from "../params.js";
-import { installedPipkinExtensionFiles, pipkinExtensionFingerprintsParam } from "../pipkin-extensions.js";
-import { SYSTEM_APPEND } from "../prompt.js";
+import { installedPipkinExtensionFiles, pipkinExtensionFingerprintsParam, REMOTE_EXTENSION } from "../pipkin-extensions.js";
+import { remoteSystemAppend, SYSTEM_APPEND } from "../prompt.js";
+import { findHost } from "../remote/hosts.js";
+import { remotePaths } from "../remote/paths.js";
+import { readStandIn } from "../remote/stand-ins.js";
 import { openSettingsIfValid, readGlobalSettings, userNpmPackages } from "../settings.js";
 import { termuxSessionEnv } from "../termux-session.js";
 import { configBusy, isConfigLocked } from "../config-lock.js";
@@ -116,6 +119,33 @@ function fail(ctx: ModeContext, refusal: HostError): void {
   ctx.conn.finish();
 }
 
+/** What a remote chat's Pi starts with instead of a local one's: `pipkin-remote`, and a prompt naming the remote. */
+interface RemoteChat {
+  extension: string;
+  prompt: string;
+}
+
+/**
+ * The remote chat in [cwd], or null when it's a local folder; the refusal to send when its host was removed or Pipkin's
+ * `pipkin-remote` isn't among the installed [extensionFiles], which only an out-of-date app leaves out.
+ */
+async function remoteChat(ctx: ModeContext, cwd: string, extensionFiles: { name: string; path: string }[]): Promise<RemoteChat | HostError | null> {
+  const paths = remotePaths(ctx.env.configDir, ctx.env.prefix, ctx.env.home);
+  const standIn = await readStandIn(paths.remotes, cwd);
+  if (standIn === null) return null;
+  const extension = extensionFiles.find(({ name }) => name === REMOTE_EXTENSION);
+  if (extension === undefined) {
+    return new HostError("pi_version", "The agent's bundled extensions are out of date", { key: "agent_extensions_outdated" });
+  }
+  try {
+    const host = await findHost(paths, standIn.hostId);
+    return { extension: extension.path, prompt: remoteSystemAppend(host, standIn.path) };
+  } catch (error) {
+    if (error instanceof HostError) return error;
+    throw error;
+  }
+}
+
 /**
  * Bridges the socket to `pi --mode rpc` byte-for-byte. Pi exits on stdin EOF, so closing the
  * socket stops the agent; signals only cover a Pi that ignores EOF.
@@ -160,6 +190,11 @@ export async function rpc(ctx: ModeContext): Promise<void> {
     fail(ctx, folderNotFound("cwd_missing", cwd));
     return;
   }
+  const remote = await remoteChat(ctx, cwd, extensionFiles);
+  if (remote instanceof HostError) {
+    fail(ctx, remote);
+    return;
+  }
   // A restore swaps the configuration while it holds the lock, and an extension update rewrites the packages Pi loads;
   // Pi must start on one side of the change or the other.
   if (await isConfigLocked(ctx.env)) {
@@ -175,9 +210,11 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   // Pi exits when two copies of one extension register the same tools, so pi-web-access from npm replaces Pipkin's copy.
   const replacedByNpm = userNpmPackages(settings).has(WEB_ACCESS_NPM_PACKAGE);
   for (const { name, path } of extensionFiles) {
-    if (!(replacedByNpm && name === WEB_ACCESS_EXTENSION)) args.push("--extension", path);
+    if (name !== REMOTE_EXTENSION && !(replacedByNpm && name === WEB_ACCESS_EXTENSION)) args.push("--extension", path);
   }
-  args.push("--append-system-prompt", SYSTEM_APPEND);
+  // Last, so it turns grep, find and ls off after every other extension set up its tools.
+  if (remote !== null) args.push("--extension", remote.extension);
+  args.push("--append-system-prompt", remote === null ? SYSTEM_APPEND : remote.prompt);
   const env = await termuxSessionEnv(ctx.env);
   // The channel socket goes last, at CHANNEL_FD; Pi hands none of its fds past stderr to the commands it runs.
   const child = spawn(process.execPath, args, { cwd, env, stdio: ["pipe", "pipe", "pipe", "pipe"] });

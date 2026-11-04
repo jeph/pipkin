@@ -7,27 +7,46 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONObject
 
-/** A starting point offered by the browser. [kind] is `home`, `shared` or `volume` (with its [name]). */
+/**
+ * A starting point offered by the browser. [kind] is `home`, `shared` or `volume` (with its [name]) on the phone,
+ * `remote_home` or `remote_root` on a remote host.
+ */
 internal data class FolderPlace(val kind: String, val path: String, val name: String?)
 
-/** Subfolders of [path], as Termux sees them. [error] explains an unreadable path; [parent] is null at `/`. */
-internal data class FolderListing(val path: String, val parent: String?, val dirs: List<String>, val error: HostText?)
+/**
+ * Subfolders of [path], as Termux sees them. [error] explains an unreadable path, and [errorCode] names the failure
+ * when it was the connection to a remote host, such as `remote_not_connected`; [parent] is null at `/`.
+ */
+internal data class FolderListing(
+  val path: String,
+  val parent: String?,
+  val dirs: List<String>,
+  val error: HostText?,
+  val errorCode: String?,
+)
 
 /**
  * One `host.mjs browse` process kept open while the folder browser is shown, so only opening it pays
- * for starting Termux. Requests are one at a time; [close] ends the host.
+ * for starting Termux. Requests are one at a time; [close] ends the host. A browser for a remote host that can't be
+ * reached has no [places] and says why in [error].
  */
-internal class FolderBrowser(private val channel: HostChannel, val places: List<FolderPlace>) : AutoCloseable {
+internal class FolderBrowser(
+  private val channel: HostChannel,
+  val places: List<FolderPlace>,
+  val error: RemoteFailure?,
+  private val listTimeoutMillis: Long,
+) : AutoCloseable {
   private val lock = Mutex()
   private var nextId = 0L
 
   suspend fun list(path: String): FolderListing {
-    val line = request(JSONObject().put("type", LIST).put("path", path), LISTING, LIST_TIMEOUT_MILLIS)
+    val line = request(JSONObject().put("type", LIST).put("path", path), LISTING, listTimeoutMillis)
     return FolderListing(
       path = line.optString("path"),
       parent = line.opt("parent") as? String,
       dirs = line.optJSONArray("dirs").strings(),
       error = HostText.field(line, "error"),
+      errorCode = (line.opt("errorCode") as? String)?.takeIf(String::isNotEmpty),
     )
   }
 
@@ -64,12 +83,16 @@ internal class FolderBrowser(private val channel: HostChannel, val places: List<
     private const val SEARCH_RESULTS = "pipkin_search_results"
     private const val LIST_TIMEOUT_MILLIS = 15_000L
 
+    /** Past `ssh`'s 15-second connect timeout, so a host that doesn't answer is reported by `ssh` rather than by this. */
+    private const val REMOTE_LIST_TIMEOUT_MILLIS = 45_000L
+
     /** A search walks up to 20,000 folders per place, which takes a while on shared storage. */
     private const val SEARCH_TIMEOUT_MILLIS = 60_000L
 
     /** Waits for the host's `pipkin_places`; a refusal arrives as `pipkin_result` instead. */
-    suspend fun start(channel: HostChannel): FolderBrowser {
-      val line = withTimeoutOrNull(LIST_TIMEOUT_MILLIS) {
+    suspend fun start(channel: HostChannel, remote: Boolean): FolderBrowser {
+      val timeoutMillis = if (remote) REMOTE_LIST_TIMEOUT_MILLIS else LIST_TIMEOUT_MILLIS
+      val line = withTimeoutOrNull(timeoutMillis) {
         channel.lines.firstOrNull { it.optString("type") == PLACES || it.optString("type") == HostProtocol.RESULT }
           ?: throw HostFailure.Disconnected()
       } ?: throw HostFailure.Timeout()
@@ -77,7 +100,7 @@ internal class FolderBrowser(private val channel: HostChannel, val places: List<
       val places = line.optJSONArray("places").objects().map {
         FolderPlace(it.optString("kind"), it.optString("path"), it.opt("name") as? String)
       }
-      return FolderBrowser(channel, places)
+      return FolderBrowser(channel, places, RemoteFailure.from(line.optJSONObject("error")), timeoutMillis)
     }
   }
 }

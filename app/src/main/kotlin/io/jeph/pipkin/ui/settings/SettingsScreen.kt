@@ -53,13 +53,16 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import kotlinx.coroutines.launch
 
-/** Settings: models, chats, appearance, extensions, agent, configuration and about cards under a header. */
+/**
+ * Settings: models, chats, appearance, extensions, agent, remote hosts, configuration and about cards under a header.
+ */
 @Composable
 internal fun SettingsScreen(
   onBack: () -> Unit,
   onOpenProviders: () -> Unit,
   onOpenRunningAgents: () -> Unit,
   onOpenPermissions: () -> Unit,
+  onOpenRemoteHosts: () -> Unit,
   onOpenBackups: () -> Unit,
   onOpenLicenses: () -> Unit,
 ) {
@@ -83,6 +86,7 @@ internal fun SettingsScreen(
         onOpenProviders = onOpenProviders,
         onOpenRunningAgents = onOpenRunningAgents,
         onOpenPermissions = onOpenPermissions,
+        onOpenRemoteHosts = onOpenRemoteHosts,
         onOpenBackups = onOpenBackups,
         onOpenLicenses = onOpenLicenses,
       )
@@ -101,6 +105,7 @@ private fun SettingsContent(
   onOpenProviders: () -> Unit,
   onOpenRunningAgents: () -> Unit,
   onOpenPermissions: () -> Unit,
+  onOpenRemoteHosts: () -> Unit,
   onOpenBackups: () -> Unit,
   onOpenLicenses: () -> Unit,
 ) {
@@ -122,6 +127,7 @@ private fun SettingsContent(
       AppearanceSection(preferences = graph.preferences)
       ExtensionsSection(graph = graph, snackbar = snackbar)
       AgentSection(graph = graph, onOpenRunningAgents = onOpenRunningAgents, onOpenPermissions = onOpenPermissions)
+      RemoteHostsSection(remoteHosts = graph.remoteHosts, onOpenRemoteHosts = onOpenRemoteHosts)
       ConfigurationSection(graph = graph, snackbar = snackbar, onOpenBackups = onOpenBackups)
       AboutSection(onOpenLicenses = onOpenLicenses)
     }
@@ -167,8 +173,9 @@ private fun AppearanceSection(preferences: Preferences) {
 }
 
 /**
- * A switch for each extension Pipkin bundles, and updating the Pi extensions installed in its settings. A switch
- * reloads idle chats so they pick the change up at once; a working chat picks it up when its agent next starts.
+ * A switch for each extension Pipkin bundles that the user can turn off, and updating the Pi extensions installed in
+ * its settings. A switch reloads idle chats so they pick the change up at once; a working chat picks it up when its
+ * agent next starts.
  */
 @Composable
 private fun ExtensionsSection(graph: AppGraph, snackbar: SnackbarStackState) {
@@ -176,6 +183,7 @@ private fun ExtensionsSection(graph: AppGraph, snackbar: SnackbarStackState) {
   Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12)) {
     SettingsSection(title = stringResource(R.string.settings_section_extensions)) {
       BundledExtension.entries.forEach { extension ->
+        val switch = extension.switch ?: return@forEach
         val enabled = extension.id !in disabled
         val toggle = { on: Boolean ->
           graph.preferences.setExtensionEnabled(extension, on)
@@ -183,8 +191,8 @@ private fun ExtensionsSection(graph: AppGraph, snackbar: SnackbarStackState) {
           graph.registry.reloadIdle()
         }
         SettingsRow(
-          title = stringResource(extension.title),
-          subtitle = stringResource(extension.summary),
+          title = stringResource(switch.title),
+          subtitle = stringResource(switch.summary),
           modifier = Modifier.toggleable(value = enabled, role = Role.Switch, onValueChange = toggle),
         ) {
           SettingsSwitch(checked = enabled)

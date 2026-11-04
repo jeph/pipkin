@@ -3,7 +3,7 @@ title: Pipkin guide
 description: What Pipkin is, how it runs on your phone, and where to start.
 ---
 
-Pipkin is an AI coding agent that runs on your Android phone. Tell it what to build or fix, and it reads your code, runs commands, edits files, and checks its own work. There's no laptop or cloud server doing the work somewhere else: the agent, your files, and every command stay on the phone.
+Pipkin is an AI coding agent that runs on your Android phone. Tell it what to build or fix, and it reads your code, runs commands, edits files, and checks its own work. There's no laptop or cloud server doing the work somewhere else: the agent, your files, and every command stay on the phone. When a project lives on a computer of your own, the agent can also work on it there over SSH, while still running on the phone.
 
 ## How it fits together
 
@@ -20,6 +20,7 @@ The thinking happens at the AI model you connect, such as Claude or OpenAI, so y
 - **[Get started](/docs/get-started/)**: install Pipkin and Termux, walk through setup, and start your first chat.
 - **[Connect a model](/docs/providers/)**: sign in with a Claude or OpenAI subscription, add a Gemini, Z.ai, Kimi or OpenRouter API key, or add any OpenAI-compatible API.
 - **[Local models](/docs/local-models/)**: download a small model and run it on the phone, with no provider. Experimental.
+- **[Remote hosts](/docs/remote-hosts/)**: work on a folder on another computer over SSH, with the agent still on the phone.
 - **[Configure the agent](/docs/configure/)**: find Pi's configuration in Termux and change how the agent behaves.
 - **[Extensions](/docs/extensions/)**: add Pi extensions, skills, and prompt templates, and see which ones Pipkin bundles.
 - **[Run in the background](/docs/background/)**: how Pipkin keeps chats working while you're away, and what Android can still stop.

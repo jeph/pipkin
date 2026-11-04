@@ -4,6 +4,13 @@ import { dirname, join } from "node:path";
 import { HostError } from "./env.js";
 import { isObject, type JsonObject } from "./framing.js";
 
+/**
+ * `pipkin-remote`, which runs a remote chat's tools over SSH. The app installs it with the others and sends its
+ * fingerprint with every chat, but Settings can't turn it off: `rpc` loads it for every chat in a stand-in folder, and
+ * for no other.
+ */
+export const REMOTE_EXTENSION = "pipkin-remote";
+
 /** Where a Pi extension Pipkin ships lives, as `ensure` installs it and `rpc` finds it. */
 interface ExtensionLocation {
   name: string;

@@ -59,7 +59,8 @@ import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
-import io.jeph.pipkin.ui.sidebar.tildePath
+import io.jeph.pipkin.ui.sidebar.FolderNames
+import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.relativeTime
@@ -77,15 +78,14 @@ import kotlinx.coroutines.launch
 internal fun ArchiveScreen(actions: ShellActions, onBack: () -> Unit, onOpenChat: (path: String) -> Unit) {
   val graph = LocalContext.current.appGraph
   val archived by graph.sessionArchive.archived.collectAsStateWithLifecycle()
-  val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
+  val names = rememberFolderNames()
   val page = rememberArchivePage(actions)
   var query by rememberSaveable { mutableStateOf("") }
   // Folders may have come or gone since the list was read, which decides what can be restored.
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
   LaunchedEffect(archived) { page.keepSelected(archived.map { it.session.path }.toSet()) }
   BackHandler(enabled = page.selected.isNotEmpty()) { page.selected = emptySet() }
-  val shown = remember(archived, query, home) { archived.filter { it.session.matches(query.trim(), home) } }
+  val shown = remember(archived, query, names) { archived.filter { it.session.matches(query.trim(), names) } }
   val selectedSessions = archived.map { it.session }.filter { it.path in page.selected }
   val restorable = selectedSessions.filter { it.cwdExists }
   Box(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
@@ -106,7 +106,7 @@ internal fun ArchiveScreen(actions: ShellActions, onBack: () -> Unit, onOpenChat
         page = page,
         shown = shown,
         archiveEmpty = archived.isEmpty(),
-        home = home,
+        names = names,
         onOpenChat = onOpenChat,
         modifier = Modifier.weight(1f).fillMaxWidth().imePadding(),
       )
@@ -211,7 +211,7 @@ private fun ArchiveList(
   page: ArchivePage,
   shown: List<ArchivedSession>,
   archiveEmpty: Boolean,
-  home: String,
+  names: FolderNames,
   onOpenChat: (path: String) -> Unit,
   modifier: Modifier,
 ) {
@@ -232,7 +232,7 @@ private fun ArchiveList(
           val path = entry.session.path
           ArchivedRow(
             entry = entry,
-            home = home,
+            names = names,
             selecting = page.selected.isNotEmpty(),
             selected = path in page.selected,
             onClick = { if (page.selected.isEmpty()) onOpenChat(path) else page.toggle(path) },
@@ -270,9 +270,9 @@ private fun ArchivePageOverlays(page: ArchivePage) {
   }
 }
 
-/** Whether [query] (already trimmed) is in the chat's title or its folder, as a full or `~` path. */
-private fun SessionInfo.matches(query: String, home: String): Boolean = query.isEmpty() ||
-  listOfNotNull(name, firstMessage, cwd, tildePath(cwd, home)).any { it.contains(query, ignoreCase = true) }
+/** Whether [query] (already trimmed) is in the chat's title or its folder, as a full or `~` path or with its host. */
+private fun SessionInfo.matches(query: String, names: FolderNames): Boolean = query.isEmpty() ||
+  listOfNotNull(name, firstMessage, cwd, names.path(cwd)).any { it.contains(query, ignoreCase = true) }
 
 @Composable
 private fun ArchiveHeader(
@@ -319,7 +319,7 @@ private fun ArchiveHeader(
 @Composable
 private fun ArchivedRow(
   entry: ArchivedSession,
-  home: String,
+  names: FolderNames,
   selecting: Boolean,
   selected: Boolean,
   onClick: () -> Unit,
@@ -368,7 +368,7 @@ private fun ArchivedRow(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
-      FolderAndSubagents(session, home)
+      FolderAndSubagents(session, names)
     }
     Text(
       text = relativeTime(entry.archivedAt),
@@ -392,10 +392,10 @@ private const val SELECTED_RING_ALPHA = 0.5f
 
 /** The chat's [FolderLine], then how many subagents it ran, whose transcripts stay with it. */
 @Composable
-private fun FolderAndSubagents(session: SessionInfo, home: String) {
+private fun FolderAndSubagents(session: SessionInfo, names: FolderNames) {
   val colors = pipkinColors
   Row(verticalAlignment = Alignment.CenterVertically) {
-    FolderLine(session, home, Modifier.weight(1f, fill = false))
+    FolderLine(session, names, Modifier.weight(1f, fill = false))
     val count = session.subagents
     if (count == 0) return@Row
     Text(
@@ -420,9 +420,12 @@ private fun FolderAndSubagents(session: SessionInfo, home: String) {
   }
 }
 
-/** The chat's folder with `~` for home, led by "Folder missing" once the folder is gone. */
+/**
+ * The chat's folder with `~` for home, after its host's name for a remote one, led by "Folder missing" once the folder
+ * is gone.
+ */
 @Composable
-internal fun FolderLine(session: SessionInfo, home: String, modifier: Modifier = Modifier) {
+internal fun FolderLine(session: SessionInfo, names: FolderNames, modifier: Modifier = Modifier) {
   val colors = pipkinColors
   Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
     if (!session.cwdExists) {
@@ -434,7 +437,7 @@ internal fun FolderLine(session: SessionInfo, home: String, modifier: Modifier =
       )
     }
     Text(
-      text = tildePath(session.cwd, home),
+      text = names.path(session.cwd),
       color = colors.foregroundMuted,
       fontSize = PipkinTokens.FontSize.sm,
       maxLines = 1,

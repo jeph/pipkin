@@ -65,6 +65,8 @@ internal data class SessionInfo(
   val messageCount: Int,
   val firstMessage: String,
   val subagents: Int = 0,
+  /** The remote folder a stand-in [cwd] names; null for a chat in a folder on the phone. */
+  val remote: RemotePath? = null,
 ) {
   companion object {
     fun from(json: JSONObject) = SessionInfo(
@@ -78,6 +80,7 @@ internal data class SessionInfo(
       messageCount = json.optInt("messageCount"),
       firstMessage = json.optString("firstMessage"),
       subagents = json.optInt("subagents"),
+      remote = RemotePath.from(json.optJSONObject("remote")),
     )
   }
 }

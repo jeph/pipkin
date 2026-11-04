@@ -7,6 +7,8 @@ import { closeSync, mkdirSync, openSync, readSync, fstatSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
+import { remoteScript, watched } from "../../remote/script.js";
+import { type Remote, sessionScript, shBinary, sshEnvironment } from "../../remote/ssh.js";
 import { StringEnum } from "../string-enum.js";
 
 export const TOOL_NAME = "background";
@@ -286,6 +288,32 @@ export function startProcess(
       child.once("error", reject);
       child.once("exit", (code, signal) => resolve({ code, signal }));
     });
+    return { pid: child.pid, ended };
+  } finally {
+    closeSync(log);
+  }
+}
+
+/**
+ * Runs [command] on [remote] in its folder [cwd], through a local `ssh` that `sh` runs ([sessionScript]) in their own
+ * process group, writing the command's stdout and stderr, and `ssh`'s own messages, to [logPath]. The command runs
+ * under the remote watchdog, which ends it once `ssh`'s standard input closes: `sh` passes the pipe on, which stays
+ * open while the task runs, and closes when Stop kills the group or this Pi dies, however it dies, as only this Pi
+ * holds its writing end. Throws when `sh` can't start.
+ */
+export function startRemoteProcess(remote: Remote, command: string, cwd: string, logPath: string): Started {
+  const log = openSync(logPath, "w");
+  try {
+    // Through [sessionScript], which waits while the server refuses the master a session instead of failing.
+    const child = spawn(shBinary(remote.paths), ["-c", sessionScript(remote, remoteScript(watched(command, cwd)))], {
+      detached: true,
+      stdio: ["pipe", log, log],
+      env: sshEnvironment(),
+    });
+    child.stdin?.on("error", () => undefined);
+    const { promise: ended, resolve, reject } = Promise.withResolvers<{ code: number | null; signal: string | null }>();
+    child.once("error", reject);
+    child.once("exit", (code, signal) => resolve({ code, signal }));
     return { pid: child.pid, ended };
   } finally {
     closeSync(log);

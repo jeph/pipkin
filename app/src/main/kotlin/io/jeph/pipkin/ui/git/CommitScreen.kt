@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -25,6 +26,9 @@ import io.jeph.pipkin.git.CommitDiffState
 import io.jeph.pipkin.git.CommitTab
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
+import io.jeph.pipkin.ui.remote.RemoteConnectDialogs
+import io.jeph.pipkin.ui.remote.rememberRemoteConnector
+import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import io.jeph.pipkin.ui.workspace.PaneControls
@@ -32,6 +36,7 @@ import io.jeph.pipkin.ui.workspace.PaneHeader
 import io.jeph.pipkin.ui.workspace.PublishTabActions
 import io.jeph.pipkin.ui.workspace.TabAction
 import io.jeph.pipkin.workspace.WorkspaceTab
+import kotlinx.coroutines.launch
 
 /**
  * One open commit in a pane: the pane's header with the commit's title and the commit's actions, which acts through
@@ -56,34 +61,63 @@ internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: M
   // A fresh list per commit, so switching commits never carries the old one's scroll position over.
   val list = remember(commit) { LazyListState() }
   LaunchedEffect(commit, hideWhitespace) { commit.load(hideWhitespace) }
+  val scope = rememberCoroutineScope()
+  val connector = rememberRemoteConnector()
+  RemoteConnectDialogs(connector)
+  val host = rememberFolderNames().remote(commit.cwd)?.host
+  val remoteHosts = LocalContext.current.appGraph.remoteHosts
+  val unreachable = (state as? CommitDiffState.Failed)?.remote
+  // A read that found the connection gone shows the host disconnected in the sidebar and chat banner too.
+  LaunchedEffect(host?.id, unreachable) {
+    if (host != null && unreachable != null) remoteHosts.noteFailure(host.id, unreachable.code)
+  }
+  // A failed read is read again once the host is connected.
+  val connect = host?.let { shown ->
+    { connector.connect(shown.id, shown.name) { scope.launch { commit.load(hideWhitespace) } } }
+  }
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
     PaneHeader(title = commit.title, cwd = commit.cwd, controls = controls)
-    val body = Modifier.weight(1f)
-    when (val shown = state) {
-      CommitDiffState.Loading -> DiffNote(text = null, modifier = body, loading = true)
+    CommitBody(state, wrapLines, list, connect, Modifier.weight(1f))
+  }
+}
 
-      CommitDiffState.NotFound -> DiffNote(stringResource(R.string.git_commit_not_found), body)
+/** What the commit changed, or a note in its place; an error only connecting the remote host fixes offers [onConnect]. */
+@Composable
+private fun CommitBody(
+  state: CommitDiffState,
+  wrapLines: Boolean,
+  list: LazyListState,
+  onConnect: (() -> Unit)?,
+  modifier: Modifier,
+) {
+  when (state) {
+    CommitDiffState.Loading -> DiffNote(text = null, modifier = modifier, loading = true)
 
-      is CommitDiffState.Failed -> DiffNote(shown.message.ifEmpty { stringResource(R.string.git_refresh_failed) }, body)
+    CommitDiffState.NotFound -> DiffNote(stringResource(R.string.git_commit_not_found), modifier)
 
-      is CommitDiffState.Loaded -> when {
-        shown.document.tooLarge -> DiffTooLarge(body)
+    is CommitDiffState.Failed -> DiffNote(
+      state.message.ifEmpty { stringResource(R.string.git_refresh_failed) },
+      modifier,
+      onConnect = onConnect?.takeIf { state.remote?.needsConnect == true },
+    )
 
-        shown.document.sections.isEmpty() -> DiffNote(stringResource(R.string.git_empty), body)
+    is CommitDiffState.Loaded -> when {
+      state.document.tooLarge -> DiffTooLarge(modifier)
 
-        else -> DiffView(
-          document = shown.document,
-          wrapLines = wrapLines,
-          collapsed = emptySet(),
-          onToggle = null,
-          state = list,
-          modifier = body,
-          contentPadding = PaddingValues(
-            bottom = PipkinTokens.Spacing.s16 + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
-          ),
-        )
-      }
+      state.document.sections.isEmpty() -> DiffNote(stringResource(R.string.git_empty), modifier)
+
+      else -> DiffView(
+        document = state.document,
+        wrapLines = wrapLines,
+        collapsed = emptySet(),
+        onToggle = null,
+        state = list,
+        modifier = modifier,
+        contentPadding = PaddingValues(
+          bottom = PipkinTokens.Spacing.s16 + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+        ),
+      )
     }
   }
 }

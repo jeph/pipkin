@@ -71,6 +71,7 @@ internal class Preferences(context: Context) {
     prefs.getInt(LOCAL_MODEL_IDLE_UNLOAD_MINUTES, LocalModelSettings.DEFAULT_IDLE_UNLOAD_MINUTES)
       .coerceIn(LocalModelSettings.IDLE_UNLOAD_MINUTES),
   )
+  private val pickerMachineState = MutableStateFlow(prefs.getString(PICKER_MACHINE, null))
 
   /** Onboarding finished. */
   val setupComplete: StateFlow<Boolean> = setupCompleteState.asStateFlow()
@@ -154,6 +155,9 @@ internal class Preferences(context: Context) {
 
   /** How many minutes a loaded local model may sit unused before its memory is given back. */
   val localModelIdleUnloadMinutes: StateFlow<Int> = localModelIdleUnloadMinutesState.asStateFlow()
+
+  /** The machine the folder picker last browsed: a remote host's id, or null for the phone. */
+  val pickerMachine: StateFlow<String?> = pickerMachineState.asStateFlow()
 
   fun setSetupComplete(complete: Boolean) {
     prefs.edit { putBoolean(SETUP_COMPLETE, complete) }
@@ -351,6 +355,22 @@ internal class Preferences(context: Context) {
     localModelIdleUnloadMinutesState.value = allowed
   }
 
+  fun setPickerMachine(hostId: String?) {
+    if (pickerMachineState.value == hostId) return
+    prefs.edit { putString(PICKER_MACHINE, hostId) }
+    pickerMachineState.value = hostId
+  }
+
+  /**
+   * The last `remote_hosts` result, so remote workspaces show their host and path as soon as Pipkin starts, before
+   * Termux has answered; null before the first.
+   */
+  fun remoteHostsCache(): String? = prefs.getString(REMOTE_HOSTS, null)
+
+  fun setRemoteHostsCache(json: String) {
+    prefs.edit { putString(REMOTE_HOSTS, json) }
+  }
+
   /** The tabs and panes last shown, for a restarted Pipkin to show again; null before any were saved. */
   fun savedLayout(): SavedLayout? = prefs.getString(LAYOUT, null)?.let(::savedLayoutOf)
 
@@ -440,5 +460,7 @@ internal class Preferences(context: Context) {
     const val LOCAL_MODEL_GPU = "localModelGpu"
     const val LOCAL_MODEL_GPU_ON = "localModelGpuOn"
     const val LOCAL_MODEL_IDLE_UNLOAD_MINUTES = "localModelIdleUnloadMinutes"
+    const val PICKER_MACHINE = "pickerMachine"
+    const val REMOTE_HOSTS = "remoteHosts"
   }
 }

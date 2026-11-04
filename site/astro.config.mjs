@@ -38,6 +38,7 @@ export default defineConfig({
         { label: "Get started", slug: "docs/get-started" },
         { label: "Connect a model", slug: "docs/providers" },
         { label: "Local models", slug: "docs/local-models" },
+        { label: "Remote hosts", slug: "docs/remote-hosts" },
         { label: "Configure the agent", slug: "docs/configure" },
         { label: "Extensions", slug: "docs/extensions" },
         { label: "Run in the background", slug: "docs/background" },

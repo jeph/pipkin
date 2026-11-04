@@ -24,7 +24,12 @@ internal object HostLauncher {
   private const val BASH = "/data/data/com.termux/files/usr/bin/bash"
   private val SERVICE = ComponentName("com.termux", "com.termux.app.RunCommandService")
   private const val HOST_ASSET = "pipkin-host.mjs"
-  private const val ARGUMENT_LIMIT = 256 * 1024
+
+  /**
+   * Most UTF-16 units of host script the Intent carries: Android delivers it in one binder transaction capped near
+   * 512 KiB, two bytes per unit in a Parcel, with room left for the other extras. `host/build.ts` fails the build past it.
+   */
+  private const val SCRIPT_UNIT_LIMIT = 200 * 1024
 
   /**
    * Linux refuses to exec a command with any one argument over 128 KiB (`MAX_ARG_STRLEN`), so the script travels in
@@ -168,7 +173,7 @@ internal object HostLauncher {
   private fun script(context: Context): List<String> {
     hostScript?.let { return it }
     val text = context.assets.open(HOST_ASSET).bufferedReader(Charsets.UTF_8).use { it.readText() }
-    check(text.toByteArray(Charsets.UTF_8).size <= ARGUMENT_LIMIT) { "$HOST_ASSET exceeds the Intent size limit" }
+    check(text.length <= SCRIPT_UNIT_LIMIT) { "$HOST_ASSET exceeds the Intent size limit" }
     val pieces = buildList {
       var start = 0
       while (start < text.length) {

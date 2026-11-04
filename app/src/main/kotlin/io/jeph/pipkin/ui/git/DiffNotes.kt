@@ -23,12 +23,21 @@ import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.files.Spinner
+import io.jeph.pipkin.ui.onboarding.PrimaryButton
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** A note in place of a diff, centred on a card: a spinner first while [loading], then [text] if any. */
+/**
+ * A note in place of a diff, centred on a card: a spinner first while [loading], then [text] if any, then Connect when
+ * [onConnect] is given, for a remote host only the user can sign in to or check the key of.
+ */
 @Composable
-internal fun DiffNote(text: String?, modifier: Modifier = Modifier, loading: Boolean = false) {
+internal fun DiffNote(
+  text: String?,
+  modifier: Modifier = Modifier,
+  loading: Boolean = false,
+  onConnect: (() -> Unit)? = null,
+) {
   val colors = pipkinColors
   NoteCard(modifier, Alignment.Center, PipkinTokens.Spacing.s8) {
     if (loading) Spinner(PipkinTokens.IconSize.md, contentDescription = null)
@@ -38,6 +47,13 @@ internal fun DiffNote(text: String?, modifier: Modifier = Modifier, loading: Boo
         color = colors.foregroundMuted,
         fontSize = PipkinTokens.FontSize.base,
         textAlign = TextAlign.Center,
+      )
+    }
+    if (onConnect != null) {
+      PrimaryButton(
+        text = stringResource(R.string.remote_connect),
+        onClick = onConnect,
+        modifier = Modifier.padding(top = PipkinTokens.Spacing.s4),
       )
     }
   }

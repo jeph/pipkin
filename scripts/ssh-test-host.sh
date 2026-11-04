@@ -41,6 +41,18 @@ run() {
   local env
   for env in "$@"; do args+=(--env "$env"); done
   docker run --detach --name "$name" --hostname "$name" --publish "127.0.0.1:$port:22" "${args[@]}" "$image" >/dev/null
+  # The entrypoint makes host keys and writes authorized_keys before it starts sshd, so wait for sshd: anything run in
+  # the container before then races it.
+  local tries
+  for ((tries = 0; tries < 100; tries++)); do
+    docker exec "$name" pgrep -x sshd >/dev/null && break
+    sleep 0.1
+  done
+  if [ "$tries" -eq 100 ]; then
+    docker logs "$name" >&2
+    echo "$name: sshd didn't start" >&2
+    exit 1
+  fi
   echo "$name is up: ssh -p $port pipkin@localhost here, 10.0.2.2 port $port from the emulator"
 }
 
@@ -79,6 +91,7 @@ case "$cmd" in
     envs=()
     while IFS= read -r env; do envs+=("$env"); done < <(container_env "$name")
     keys=$(docker exec -u pipkin "$name" cat /home/pipkin/.ssh/authorized_keys 2>/dev/null || true)
+    build
     docker rm --force "$name" >/dev/null
     run "$name" "$port" ${envs[@]+"${envs[@]}"}
     [ -z "$keys" ] || docker exec -i -u pipkin "$name" sh -c 'cat >~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys' <<<"$keys"

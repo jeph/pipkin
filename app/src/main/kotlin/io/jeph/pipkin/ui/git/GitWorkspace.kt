@@ -12,6 +12,7 @@ import io.jeph.pipkin.host.GitDiffMode
 import io.jeph.pipkin.host.GitHost
 import io.jeph.pipkin.host.GitReply
 import io.jeph.pipkin.host.HostRejected
+import io.jeph.pipkin.host.RemoteFailure
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -27,8 +28,11 @@ internal sealed interface ChangesContent {
 
   class Loaded(val request: ChangesRequest, val changes: GitChanges, val document: DiffDocument) : ChangesContent
 
-  /** Git or the host failed; [message] is git's own text, or empty when there is none. */
-  class Failed(val message: String) : ChangesContent
+  /**
+   * Git or the host failed; [message] is git's own text, or empty when there is none. [remote] is set when the
+   * workspace's remote host couldn't be reached.
+   */
+  class Failed(val message: String, val remote: RemoteFailure? = null) : ChangesContent
 }
 
 internal sealed interface CommitsContent {
@@ -36,7 +40,8 @@ internal sealed interface CommitsContent {
 
   class Loaded(val commits: GitCommits) : CommitsContent
 
-  data object Failed : CommitsContent
+  /** [remote] is set when the workspace's remote host couldn't be reached. */
+  class Failed(val remote: RemoteFailure? = null) : CommitsContent
 }
 
 /**
@@ -48,6 +53,10 @@ internal sealed interface CommitsContent {
 @Stable
 internal class GitWorkspace(val root: String, private val git: GitHost) {
   var detection by mutableStateOf<GitDetection?>(null)
+    private set
+
+  /** Why the last detection couldn't reach the workspace's remote host; null once one did, and for a local workspace. */
+  var unreachable by mutableStateOf<RemoteFailure?>(null)
     private set
 
   var changes by mutableStateOf<ChangesContent>(ChangesContent.Loading)
@@ -79,19 +88,25 @@ internal class GitWorkspace(val root: String, private val git: GitHost) {
 
   /**
    * Detects the repository again, reading it with git only when [trusted]; returns why the Changes tab went away, if
-   * it did. A detection the host couldn't run keeps the last one.
+   * it did. A detection the host couldn't run keeps the last one, as does one on a remote host that couldn't be
+   * reached, which [unreachable] says.
    */
   suspend fun detect(trusted: Boolean): GitLoss? = detectLock.withLock {
     val before = detection
-    val after = try {
+    val reply = try {
       git.detect(root, trusted)
     } catch (_: IOException) {
       return null
     } catch (_: HostRejected) {
       return null
     }
-    detection = after
-    gitLoss(before, after)
+    if (reply !is GitReply.Loaded) {
+      unreachable = (reply as? GitReply.Failed)?.remote
+      return null
+    }
+    unreachable = null
+    detection = reply.value
+    gitLoss(before, reply.value)
   }
 
   /**
@@ -128,10 +143,10 @@ internal class GitWorkspace(val root: String, private val git: GitHost) {
       commitsReloading = false
     }
     when (reply) {
-      null -> if (commits == CommitsContent.Loading) commits = CommitsContent.Failed
+      null -> if (commits == CommitsContent.Loading) commits = CommitsContent.Failed()
       GitReply.Unchanged -> Unit
       is GitReply.Loaded -> commits = CommitsContent.Loaded(reply.value)
-      is GitReply.Failed -> commits = CommitsContent.Failed
+      is GitReply.Failed -> commits = CommitsContent.Failed(reply.remote)
     }
     reply != null && reply !is GitReply.Failed
   }
@@ -157,7 +172,7 @@ internal class GitWorkspace(val root: String, private val git: GitHost) {
     when (reply) {
       GitReply.Unchanged -> Unit
 
-      is GitReply.Failed -> changes = ChangesContent.Failed(reply.message)
+      is GitReply.Failed -> changes = ChangesContent.Failed(reply.message, reply.remote)
 
       is GitReply.Loaded -> {
         val previous = (changes as? ChangesContent.Loaded)?.document

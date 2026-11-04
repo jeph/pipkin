@@ -79,4 +79,29 @@ describe("ensure mode", () => {
     expect(result).toMatchObject({ ok: false, code: "bad_params" });
     expect(await readdir(dirs.root)).not.toContain("escape");
   });
+
+  describe("with remote hosts saved", () => {
+    const host = { id: "0123456789ab", name: "devbox", auth: "key", address: "me@devbox", port: 22, home: null };
+
+    it("rewrites ssh/config an older Pipkin wrote, so its settings reach saved hosts", async () => {
+      const ssh = path.join(path.dirname(dirs.configDir), "ssh");
+      await mkdir(ssh, { recursive: true });
+      await writeFile(path.join(ssh, "hosts.json"), JSON.stringify({ version: 1, hosts: [host] }));
+      await writeFile(path.join(ssh, "config"), "Host *\n  ServerAliveCountMax 3\n");
+
+      expect(await ensure()).toMatchObject({ ok: true });
+
+      const config = await readFile(path.join(ssh, "config"), "utf8");
+      expect(config).toContain("ServerAliveCountMax 2");
+      expect(config).toContain("Host pipkin-0123456789ab");
+    });
+
+    it("still succeeds when the hosts file can't be read", async () => {
+      const ssh = path.join(path.dirname(dirs.configDir), "ssh");
+      await mkdir(ssh, { recursive: true });
+      await writeFile(path.join(ssh, "hosts.json"), "{not json");
+
+      expect(await ensure()).toMatchObject({ ok: true, data: { piVersion: PI_VERSION } });
+    });
+  });
 });

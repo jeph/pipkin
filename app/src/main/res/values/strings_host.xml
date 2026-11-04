@@ -126,4 +126,39 @@
     <string name="host_git_exited"><xliff:g id="command" example="git diff">%1$s</xliff:g> exited with <xliff:g id="exit" example="128">%2$s</xliff:g>.</string>
     <!-- %1$s: the git command, such as "git diff"; %2$s: how many seconds it was given. -->
     <string name="host_git_timed_out"><xliff:g id="command" example="git diff">%1$s</xliff:g> took longer than <xliff:g id="seconds" example="30">%2$s</xliff:g> seconds.</string>
+
+    <!-- Remote hosts, reached over SSH. %1$s in these: the host's name as the user gave it, such as devbox. -->
+    <string name="host_remote_ssh_missing">OpenSSH isn\'t installed in Termux.</string>
+    <string name="host_remote_host_unknown">This workspace\'s host was removed.</string>
+    <string name="host_remote_not_connected">Not connected to <xliff:g id="host" example="devbox">%1$s</xliff:g>. Connect to sign in.</string>
+    <string name="host_remote_host_key_unknown"><xliff:g id="host" example="devbox">%1$s</xliff:g>\'s host key isn\'t known yet. Connect to check it.</string>
+    <string name="host_remote_host_key_changed"><xliff:g id="host" example="devbox">%1$s</xliff:g>\'s host key has changed. Someone may be intercepting the connection.</string>
+    <string name="host_remote_auth_failed"><xliff:g id="host" example="devbox">%1$s</xliff:g> refused the sign-in.</string>
+    <!-- %2$s: what ssh said, in English, such as "Connection timed out". -->
+    <string name="host_remote_unreachable">Couldn\'t reach <xliff:g id="host" example="devbox">%1$s</xliff:g>: <xliff:g id="detail" example="Connection timed out">%2$s</xliff:g></string>
+    <string name="host_remote_bash_missing"><xliff:g id="host" example="devbox">%1$s</xliff:g> has no <xliff:g id="command">bash</xliff:g>, which Pipkin needs to work there.</string>
+    <!-- %1$s: the remote host's name. Its SSH server allows a limited number of sessions at once, and all are in use. -->
+    <string name="host_remote_sessions_full"><xliff:g id="host" example="devbox">%1$s</xliff:g> has no free sessions. Close a terminal or stop a background task, then try again.</string>
+    <!-- %2$s: what ssh said, in English. -->
+    <string name="host_remote_failed">SSH to <xliff:g id="host" example="devbox">%1$s</xliff:g> failed: <xliff:g id="detail" example="Broken pipe">%2$s</xliff:g></string>
+    <string name="host_remote_connect_cancelled">Connecting was cancelled.</string>
+    <string name="host_remote_install_busy">Termux\'s package manager is busy with another install. Try again once it\'s done.</string>
+    <string name="host_remote_install_offline">Couldn\'t download OpenSSH. Check your internet connection, then try again.</string>
+    <!-- A remote folder the user's account on the host may not open. -->
+    <string name="host_remote_browse_no_access"><xliff:g id="host" example="devbox">%1$s</xliff:g> doesn\'t let you open this folder.</string>
+    <!-- A remote file or folder the user's account on the host may not open. -->
+    <string name="host_remote_files_no_access"><xliff:g id="host" example="devbox">%1$s</xliff:g> doesn\'t let you open this.</string>
+    <!-- "git" is a program's name and isn't translated. -->
+    <string name="host_remote_git_missing"><xliff:g id="command">git</xliff:g> isn\'t installed on <xliff:g id="host" example="devbox">%1$s</xliff:g>.</string>
+    <!-- The host editor's checks -->
+    <string name="host_remote_name_empty">Enter a name.</string>
+    <string name="host_remote_name_invalid">The name can\'t contain control characters.</string>
+    <!-- %1$s: the name the user typed. -->
+    <string name="host_remote_name_taken">Another host is named <xliff:g id="name" example="devbox">%1$s</xliff:g>.</string>
+    <string name="host_remote_address_empty">Enter an address.</string>
+    <!-- %1$s: the address the user typed. "user@host" is the shape of an SSH address and isn't translated. -->
+    <string name="host_remote_address_invalid"><xliff:g id="address" example="devbox lan">%1$s</xliff:g> isn\'t an address like <xliff:g id="shape">user@host</xliff:g>.</string>
+    <!-- %1$s: the alias the user typed. "Host" is the ~/.ssh/config keyword and isn't translated. -->
+    <string name="host_remote_alias_invalid"><xliff:g id="alias" example="dev box">%1$s</xliff:g> isn\'t a <xliff:g id="keyword">Host</xliff:g> alias.</string>
+    <string name="host_remote_port_invalid">The port must be a number from 1 to 65535.</string>
 </resources>

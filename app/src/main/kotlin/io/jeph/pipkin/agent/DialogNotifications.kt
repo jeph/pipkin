@@ -6,6 +6,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import io.jeph.pipkin.R
+import io.jeph.pipkin.ui.sidebar.FolderNames
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +32,7 @@ internal class DialogNotifications(
   private val chatsOnScreen: StateFlow<Set<AgentProcess>>,
   private val visibility: AppVisibility,
   private val inbox: ChatInbox,
-  private val home: () -> String?,
+  private val names: () -> FolderNames,
 ) {
   private val context: Context = application
   private val manager = context.getSystemService(NotificationManager::class.java)
@@ -120,7 +121,7 @@ internal class DialogNotifications(
     val question = question(dialog.request).ifEmpty { context.getString(R.string.dialog_notification_text) }
     val headline = dialog.asker?.let { context.getString(R.string.dialog_notification_waiting_subagent, it) }
       ?: context.getString(R.string.dialog_notification_waiting)
-    return ChatNotification.builder(context, CHANNEL, process, home().orEmpty())
+    return ChatNotification.builder(context, CHANNEL, process, names())
       .setContentTitle(ChatNotification.title(context, process, headline))
       .setContentText(question)
       .setStyle(Notification.BigTextStyle().bigText(question))

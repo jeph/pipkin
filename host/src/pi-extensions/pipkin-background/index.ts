@@ -14,9 +14,12 @@
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getShellConfig } from "@earendil-works/pi-coding-agent";
 import { statSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, posix, resolve } from "node:path";
+import { HostError } from "../../env.js";
 import { isObject } from "../../framing.js";
+import { remoteHome, RemoteFileError } from "../../remote/fs.js";
 import { type PipkinChannel, pipkinChannel } from "../pipkin-channel.js";
+import { expandRemoteHome, remoteWorkspace, type RemoteWorkspace, toRemotePath } from "../pipkin-remote/workspace.js";
 import {
   bootId,
   groupRunning,
@@ -46,6 +49,7 @@ import {
   resultText,
   signalGroup,
   startProcess,
+  startRemoteProcess,
   type Task,
   taskDir,
   TOOL_DESCRIPTION,
@@ -341,16 +345,46 @@ async function reconcile(state: Registry, sessionId: string, binding: Binding, r
   }
 }
 
-function start(state: Registry, params: BackgroundParams, ctx: ExtensionContext): string {
+/** Where a remote chat's task runs. */
+interface RemoteTask {
+  workspace: RemoteWorkspace;
+  /** The remote folder the command starts in. */
+  cwd: string;
+}
+
+/**
+ * Where a task in a remote chat runs: the chat's remote workspace, and the remote folder [requested] names, relative
+ * to the workspace's folder, with `~` the remote home. Undefined in a local chat, whose tasks run on the phone.
+ */
+async function remoteTask(chatCwd: string, requested: string | undefined): Promise<RemoteTask | undefined> {
+  const workspace = await remoteWorkspace(chatCwd);
+  if (workspace === null) return undefined;
+  if (!requested) return { workspace, cwd: workspace.path };
+  if (/^~(\/|$)/.test(requested)) {
+    const home = workspace.host.home ?? (await remoteHome(workspace));
+    return { workspace, cwd: expandRemoteHome(requested, home) ?? requested };
+  }
+  return { workspace, cwd: posix.isAbsolute(requested) ? toRemotePath(workspace, requested) : posix.join(workspace.path, requested) };
+}
+
+async function start(state: Registry, params: BackgroundParams, ctx: ExtensionContext): Promise<string> {
   const command = params.command?.trim();
   if (!command) return "Error: command required for start";
+  let remote: RemoteTask | undefined;
+  try {
+    remote = await remoteTask(ctx.cwd, params.cwd);
+  } catch (error) {
+    if (error instanceof HostError || error instanceof RemoteFileError) return `Error: ${error.message}`;
+    throw error;
+  }
+  // Counted after the wait above, so tasks started at once can't pass the limit together.
   const running = [...state.tasks.values()].filter((task) => task.status === "running").length;
   if (running >= MAX_RUNNING) {
     return `Error: ${running} background tasks are already running, the most Pipkin allows. Stop one or wait for one to finish.`;
   }
-  const cwd = params.cwd ? (isAbsolute(params.cwd) ? params.cwd : resolve(ctx.cwd, params.cwd)) : ctx.cwd;
-  // Node reports a missing cwd as the shell not being found, so it's checked here.
-  if (!statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) return `Error: ${cwd} is not a directory`;
+  const cwd = remote?.cwd ?? (params.cwd ? (isAbsolute(params.cwd) ? params.cwd : resolve(ctx.cwd, params.cwd)) : ctx.cwd);
+  // Node reports a missing cwd as the shell not being found, so it's checked here; a remote task's log says so itself.
+  if (remote === undefined && !statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) return `Error: ${cwd} is not a directory`;
   const id = `bg${state.nextId++}`;
   const startedAt = Date.now();
   const key = `${startedAt.toString(36)}-${process.pid}-${id}`;
@@ -367,7 +401,10 @@ function start(state: Registry, params: BackgroundParams, ctx: ExtensionContext)
     pid: undefined,
   };
   try {
-    const started = startProcess(getShellConfig(), command, cwd, task.logPath);
+    const started =
+      remote === undefined
+        ? startProcess(getShellConfig(), command, cwd, task.logPath)
+        : startRemoteProcess(remote.workspace, command, cwd, task.logPath);
     task.pid = started.pid;
     if (started.pid !== undefined) {
       task.record = {
@@ -424,7 +461,7 @@ export default function pipkinBackground(pi: ExtensionAPI): void {
       async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
         const sessionId = ctx.sessionManager.getSessionId();
         let text: string;
-        if (params.action === "start") text = start(state, params, ctx);
+        if (params.action === "start") text = await start(state, params, ctx);
         else if (params.action === "stop") text = stopFromTool(state, params.id, sessionId);
         else text = listText([...state.tasks.values()].filter((task) => task.sessionId === sessionId), Date.now());
         return { content: [{ type: "text", text }], details: undefined };

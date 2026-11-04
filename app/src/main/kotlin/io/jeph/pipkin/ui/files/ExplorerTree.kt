@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.FileEntry
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.remote.RemoteConnectAction
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
@@ -78,7 +79,7 @@ internal fun ExplorerTree(
   val failure = state.failure
   val listed = ROOT_FOLDER in state.directories
   if (failure != null && !listed) {
-    TreeFailure(failure, onRetry, modifier)
+    TreeFailure(failure, state, onRetry, modifier)
     return
   }
   if (!listed || state.restoringScroll) {
@@ -279,9 +280,9 @@ internal fun Spinner(size: Dp, contentDescription: String?) {
   }
 }
 
-/** Why the top folder couldn't be listed, and Retry. */
+/** Why [state]'s top folder couldn't be listed, Connect when connecting to its remote host would fix it, and Retry. */
 @Composable
-private fun TreeFailure(message: String, onRetry: () -> Unit, modifier: Modifier) {
+private fun TreeFailure(message: String, state: FileExplorerState, onRetry: () -> Unit, modifier: Modifier) {
   val colors = pipkinColors
   CenterNote(modifier) {
     Text(
@@ -290,6 +291,7 @@ private fun TreeFailure(message: String, onRetry: () -> Unit, modifier: Modifier
       fontSize = PipkinTokens.FontSize.base,
       textAlign = TextAlign.Center,
     )
+    RemoteConnectAction(cwd = state.root, code = state.failureCode, onConnected = onRetry)
     Text(
       text = stringResource(R.string.files_retry),
       modifier = Modifier

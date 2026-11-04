@@ -58,6 +58,7 @@ import io.jeph.pipkin.ui.files.ExplorerPanel
 import io.jeph.pipkin.ui.files.FileScreen
 import io.jeph.pipkin.ui.git.CommitScreen
 import io.jeph.pipkin.ui.sidebar.Sidebar
+import io.jeph.pipkin.ui.sidebar.SidebarLinks
 import io.jeph.pipkin.ui.terminal.TerminalScreen
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -159,16 +160,15 @@ private fun rememberPanePanels(): PanePanels {
  * entry when none is shown, and shows [requestedChat] in the main pane when a notification asks for it (an archived
  * one opens as its transcript instead); one-shot shell notices show as snackbars. A window too narrow for split screen,
  * such as a folded phone's, closes it. Tells [onSidePanelOpen] whether a sidebar or explorer covers a shown pane.
+ * [links] are the pages the sidebar opens; a pane also opens Settings, setup and [onOpenProviders].
  */
 @Composable
 internal fun MainScreen(
   actions: ShellActions,
   requestedChat: MutableStateFlow<ChatLocation?>,
-  onOpenSettings: () -> Unit,
+  links: SidebarLinks,
   onOpenProviders: () -> Unit,
-  onOpenArchive: () -> Unit,
   onOpenArchivedChat: (path: String) -> Unit,
-  onOpenOnboarding: () -> Unit,
   onSidePanelOpen: (Boolean) -> Unit,
 ) {
   val snackbar = remember { SnackbarStackState() }
@@ -196,18 +196,16 @@ internal fun MainScreen(
       splitAvailable = splitAvailable,
       panels = panels,
       snackbar = snackbar,
-      onOpenSettings = onOpenSettings,
+      onOpenSettings = links.onOpenSettings,
       onOpenProviders = onOpenProviders,
-      onOpenOnboarding = onOpenOnboarding,
+      onOpenOnboarding = links.onOpenOnboarding,
       sidebar = { pane, onShownInSplit ->
         Sidebar(
           pane = pane,
           actions = actions,
           onShownInSplit = onShownInSplit,
           onClose = { panels.show(pane, Panel.Chat) },
-          onOpenSettings = onOpenSettings,
-          onOpenArchive = onOpenArchive,
-          onOpenOnboarding = onOpenOnboarding,
+          links = links,
         )
       },
     )
@@ -275,18 +273,21 @@ private fun ShellNotices(actions: ShellActions, snackbar: SnackbarStackState) {
 
 /**
  * Opening a side panel hides the keyboard, so it doesn't cover the panel; opening the sidebar also refreshes the chat
- * list.
+ * list and the remote hosts.
  */
 @Composable
 private fun SidePanelOpenedEffect(panel: Panel) {
   val keyboard = LocalSoftwareKeyboardController.current
   val focusManager = LocalFocusManager.current
-  val sessionRepository = LocalContext.current.appGraph.sessionRepository
+  val graph = LocalContext.current.appGraph
   LaunchedEffect(panel) {
     if (panel == Panel.Chat) return@LaunchedEffect
     keyboard?.hide()
     focusManager.clearFocus(force = true)
-    if (panel == Panel.Sidebar) sessionRepository.refresh()
+    if (panel != Panel.Sidebar) return@LaunchedEffect
+    graph.sessionRepository.refresh()
+    // Hosts added, renamed or connected elsewhere label their workspaces as the sidebar opens.
+    graph.remoteHosts.refresh()
   }
 }
 

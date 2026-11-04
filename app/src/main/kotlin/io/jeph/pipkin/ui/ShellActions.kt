@@ -243,15 +243,24 @@ internal class ShellActions(private val graph: AppGraph) {
    * saved history yet, whose runs stop, and closes its tabs, whose shells end. A pane left with nothing shows the most
    * recent other chat, or closes split screen.
    */
-  fun removeWorkspace(cwd: String) {
-    val open = processesIn(cwd)
-    val paths = sessionArchive.active.value.filter { sameFolder(it.cwd, cwd) }.map { it.path } +
-      open.mapNotNull { it.sessionFile.value }
-    sessionArchive.removeWorkspace(cwd, paths.distinct())
-    registry.discardParked(paths)
-    graph.panes.forgetChats(paths)
-    // Not through closeTab, which would show the workspace being removed in the pane a tab leaves.
-    graph.tabs.tabs.value.filter { sameFolder(it.cwd, cwd) }.forEach(graph.tabs::close)
+  fun removeWorkspace(cwd: String) = removeWorkspaces(listOf(cwd))
+
+  /**
+   * [removeWorkspace] for several workspaces at once, such as a removed host's. Panes are refilled only once all are
+   * gone, so a pane never opens a chat of a workspace that is about to go, which would start its Pi only to stop it.
+   */
+  fun removeWorkspaces(cwds: Collection<String>) {
+    val open = cwds.flatMap(::processesIn)
+    val removed = cwds.flatMap { cwd ->
+      val paths = sessionArchive.active.value.filter { sameFolder(it.cwd, cwd) }.map { it.path } +
+        open.filter { sameFolder(it.cwd, cwd) }.mapNotNull { it.sessionFile.value }
+      sessionArchive.removeWorkspace(cwd, paths.distinct())
+      paths
+    }.distinct()
+    registry.discardParked(removed)
+    graph.panes.forgetChats(removed)
+    // Not through closeTab, which would show a workspace being removed in the pane a tab leaves.
+    graph.tabs.tabs.value.filter { tab -> cwds.any { sameFolder(tab.cwd, it) } }.forEach(graph.tabs::close)
     if (graph.panes.itemIn(Pane.Secondary) == null) closeSplit(Pane.Secondary)
     if (graph.panes.itemIn(Pane.Primary) == null) openMostRecent()
     stop(open, replaceIn = null)
@@ -361,10 +370,10 @@ internal class ShellActions(private val graph: AppGraph) {
     noticeChannel.trySend(notice)
   }
 
-  private companion object {
-    // Termux's own fixed home, not a path in Pipkin's storage.
+  companion object {
+    /** Termux's own fixed home, not a path in Pipkin's storage; the home until a host has reported its own. */
     @SuppressLint("SdCardPath")
     const val TERMUX_HOME = "/data/data/com.termux/files/home"
-    const val START_TIMEOUT_MILLIS = 60_000L
+    private const val START_TIMEOUT_MILLIS = 60_000L
   }
 }

@@ -92,11 +92,21 @@ internal class SessionRepository(
   /** The session's messages for a read-only transcript; throws like [delete], or [JSONException]. */
   suspend fun messages(path: String): JSONArray = hostClient.sessionMessages(path)
 
+  /**
+   * Reads the list from the host now, for an action that must not go by a stale or missing one, such as removing a
+   * host's workspaces; throws like [delete], or [JSONException].
+   */
+  suspend fun listNow(): List<SessionInfo> {
+    val listed = hostClient.sessions()
+    sessionsState.value = listed
+    listingsFlow.tryEmit(listed)
+    loadedState.value = true
+    return listed
+  }
+
   private suspend fun load() {
     try {
-      val listed = hostClient.sessions()
-      sessionsState.value = listed
-      listingsFlow.tryEmit(listed)
+      listNow()
     } catch (error: IOException) {
       Log.w(TAG, "Refreshing sessions failed", error)
     } catch (error: HostRejected) {

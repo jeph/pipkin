@@ -150,6 +150,53 @@ class FileExplorerStateTest {
     assertFalse(state.restoringScroll)
   }
 
+  /** [workspace] on a remote host whose connection is up while [connected]; down, every listing fails as the host's. */
+  private inner class RemoteFolders : WorkspaceFolders {
+    var connected = false
+
+    override suspend fun list(root: String, path: String): List<FileEntry> {
+      if (!connected) throw FileError(HostText("devbox isn't connected."), "remote_not_connected")
+      return workspace.getValue(path)
+    }
+
+    override suspend fun createFolder(root: String, parent: String, name: String) = error("unused")
+  }
+
+  @Test
+  fun aLostConnectionKeepsItsCodeUntilTheFolderListsAgain() {
+    val remote = RemoteFolders()
+    val state = FileExplorerState("/work", remote)
+
+    runBlocking { state.refresh() }
+    assertEquals("devbox isn't connected.", state.failure)
+    assertEquals("remote_not_connected", state.failureCode)
+
+    remote.connected = true
+    runBlocking { state.refresh() }
+    assertNull(state.failure)
+    assertNull(state.failureCode)
+  }
+
+  @Test
+  fun aConnectionLostWhileExpandingShowsInPlaceOfTheTreeAndKeepsTheFolderOpen() {
+    val remote = RemoteFolders().apply { connected = true }
+    val state = FileExplorerState("/work", remote)
+    runBlocking { state.refresh() }
+
+    remote.connected = false
+    val reported = runBlocking { state.toggle(folder("src")) }
+
+    assertNull(reported)
+    assertEquals("remote_not_connected", state.failureCode)
+    assertEquals(emptyMap<String, List<FileEntry>>(), state.directories)
+    assertEquals(setOf("src"), state.expanded)
+
+    remote.connected = true
+    runBlocking { state.refresh() }
+    assertNull(state.failureCode)
+    assertEquals(setOf(ROOT_FOLDER, "src"), state.directories.keys)
+  }
+
   @Test
   fun eachWorkspacesTreeSavesAndRestoresItsExpandedFoldersAndTopRow() {
     val saver = ExplorerTrees.saver(Folders(workspace))

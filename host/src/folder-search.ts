@@ -20,7 +20,8 @@ export interface SearchRoot {
 
 export const SEARCH_LIMIT = 30;
 
-const MAX_DEPTH = 12;
+/** How deep a search walks below its root. */
+export const MAX_DEPTH = 12;
 const MAX_FOLDERS_SCANNED = 20_000;
 /** Past this many folders a root stops as soon as one result is a confident match. */
 const CONFIDENT_RESULT_SCAN_THRESHOLD = 5_000;
@@ -31,7 +32,8 @@ const NO_SEGMENT_INDEX = Number.MAX_SAFE_INTEGER;
 const NO_MATCH_OFFSET = Number.MAX_SAFE_INTEGER;
 const NO_FUZZY_SCORE = Number.MAX_SAFE_INTEGER;
 const NO_MATCH_TIER = 5;
-const IGNORED_FOLDER_NAMES = new Set([
+/** Folders a search never enters or offers, besides hidden ones. */
+export const IGNORED_FOLDER_NAMES = new Set([
   "node_modules",
   "venv",
   "env",

@@ -6,6 +6,7 @@ import io.jeph.pipkin.host.GitErrorCode
 import io.jeph.pipkin.host.GitHost
 import io.jeph.pipkin.host.GitReply
 import io.jeph.pipkin.host.HostRejected
+import io.jeph.pipkin.host.RemoteFailure
 import io.jeph.pipkin.ui.git.DiffDocument
 import io.jeph.pipkin.workspace.OpenTabs
 import io.jeph.pipkin.workspace.Pane
@@ -29,7 +30,8 @@ internal sealed interface CommitDiffState {
   /** Git can't find the commit any more. */
   data object NotFound : CommitDiffState
 
-  class Failed(val message: String) : CommitDiffState
+  /** [remote] is set when the workspace's remote host couldn't be reached. */
+  class Failed(val message: String, val remote: RemoteFailure? = null) : CommitDiffState
 }
 
 /** One open commit of the workspace folder [cwd]: what it changed, read once, since a commit never changes. */
@@ -64,7 +66,7 @@ internal class CommitTab(val id: Int, val cwd: String, val commit: GitCommit, pr
       is GitReply.Failed -> if (reply.code == GitErrorCode.CommitNotFound) {
         CommitDiffState.NotFound
       } else {
-        CommitDiffState.Failed(reply.message)
+        CommitDiffState.Failed(reply.message, reply.remote)
       }
 
       is GitReply.Loaded -> {

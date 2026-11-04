@@ -9,6 +9,7 @@ import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.host.HostFailure
 import io.jeph.pipkin.host.HostProtocol
 import io.jeph.pipkin.host.HostRejected
+import io.jeph.pipkin.host.RemoteFailure
 import java.io.IOException
 import java.util.Base64
 import kotlinx.coroutines.CoroutineScope
@@ -30,8 +31,11 @@ internal sealed interface TerminalState {
 
   data object Running : TerminalState
 
-  /** The shell ended; [code] is null when the connection dropped without the host's exit record. */
-  data class Exited(val code: Int?) : TerminalState
+  /**
+   * The shell ended; [code] is null when the connection dropped without the host's exit record. [remote] says why when
+   * it was a remote workspace's `ssh` connection that failed.
+   */
+  data class Exited(val code: Int?, val remote: RemoteFailure? = null) : TerminalState
 
   data class Failed(val message: String) : TerminalState
 }
@@ -172,7 +176,7 @@ internal class TerminalSession(
     }
     if (stateFlow.value != TerminalState.Running) return
     val code = exit?.let { if (it.isNull("code")) null else it.optInt("code") }
-    stateFlow.value = TerminalState.Exited(code)
+    stateFlow.value = TerminalState.Exited(code, RemoteFailure.from(exit?.optJSONObject("error")))
   }
 
   private companion object {

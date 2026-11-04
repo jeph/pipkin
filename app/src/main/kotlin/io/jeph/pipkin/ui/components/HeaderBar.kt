@@ -73,14 +73,16 @@ private val HEADER_ICON_SIZE = 18.dp
 val HeaderBarHeight = 52.dp
 
 /**
- * The header of a screen: [leading] and [trailing] buttons around a bold [title] over the [folder] it's in, or over
- * the [status] while there is one, which pans when it doesn't fit.
+ * The header of a screen: [leading] and [trailing] buttons around a bold [title] over the [folder] it's in, after
+ * [folderIcon] (a server for a folder on a remote host), or over the [status] while there is one, which pans when it
+ * doesn't fit.
  */
 @Composable
 fun HeaderBar(
   title: String,
   modifier: Modifier = Modifier,
   folder: String? = null,
+  @DrawableRes folderIcon: Int = R.drawable.ic_lucide_folder,
   status: AnnotatedString? = null,
   leading: @Composable RowScope.() -> Unit = {},
   trailing: @Composable RowScope.() -> Unit = {},
@@ -110,7 +112,7 @@ fun HeaderBar(
       if (status != null) {
         PanningText(status)
       } else if (folder != null) {
-        HeaderFolder(folder)
+        HeaderFolder(folder, folderIcon)
       }
     }
     trailing()
@@ -119,14 +121,14 @@ fun HeaderBar(
 
 /** The header's folder line; a long path keeps its end, the folder that tells workspaces apart. */
 @Composable
-private fun HeaderFolder(folder: String) {
+private fun HeaderFolder(folder: String, @DrawableRes icon: Int) {
   val colors = pipkinColors
   Row(
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6),
   ) {
     LucideIcon(
-      icon = R.drawable.ic_lucide_folder,
+      icon = icon,
       contentDescription = null,
       size = PipkinTokens.IconSize.xs,
       tint = colors.foregroundMuted,

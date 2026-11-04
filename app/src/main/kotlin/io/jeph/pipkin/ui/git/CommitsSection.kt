@@ -42,7 +42,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.GitCommit
+import io.jeph.pipkin.host.RemoteFailure
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.PillButton
+import io.jeph.pipkin.ui.components.PillTone
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -51,7 +54,8 @@ import io.jeph.pipkin.ui.workspace.relativeTime
 /**
  * The Commits section, docked under the diff: a header that folds and unfolds it with the number of commits once
  * loaded, and while unfolded the commits ahead of the base, newest first, in a list up to [listMaxHeight] tall that
- * ends by saying so when the host listed only the first of them.
+ * ends by saying so when the host listed only the first of them. A failure only connecting the remote host fixes
+ * offers [onConnect].
  */
 @Composable
 internal fun CommitsSection(
@@ -60,6 +64,7 @@ internal fun CommitsSection(
   listMaxHeight: Dp,
   onToggle: () -> Unit,
   onOpenCommit: (GitCommit) -> Unit,
+  onConnect: (() -> Unit)?,
 ) {
   val colors = pipkinColors
   val navigationBar = WindowInsets.navigationBars.asPaddingValues()
@@ -89,7 +94,7 @@ internal fun CommitsSection(
       )
       if (content is CommitsContent.Loaded) CommitCount(content.commits.commits.size)
     }
-    if (!collapsed) CommitsContentRows(content, listMaxHeight, onOpenCommit)
+    if (!collapsed) CommitsContentRows(content, listMaxHeight, onOpenCommit, onConnect)
   }
 }
 
@@ -113,7 +118,12 @@ private fun CommitCount(count: Int) {
 }
 
 @Composable
-private fun CommitsContentRows(content: CommitsContent, listMaxHeight: Dp, onOpenCommit: (GitCommit) -> Unit) {
+private fun CommitsContentRows(
+  content: CommitsContent,
+  listMaxHeight: Dp,
+  onOpenCommit: (GitCommit) -> Unit,
+  onConnect: (() -> Unit)?,
+) {
   val colors = pipkinColors
   val notePadding = Modifier.padding(
     start = PipkinTokens.Spacing.s16,
@@ -128,7 +138,7 @@ private fun CommitsContentRows(content: CommitsContent, listMaxHeight: Dp, onOpe
       notePadding,
     )
 
-    CommitsContent.Failed -> CommitsNote(stringResource(R.string.git_commits_failed), colors.dotDanger, notePadding)
+    is CommitsContent.Failed -> CommitsFailed(content.remote, onConnect, notePadding)
 
     is CommitsContent.Loaded -> {
       val commits = content.commits.commits
@@ -164,6 +174,29 @@ private fun CommitsContentRows(content: CommitsContent, listMaxHeight: Dp, onOpe
 @Composable
 private fun CommitsNote(text: String, color: Color, modifier: Modifier) {
   Text(text = text, modifier = modifier, color = color, fontSize = PipkinTokens.FontSize.meta)
+}
+
+/**
+ * Why the commits didn't load: the remote host's reason when it couldn't be reached, with Connect when only connecting
+ * fixes it.
+ */
+@Composable
+private fun CommitsFailed(remote: RemoteFailure?, onConnect: (() -> Unit)?, modifier: Modifier) {
+  val colors = pipkinColors
+  val text = remote?.text?.localized() ?: stringResource(R.string.git_commits_failed)
+  val connect = onConnect?.takeIf { remote?.needsConnect == true }
+  if (connect == null) {
+    CommitsNote(text, colors.dotDanger, modifier)
+    return
+  }
+  Row(
+    modifier = modifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s12),
+  ) {
+    Text(text = text, modifier = Modifier.weight(1f), color = colors.dotDanger, fontSize = PipkinTokens.FontSize.meta)
+    PillButton(label = stringResource(R.string.remote_connect), onClick = connect, tone = PillTone.Tonal)
+  }
 }
 
 /** A commit row: the graph node, the short SHA, the subject, how long ago it was written, a chevron. */

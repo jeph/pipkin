@@ -34,7 +34,7 @@ internal data class FolderSearch(val query: String, val paths: List<String>, val
 internal fun FolderSearchResults(
   query: String,
   found: FolderSearch?,
-  home: String,
+  folders: PickerFolders,
   isWorkspace: (cwd: String) -> Boolean,
   modifier: Modifier = Modifier,
   onChoose: (String) -> Unit,
@@ -49,7 +49,7 @@ internal fun FolderSearchResults(
       found.paths.isEmpty() -> item { Note(stringResource(R.string.shell_browse_no_matches), colors.foregroundMuted) }
 
       else -> items(found.paths, key = { it }) { path ->
-        FolderResultRow(path, home, added = isWorkspace(path), onClick = { onChoose(path) })
+        FolderResultRow(path, folders, added = isWorkspace(path), onClick = { onChoose(path) })
       }
     }
   }
@@ -57,7 +57,7 @@ internal fun FolderSearchResults(
 
 /** The folder's name over its full path, shortened in the middle so both ends stay readable. */
 @Composable
-private fun FolderResultRow(path: String, home: String, added: Boolean, onClick: () -> Unit) {
+private fun FolderResultRow(path: String, folders: PickerFolders, added: Boolean, onClick: () -> Unit) {
   val colors = pipkinColors
   Row(
     modifier = Modifier
@@ -72,14 +72,14 @@ private fun FolderResultRow(path: String, home: String, added: Boolean, onClick:
     LucideIcon(icon = R.drawable.ic_lucide_folder, contentDescription = null)
     Column(modifier = Modifier.weight(1f)) {
       Text(
-        text = projectName(path, home),
+        text = folders.name(path),
         color = colors.foreground,
         fontSize = PipkinTokens.FontSize.base,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
       )
       Text(
-        text = tildePath(path, home),
+        text = folders.path(path),
         color = colors.foregroundMuted,
         fontSize = PipkinTokens.FontSize.sm,
         maxLines = 1,

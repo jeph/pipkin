@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -49,15 +50,15 @@ import java.text.BreakIterator
 
 /**
  * A workspace's row: a letter tile in the workspace's colour (the simmering pot while Pi works in one of its chats),
- * its name over its [status], and its actions and New chat. The row is outlined in cobalt while the sidebar's pane
- * shows one of its chats or tabs. Tapping it shows the workspace; long-press opens its actions.
+ * with a server badge for a remote workspace, its name over its [status], and its actions and New chat. [names] names
+ * the folder [cwd] and its path. The row is outlined in cobalt while the sidebar's pane shows one of its chats or tabs.
+ * Tapping it shows the workspace; long-press opens its actions.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun WorkspaceRow(
-  name: String,
-  folder: String,
   cwd: String,
+  names: FolderNames,
   shown: Boolean,
   status: WorkspaceStatus,
   onOpen: () -> Unit,
@@ -65,6 +66,8 @@ internal fun WorkspaceRow(
   onActions: () -> Unit,
 ) {
   val colors = pipkinColors
+  val name = names.name(cwd)
+  val folder = names.path(cwd)
   Row(
     modifier = Modifier
       .fillMaxWidth()
@@ -96,6 +99,7 @@ internal fun WorkspaceRow(
       letter = remember(name) { tileLetter(name) },
       tint = tileColor(cwd, colors),
       working = status.activity != WorkspaceActivity.Idle,
+      remote = names.isRemote(cwd),
     )
     Column(modifier = Modifier.weight(1f)) {
       Text(
@@ -237,24 +241,43 @@ internal fun AddWorkspaceRow(onClick: () -> Unit, modifier: Modifier = Modifier)
 }
 
 /**
- * The workspace's letter on a wash of its colour, or a simmering pot while Pi works there; the name beside it says
- * the same, so TalkBack skips it.
+ * The workspace's letter on a wash of its colour, or a simmering pot while Pi works there, with a server badge on its
+ * corner for a [remote] workspace; the name and path beside it say the same, so TalkBack skips it.
  */
 @Composable
-private fun WorkspaceTile(letter: String, tint: Color, working: Boolean) {
+private fun WorkspaceTile(letter: String, tint: Color, working: Boolean, remote: Boolean) {
   val colors = pipkinColors
-  Box(
-    modifier = Modifier
-      .size(TILE_SIZE)
-      .clip(TILE_SHAPE)
-      .background(if (working) colors.accentSoft else tint.copy(alpha = TILE_WASH_ALPHA))
-      .clearAndSetSemantics {},
-    contentAlignment = Alignment.Center,
-  ) {
-    if (working) {
-      SimmeringPot(size = PipkinTokens.IconSize.lg, tint = colors.accent)
-    } else {
-      Text(text = letter, color = tint, fontSize = TILE_LETTER_SIZE, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+  Box(modifier = Modifier.size(TILE_SIZE).clearAndSetSemantics {}) {
+    Box(
+      modifier = Modifier
+        .size(TILE_SIZE)
+        .clip(TILE_SHAPE)
+        .background(if (working) colors.accentSoft else tint.copy(alpha = TILE_WASH_ALPHA)),
+      contentAlignment = Alignment.Center,
+    ) {
+      if (working) {
+        SimmeringPot(size = PipkinTokens.IconSize.lg, tint = colors.accent)
+      } else {
+        Text(text = letter, color = tint, fontSize = TILE_LETTER_SIZE, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+      }
+    }
+    if (remote) {
+      // On the sidebar's colour, so it reads as a badge cut out of the tile's corner.
+      Box(
+        modifier = Modifier
+          .align(Alignment.BottomEnd)
+          .offset(x = BADGE_OFFSET, y = BADGE_OFFSET)
+          .clip(RoundedCornerShape(BADGE_RADIUS))
+          .background(colors.sidebar)
+          .padding(BADGE_PADDING),
+      ) {
+        LucideIcon(
+          icon = R.drawable.ic_lucide_server,
+          contentDescription = null,
+          size = PipkinTokens.IconSize.xs,
+          tint = colors.foregroundMuted,
+        )
+      }
     }
   }
 }
@@ -287,3 +310,6 @@ private val TILE_LETTER_SIZE = 16.sp
 private val SUBTITLE_SIZE = 12.5.sp
 private const val TILE_WASH_ALPHA = 0.14f
 private const val SHOWN_BORDER_ALPHA = 0.55f
+private val BADGE_OFFSET = 4.dp
+private val BADGE_RADIUS = 4.dp
+private val BADGE_PADDING = 1.dp

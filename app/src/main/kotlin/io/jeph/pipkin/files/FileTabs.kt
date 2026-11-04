@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import io.jeph.pipkin.data.folderKey
 import io.jeph.pipkin.host.FileContent
+import io.jeph.pipkin.host.FileError
 import io.jeph.pipkin.host.FileHost
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.workspace.OpenTabs
@@ -20,7 +21,8 @@ internal sealed interface FileState {
 
   data class Loaded(val content: FileContent) : FileState
 
-  data class Failed(val message: String) : FileState
+  /** [code] names a failed connection to a remote workspace's host, such as `remote_not_connected`. */
+  data class Failed(val message: String, val code: String? = null) : FileState
 }
 
 /** One open file of the workspace folder [cwd], at the workspace-relative [path], which [read] reads from the host. */
@@ -48,6 +50,8 @@ internal class FileTab(
       FileState.Loaded(read(cwd, path))
     } catch (error: HostRejected) {
       FileState.Failed(error.error)
+    } catch (error: FileError) {
+      FileState.Failed(error.message, error.code)
     } catch (error: IOException) {
       FileState.Failed(error.message.orEmpty())
     }

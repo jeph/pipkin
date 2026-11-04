@@ -89,6 +89,26 @@ class GitHostTest {
   }
 
   @Test
+  fun `a remote connection failure keeps its code, and git's own codes have none`() {
+    fun remote(json: String) = (parseGitChanges(JSONObject(json)) as GitReply.Failed).remote
+
+    val failure = remote("""{"code":"remote_not_connected","error":"Not connected to devbox."}""")
+    assertEquals(RemoteFailure.NOT_CONNECTED, failure?.code)
+    assertTrue(failure?.needsConnect == true)
+    assertNull(remote("""{"code":"no_git","error":"git isn't installed on devbox."}"""))
+  }
+
+  @Test
+  fun `a detection that couldn't reach the host is a failure, not a missing git`() {
+    val detected = parseGitDetection(JSONObject("""{"repo":true,"git":false}"""))
+    assertEquals(GitDetection(repo = true, git = false), (detected as GitReply.Loaded).value)
+
+    val reply = JSONObject("""{"code":"remote_unreachable","error":"Couldn't reach devbox."}""")
+    val unreachable = parseGitDetection(reply)
+    assertEquals("remote_unreachable", (unreachable as GitReply.Failed).remote?.code)
+  }
+
+  @Test
   fun `a diff too large to send has no files`() {
     val reply = parseGitCommitDiff(JSONObject("""{"tooLarge":true,"files":[]}"""))
 

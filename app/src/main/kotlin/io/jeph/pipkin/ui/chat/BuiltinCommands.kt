@@ -10,6 +10,7 @@ import io.jeph.pipkin.agent.fork
 import io.jeph.pipkin.agent.forkMessages
 import io.jeph.pipkin.agent.lastAssistantText
 import io.jeph.pipkin.agent.sessionStats
+import io.jeph.pipkin.ui.sidebar.joinPath
 import io.jeph.pipkin.ui.sidebar.tildePath
 import kotlinx.coroutines.launch
 
@@ -40,7 +41,7 @@ internal class BuiltinCommands(private val controller: ChatController, private v
       BuiltinCommand.Thinking -> thinking(argument)
 
       BuiltinCommand.Export -> controller.launchRpc {
-        controller.show(R.string.chat_exported, displayPath(process.exportHtml(argument)))
+        controller.show(R.string.chat_exported, displayPath(process.exportHtml(exportPath(argument))))
       }
 
       BuiltinCommand.Copy -> controller.launchRpc {
@@ -141,10 +142,32 @@ internal class BuiltinCommands(private val controller: ChatController, private v
     }
   }
 
+  /** Where `/export` [argument] writes; see [remoteExportPath]. */
+  private fun exportPath(argument: String): String {
+    val names = controller.folderNames
+    if (!names.isRemote(process.cwd)) return argument
+    return remoteExportPath(argument, names.home, process.sessionFile.value)
+  }
+
   /** Pi resolves a relative export path against the chat's cwd; shown `~`-relative like other paths. */
   private fun displayPath(path: String): String {
     val absolute = if (path.startsWith("/")) path else "${process.cwd.trimEnd('/')}/$path"
     val home = controller.home ?: return absolute
     return tildePath(absolute, home)
   }
+}
+
+/**
+ * Where `/export` [argument] writes in a remote workspace. Pi puts a blank or relative path in its cwd, which there is
+ * the stand-in folder on the phone that the user never sees, so it goes to the Termux [home] instead, a blank one under
+ * the name Pi would give it from the [sessionFile]. The file stays on the phone either way, as Pi runs there. Pi
+ * expands only `~` and `~/…` itself; an in-memory session (no [sessionFile]) is left for Pi to refuse.
+ */
+internal fun remoteExportPath(argument: String, home: String, sessionFile: String?): String {
+  if (argument.startsWith('/') || argument == "~" || argument.startsWith("~/")) return argument
+  val name = argument.ifBlank {
+    sessionFile ?: return argument
+    "pi-session-" + sessionFile.substringAfterLast('/').removeSuffix(".jsonl") + ".html"
+  }
+  return joinPath(home, name)
 }

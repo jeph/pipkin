@@ -26,4 +26,6 @@ internal object HostProtocol {
   const val AUTH_RESPONSE = "pipkin_auth_response"
   const val AUTH_CANCEL = "pipkin_auth_cancel"
   const val AUTH_PROMPT_DISMISS = "pipkin_auth_prompt_dismiss"
+  const val REMOTE_PROMPT = "pipkin_remote_prompt"
+  const val REMOTE_ANSWER = "pipkin_remote_answer"
 }

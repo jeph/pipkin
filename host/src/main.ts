@@ -10,10 +10,13 @@ import { files } from "./modes/files.js";
 import { git } from "./modes/git.js";
 import { login } from "./modes/login.js";
 import { packageInstall } from "./modes/package-install.js";
+import { remoteConnect } from "./modes/remote-connect.js";
+import { remoteInstall } from "./modes/remote-install.js";
 import { rpc } from "./modes/rpc.js";
 import { terminal } from "./modes/terminal.js";
 import { updateExtensions } from "./modes/update-extensions.js";
 import { utility } from "./modes/utility.js";
+import { askpass } from "./remote/askpass.js";
 
 const PROTOCOL = 1;
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -44,6 +47,8 @@ async function respond(ctx: ModeContext, run: (ctx: ModeContext) => Promise<Json
 
 async function main(): Promise<void> {
   const [mode, portArg] = process.argv.slice(2);
+  // `ssh` runs the bundle as its askpass program (see `remote/askpass.ts`), with the question as the argument.
+  if (mode === "askpass") process.exit(await askpass(portArg ?? ""));
   const env = readHostEnv();
   const port = Number(portArg);
   if (mode === undefined || env === undefined || !Number.isInteger(port) || port <= 0 || port > 65_535) {
@@ -102,6 +107,10 @@ async function main(): Promise<void> {
       return respond(ctx, utility);
     case "browse":
       return respond(ctx, browse);
+    case "remote_connect":
+      return respond(ctx, remoteConnect);
+    case "remote_install":
+      return respond(ctx, remoteInstall);
     case "login":
       return respond(ctx, login);
     case "package_install":

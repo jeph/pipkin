@@ -8,12 +8,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -26,16 +24,14 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.jeph.pipkin.R
-import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.ui.components.HeaderBar
 import io.jeph.pipkin.ui.components.HeaderButton
 import io.jeph.pipkin.ui.components.HeaderButtonSize
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.PotIcon
 import io.jeph.pipkin.ui.components.roundButton
-import io.jeph.pipkin.ui.sidebar.tildePath
+import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.text.NumberFormat
@@ -43,8 +39,9 @@ import java.text.NumberFormat
 /**
  * The header of a screen in a pane: the pot that toggles the sidebar; the [title]; the tabs button, which opens the
  * session sheet and shows how many tabs the workspace folder [cwd] has; the explorer's toggle; and, in the end-side
- * pane, the button that closes split screen. Under the title is [folder], with `~` for the Termux home, or the
- * [status] extensions set while there is one.
+ * pane, the button that closes split screen. Under the title is the path of [subfolder] in the workspace, with `~` for
+ * the home folder and after its host's name and a server icon for a remote workspace, or the [status] extensions set
+ * while there is one.
  */
 @Composable
 internal fun PaneHeader(
@@ -52,15 +49,16 @@ internal fun PaneHeader(
   cwd: String,
   controls: PaneControls,
   modifier: Modifier = Modifier,
-  folder: String = cwd,
+  subfolder: String = "",
   status: AnnotatedString? = null,
 ) {
-  val hello by LocalContext.current.appGraph.hostClient.lastHello.collectAsStateWithLifecycle()
+  val names = rememberFolderNames()
   val tabs = rememberWorkspaceTabs(controls.pane, cwd).count
   HeaderBar(
     title = title,
     modifier = modifier,
-    folder = hello?.home?.let { tildePath(folder, it) } ?: folder,
+    folder = names.path(cwd, subfolder),
+    folderIcon = if (names.isRemote(cwd)) R.drawable.ic_lucide_server else R.drawable.ic_lucide_folder,
     status = status,
     leading = { SidebarButton(controls.onToggleSidebar) },
     trailing = {

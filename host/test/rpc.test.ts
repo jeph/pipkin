@@ -4,7 +4,10 @@ import { setTimeout as sleep } from "node:timers/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { encodeLine } from "../src/framing.js";
-import { SYSTEM_APPEND } from "../src/prompt.js";
+import { remoteSystemAppend, SYSTEM_APPEND } from "../src/prompt.js";
+import { type Host, updateHosts } from "../src/remote/hosts.js";
+import { remotePaths } from "../src/remote/paths.js";
+import { createStandIn } from "../src/remote/stand-ins.js";
 import {
   type Dirs,
   holdConfigLock,
@@ -458,6 +461,86 @@ describe("rpc mode", () => {
       ok: false,
       code: "cwd_missing",
       i18n: { key: "folder_not_found", args: { path: path.join(dirs.base, "nope") } },
+    });
+  });
+});
+
+describe("rpc mode in a remote workspace", () => {
+  let dirs: Dirs;
+  const host: Host = { id: "0123456789ab", name: "devbox", auth: "key", address: "me@devbox.lan", port: 22, home: "/home/me" };
+
+  beforeEach(async () => {
+    dirs = await makeDirs();
+    await installFakePi(dirs);
+  });
+
+  afterEach(async () => {
+    await removeDirs(dirs);
+  });
+
+  /** Saves [host] in `hosts.json` when [saved], and returns the stand-in for its `/srv/api`. */
+  async function standIn(saved: boolean): Promise<string> {
+    const paths = remotePaths(dirs.configDir, dirs.prefix, dirs.home);
+    if (saved) await updateHosts(paths, () => ({ hosts: [host], result: undefined }));
+    return createStandIn(paths.remotes, host.id, "/srv/api");
+  }
+
+  /** The first line the host answers a chat in [cwd] with, loading [pipkinExtensions]. */
+  async function answer(cwd: string, pipkinExtensions: Record<string, unknown>[]): Promise<Record<string, unknown> | undefined> {
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions } });
+    const line = await run.next();
+    run.socket.end();
+    await run.exited;
+    return line;
+  }
+
+  it("loads pipkin-remote last and names the remote folder in the prompt instead of Termux's conventions", async () => {
+    const cwd = await standIn(true);
+    const extensions = [await installedExtension(dirs, "pipkin-remote"), await installedExtension(dirs, "pipkin-todo")];
+    const prompt = remoteSystemAppend(host, "/srv/api");
+    expect(prompt).toContain("/srv/api on devbox (me@devbox.lan)");
+    expect(prompt).not.toContain("termux-chroot");
+    expect(await answer(cwd, extensions)).toMatchObject({
+      type: "ready",
+      argv: ["--mode", "rpc", "--extension", extensionFile(dirs, "pipkin-todo"), "--extension", extensionFile(dirs, "pipkin-remote"), "--append-system-prompt", prompt],
+    });
+  });
+
+  it("leaves pipkin-remote out of a local chat", async () => {
+    const extensions = [await installedExtension(dirs, "pipkin-remote"), await installedExtension(dirs, "pipkin-todo")];
+    expect(await answer(dirs.home, extensions)).toMatchObject({
+      type: "ready",
+      argv: ["--mode", "rpc", "--extension", extensionFile(dirs, "pipkin-todo"), "--append-system-prompt", SYSTEM_APPEND],
+    });
+  });
+
+  it("treats a folder holding a remote.json outside the stand-ins as local", async () => {
+    await writeFile(path.join(dirs.home, "remote.json"), JSON.stringify({ version: 1, hostId: host.id, path: "/srv/api" }));
+    expect(await answer(dirs.home, [await installedExtension(dirs, "pipkin-remote")])).toMatchObject({
+      type: "ready",
+      argv: ["--mode", "rpc", "--append-system-prompt", SYSTEM_APPEND],
+    });
+  });
+
+  it("refuses a workspace whose host was removed", async () => {
+    const cwd = await standIn(false);
+    expect(await answer(cwd, [await installedExtension(dirs, "pipkin-remote")])).toMatchObject({
+      type: "pipkin_result",
+      ok: false,
+      code: "remote_host_unknown",
+      i18n: { key: "remote_host_unknown" },
+    });
+  });
+
+  it("refuses a remote chat without pipkin-remote, which would work on the empty stand-in", async () => {
+    const cwd = await standIn(true);
+    expect(await answer(cwd, [await installedExtension(dirs, "pipkin-todo")])).toMatchObject({
+      type: "pipkin_result",
+      ok: false,
+      code: "pi_version",
+      i18n: { key: "agent_extensions_outdated" },
     });
   });
 });

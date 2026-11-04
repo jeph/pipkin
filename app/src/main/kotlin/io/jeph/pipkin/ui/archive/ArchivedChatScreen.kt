@@ -51,7 +51,7 @@ import io.jeph.pipkin.ui.components.PillButton
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.components.SnackbarStack
 import io.jeph.pipkin.ui.components.SnackbarStackState
-import io.jeph.pipkin.ui.sidebar.tildePath
+import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.subagents.ChatSubagents
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -99,7 +99,7 @@ internal fun ArchivedChatScreen(
   var busy by remember { mutableStateOf(false) }
   LaunchedEffect(marks) { if (path !in marks) onBack() }
   Column(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    TranscriptHeader(session, actions.home, deleteEnabled = !busy, onBack, onDelete = { confirmingDelete = true })
+    TranscriptHeader(session, deleteEnabled = !busy, onBack, onDelete = { confirmingDelete = true })
     Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
       TranscriptBody(
         transcript,
@@ -169,20 +169,18 @@ private fun rememberTranscript(path: String, attempt: Int): State<Transcript> {
   }
 }
 
-/** Back, the chat's title over its folder, and Delete. */
+/** Back, the chat's title over its folder (on its host, for a remote one), and Delete. */
 @Composable
-private fun TranscriptHeader(
-  session: SessionInfo?,
-  fallbackHome: String,
-  deleteEnabled: Boolean,
-  onBack: () -> Unit,
-  onDelete: () -> Unit,
-) {
-  val hello by LocalContext.current.appGraph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val home = hello?.home?.takeIf { it.isNotEmpty() } ?: fallbackHome
+private fun TranscriptHeader(session: SessionInfo?, deleteEnabled: Boolean, onBack: () -> Unit, onDelete: () -> Unit) {
+  val names = rememberFolderNames()
   HeaderBar(
     title = session?.let { sessionTitle(it) } ?: stringResource(R.string.archive_title),
-    folder = session?.let { tildePath(it.cwd, home) },
+    folder = session?.let { names.path(it.cwd) },
+    folderIcon = if (session != null && names.isRemote(session.cwd)) {
+      R.drawable.ic_lucide_server
+    } else {
+      R.drawable.ic_lucide_folder
+    },
     leading = {
       HeaderButton(
         icon = R.drawable.ic_lucide_chevron_left,

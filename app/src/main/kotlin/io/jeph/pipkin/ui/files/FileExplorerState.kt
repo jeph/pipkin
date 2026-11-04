@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.setValue
 import io.jeph.pipkin.host.FileEntry
+import io.jeph.pipkin.host.FileError
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.WorkspaceFolders
 import java.io.IOException
@@ -137,6 +138,10 @@ internal class FileExplorerState(
   /** Why the top folder couldn't be listed; the explorer shows it in place of the tree. */
   var failure by mutableStateOf<String?>(null)
     private set
+
+  /** [failure]'s code when it was the connection to a remote workspace's host, such as `remote_not_connected`. */
+  var failureCode by mutableStateOf<String?>(null)
+    private set
   var refreshing by mutableStateOf(false)
     private set
 
@@ -185,7 +190,8 @@ internal class FileExplorerState(
   /**
    * Lists the top folder and every expanded one again, together, since Pi may have changed any of them. An expanded
    * folder that can't be listed any more (deleted or renamed) collapses; when the top folder itself can't be, the
-   * whole tree goes, so its failure shows instead of files that may no longer be there.
+   * whole tree goes, so its failure shows instead of files that may no longer be there. A lost connection to a remote
+   * workspace's host shows as [lose] does.
    */
   suspend fun refresh() {
     if (refreshing) return
@@ -193,9 +199,15 @@ internal class FileExplorerState(
     try {
       val paths = listOf(ROOT_FOLDER) + expanded
       val failures = coroutineScope { paths.map { async { it to fetch(it) } }.awaitAll() }.toMap()
+      val lost = failures.values.firstOrNull { it?.code != null }
+      if (lost != null) {
+        lose(lost)
+        return
+      }
       val rootFailure = failures[ROOT_FOLDER]
       if (rootFailure != null) {
-        failure = rootFailure
+        failure = rootFailure.message
+        failureCode = null
         expanded = emptySet()
         directories = emptyMap()
         pendingAnchor = null
@@ -215,7 +227,13 @@ internal class FileExplorerState(
       return null
     }
     expanded += folder.path
-    return fetch(folder.path)?.also { collapse(folder.path) }
+    val failed = fetch(folder.path) ?: return null
+    if (failed.code != null) {
+      lose(failed)
+      return null
+    }
+    collapse(folder.path)
+    return failed.message
   }
 
   /**
@@ -234,7 +252,22 @@ internal class FileExplorerState(
   /** Creates folder [name] at the top of the workspace; returns why it couldn't. */
   suspend fun createFolder(name: String): String? {
     creatingFolder = false
-    return attempt { files.createFolder(root, ROOT_FOLDER, name) } ?: fetch(ROOT_FOLDER)
+    val failed = attempt { files.createFolder(root, ROOT_FOLDER, name) } ?: fetch(ROOT_FOLDER) ?: return null
+    if (failed.code != null) {
+      lose(failed)
+      return null
+    }
+    return failed.message
+  }
+
+  /**
+   * The connection to a remote workspace's host is gone: the tree gives way to [failed], which offers Connect, until
+   * it lists again. Expanded folders stay expanded, as they are still there, so the next [refresh] lists them too.
+   */
+  private fun lose(failed: Failure) {
+    failure = failed.message
+    failureCode = failed.code
+    directories = emptyMap()
   }
 
   private fun collapse(path: String) {
@@ -242,25 +275,33 @@ internal class FileExplorerState(
     directories -= path
   }
 
-  private suspend fun fetch(path: String): String? {
+  private suspend fun fetch(path: String): Failure? {
     loading += path
     try {
       return attempt {
         val entries = files.list(root, path)
         directories += path to entries
-        if (path == ROOT_FOLDER) failure = null
+        if (path == ROOT_FOLDER) {
+          failure = null
+          failureCode = null
+        }
       }
     } finally {
       loading -= path
     }
   }
 
-  private suspend fun attempt(block: suspend () -> Unit): String? = try {
+  private suspend fun attempt(block: suspend () -> Unit): Failure? = try {
     block()
     null
   } catch (error: HostRejected) {
-    error.error
+    Failure(error.error, code = null)
+  } catch (error: FileError) {
+    Failure(error.message, error.code)
   } catch (error: IOException) {
-    error.message.orEmpty()
+    Failure(error.message.orEmpty(), code = null)
   }
+
+  /** Why a request failed, and the connection failure's code for a remote workspace's host. */
+  private class Failure(val message: String, val code: String?)
 }

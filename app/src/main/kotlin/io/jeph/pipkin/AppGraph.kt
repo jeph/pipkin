@@ -21,6 +21,7 @@ import io.jeph.pipkin.data.ModelDefaults
 import io.jeph.pipkin.data.NoticeStore
 import io.jeph.pipkin.data.PiExtensionUpdate
 import io.jeph.pipkin.data.Preferences
+import io.jeph.pipkin.data.RemoteHosts
 import io.jeph.pipkin.data.SessionArchive
 import io.jeph.pipkin.data.SessionRepository
 import io.jeph.pipkin.files.FileTabRegistry
@@ -31,6 +32,7 @@ import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.localmodel.LocalModels
 import io.jeph.pipkin.terminal.TerminalRegistry
 import io.jeph.pipkin.ui.chat.ChatViews
+import io.jeph.pipkin.ui.sidebar.folderNames
 import io.jeph.pipkin.workspace.OpenTabs
 import io.jeph.pipkin.workspace.Panes
 import io.jeph.pipkin.workspace.WorkspaceLayout
@@ -59,6 +61,7 @@ internal class AppGraph(private val application: Application) {
   )
   val keepAlive = KeepAlive(application)
   val preferences = Preferences(application)
+  val remoteHosts = RemoteHosts(hostClient, preferences, keepAlive, scope)
   val sessionRepository = SessionRepository(hostClient, NoticeStore(File(application.filesDir, "notices")), scope)
   val sessionArchive = SessionArchive(sessionRepository, preferences, scope)
   private val visibility = AppVisibility(application)
@@ -66,9 +69,7 @@ internal class AppGraph(private val application: Application) {
   /** The chats the user sees: those the panes show while Pipkin is on screen and nothing covers them. */
   val chatsOnScreen = MutableStateFlow<Set<AgentProcess>>(emptySet())
   val chatInbox = ChatInbox()
-  private val turnNotifications = TurnNotifications(application, visibility, chatInbox) {
-    hostClient.lastHello.value?.home
-  }
+  private val turnNotifications = TurnNotifications(application, visibility, chatInbox) { folderNames() }
   val registry: AgentRegistry<AgentProcess> =
     AgentRegistry(
       scope,
@@ -80,7 +81,16 @@ internal class AppGraph(private val application: Application) {
         process.sessionFile.value?.let { sessionArchive.touch(listOf(it)) }
       },
     ) { cwd, sessionPath ->
-      AgentProcess(hostClient, keepAlive, cwd, sessionPath, scope, sessionRepository, preferences.disabledExtensions)
+      AgentProcess(
+        hostClient,
+        keepAlive,
+        cwd,
+        sessionPath,
+        scope,
+        sessionRepository,
+        remoteHosts,
+        preferences.disabledExtensions,
+      )
     }
   val accountRepository = AccountRepository(hostClient, registry, keepAlive)
   val configBackups = ConfigBackups(hostClient, registry, keepAlive, accountRepository, sessionRepository, scope)
@@ -89,7 +99,7 @@ internal class AppGraph(private val application: Application) {
   val panes = Panes(registry, sessionArchive::isArchived)
   val tabs = OpenTabs(panes)
   val terminals = TerminalRegistry(application, hostClient, scope, tabs)
-  val fileHost = FileHost(hostClient, scope)
+  val fileHost = FileHost(hostClient, scope, remoteHosts::isRemote)
   val files = FileTabRegistry(fileHost, tabs)
   val gitHost = GitHost(hostClient, scope)
   val commits = CommitTabRegistry(gitHost, tabs, preferences.trustedRepositories, scope)
@@ -111,15 +121,17 @@ internal class AppGraph(private val application: Application) {
     feedChatInbox()
     touchChatsOnScreen()
     endLocalModelLeases()
-    val dialogNotifications = DialogNotifications(application, registry, chatsOnScreen, visibility, chatInbox) {
-      hostClient.lastHello.value?.home
-    }
+    val dialogNotifications =
+      DialogNotifications(application, registry, chatsOnScreen, visibility, chatInbox) { folderNames() }
     scope.launch { dialogNotifications.watch() }
     ProcessLifecycleOwner.get().lifecycle.addObserver(
       object : DefaultLifecycleObserver {
         override fun onStart(owner: LifecycleOwner) {
           // Before setup, Termux may not be able to run the host yet.
-          if (preferences.setupComplete.value) sessionRepository.refresh()
+          if (preferences.setupComplete.value) {
+            sessionRepository.refresh()
+            remoteHosts.refresh()
+          }
           // Events may have gone missing while Pipkin was in the background.
           for (process in registry.processes.value.values) scope.launch { process.resync() }
         }

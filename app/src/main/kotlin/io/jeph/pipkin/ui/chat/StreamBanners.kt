@@ -43,6 +43,8 @@ import io.jeph.pipkin.ui.components.CodeBox
 import io.jeph.pipkin.ui.components.CodeText
 import io.jeph.pipkin.ui.components.LucideIcon
 import io.jeph.pipkin.ui.components.SimmeringPot
+import io.jeph.pipkin.ui.remote.RemoteConnectDialogs
+import io.jeph.pipkin.ui.remote.rememberRemoteConnector
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -120,7 +122,8 @@ private fun StartingBanner(modifier: Modifier) {
 /**
  * Pi could not start. A Termux setup failure offers setup, which opens at the step that fixes it; an unreachable Play
  * helper offers Open Termux, which starts the helper there and switches back to Pipkin before retrying, and setup for
- * when Termux says the helper can't start. The first action, the likeliest fix, is filled.
+ * when Termux says the helper can't start. A remote host only the user can sign in to, or whose key they must check,
+ * offers Connect, which retries once connected. The first action, the likeliest fix, is filled.
  */
 @Composable
 private fun FailedBanner(
@@ -134,6 +137,10 @@ private fun FailedBanner(
   val failure = state.failure
   val openTermux = failure?.needsTermuxOpen == true
   val setUp = failure?.fixedInTermux == true
+  val connector = rememberRemoteConnector()
+  RemoteConnectDialogs(connector)
+  val hostId = state.remote?.takeIf { it.failure?.needsConnect == true }?.hostId
+  val host = hostId?.let { remoteHost(it) }
   BannerCard(modifier) {
     AlertTitle(R.drawable.ic_lucide_circle_alert, state.message, error = true)
     if (openTermux) BannerText(stringResource(R.string.chat_open_termux_hint))
@@ -155,7 +162,16 @@ private fun FailedBanner(
           onClick = onOpenOnboarding,
         )
       }
-      BannerAction(stringResource(R.string.chat_retry), filled = !openTermux && !setUp, onClick = onRetry)
+      if (host != null) {
+        BannerAction(stringResource(R.string.remote_connect), filled = true) {
+          connector.connect(host.id, host.name, onConnected = onRetry)
+        }
+      }
+      BannerAction(
+        stringResource(R.string.chat_retry),
+        filled = !openTermux && !setUp && host == null,
+        onClick = onRetry,
+      )
     }
   }
 }

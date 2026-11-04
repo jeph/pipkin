@@ -60,8 +60,12 @@ internal sealed interface GitReply<out T> {
 
   class Loaded<T>(val value: T) : GitReply<T>
 
-  /** [message] is why, in the app's language, or empty when git gave no reason. */
-  class Failed(val code: GitErrorCode, private val reason: HostText) : GitReply<Nothing> {
+  /**
+   * [message] is why, in the app's language, or empty when git gave no reason. [remote] is set when it failed because
+   * the workspace's remote host couldn't be reached or is gone.
+   */
+  class Failed(val code: GitErrorCode, private val reason: HostText, val remote: RemoteFailure? = null) :
+    GitReply<Nothing> {
     val message: String get() = reason.resolve()
   }
 }
@@ -75,8 +79,11 @@ internal sealed interface GitReply<out T> {
 internal class GitHost(hostClient: HostClient, scope: CoroutineScope) {
   private val host = SharedHost(scope, IDLE_MILLIS, hostClient::openGit)
 
-  /** Whether [root] is a repository git can use; git reads a [trusted] one to check, an untrusted one only by path. */
-  suspend fun detect(root: String, trusted: Boolean): GitDetection {
+  /**
+   * Whether [root] is a repository git can use; git reads a [trusted] one to check, an untrusted one only by path. A
+   * remote workspace whose host can't be reached can't tell, and [GitReply.Failed] says why.
+   */
+  suspend fun detect(root: String, trusted: Boolean): GitReply<GitDetection> {
     val reply = host.request(JSONObject().put("type", DETECT).put("root", root).put("trusted", trusted), DETECT_TIMEOUT)
     return parseGitDetection(reply)
   }
@@ -137,8 +144,8 @@ internal class GitHost(hostClient: HostClient, scope: CoroutineScope) {
 /** Git's own abbreviation length, which a short SHA in Paseo's commit rows has too. */
 private const val SHORT_SHA_LENGTH = 7
 
-internal fun parseGitDetection(reply: JSONObject) =
-  GitDetection(repo = reply.optBoolean("repo"), git = reply.optBoolean("git"))
+internal fun parseGitDetection(reply: JSONObject): GitReply<GitDetection> =
+  parseReply(reply) { GitDetection(repo = reply.optBoolean("repo"), git = reply.optBoolean("git")) }
 
 internal fun parseGitChanges(reply: JSONObject): GitReply<GitChanges> = parseReply(reply) {
   GitChanges(
@@ -169,7 +176,9 @@ private fun <T> parseReply(reply: JSONObject, loaded: () -> T): GitReply<T> {
   val code = reply.optNullableString("code")
   val error = reply.optNullableString("error")
   if (code != null || error != null) {
-    return GitReply.Failed(errorCode(code), HostText.of(error.orEmpty(), reply.optJSONObject("errorI18n")))
+    val reason = HostText.of(error.orEmpty(), reply.optJSONObject("errorI18n"))
+    val remote = code?.takeIf { it.startsWith(REMOTE_CODE_PREFIX) }?.let { RemoteFailure(it, reason) }
+    return GitReply.Failed(errorCode(code), reason, remote)
   }
   if (reply.optBoolean("unchanged")) return GitReply.Unchanged
   return GitReply.Loaded(loaded())
@@ -181,6 +190,9 @@ private fun errorCode(code: String?): GitErrorCode = when (code) {
   "commit_not_found" -> GitErrorCode.CommitNotFound
   else -> GitErrorCode.Failed
 }
+
+/** The prefix of the codes of a remote workspace's connection failures, such as `remote_not_connected`. */
+private const val REMOTE_CODE_PREFIX = "remote_"
 
 private fun parseGitDiff(reply: JSONObject): GitDiff {
   if (reply.optBoolean("tooLarge")) return GitDiff(emptyList(), tooLarge = true)

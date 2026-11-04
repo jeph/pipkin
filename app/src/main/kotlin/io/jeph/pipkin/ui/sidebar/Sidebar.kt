@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,6 +71,17 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 
 /**
+ * The pages the sidebar opens over the main screen: Settings, a remote host's editor (Add host for null) from the
+ * folder picker, the archive, and setup.
+ */
+internal class SidebarLinks(
+  val onOpenSettings: () -> Unit,
+  val onOpenRemoteHost: (hostId: String?) -> Unit,
+  val onOpenArchive: () -> Unit,
+  val onOpenOnboarding: () -> Unit,
+)
+
+/**
  * [pane]'s sidebar: the workspace folders, with a health/actions footer. Tapping a workspace shows its chat in [pane];
  * the chats in it are in the chat header's tab menu. A workspace is removed, archiving its chats, from its own sheet,
  * which also opens it in split screen when [onShownInSplit] is given, calling it once the second pane shows it.
@@ -80,20 +92,17 @@ internal fun Sidebar(
   actions: ShellActions,
   onShownInSplit: (() -> Unit)?,
   onClose: () -> Unit,
-  onOpenSettings: () -> Unit,
-  onOpenArchive: () -> Unit,
-  onOpenOnboarding: () -> Unit,
+  links: SidebarLinks,
   modifier: Modifier = Modifier,
 ) {
   val graph = LocalContext.current.appGraph
   val sessions by graph.sessionArchive.active.collectAsStateWithLifecycle()
   val added by graph.preferences.workspaces.collectAsStateWithLifecycle()
-  val hello by graph.hostClient.lastHello.collectAsStateWithLifecycle()
-  val home = hello?.home?.takeIf { it.isNotEmpty() } ?: actions.home
+  val names = rememberFolderNames()
   val workspaces = remember(sessions, added) { workspaces(sessions, added) }
   val removal = remember(actions) { WorkspaceRemoval(actions) }
   var menuFor by remember { mutableStateOf<Workspace?>(null) }
-  var pickerOpen by rememberSaveable { mutableStateOf(false) }
+  val pickerOpen = rememberSaveable { mutableStateOf(false) }
   // Rows that left the list forget that they were leaving, so a workspace added back shows in place.
   LaunchedEffect(workspaces) { removal.forgetGone(workspaces) }
   val showThen = { cwd: String, open: () -> Boolean ->
@@ -112,25 +121,25 @@ internal fun Sidebar(
     WorkspaceList(
       pane = pane,
       workspaces = workspaces,
-      home = home,
+      names = names,
       removal = removal,
       callbacks = WorkspaceListCallbacks(
         onOpen = { cwd -> showThen(cwd) { actions.openWorkspace(pane, cwd) } },
         onNewChatIn = { cwd -> showThen(cwd) { actions.newChat(pane, cwd) } },
         onActions = { menuFor = it },
-        onAddWorkspace = { pickerOpen = true },
+        onAddWorkspace = { pickerOpen.value = true },
       ),
       modifier = Modifier.weight(1f),
     )
     SidebarFooter(
-      onOpenArchive = onOpenArchive,
-      onOpenSettings = onOpenSettings,
-      onOpenOnboarding = onOpenOnboarding,
+      onOpenArchive = links.onOpenArchive,
+      onOpenSettings = links.onOpenSettings,
+      onOpenOnboarding = links.onOpenOnboarding,
     )
   }
   menuFor?.let { workspace ->
     WorkspaceActions(
-      path = tildePath(workspace.cwd, home),
+      path = names.path(workspace.cwd),
       onDismiss = { menuFor = null },
       onOpenInSplit = onShownInSplit?.let { shown ->
         {
@@ -140,19 +149,39 @@ internal fun Sidebar(
       onRemove = { removal.askToRemove(workspace) },
     )
   }
-  RemoveWorkspaceDialog(removal, home)
-  if (pickerOpen) AddWorkspacePicker(home, workspaces, onDismiss = { pickerOpen = false })
+  RemoveWorkspaceDialog(removal, names)
+  AddWorkspacePicker(pickerOpen, workspaces, links.onOpenRemoteHost)
 }
 
-/** The add-workspace sheet over the sidebar, which adds the folder picked as a workspace. */
+/**
+ * The add-workspace sheet over the sidebar while [open], which adds the folder picked as a workspace: a remote one by
+ * its stand-in folder, which the picker made. The sheet slides away before a host's editor covers the main screen,
+ * and comes back once the editor closes.
+ */
 @Composable
-private fun AddWorkspacePicker(home: String, workspaces: List<Workspace>, onDismiss: () -> Unit) {
+private fun AddWorkspacePicker(
+  open: MutableState<Boolean>,
+  workspaces: List<Workspace>,
+  onOpenRemoteHost: (hostId: String?) -> Unit,
+) {
   val preferences = LocalContext.current.appGraph.preferences
+  var reopen by rememberSaveable { mutableStateOf(false) }
+  // Only on returning from the editor is the sidebar composed afresh, so this runs then, not as the editor slides in.
+  LaunchedEffect(Unit) {
+    if (reopen) {
+      reopen = false
+      open.value = true
+    }
+  }
+  if (!open.value) return
   AddWorkspaceSheet(
-    home = home,
     isWorkspace = { cwd -> workspaces.any { sameFolder(it.cwd, cwd) } },
     onAdd = preferences::addWorkspace,
-    onDismiss = onDismiss,
+    onOpenHost = { id ->
+      reopen = true
+      onOpenRemoteHost(id)
+    },
+    onDismiss = { open.value = false },
   )
 }
 
@@ -173,7 +202,7 @@ private class WorkspaceRemoval(private val actions: ShellActions) {
     private set
 
   fun askToRemove(workspace: Workspace) {
-    confirming = RemovalRequest(workspace, actions.workingIn(workspace.cwd), actions.terminalsIn(workspace.cwd))
+    confirming = RemovalRequest(workspace, RemovalCounts.of(actions, listOf(workspace)))
   }
 
   fun confirm() {
@@ -196,38 +225,64 @@ private class WorkspaceRemoval(private val actions: ShellActions) {
   }
 }
 
-/** A workspace to remove, with how many of its chats are working and how many terminals it has open. */
-private class RemovalRequest(val workspace: Workspace, val working: Int, val terminals: Int)
+/** A workspace to remove, with what removing it does. */
+private class RemovalRequest(val workspace: Workspace, val counts: RemovalCounts)
+
+/**
+ * What removing workspaces does, for the dialog that asks first: their [chats] are archived, the [working] ones stop,
+ * and their open [terminals] close.
+ */
+internal class RemovalCounts(val chats: Int, val working: Int, val terminals: Int) {
+  companion object {
+    fun of(actions: ShellActions, workspaces: List<Workspace>) = RemovalCounts(
+      chats = workspaces.sumOf { it.chats.size },
+      working = workspaces.sumOf { actions.workingIn(it.cwd) },
+      terminals = workspaces.sumOf { actions.terminalsIn(it.cwd) },
+    )
+  }
+}
 
 @Composable
-private fun RemoveWorkspaceDialog(removal: WorkspaceRemoval, home: String) {
+private fun RemoveWorkspaceDialog(removal: WorkspaceRemoval, names: FolderNames) {
   val request = removal.confirming ?: return
-  val chats = request.workspace.chats.size
-  val working = request.working
-  val archived = if (chats == 0) {
-    stringResource(R.string.archive_remove_text_empty)
-  } else {
-    pluralStringResource(R.plurals.archive_remove_text, chats, chats)
-  }
-  // A chat Pi just started may be working before its session file is listed, so working can exceed chats.
-  val stopping = when {
-    working == 0 -> null
-    working == 1 && chats <= 1 -> stringResource(R.string.archive_remove_working_single)
-    else -> pluralStringResource(R.plurals.archive_remove_working, working, working)
-  }
-  val closing = request.terminals.takeIf { it > 0 }?.let {
-    pluralStringResource(R.plurals.archive_remove_terminals, it, it)
-  }
-  val text = listOfNotNull(archived, stopping, closing).joinToString(" ")
   ConfirmDialog(
-    title = stringResource(R.string.archive_remove_title, projectName(request.workspace.cwd, home)),
-    text = text,
+    title = stringResource(R.string.archive_remove_title, names.name(request.workspace.cwd)),
+    text = removalConsequences(request.counts),
     confirmLabel = stringResource(R.string.archive_remove_confirm),
     onConfirm = removal::confirm,
     onDismiss = removal::cancel,
     destructive = true,
     icon = R.drawable.ic_lucide_folder_minus,
   )
+}
+
+/** [counts] as the sentences of the dialog that asks before removing workspaces. */
+@Composable
+internal fun removalConsequences(counts: RemovalCounts): String {
+  val chats = counts.chats
+  val archived = if (chats == 0) {
+    stringResource(R.string.archive_remove_text_empty)
+  } else {
+    pluralStringResource(R.plurals.archive_remove_text, chats, chats)
+  }
+  return (listOf(archived) + removalStops(counts)).joinToString(" ")
+}
+
+/** What removing workspaces with [counts] stops, as sentences: the work in their chats, and their terminals. */
+@Composable
+internal fun removalStops(counts: RemovalCounts): List<String> {
+  val chats = counts.chats
+  val working = counts.working
+  // A chat Pi just started may be working before its session file is listed, so working can exceed chats.
+  val stopping = when {
+    working == 0 -> null
+    working == 1 && chats <= 1 -> stringResource(R.string.archive_remove_working_single)
+    else -> pluralStringResource(R.plurals.archive_remove_working, working, working)
+  }
+  val closing = counts.terminals.takeIf { it > 0 }?.let {
+    pluralStringResource(R.plurals.archive_remove_terminals, it, it)
+  }
+  return listOfNotNull(stopping, closing)
 }
 
 /** A workspace's sheet under its path: Open in split screen when [onOpenInSplit] is given, and Remove workspace. */
@@ -301,7 +356,7 @@ private class WorkspaceListCallbacks(
 private fun WorkspaceList(
   pane: Pane,
   workspaces: List<Workspace>,
-  home: String,
+  names: FolderNames,
   removal: WorkspaceRemoval,
   callbacks: WorkspaceListCallbacks,
   modifier: Modifier = Modifier,
@@ -333,9 +388,8 @@ private fun WorkspaceList(
         swipeEnabled = false,
       ) {
         WorkspaceRow(
-          name = projectName(cwd, home),
-          folder = tildePath(cwd, home),
           cwd = cwd,
+          names = names,
           shown = items[pane]?.let { sameFolder(it.cwd, cwd) } == true,
           status = WorkspaceStatus(
             activity = workspaceActivity(

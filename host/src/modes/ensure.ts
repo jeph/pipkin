@@ -7,6 +7,8 @@ import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { stringParam } from "../params.js";
 import { installPipkinExtensions, pipkinExtensionsParam } from "../pipkin-extensions.js";
+import { refreshSshConfig } from "../remote/hosts.js";
+import { remotePaths } from "../remote/paths.js";
 
 /** Longest progress line forwarded; npm never needs more, and the app shows only a few lines. */
 const MAX_PROGRESS_LINE = 4096;
@@ -91,6 +93,10 @@ export async function ensure(ctx: ModeContext): Promise<JsonObject> {
     await npmCi(ctx, piDir);
   }
   await installPipkinExtensions(ctx.env.root, pipkinExtensions);
+  // Remote hosts are secondary here: a hosts file that can't be read mustn't keep local chats from starting.
+  await refreshSshConfig(remotePaths(ctx.env.configDir, ctx.env.prefix, ctx.env.home)).catch((error: unknown) => {
+    process.stderr.write(`pipkin-host ensure: couldn't rewrite ssh/config: ${String(error)}\n`);
+  });
 
   return { piVersion: await installedPiVersion(ctx.env.root) };
 }

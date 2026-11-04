@@ -32,6 +32,7 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,8 +59,10 @@ import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.fileLanguage
 import io.jeph.pipkin.ui.components.rememberHighlightedCode
 import io.jeph.pipkin.ui.components.splitLines
+import io.jeph.pipkin.ui.remote.RemoteConnectAction
 import io.jeph.pipkin.ui.settings.SegmentedControl
 import io.jeph.pipkin.ui.settings.copyToClipboard
+import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -70,6 +73,7 @@ import io.jeph.pipkin.ui.workspace.TabAction
 import io.jeph.pipkin.workspace.WorkspaceTab
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -82,13 +86,15 @@ import kotlinx.coroutines.withContext
 internal fun FileScreen(file: FileTab, controls: PaneControls, modifier: Modifier = Modifier) {
   val context = LocalContext.current
   val state by file.state.collectAsStateWithLifecycle()
-  val folder = if (file.folder.isEmpty()) file.cwd else "${file.cwd}/${file.folder}"
+  // On a remote workspace, the path on the remote host, where the user would look for the file.
+  val fullPath = rememberFolderNames().absolutePath(file.cwd, file.path)
+  val scope = rememberCoroutineScope()
   LaunchedEffect(file) { file.reload() }
   PublishTabActions(
     controls.shownTab,
     listOf(
       TabAction(R.string.file_copy_path, R.drawable.ic_lucide_copy, {
-        copyToClipboard(context, file.name, "${file.cwd}/${file.path}")
+        copyToClipboard(context, file.name, fullPath)
       }),
       TabAction(R.string.file_close, R.drawable.ic_lucide_x, {
         controls.onCloseTab(WorkspaceTab.File(file))
@@ -97,7 +103,7 @@ internal fun FileScreen(file: FileTab, controls: PaneControls, modifier: Modifie
   )
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
-    PaneHeader(title = file.name, cwd = file.cwd, controls = controls, folder = folder)
+    PaneHeader(title = file.name, cwd = file.cwd, controls = controls, subfolder = file.folder)
     when (val shown = state) {
       FileState.Loading -> FileNote(Modifier.weight(1f)) {
         CircularProgressIndicator(
@@ -111,6 +117,7 @@ internal fun FileScreen(file: FileTab, controls: PaneControls, modifier: Modifie
       is FileState.Failed -> FileNote(Modifier.weight(1f)) {
         NoteText(stringResource(R.string.file_failed), pipkinColors.destructive)
         if (shown.message.isNotEmpty()) NoteText(shown.message)
+        RemoteConnectAction(file.cwd, shown.code, onConnected = { scope.launch { file.reload() } })
       }
 
       is FileState.Loaded -> {
@@ -297,11 +304,12 @@ private fun decodeImage(bytes: ByteArray): ImageBitmap? {
 @Composable
 internal fun FileActionsSheet(file: FileTab, onClose: () -> Unit, onDismiss: () -> Unit) {
   val context = LocalContext.current
+  val fullPath = rememberFolderNames().absolutePath(file.cwd, file.path)
   PipkinSheet(onDismissRequest = onDismiss) { dismiss ->
     SheetRow(
       label = stringResource(R.string.file_copy_path),
       icon = R.drawable.ic_lucide_copy,
-      onClick = { dismiss { copyToClipboard(context, file.name, "${file.cwd}/${file.path}") } },
+      onClick = { dismiss { copyToClipboard(context, file.name, fullPath) } },
     )
     SheetRow(
       label = stringResource(R.string.file_close),

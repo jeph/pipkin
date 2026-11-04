@@ -62,6 +62,9 @@ import io.jeph.pipkin.ui.git.GitWorkspace
 import io.jeph.pipkin.ui.git.GitWorkspaces
 import io.jeph.pipkin.ui.git.TrustPrompt
 import io.jeph.pipkin.ui.git.shownExplorerTab
+import io.jeph.pipkin.ui.remote.RemoteConnectDialogs
+import io.jeph.pipkin.ui.remote.rememberRemoteConnector
+import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.theme.PipkinFonts
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
@@ -151,7 +154,9 @@ internal fun ExplorerPanel(
 
 /**
  * Detects [repository] again, reading it with git only while [trusted], and says on [snackbar] why Changes went away
- * when it did.
+ * when it did. While Changes isn't there to say it, it also says why a remote workspace's host couldn't be reached,
+ * with Connect when only connecting fixes it; the connect's dialogs show from here, and it detects again once
+ * connected.
  */
 @Composable
 private fun rememberDetection(
@@ -162,7 +167,12 @@ private fun rememberDetection(
   val scope = rememberCoroutineScope()
   val notRepository = stringResource(R.string.git_no_longer_repository)
   val gitMissing = stringResource(R.string.git_no_longer_installed)
-  return remember(repository, trusted, notRepository, gitMissing) {
+  val connectLabel = stringResource(R.string.remote_connect)
+  val connector = rememberRemoteConnector()
+  RemoteConnectDialogs(connector)
+  val names = rememberFolderNames()
+  val host = repository?.let { names.remote(it.root)?.host }
+  return remember(repository, trusted, notRepository, gitMissing, connectLabel, connector, host) {
     {
       val message = when (repository?.detect(trusted)) {
         GitLoss.NotRepository -> notRepository
@@ -171,6 +181,16 @@ private fun rememberDetection(
       }
       // The snackbar shows on its own, so a refresh that detected the loss needn't wait the 4 seconds it shows for.
       if (message != null) scope.launch { snackbar.show(message) }
+      // While Changes shows, its own note says why the host couldn't be reached.
+      val unreachable = repository?.takeIf { it.detection?.available != true }?.unreachable
+      if (unreachable != null) {
+        scope.launch {
+          val connect = host?.takeIf { unreachable.needsConnect }
+          if (snackbar.show(unreachable.text.resolve(), connectLabel.takeIf { connect != null }) && connect != null) {
+            connector.connect(connect.id, connect.name) { scope.launch { repository.detect(trusted) } }
+          }
+        }
+      }
     }
   }
 }
