@@ -4,11 +4,11 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type Dirs, installRealPi, makeDirs, removeDirs, runOp } from "./harness.js";
 
-/** A Kimi Code `/models` entry for a model Pi 1.4.0 doesn't ship, as the real endpoint serves it. */
-const K3_1_PRO = {
-  id: "k3.1-pro",
+/** A Kimi Code `/models` entry in the shape the real endpoint serves, for a model Pi 1.5.0 doesn't ship. */
+const K3_2_PRO = {
+  id: "k3.2-pro",
   object: "model",
-  display_name: "K3.1 Pro",
+  display_name: "K3.2 Pro",
   context_length: 1_048_576,
   supports_reasoning: true,
   supports_image_in: true,
@@ -29,7 +29,7 @@ describe("subscription_models", () => {
       const authorized = request.headers.authorization === "Bearer key-123";
       const data =
         request.url === "/kimi/models"
-          ? [{ id: "k3", object: "model", display_name: "K3 (served)" }, K3_1_PRO]
+          ? [{ id: "k3", object: "model", display_name: "K3 (served)" }, K3_2_PRO]
           : request.url === "/openrouter/models/user"
             ? [{ id: "acme/model-x", name: "Acme: Model X", context_length: 131_072, supported_parameters: ["tools"] }]
             : undefined;
@@ -76,8 +76,8 @@ describe("subscription_models", () => {
         models: [
           expect.objectContaining({ id: "k3", name: "Kimi K3", contextWindow: 1_048_576, maxTokens: 131_072 }),
           {
-            id: "k3.1-pro",
-            name: "K3.1 Pro",
+            id: "k3.2-pro",
+            name: "K3.2 Pro",
             reasoning: true,
             thinkingLevelMap: { off: null, minimal: null, low: "low", medium: null, high: "high", xhigh: null, max: "max" },
             input: ["text", "image"],
@@ -116,16 +116,16 @@ describe("subscription_models", () => {
 
   it("gives a model Pi doesn't ship the compat that its provider's like models share when it is saved", async () => {
     const levels = { off: null, minimal: null, low: "low", medium: null, high: "high", xhigh: null, max: "max" };
-    const models = [{ id: "k3" }, { id: "k3.1-pro", name: "K3.1 Pro", reasoning: true, thinkingLevelMap: levels }];
-    expect(await runOp("subscription_save", dirs, { providerId: "kimi-coding", enabled: ["k3", "k3.1-pro"], models })).toMatchObject({ ok: true });
+    const models = [{ id: "k3" }, { id: "k3.2-pro", name: "K3.2 Pro", reasoning: true, thinkingLevelMap: levels }];
+    expect(await runOp("subscription_save", dirs, { providerId: "kimi-coding", enabled: ["k3", "k3.2-pro"], models })).toMatchObject({ ok: true });
     const document = JSON.parse(await readFile(path.join(dirs.configDir, "models.json"), "utf8")) as unknown;
     expect(document).toMatchObject({
       providers: {
         "kimi-coding": {
           models: [
             {
-              id: "k3.1-pro",
-              name: "K3.1 Pro",
+              id: "k3.2-pro",
+              name: "K3.2 Pro",
               compat: expect.objectContaining({
                 maxTokensField: "max_tokens",
                 thinkingFormat: "openai",

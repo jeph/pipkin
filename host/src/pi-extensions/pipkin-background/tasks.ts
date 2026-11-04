@@ -5,9 +5,9 @@
 import { spawn } from "node:child_process";
 import { closeSync, mkdirSync, openSync, readSync, fstatSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { StringEnum } from "@earendil-works/pi-ai";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
+import { StringEnum } from "../string-enum.js";
 
 export const TOOL_NAME = "background";
 export const TOOL_LABEL = "Background";

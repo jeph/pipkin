@@ -9,7 +9,6 @@
  * and every load shares one registry. A run lasts as long as the parent's tool call, so the end of the parent's run,
  * by Stop, `/reload`, switching session or quitting, stops it through the tool's signal.
  */
-import { StringEnum } from "@earendil-works/pi-ai";
 import {
   type ExtensionAPI,
   type ExtensionContext,
@@ -17,6 +16,7 @@ import {
   getAgentDir,
 } from "@earendil-works/pi-coding-agent";
 import { type Static, Type } from "typebox";
+import { StringEnum } from "../string-enum.js";
 import { type AgentDefinition, type Agents, agentToolNames, loadAgents, THINKING_LEVELS, unknownAgentText } from "./agents.js";
 import { type RunRequest, runSubagent, startFailure } from "./runs.js";
 import { dropFinished, MAX_RUNNING, registry, report } from "./state.js";

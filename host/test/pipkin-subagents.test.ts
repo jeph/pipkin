@@ -560,13 +560,14 @@ describe("results", () => {
     });
     await session.prompt("PARENT go");
     const result = subagentResults(session).get("sub1");
-    const details = result?.details as { sessionFile: string; usage: { totalTokens: number; input: number } };
+    const details = result?.details as { sessionFile: string; usage: { totalTokens: number; cacheWrite: number } };
     const text = messageText(result);
     expect(text.startsWith("x".repeat(RESULT_LIMIT_BYTES))).toBe(true);
     expect(text).not.toContain("x".repeat(RESULT_LIMIT_BYTES + 1));
     expect(text).toContain(`Cut at 50 KB of 60 KB. The full reply is in the subagent's transcript: ${details.sessionFile}`);
     expect(details.usage.totalTokens).toBeGreaterThan(0);
-    expect(details.usage.input).toBeGreaterThan(0);
+    // Pi's faux provider counts a session's first prompt as written to its simulated cache, not as plain input.
+    expect(details.usage.cacheWrite).toBeGreaterThan(0);
     expect(result).toMatchObject({ usage: { totalTokens: details.usage.totalTokens } });
     session.dispose();
   });

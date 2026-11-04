@@ -7,8 +7,8 @@
  * texts. The `/todos` command's texts come from it too. The code is Pipkin's own; the widget follows rpiv-todo's
  * overlay but lists every task, since Pipkin's widget panel scrolls instead of truncating.
  */
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
+import { StringEnum } from "../string-enum.js";
 
 export type TaskStatus = "pending" | "in_progress" | "completed" | "deleted";
 

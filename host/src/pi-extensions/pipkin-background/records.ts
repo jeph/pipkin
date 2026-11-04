@@ -8,10 +8,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
 import { Value } from "typebox/value";
 import { isObject } from "../../framing.js";
+import { StringEnum } from "../string-enum.js";
 import { clockTime, formatDuration, outcome, outputText, TaskStatus, taskDir } from "./tasks.js";
 
 /** Why Pipkin began stopping a task: the agent's `stop`, the user's Stop, its timeout, its session being left or its Pi exiting. */

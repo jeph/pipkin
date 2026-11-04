@@ -7,15 +7,15 @@
     "node": ">=22.19.0"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "1.4.0",
-    "@modelcontextprotocol/sdk": "1.32.1",
+    "@earendil-works/pi-coding-agent": "1.5.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@mozilla/readability": "0.6.0",
-    "defuddle": "0.19.3",
+    "defuddle": "0.19.6",
     "linkedom": "0.16.11",
     "p-limit": "6.2.0",
     "promise.try": "2.0.2",
     "turndown": "7.2.4",
-    "undici": "8.11.2",
+    "undici": "8.12.3",
     "unpdf": "1.8.1"
   }
 }
