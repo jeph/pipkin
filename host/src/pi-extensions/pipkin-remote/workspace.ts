@@ -6,7 +6,6 @@
 import os from "node:os";
 import { posix, resolve } from "node:path";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
-import { hostLabel } from "../../prompt.js";
 import { findHost } from "../../remote/hosts.js";
 import { remotePaths, type RemotePaths } from "../../remote/paths.js";
 import { readStandIn } from "../../remote/stand-ins.js";
@@ -55,17 +54,4 @@ export function expandRemoteHome(path: string, home: string): string | undefined
   if (bare === "~") return home;
   if (bare.startsWith("~/")) return posix.join(home, bare.slice(2));
   return undefined;
-}
-
-/**
- * What a subagent needs to know to work in [workspace]: where its tools run, and that the working directory its
- * prompt names is only the stand-in.
- */
-export function remoteWorkspaceText(workspace: RemoteWorkspace): string {
-  const { host, path } = workspace;
-  return [
-    `This chat works on another machine over SSH: the folder ${path} on ${hostLabel(host)}. The read, write, edit and bash tools run there, in that folder, and \`~\` in their paths means that machine's home folder.`,
-    `The working directory named above, ${workspace.standIn}, only stands in for that folder on the phone: give the tools paths in ${path}.`,
-    "There are no grep, find or ls tools here: search with bash on the remote machine when you have it.",
-  ].join(" ");
 }

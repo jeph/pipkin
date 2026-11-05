@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { append, forApp, type LiveEntry, newLog } from "../src/pi-extensions/pipkin-subagents/live.js";
 import { capped, RESULT_LIMIT_BYTES } from "../src/pi-extensions/pipkin-subagents/runs.js";
 import { registry, report, reportSoon, type Run, THROTTLE_MS } from "../src/pi-extensions/pipkin-subagents/state.js";
+import { SYSTEM_APPEND } from "../src/prompt.js";
 import {
   type Dir,
   echoResults,
@@ -885,7 +886,7 @@ describe("agents", () => {
     session.dispose();
   });
 
-  it("use a user agent's tools and prompt, with the project's AGENTS.md and the user's skills", async () => {
+  it("use a user agent's tools and prompt after Pipkin's, with the project's AGENTS.md and the user's skills", async () => {
     await mkdir(path.join(dir.agentDir, "agents"), { recursive: true });
     await writeFile(
       path.join(dir.agentDir, "agents", "reviewer.md"),
@@ -906,7 +907,9 @@ describe("agents", () => {
     await session.prompt("PARENT go");
     expect(messageText(subagentResults(session).get("sub1"))).toBe("reviewed");
     expect(seen?.toolNames.toSorted()).toEqual(["bash", "read"]);
-    expect(seen?.systemPrompt).toContain("REVIEWER-MARKER");
+    const prompt = seen?.systemPrompt ?? "";
+    expect(prompt.indexOf(SYSTEM_APPEND)).toBeGreaterThan(-1);
+    expect(prompt.indexOf("REVIEWER-MARKER")).toBeGreaterThan(prompt.indexOf(SYSTEM_APPEND));
     expect(seen?.systemPrompt).toContain("PROJECT-MARKER");
     expect(seen?.systemPrompt).toContain("SKILL-MARKER");
     session.dispose();

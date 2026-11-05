@@ -10,6 +10,7 @@ import { isObject } from "../src/framing.js";
 import pipkinBackground from "../src/pi-extensions/pipkin-background/index.js";
 import { RESULT_TYPE } from "../src/pi-extensions/pipkin-background/tasks.js";
 import { createPipkinRemote } from "../src/pi-extensions/pipkin-remote/index.js";
+import { remoteSystemAppend } from "../src/prompt.js";
 import { quote } from "../src/remote/script.js";
 import { runOp } from "./harness.js";
 import { alive, eventually, type RemoteFixture, startRemoteFixture } from "./remote-harness.js";
@@ -174,12 +175,13 @@ describe.skipIf(unavailable !== null)(`a remote chat against a throwaway sshd${u
       await start([createPipkinRemote(fixture.standIn), pipkinSubagents], ["read", "bash", "subagent"]);
     });
 
-    it("run their tools on the remote and are told where it is", async () => {
+    it("run their tools on the remote and are told where it is, with the remote folder as their working directory", async () => {
       const result = await call("subagent", { agent: "General", task: "CHILD pwd", description: "where" });
       expect(messageText(result)).toBe(`child got: ${fixture.remoteDir}`);
       const child = turns.find((turn) => turn.who === "child");
-      expect(child?.systemPrompt).toContain(`the folder ${fixture.remoteDir} on testbox (${fixture.host.address})`);
-      expect(child?.systemPrompt).toContain(`only stands in for that folder on the phone`);
+      expect(child?.systemPrompt).toContain(remoteSystemAppend(fixture.host, fixture.remoteDir));
+      expect(child?.systemPrompt).toContain(`<cwd>\n${fixture.remoteDir}\n</cwd>`);
+      expect(child?.systemPrompt).not.toContain(fixture.standIn);
       expect(subagentResults(session).size).toBe(1);
     });
   });

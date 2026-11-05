@@ -14,13 +14,15 @@ import {
   DefaultResourceLoader,
   type ExtensionToolContext,
   getAgentDir,
+  type InlineExtension,
   ModelRuntime,
   SessionManager,
   SettingsManager,
   type ToolDefinition,
   type ToolInfo,
 } from "@earendil-works/pi-coding-agent";
-import { remoteWorkspace, remoteWorkspaceText } from "../pipkin-remote/workspace.js";
+import { remoteSystemAppend, SYSTEM_APPEND } from "../../prompt.js";
+import { remoteWorkspace } from "../pipkin-remote/workspace.js";
 import type { AgentDefinition, ThinkingLevel } from "./agents.js";
 import { newLog } from "./live.js";
 import {
@@ -230,17 +232,18 @@ async function createChild(
   const cwd = ctx.cwd;
   const agentDir = getAgentDir();
   const settingsManager = SettingsManager.create(cwd, agentDir, { projectTrusted: ctx.isProjectTrusted() });
-  // A remote chat's subagent runs the parent's tools, which work on the remote; its prompt says where that is.
+  // The child gets the parent's Pipkin prompt, then its agent's. In a remote chat its tools run on the remote, so like
+  // the parent's, its prompt names the remote folder as its working directory, not the stand-in it runs in.
   const workspace = await remoteWorkspace(cwd);
-  const appended = [request.agent.prompt, workspace === null ? undefined : remoteWorkspaceText(workspace)].filter(
-    (part): part is string => part !== undefined && part !== "",
-  );
+  const pipkinPrompt = workspace === null ? SYSTEM_APPEND : remoteSystemAppend(workspace.host, workspace.path);
+  const appended = request.agent.prompt === "" ? [pipkinPrompt] : [pipkinPrompt, request.agent.prompt];
   const resourceLoader = new DefaultResourceLoader({
     cwd,
     agentDir,
     settingsManager,
     noExtensions: true,
-    ...(appended.length > 0 ? { appendSystemPromptOverride: (base: string[]) => [...base, ...appended] } : {}),
+    ...(workspace === null ? {} : { extensionFactories: [remoteCwd(workspace.path)] }),
+    appendSystemPromptOverride: (base: string[]) => [...base, ...appended],
   });
   await resourceLoader.reload();
   const { session } = await createAgentSession({
@@ -264,6 +267,18 @@ async function createChild(
   };
   session.sessionManager.appendCustomEntry(ENTRY_TYPE, entry);
   return session;
+}
+
+/** Names remote folder [path] as the child's working directory in its prompt, as `pipkin-remote` does for the parent. */
+function remoteCwd(path: string): InlineExtension {
+  return {
+    name: "pipkin-subagent-remote-cwd",
+    factory: (pi) => {
+      pi.on("before_agent_start", (event) => {
+        event.systemPromptOptions.cwd = path;
+      });
+    },
+  };
 }
 
 /** `subagents/<parent id>/` beside the parent's file, or memory when the parent has no file either. */

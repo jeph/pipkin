@@ -44,7 +44,7 @@ thinking: high
 Review the change you are given. List bugs first, with file paths and line numbers.
 ```
 
-The body is added to the subagent's system prompt. Every field is optional:
+The body is added to the subagent's system prompt, after the instructions Pipkin gives every chat's agent about Pipkin and Termux, or about the remote machine in a remote chat. Every field is optional:
 
 - `name` defaults to the file's name without `.md`.
 - `description` tells the chat's agent when to use the agent.
