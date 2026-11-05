@@ -28,15 +28,17 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import { HostError } from "../../env.js";
 import { isObject } from "../../framing.js";
-import { errorJson } from "../../remote/errors.js";
+import { errorJson, notConnected } from "../../remote/errors.js";
 import { accessRemote, mkdirRemote, readRemoteFile, RemoteFileError, remoteHome, writeRemoteFile } from "../../remote/fs.js";
-import { checkConnection, runWatched } from "../../remote/ssh.js";
+import { checkConnection, isConnected, runWatched } from "../../remote/ssh.js";
 import { pipkinChannel } from "../pipkin-channel.js";
 import { expandRemoteHome, remoteWorkspace, type RemoteWorkspace, toRemotePath } from "./workspace.js";
 
 /**
  * The channel topic. To the app: `{ connected, error? }` when a tool call finds the connection gone, or back, and after
- * every check. From the app: `{ action: "check" }`, which it sends every few seconds while the chat is on screen.
+ * every check; `{ reconnect: true }` when a call needs a password host that has no connection, asking the app to sign
+ * in again with the saved password. From the app: `{ action: "check" }`, which it sends every few seconds while the chat is on
+ * screen, and `{ action: "reconnected", connected }`, its answer to a reconnect.
  */
 export const TOPIC = "remote";
 
@@ -67,6 +69,10 @@ interface State {
   workspace: RemoteWorkspace | undefined;
   /** Whether a check is running; one the app asks for meanwhile is dropped, as the running one answers it. */
   checking: boolean;
+  /** The app's answer to the reconnect asked for last, while calls wait on it. */
+  reconnect: Promise<boolean> | undefined;
+  /** Settles [reconnect]; the app's `reconnected` message calls it. */
+  reconnected: ((connected: boolean) => void) | undefined;
 }
 
 const SHARED = Symbol.for("pipkin.remote");
@@ -75,10 +81,20 @@ const SHARED = Symbol.for("pipkin.remote");
 function sharedState(): State {
   const global = globalThis as { [SHARED]?: State };
   if (global[SHARED] !== undefined) return global[SHARED];
-  const state: State = { down: undefined, outputs: new Set(), home: undefined, workspace: undefined, checking: false };
+  const state: State = {
+    down: undefined,
+    outputs: new Set(),
+    home: undefined,
+    workspace: undefined,
+    checking: false,
+    reconnect: undefined,
+    reconnected: undefined,
+  };
   global[SHARED] = state;
   pipkinChannel().on(TOPIC, (data) => {
-    if (isObject(data) && data.action === "check") void check(state);
+    if (!isObject(data)) return;
+    if (data.action === "check") void check(state);
+    if (data.action === "reconnected") state.reconnected?.(data.connected === true);
   });
   return state;
 }
@@ -121,11 +137,59 @@ function markUp(state: State): void {
 }
 
 /**
+ * How long a call to a password host with no connection waits for the app to sign in again before failing. Read at each call,
+ * so tests can shorten it.
+ */
+function reconnectWaitMs(): number {
+  return Number(process.env.PIPKIN_REMOTE_RECONNECT_WAIT_MS ?? 30_000);
+}
+
+/**
+ * Asks the app to sign in to the host again, as it can with a password the user saved, and resolves to whether it
+ * did; false when it couldn't, didn't answer within [reconnectWaitMs], or [signal] aborted first. One ask serves every
+ * call that needs the host meanwhile.
+ */
+function askReconnect(state: State, signal: AbortSignal | undefined): Promise<boolean> {
+  if (state.reconnect === undefined) {
+    const { promise, resolve } = Promise.withResolvers<boolean>();
+    const settle = (connected: boolean): void => {
+      clearTimeout(timer);
+      state.reconnect = undefined;
+      state.reconnected = undefined;
+      resolve(connected);
+    };
+    const timer = setTimeout(() => settle(false), reconnectWaitMs());
+    state.reconnect = promise;
+    state.reconnected = settle;
+    pipkinChannel().send(TOPIC, { reconnect: true });
+  }
+  const answer = state.reconnect;
+  if (signal === undefined) return answer;
+  if (signal.aborted) return Promise.resolve(false);
+  const { promise, resolve } = Promise.withResolvers<boolean>();
+  const stop = (): void => resolve(false);
+  signal.addEventListener("abort", stop, { once: true });
+  void answer.then((connected) => {
+    signal.removeEventListener("abort", stop);
+    resolve(connected);
+  });
+  return promise;
+}
+
+/**
  * Runs remote [work], keeping the app's view of the connection current. A failure of `ssh` itself reaches the model
  * as `ssh`'s own message in a plain error, without the `code` Pi's tools would otherwise report instead of it.
+ *
+ * A password host signs in only with a password, which no call sends, so without a connection it first asks the app
+ * to sign in again, as it can with a password the user saved. Asking before [work] rather than after its sign-in was
+ * refused keeps `ssh`'s refusal out of a command's streamed output.
  */
-async function remoteCall<T>(state: State, work: () => Promise<T>): Promise<T> {
+async function remoteCall<T>(state: State, work: () => Promise<T>, signal?: AbortSignal): Promise<T> {
   try {
+    const workspace = state.workspace;
+    if (workspace?.host.auth === "password" && !(await isConnected(workspace)) && !(await askReconnect(state, signal))) {
+      throw notConnected(workspace.host.name);
+    }
     const result = await work();
     markUp(state);
     return result;
@@ -213,7 +277,7 @@ function readOperations(state: State, workspace: RemoteWorkspace, signal: AbortS
     const remotePath = toRemotePath(workspace, path);
     let file = files.get(remotePath);
     if (file === undefined) {
-      file = remoteCall(state, () => readRemoteFile(workspace, remotePath, { signal }));
+      file = remoteCall(state, () => readRemoteFile(workspace, remotePath, { signal }), signal);
       files.set(remotePath, file);
     }
     return file;
@@ -240,8 +304,8 @@ function writeOperations(state: State, workspace: RemoteWorkspace): WriteOperati
 
 function editOperations(state: State, workspace: RemoteWorkspace, signal: AbortSignal | undefined): EditOperations {
   return {
-    readFile: (path) => remoteCall(state, () => readRemoteFile(workspace, toRemotePath(workspace, path), { signal })),
-    access: (path) => remoteCall(state, () => accessRemote(workspace, toRemotePath(workspace, path), { signal })),
+    readFile: (path) => remoteCall(state, () => readRemoteFile(workspace, toRemotePath(workspace, path), { signal }), signal),
+    access: (path) => remoteCall(state, () => accessRemote(workspace, toRemotePath(workspace, path), { signal }), signal),
     writeFile: writeOperations(state, workspace).writeFile,
   };
 }
@@ -257,13 +321,16 @@ function remoteBashOperations(state: State, workspace: RemoteWorkspace): BashOpe
         throw new Error("Invalid timeout: must be a finite number of seconds");
       }
       try {
-        const result = await remoteCall(state, () =>
-          runWatched(workspace, command, toRemotePath(workspace, cwd), {
-            onStdout: onData,
-            onStderr: onData,
-            signal,
-            ...(timeout === undefined ? {} : { timeoutMs: timeout * 1000 }),
-          }),
+        const result = await remoteCall(
+          state,
+          () =>
+            runWatched(workspace, command, toRemotePath(workspace, cwd), {
+              onStdout: onData,
+              onStderr: onData,
+              signal,
+              ...(timeout === undefined ? {} : { timeoutMs: timeout * 1000 }),
+            }),
+          signal,
         );
         return { exitCode: result.code };
       } catch (error) {

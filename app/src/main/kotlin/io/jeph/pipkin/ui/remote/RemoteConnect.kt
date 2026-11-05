@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
@@ -32,6 +35,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.data.Reconnect
 import io.jeph.pipkin.data.RemoteHosts
 import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.RemoteFailure
@@ -94,13 +98,31 @@ internal class RemoteConnector(private val remoteHosts: RemoteHosts, private val
     }
   }
 
-  /** Answers the shown prompt; null cancels the connect. */
-  fun answer(text: String?) {
+  /**
+   * Signs host [hostId], named [name], in again with its saved password without asking anything, as a surface that
+   * found it signed out does by itself ([AutoReconnect]), then runs [onConnected]. When that can't sign it in, the
+   * surface goes on offering Connect.
+   */
+  fun reconnect(hostId: String, name: String, onConnected: () -> Unit) {
+    if (connecting) return
+    hostName = name
+    connecting = true
+    job = scope.launch {
+      try {
+        if (remoteHosts.reconnect(hostId) == Reconnect.Connected) onConnected()
+      } finally {
+        connecting = false
+      }
+    }
+  }
+
+  /** Answers the shown prompt, saving the password once it signs in when [remember] is set; null cancels the connect. */
+  fun answer(text: String?, remember: Boolean = false) {
     val shown = prompt ?: return
     prompt = null
     scope.launch {
       // The connect has already ended when the answer can't be sent; it reports why itself.
-      if (!shown.reply.answer(text) && text == null) job?.cancel()
+      if (!shown.reply.answer(text, remember) && text == null) job?.cancel()
     }
   }
 
@@ -191,12 +213,16 @@ private fun HostKeyDialog(host: String, prompt: RemotePrompt, onAnswer: (String?
   }
 }
 
-/** A password, a key's passphrase, or another question in `ssh`'s words, answered in a field masked for secrets. */
+/**
+ * A password, a key's passphrase, or another question in `ssh`'s words, answered in a field masked for secrets. A
+ * password that can be saved comes with Remember, ticked, and says so when it's asked because the saved one failed.
+ */
 @Composable
-private fun SecretDialog(host: String, prompt: RemotePrompt, onAnswer: (String?) -> Unit) {
+private fun SecretDialog(host: String, prompt: RemotePrompt, onAnswer: (String?, Boolean) -> Unit) {
   val secret = prompt.kind != RemotePrompt.Kind.Other
   var value by remember(prompt) { mutableStateOf(TextFieldValue()) }
   var shown by remember(prompt) { mutableStateOf(!secret) }
+  var remember by remember(prompt) { mutableStateOf(true) }
   val title = when (prompt.kind) {
     RemotePrompt.Kind.Password -> stringResource(R.string.remote_password_title, host)
     RemotePrompt.Kind.Passphrase -> stringResource(R.string.remote_passphrase_title)
@@ -207,16 +233,23 @@ private fun SecretDialog(host: String, prompt: RemotePrompt, onAnswer: (String?)
     RemotePrompt.Kind.Passphrase -> stringResource(R.string.remote_passphrase_hint)
     else -> null
   }
+  val text = when {
+    prompt.savedRejected -> stringResource(R.string.remote_password_rejected_text)
+
+    // A passphrase prompt names the key file; a question is only in ssh's words.
+    prompt.kind != RemotePrompt.Kind.Password && prompt.text.isNotBlank() -> prompt.text
+
+    else -> null
+  }
   PipkinDialog(
     title = title,
-    // A passphrase prompt names the key file; a question is only in ssh's words.
-    text = prompt.text.takeIf { prompt.kind != RemotePrompt.Kind.Password && it.isNotBlank() },
+    text = text,
     confirm = DialogConfirm(
       label = stringResource(if (secret) R.string.remote_connect else R.string.remote_answer),
-      onClick = { onAnswer(value.text) },
+      onClick = { onAnswer(value.text, prompt.savable && remember) },
     ),
     dismissLabel = stringResource(R.string.remote_cancel),
-    onDismiss = { onAnswer(null) },
+    onDismiss = { onAnswer(null, false) },
   ) {
     DialogTextField(
       value = value,
@@ -233,6 +266,47 @@ private fun SecretDialog(host: String, prompt: RemotePrompt, onAnswer: (String?)
         null
       },
     )
+    if (prompt.savable) RememberRow(remember) { remember = it }
+  }
+}
+
+/** Remember password, under a password's field. */
+@Composable
+private fun RememberRow(checked: Boolean, onChange: (Boolean) -> Unit) {
+  val colors = pipkinColors
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(top = PipkinTokens.Spacing.s12)
+      .clip(RoundedCornerShape(10.dp))
+      .toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange)
+      .padding(vertical = PipkinTokens.Spacing.s4),
+    verticalAlignment = Alignment.Top,
+  ) {
+    Checkbox(
+      checked = checked,
+      onCheckedChange = null,
+      colors = CheckboxDefaults.colors(
+        checkedColor = colors.accent,
+        checkmarkColor = colors.accentForeground,
+        uncheckedColor = colors.foregroundMuted,
+      ),
+    )
+    Column(
+      modifier = Modifier.padding(start = PipkinTokens.Spacing.s12),
+      verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s2),
+    ) {
+      Text(
+        text = stringResource(R.string.remote_remember_password),
+        color = colors.foreground,
+        fontSize = PipkinTokens.FontSize.base,
+      )
+      Text(
+        text = stringResource(R.string.remote_remember_password_detail),
+        color = colors.foregroundMuted,
+        fontSize = PipkinTokens.FontSize.sm,
+      )
+    }
   }
 }
 

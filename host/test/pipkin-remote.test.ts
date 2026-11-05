@@ -5,11 +5,12 @@ import { fauxAssistantMessage, fauxToolCall, type Message, type ToolCall } from 
 import type { AgentSession, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { isObject } from "../src/framing.js";
 import { createPipkinRemote, imageMimeType } from "../src/pi-extensions/pipkin-remote/index.js";
 import { sshConfigFile } from "../src/remote/paths.js";
 import { quote } from "../src/remote/script.js";
 import { updateHosts } from "../src/remote/hosts.js";
-import { disconnect, isConnected } from "../src/remote/ssh.js";
+import { disconnect, isConnected, runScript } from "../src/remote/ssh.js";
 import { alive, eventually, processTree, type RemoteFixture, signalEach, startRemoteFixture } from "./remote-harness.js";
 import { shortTempDir, sshdUnavailable } from "./sshd.js";
 import { fakeUi, installChannel, makeParent, messageText, removeChannel, type Script, type Turn } from "./subagents-harness.js";
@@ -269,30 +270,20 @@ describe.skipIf(unavailable !== null)(`pipkin-remote against a throwaway sshd${u
   });
 
   it("tells the app a renamed password host with no connection needs signing in, on a fresh chat's first call", async () => {
-    const remote = { paths: fixture.paths, host: fixture.host };
-    const renamed = { ...fixture.host, name: "pwhost", auth: "password" as const };
-    await updateHosts(fixture.paths, (hosts) => ({ hosts: hosts.map((host) => (host.id === renamed.id ? renamed : host)), result: undefined }));
-    try {
-      await disconnect(remote);
-      // A new Pi for the chat, which reads the host as it is now.
-      session.dispose();
-      const dir = { cwd: fixture.standIn, agentDir: fixture.dirs.configDir, sessionsDir: path.join(fixture.dirs.configDir, "sessions") };
-      const recording = (globalThis as Record<symbol, unknown>)[CHANNEL];
-      const ui = fakeUi(installChannel());
-      (globalThis as Record<symbol, unknown>)[CHANNEL] = recording;
-      delete (globalThis as Record<symbol, unknown>)[STATE];
-      ({ session } = await makeParent(dir, script, { extensions: [createPipkinRemote(fixture.standIn)], tools: ["bash"], ui }));
-      const failed = await call("bash", { command: "hostname" });
-      expect(messageText(failed)).toBe("Not connected to pwhost. Connect to sign in.");
+    await asSignedOutPasswordHost(async () => {
+      const failed = call("bash", { command: "hostname" });
+      await eventually(() => sent.some((data) => isObject(data) && data.reconnect === true), 10_000);
+      // The app has no saved password to sign in with.
+      for (const handler of fromApp) handler({ action: "reconnected", connected: false });
+      expect(messageText(await failed)).toBe("Not connected to pwhost. Connect to sign in.");
       expect(sent).toEqual([
+        { reconnect: true },
         {
           connected: false,
           error: { code: "remote_not_connected", message: "Not connected to pwhost. Connect to sign in.", i18n: { key: "remote_not_connected", args: { host: "pwhost" } } },
         },
       ]);
-    } finally {
-      await updateHosts(fixture.paths, (hosts) => ({ hosts: hosts.map((host) => (host.id === renamed.id ? fixture.host : host)), result: undefined }));
-    }
+    });
   });
 
   it("fails a command whose server froze as a lost connection, and tells the app when it's back", async () => {
@@ -372,13 +363,16 @@ describe.skipIf(unavailable !== null)(`pipkin-remote against a throwaway sshd${u
     expect(await check()).toEqual({ connected: true });
   });
 
-  it("doesn't connect a password host the user hasn't signed in", async () => {
+  /**
+   * Runs [body] with the fixture's host saved as a password host and no connection, in a new Pi for the chat, which
+   * reads the host as it is now; then puts the host back.
+   */
+  async function asSignedOutPasswordHost(body: () => Promise<void>): Promise<void> {
     const remote = { paths: fixture.paths, host: fixture.host };
     const renamed = { ...fixture.host, name: "pwhost", auth: "password" as const };
     await updateHosts(fixture.paths, (hosts) => ({ hosts: hosts.map((host) => (host.id === renamed.id ? renamed : host)), result: undefined }));
     try {
       await disconnect(remote);
-      // A new Pi for the chat, which reads the host as it is now.
       session.dispose();
       const dir = { cwd: fixture.standIn, agentDir: fixture.dirs.configDir, sessionsDir: path.join(fixture.dirs.configDir, "sessions") };
       const recording = (globalThis as Record<symbol, unknown>)[CHANNEL];
@@ -388,6 +382,14 @@ describe.skipIf(unavailable !== null)(`pipkin-remote against a throwaway sshd${u
       // The first Pi's extension, whose host still signs in with Pipkin's key, is gone with its session.
       fromApp = [];
       ({ session } = await makeParent(dir, script, { extensions: [createPipkinRemote(fixture.standIn)], tools: ["bash"], ui }));
+      await body();
+    } finally {
+      await updateHosts(fixture.paths, (hosts) => ({ hosts: hosts.map((host) => (host.id === renamed.id ? fixture.host : host)), result: undefined }));
+    }
+  }
+
+  it("doesn't connect a password host the user hasn't signed in", async () => {
+    await asSignedOutPasswordHost(async () => {
       const repair = await breakSsh();
       try {
         expect(await check()).toEqual({
@@ -397,8 +399,34 @@ describe.skipIf(unavailable !== null)(`pipkin-remote against a throwaway sshd${u
       } finally {
         await repair();
       }
+    });
+  });
+
+  it("asks the app to sign a password host in again, and runs the call once it has", async () => {
+    await asSignedOutPasswordHost(async () => {
+      const result = call("bash", { command: "echo again" });
+      await eventually(() => sent.some((data) => isObject(data) && data.reconnect === true), 10_000);
+      // The app signed in with the saved password; here, with the key the fixture's sshd also takes.
+      await updateHosts(fixture.paths, (hosts) => ({ hosts: hosts.map((host) => (host.id === fixture.host.id ? fixture.host : host)), result: undefined }));
+      await runScript({ paths: fixture.paths, host: fixture.host }, "true");
+      for (const handler of fromApp) handler({ action: "reconnected", connected: true });
+      const output = await result;
+      expect(output.isError).toBe(false);
+      expect(messageText(output)).toBe("again\n");
+      expect(sent.filter((data) => isObject(data) && data.reconnect === true)).toHaveLength(1);
+    });
+  });
+
+  it("stops waiting for a reconnect the app never answers", async () => {
+    process.env.PIPKIN_REMOTE_RECONNECT_WAIT_MS = "500";
+    try {
+      await asSignedOutPasswordHost(async () => {
+        const output = await call("bash", { command: "echo again" });
+        expect(output.isError).toBe(true);
+        expect(messageText(output)).toBe("Not connected to pwhost. Connect to sign in.");
+      });
     } finally {
-      await updateHosts(fixture.paths, (hosts) => ({ hosts: hosts.map((host) => (host.id === renamed.id ? fixture.host : host)), result: undefined }));
+      delete process.env.PIPKIN_REMOTE_RECONNECT_WAIT_MS;
     }
   });
 

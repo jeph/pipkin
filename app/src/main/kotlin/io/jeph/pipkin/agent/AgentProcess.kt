@@ -11,6 +11,7 @@ import io.jeph.pipkin.host.HostClient
 import io.jeph.pipkin.host.HostFailure
 import io.jeph.pipkin.host.HostProtocol
 import io.jeph.pipkin.host.HostRejected
+import io.jeph.pipkin.host.RemoteFailure
 import io.jeph.pipkin.host.objects
 import io.jeph.pipkin.host.strings
 import java.io.IOException
@@ -245,7 +246,7 @@ internal class AgentProcess(
   val subagentsStandingAside: StateFlow<Boolean> = subagentsStandingAsideState.asStateFlow()
 
   /** Whether the chat's remote host was lost; the user connecting it again [RemoteOutages.clear]s that. */
-  val remoteOutages = RemoteOutages(cwd, remoteHosts)
+  val remoteOutages = RemoteOutages(cwd, remoteHosts, processScope) { sendChannel(RemoteOutages.TOPIC, it) }
 
   /** The runs subagent screens follow, with their transcripts as they run. */
   val liveSubagents = LiveSubagents(processScope, ::sendSubagents)
@@ -522,12 +523,20 @@ internal class AgentProcess(
     sessions.refresh()
   }
 
-  /** Connects; a `pi_version` refusal installs the pinned Pi once and retries once. */
+  /**
+   * Connects; a `pi_version` refusal installs the pinned Pi once and retries once, and a remote host that isn't signed
+   * in is signed in again with its saved password, if it has one, and tried once more.
+   */
   private suspend fun connect() {
     restoreNotices()
     var installed = false
+    var reconnected = false
     while (true) {
       val rejection = attempt() ?: return
+      if (rejection.code == RemoteFailure.NOT_CONNECTED && !reconnected) {
+        reconnected = true
+        if (remoteOutages.reconnect()) continue
+      }
       if (rejection.code != PI_VERSION || installed) {
         val remote = remoteOutages.refused(rejection)
         stateFlow.value = AgentProcessState.Failed(rejection.error, code = rejection.code, remote = remote)

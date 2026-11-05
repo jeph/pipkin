@@ -22,6 +22,7 @@ import io.jeph.pipkin.data.NoticeStore
 import io.jeph.pipkin.data.PiExtensionUpdate
 import io.jeph.pipkin.data.Preferences
 import io.jeph.pipkin.data.RemoteHosts
+import io.jeph.pipkin.data.RemotePasswords
 import io.jeph.pipkin.data.SessionArchive
 import io.jeph.pipkin.data.SessionRepository
 import io.jeph.pipkin.files.FileTabRegistry
@@ -61,7 +62,7 @@ internal class AppGraph(private val application: Application) {
   )
   val keepAlive = KeepAlive(application)
   val preferences = Preferences(application)
-  val remoteHosts = RemoteHosts(hostClient, preferences, keepAlive, scope)
+  val remoteHosts = RemoteHosts(hostClient, preferences, RemotePasswords.of(application), keepAlive, scope)
   val sessionRepository = SessionRepository(hostClient, NoticeStore(File(application.filesDir, "notices")), scope)
   val sessionArchive = SessionArchive(sessionRepository, preferences, scope)
   private val visibility = AppVisibility(application)

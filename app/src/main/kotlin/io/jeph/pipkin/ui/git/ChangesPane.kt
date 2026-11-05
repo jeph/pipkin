@@ -48,6 +48,7 @@ import io.jeph.pipkin.ui.components.SnackbarStackState
 import io.jeph.pipkin.ui.files.Spinner
 import io.jeph.pipkin.ui.onboarding.PrimaryButton
 import io.jeph.pipkin.ui.onboarding.SecondaryButton
+import io.jeph.pipkin.ui.remote.AutoReconnect
 import io.jeph.pipkin.ui.remote.RemoteConnectDialogs
 import io.jeph.pipkin.ui.remote.rememberRemoteConnector
 import io.jeph.pipkin.ui.sidebar.rememberFolderNames
@@ -111,6 +112,7 @@ internal fun ChangesPane(
   }
   // Connecting reloads everything, which only failed because the host couldn't be reached.
   val connect = host?.let { { connector.connect(it.id, it.name, onConnected = refresh) } }
+  if (host != null) AutoReconnect(connector, host, unreachable?.code, onConnected = refresh)
   BoxWithConstraints(modifier = modifier.fillMaxSize()) {
     val commitsMaxHeight = maxHeight / 2
     Column(modifier = Modifier.fillMaxSize()) {

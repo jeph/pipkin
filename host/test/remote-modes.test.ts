@@ -13,10 +13,15 @@ const unavailable = await sshdUnavailable();
 const user = os.userInfo().username;
 
 /** Runs `remote_connect` for [hostId], answering each prompt with [answer]; returns the prompts and the result. */
-async function connect(dirs: Dirs, hostId: string, answer: (prompt: JsonObject) => string | null): Promise<{ prompts: JsonObject[]; result: JsonObject }> {
+async function connect(
+  dirs: Dirs,
+  hostId: string,
+  answer: (prompt: JsonObject) => string | null,
+  params: JsonObject = {},
+): Promise<{ prompts: JsonObject[]; result: JsonObject }> {
   const { run: host } = await startHost("remote_connect", dirs);
   await host.next();
-  host.send({ type: "pipkin_request", params: { hostId } });
+  host.send({ type: "pipkin_request", params: { hostId, ...params } });
   const prompts: JsonObject[] = [];
   for (;;) {
     const message = await host.next();
@@ -209,6 +214,16 @@ describe.skipIf(unavailable !== null)(`remote_connect against a throwaway sshd${
     expect((await connect(dirs, id, () => null)).result).toMatchObject({ ok: false, code: "remote_connect_cancelled" });
     expect(await knownHosts()).toBe("");
     expect(await runOp("remote_status", dirs, { ids: [id] })).toMatchObject({ data: { connected: { [id]: false } } });
+  });
+
+  it("refuses an unknown host key without asking when connecting unattended, and connects once it's known", async () => {
+    const refused = await connect(dirs, id, () => "yes", { unattended: true });
+    expect(refused.prompts).toEqual([]);
+    expect(refused.result).toMatchObject({ ok: false, code: "remote_host_key_unknown" });
+    expect(await knownHosts()).toBe("");
+    expect((await connect(dirs, id, () => "yes")).result).toMatchObject({ ok: true });
+    await runOp("remote_disconnect", dirs, { id });
+    expect(await connect(dirs, id, () => "yes", { unattended: true })).toMatchObject({ prompts: [], result: { ok: true } });
   });
 
   it("replaces Pipkin's key, closing the old key's connection; the host refuses until it has the new line", async () => {

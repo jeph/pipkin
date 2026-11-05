@@ -14,7 +14,7 @@ Nothing is installed on the host. It needs an SSH server and `bash`, which most 
 3. Enter its **Address** as `user@host`, for example `me@devbox.lan`, `me@192.168.1.20`, or `me@[fd00::1]`, and its **Port** if it isn't 22.
 4. Choose how to **Sign in with**:
    - **Pipkin's key.** Pipkin makes an SSH key for itself the first time you need it. Tap **Copy public key** and add that line to `~/.ssh/authorized_keys` on the host.
-   - **Password.** Pipkin asks for the password each time it connects, and doesn't save it.
+   - **Password.** Pipkin asks for the password the first time it connects. With **Remember password** ticked, it saves the password on this phone once it signs in, and fills it in from then on.
    - **Use my ~/.ssh/config.** For a host you've already set up in Termux's own `~/.ssh/config`, with your own keys or jump hosts. The address is then the `Host` name from that file.
 5. Tap **Connect** to check that it works, or **Save**.
 
@@ -49,9 +49,17 @@ A few things work differently in a remote chat:
 
 ## Connections
 
-Pipkin keeps one connection per host and shares it between chats, the file explorer, git, and terminals. It closes 10 minutes after anything last used it, and a remote chat on screen counts as using it. A host that signs in with Pipkin's key connects again on its own when it's next needed, and so does one from your `~/.ssh/config` whose key needs no passphrase. A host that asks for a password or passphrase has to be connected again, and the chat, picker, or terminal offers **Connect**.
+Pipkin keeps one connection per host and shares it between chats, the file explorer, git, and terminals. It closes 10 minutes after anything last used it, and a remote chat on screen counts as using it. A host that signs in with Pipkin's key connects again on its own when it's next needed, and so does one from your `~/.ssh/config` whose key needs no passphrase, and a password host whose password is saved. A host that asks for a passphrase, or for a password that isn't saved, has to be connected again, and the chat, picker, or terminal offers **Connect**.
 
 While a remote chat is on screen, Pipkin checks every few seconds that its host still answers. If the network drops or the host stops answering, a warning floats over the top of the chat within about 15 seconds, and you can't send a message until the host can be reached again; anything you type stays in the message box. A terminal ends with the reason and **Restart shell**. **Settings → Remote hosts** shows which hosts are connected, and **Disconnect** closes a host's connection.
+
+### Saved passwords
+
+A saved password is kept in Pipkin's own storage, encrypted with a key in Android's Keystore, never in Termux. Pipkin fills it in only when SSH asks the same question it answered when you saved it; any other question, such as a one-time code, still comes to you. It doesn't send the password to a host whose key isn't the one you trusted, and the chat says so with **Review**. If the host refuses the password, Pipkin stops sending it and asks you for the current one with **Enter password**. When a connection drops in the background, Pipkin tries again after 30 seconds, then waits longer each time, up to 5 minutes.
+
+**Settings → Remote hosts** shows **Saved on this phone** under a host's **Password**, and **Forget** deletes it. Changing the host's address or port, or how it signs in, deletes it too, since it was for another server.
+
+SSH runs in Termux, so each sign-in hands the password to SSH there, where a program running in Termux at that moment could read it. Pipkin's key avoids passwords altogether and is the safer choice.
 
 ## Make a new key
 

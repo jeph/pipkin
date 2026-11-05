@@ -89,17 +89,11 @@ internal class RemoteHostForm(id: String, name: String, address: String, port: S
       (auth != RemoteAuth.Config && parseSshPort(port) != (saved.port ?: DEFAULT_SSH_PORT))
   }
 
-  /** Saves the fields over [saved] (null for a new host); returns the host as saved, or null with the errors set. */
-  suspend fun save(remoteHosts: RemoteHosts, saved: RemoteHost?): RemoteHost? {
+  /** The host the fields describe, over [saved] (null for a new host); null while the port isn't one. */
+  fun draft(saved: RemoteHost?): RemoteHost? {
     val parsedPort = parseSshPort(port)
-    if (auth != RemoteAuth.Config && parsedPort == null) {
-      errors = mapOf(RemoteHostField.Port to AppStrings.get(R.string.host_remote_port_invalid))
-      return null
-    }
-    errors = emptyMap()
-    formError = null
-    saving = true
-    val host = RemoteHost(
+    if (auth != RemoteAuth.Config && parsedPort == null) return null
+    return RemoteHost(
       id = id,
       name = name.trim(),
       auth = auth,
@@ -107,6 +101,18 @@ internal class RemoteHostForm(id: String, name: String, address: String, port: S
       port = parsedPort.takeIf { auth != RemoteAuth.Config },
       home = saved?.home,
     )
+  }
+
+  /** Saves the fields over [saved] (null for a new host); returns the host as saved, or null with the errors set. */
+  suspend fun save(remoteHosts: RemoteHosts, saved: RemoteHost?): RemoteHost? {
+    val host = draft(saved)
+    if (host == null) {
+      errors = mapOf(RemoteHostField.Port to AppStrings.get(R.string.host_remote_port_invalid))
+      return null
+    }
+    errors = emptyMap()
+    formError = null
+    saving = true
     return try {
       // The fields take the host as saved, trimmed, so they match it and don't count as unsaved edits.
       remoteHosts.save(host).also { stored ->

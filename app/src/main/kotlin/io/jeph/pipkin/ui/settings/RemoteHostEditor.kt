@@ -27,9 +27,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -53,7 +55,9 @@ import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Adds a remote host ([hostId] null) or edits one: its name, address, port and sign-in, and for a saved host its
@@ -86,8 +90,8 @@ internal fun RemoteHostEditorScreen(
       !editor.form.editing && !OpenSshGate(editor.remoteHosts) -> Unit
 
       else -> {
-        HostFields(editor.form)
-        SignInSection(editor.form, editor.remoteHosts)
+        HostFields(editor.form, editor.remoteHosts, saved)
+        SignInSection(editor, saved)
         if (saved != null) StatusSection(editor, saved)
         editor.form.formError?.let { ErrorPanel(title = null, message = it) }
         EditorActions(editor, saved, dirty, onDone)
@@ -99,7 +103,7 @@ internal fun RemoteHostEditorScreen(
 }
 
 /** A dialog the editor asks with. */
-private enum class EditorDialog { Discard, ForgetKey, Remove }
+private enum class EditorDialog { Discard, ForgetKey, ForgetPassword, Remove }
 
 /** The editor's [form] and what its buttons do, run in the screen's [scope] so a dialog closing doesn't cancel them. */
 @Stable
@@ -131,6 +135,8 @@ private class HostEditor(
   fun disconnect(hostId: String) = attempt { remoteHosts.disconnect(hostId) }
 
   fun forgetHostKey(hostId: String) = attempt { remoteHosts.forgetHostKey(hostId) }
+
+  fun forgetPassword(hostId: String) = attempt { withContext(Dispatchers.IO) { remoteHosts.forgetPassword(hostId) } }
 
   /** Removes the workspaces [cwds] the way the sidebar does, archiving their chats, then forgets host [hostId]. */
   fun remove(hostId: String, cwds: List<String>, onRemoved: () -> Unit) {
@@ -169,9 +175,17 @@ private fun rememberHostEditor(hostId: String?, actions: ShellActions): HostEdit
   return remember(form, connector, scope, actions) { HostEditor(remoteHosts, actions, form, connector, scope) }
 }
 
+/**
+ * The name, address and port. A change of address or port that would make Save forget the saved password says so under
+ * the address, since the password was for another server.
+ */
 @Composable
-private fun HostFields(form: RemoteHostForm) {
+private fun HostFields(form: RemoteHostForm, remoteHosts: RemoteHosts, saved: RemoteHost?) {
   val config = form.auth == RemoteAuth.Config
+  val savedPasswords by remoteHosts.savedPasswords.collectAsStateWithLifecycle()
+  val draft = form.draft(saved)
+  val forgetsPassword = saved != null && saved.id in savedPasswords && draft != null &&
+    draft.auth == RemoteAuth.Password && remoteHosts.forgetsPassword(saved, draft)
   EditorField(
     label = stringResource(R.string.remote_name),
     value = form.name,
@@ -189,6 +203,9 @@ private fun HostFields(form: RemoteHostForm) {
     value = form.address,
     hint = stringResource(if (config) R.string.remote_alias_hint else R.string.remote_address_hint),
     error = form.errors[RemoteHostField.Address],
+    warning = saved?.takeIf { forgetsPassword }?.let {
+      stringResource(R.string.remote_address_forgets_password, it.displayAddress)
+    },
     keyboardType = KeyboardType.Uri,
     onChange = {
       form.address = it
@@ -209,6 +226,7 @@ private fun HostFields(form: RemoteHostForm) {
   )
 }
 
+/** A field with its [error] under it, or else its [warning], which doesn't stop Save. */
 @Composable
 private fun EditorField(
   label: String,
@@ -217,7 +235,9 @@ private fun EditorField(
   error: String?,
   keyboardType: KeyboardType,
   onChange: (String) -> Unit,
+  warning: String? = null,
 ) {
+  val note = error ?: warning
   Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
     FieldLabel(label)
     OutlinedTextField(
@@ -227,7 +247,9 @@ private fun EditorField(
       shape = SettingsFieldShape,
       colors = settingsFieldColors(),
       placeholder = hint?.let { { Text(it) } },
-      supportingText = error?.let { { Text(it) } },
+      supportingText = note?.let {
+        { Text(it, color = if (error == null) pipkinColors.dotWarning else Color.Unspecified) }
+      },
       isError = error != null,
       keyboardOptions = KeyboardOptions(
         keyboardType = keyboardType,
@@ -239,25 +261,47 @@ private fun EditorField(
   }
 }
 
-/** The three ways to sign in, as radio rows; Pipkin's key shows its public line to copy, made first if needed. */
+/**
+ * The three ways to sign in, as radio rows. Pipkin's key shows its public line to copy, made first if needed; a saved
+ * password host's Password says the password is saved, with Forget.
+ */
 @Composable
-private fun SignInSection(form: RemoteHostForm, remoteHosts: RemoteHosts) {
+private fun SignInSection(editor: HostEditor, saved: RemoteHost?) {
+  val form = editor.form
+  val savedPasswords by editor.remoteHosts.savedPasswords.collectAsStateWithLifecycle()
+  val rejected = saved?.let { savedPasswords[it.id] }
   SettingsSection(title = stringResource(R.string.remote_sign_in)) {
     RemoteAuth.entries.forEachIndexed { index, auth ->
       if (index > 0) SettingsDivider()
-      AuthRow(auth = auth, selected = form.auth == auth, onSelect = { form.auth = auth }) {
-        if (auth == RemoteAuth.Key && form.auth == RemoteAuth.Key) PublicKeyLine(remoteHosts)
+      AuthRow(auth = auth, passwordSaved = rejected == false, selected = form.auth == auth, onSelect = {
+        form.auth =
+          auth
+      }) {
+        if (auth == RemoteAuth.Key && form.auth == RemoteAuth.Key) PublicKeyLine(editor.remoteHosts)
+        if (auth == RemoteAuth.Password && form.auth == RemoteAuth.Password && rejected != null) {
+          SavedPasswordLine(rejected, enabled = !editor.busy) { editor.dialog = EditorDialog.ForgetPassword }
+        }
       }
     }
   }
 }
 
 @Composable
-private fun AuthRow(auth: RemoteAuth, selected: Boolean, onSelect: () -> Unit, extra: @Composable () -> Unit) {
+private fun AuthRow(
+  auth: RemoteAuth,
+  passwordSaved: Boolean,
+  selected: Boolean,
+  onSelect: () -> Unit,
+  extra: @Composable () -> Unit,
+) {
   val colors = pipkinColors
   val (title, detail) = when (auth) {
     RemoteAuth.Key -> R.string.remote_auth_key to R.string.remote_auth_key_detail
-    RemoteAuth.Password -> R.string.remote_auth_password to R.string.remote_auth_password_detail
+
+    RemoteAuth.Password ->
+      R.string.remote_auth_password to
+        if (passwordSaved) R.string.remote_auth_password_saved_detail else R.string.remote_auth_password_detail
+
     RemoteAuth.Config -> R.string.remote_auth_config to R.string.remote_auth_config_detail
   }
   Row(
@@ -282,6 +326,32 @@ private fun AuthRow(auth: RemoteAuth, selected: Boolean, onSelect: () -> Unit, e
       Text(stringResource(detail), color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.sm)
       extra()
     }
+  }
+}
+
+/** That the host's password is saved on this phone, or that the server [rejected] it, with Forget. */
+@Composable
+private fun SavedPasswordLine(rejected: Boolean, enabled: Boolean, onForget: () -> Unit) {
+  val colors = pipkinColors
+  Row(
+    modifier = Modifier.fillMaxWidth().padding(top = PipkinTokens.Spacing.s8),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s8),
+  ) {
+    LucideIcon(
+      icon = if (rejected) R.drawable.ic_lucide_triangle_alert else R.drawable.ic_lucide_shield_check,
+      contentDescription = null,
+      tint = if (rejected) colors.dotWarning else colors.dotSuccess,
+      size = PipkinTokens.IconSize.sm,
+    )
+    Text(
+      text = stringResource(if (rejected) R.string.remote_password_saved_rejected else R.string.remote_password_saved),
+      modifier = Modifier.weight(1f),
+      color = colors.foreground,
+      fontSize = PipkinTokens.FontSize.sm,
+      fontWeight = FontWeight.SemiBold,
+    )
+    SmallButton(label = stringResource(R.string.remote_forget_password), onClick = onForget, enabled = enabled)
   }
 }
 
@@ -437,6 +507,24 @@ private fun EditorDialogs(editor: HostEditor, host: RemoteHost?, onDiscard: () -
           onClick = {
             dismiss()
             editor.forgetHostKey(host.id)
+          },
+          destructive = true,
+        ),
+        dismissLabel = stringResource(R.string.remote_cancel),
+        onDismiss = dismiss,
+      )
+    }
+
+    EditorDialog.ForgetPassword -> if (host != null) {
+      PipkinDialog(
+        title = stringResource(R.string.remote_forget_password_title, host.name),
+        text = stringResource(R.string.remote_forget_password_text, host.name),
+        icon = R.drawable.ic_lucide_key_round,
+        confirm = DialogConfirm(
+          label = stringResource(R.string.remote_forget_password),
+          onClick = {
+            dismiss()
+            editor.forgetPassword(host.id)
           },
           destructive = true,
         ),

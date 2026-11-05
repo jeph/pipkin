@@ -96,8 +96,17 @@ function connectionArgs(remote: Remote): string[] {
   return ["-F", sshConfigFile(remote.paths), "-o", `ControlPath=${configWord(controlPath(remote.paths, remote.host.id))}`];
 }
 
+/**
+ * How a call may sign in. A `background` call never asks anything and refuses unknown host keys. An `interactive` one
+ * (`remote_connect`) asks the user through `SSH_ASKPASS`, the host key included. An `unattended` one asks too, for the
+ * app to answer with a saved password, but still refuses unknown and changed host keys, so the password only ever
+ * goes to the server the user checked. Either asks for a password only once, so a wrong one ends the connect instead
+ * of asking again.
+ */
+export type SignIn = "background" | "interactive" | "unattended";
+
 /** [sshArgs] up to the destination: a call sharing [remote]'s master connection or starting one. */
-function directOptions(remote: Remote, interactive: boolean): string[] {
+function directOptions(remote: Remote, signIn: SignIn): string[] {
   return [
     ...connectionArgs(remote),
     "-o",
@@ -105,21 +114,17 @@ function directOptions(remote: Remote, interactive: boolean): string[] {
     "-o",
     "ControlPersist=10m",
     "-o",
-    `BatchMode=${interactive ? "no" : "yes"}`,
+    `BatchMode=${signIn === "background" ? "yes" : "no"}`,
     "-o",
-    `StrictHostKeyChecking=${interactive ? "ask" : "yes"}`,
-    ...(interactive ? ["-o", "NumberOfPasswordPrompts=1"] : []),
+    `StrictHostKeyChecking=${signIn === "interactive" ? "ask" : "yes"}`,
+    ...(signIn === "background" ? [] : ["-o", "NumberOfPasswordPrompts=1"]),
     destination(remote.host),
   ];
 }
 
-/**
- * The arguments that run remote command line [command] on [remote], sharing its master connection or starting one.
- * Background calls never prompt and refuse unknown host keys; an [interactive] call (`remote_connect`) asks through
- * `SSH_ASKPASS`, and asks for a password only once, so a wrong one ends the connect instead of asking again.
- */
-export function sshArgs(remote: Remote, command: string, interactive = false): string[] {
-  return [...directOptions(remote, interactive), "--", command];
+/** The arguments that run remote command line [command] on [remote], sharing its master connection or starting one. */
+export function sshArgs(remote: Remote, command: string, signIn: SignIn = "background"): string[] {
+  return [...directOptions(remote, signIn), "--", command];
 }
 
 /** The variable naming the file a [masterOptions] call creates when its master didn't carry the session. */
@@ -197,7 +202,7 @@ export function sessionScript(remote: Remote, command: string, options: { flags?
     '  [ -e "$f" ] || exit "$code"',
     '  rm -f -- "$f"',
     owned,
-    `  ${ssh} ${check} 2>/dev/null || exec ${ssh} ${words([...flags, ...directOptions(remote, false)])} -- "$c"`,
+    `  ${ssh} ${check} 2>/dev/null || exec ${ssh} ${words([...flags, ...directOptions(remote, "background")])} -- "$c"`,
     `  [ -n "$d" ] || d=$(($(date +%s) + ${String(Math.ceil(sessionWaitMs() / 1000))}))`,
     '  [ "$(date +%s)" -lt "$d" ] || full',
     "  sleep 1",

@@ -65,6 +65,7 @@ import io.jeph.pipkin.ui.components.SearchField
 import io.jeph.pipkin.ui.components.SheetRow
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.onboarding.PrimaryButton
+import io.jeph.pipkin.ui.remote.AutoReconnect
 import io.jeph.pipkin.ui.remote.RemoteConnectDialogs
 import io.jeph.pipkin.ui.remote.rememberRemoteConnector
 import io.jeph.pipkin.ui.theme.PipkinTokens
@@ -127,6 +128,7 @@ internal fun FolderBrowserPane(
     )
     val query = state.query.trim()
     val unreachable = state.unreachable
+    if (host != null) AutoReconnect(connector, host, unreachable?.code, onConnected = state::reopen)
     when {
       host != null && unreachable != null -> Unreachable(
         host = host,

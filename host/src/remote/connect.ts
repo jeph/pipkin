@@ -25,6 +25,11 @@ export interface ConnectOptions {
   prompt: (prompt: RemotePrompt) => Promise<string | null>;
   /** Kills `ssh` when it aborts; the connect then rejects with its reason. */
   signal?: AbortSignal;
+  /**
+   * For the app answering with a saved password rather than the user: `ssh` refuses an unknown or changed host key
+   * instead of asking about it, so the password is never sent to a server the user hasn't checked.
+   */
+  unattended?: boolean;
 }
 
 /** The probe's output: the home folder, then a path for each tool found. */
@@ -38,10 +43,11 @@ export function parseProbe(output: string): ProbeResult | null {
 let bridges = 0;
 
 /**
- * Connects [remote] interactively and leaves its master connection running: `ssh` asks about the host key, password
- * or passphrase through `ssh/askpass`, and each question goes to [options.prompt]. Runs [PROBE] and saves the home
- * folder it finds in `hosts.json`. A second password, or a second ask for the same key's passphrase, means the first
- * was wrong: the connect ends with `remote_auth_failed` rather than asking again.
+ * Connects [remote] and leaves its master connection running: `ssh` asks about the host key, password or passphrase
+ * through `ssh/askpass`, and each question goes to [options.prompt]; an [ConnectOptions.unattended] connect is never
+ * asked about the host key. Runs [PROBE] and saves the home folder it finds in `hosts.json`. A second password, or a
+ * second ask for the same key's passphrase, means the first was wrong: the connect ends with `remote_auth_failed`
+ * rather than asking again.
  */
 export async function connect(remote: Remote, options: ConnectOptions): Promise<ProbeResult> {
   const { paths, host } = remote;
@@ -78,7 +84,7 @@ export async function connect(remote: Remote, options: ConnectOptions): Promise<
   try {
     const bridge = await startAskpassBridge(socketPath, answer);
     try {
-      exit = await spawnSsh(paths, sshArgs(remote, PROBE, true), { signal }, env);
+      exit = await spawnSsh(paths, sshArgs(remote, PROBE, options.unattended === true ? "unattended" : "interactive"), { signal }, env);
     } finally {
       await bridge.close();
     }

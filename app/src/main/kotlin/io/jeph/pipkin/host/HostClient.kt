@@ -297,11 +297,14 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   /**
    * Connects host [hostId], handing what `ssh` asks (its host key, a password, a key's passphrase) to [ui]; the
    * connection stays up afterwards for everything else. Cancelling the caller ends the connect, as a null answer does.
+   * An [unattended] connect, for Pipkin answering with a saved password, is never asked about the host key: `ssh`
+   * refuses an unknown or changed one, so the password goes only to a server the user checked.
    */
-  suspend fun connectRemote(hostId: String, ui: RemoteConnectUi) {
-    call("remote_connect", JSONObject().put("hostId", hostId), REMOTE_CONNECT_TIMEOUT_MILLIS) { channel, line ->
+  suspend fun connectRemote(hostId: String, ui: RemoteConnectUi, unattended: Boolean = false) {
+    val params = JSONObject().put("hostId", hostId).put("unattended", unattended)
+    call("remote_connect", params, REMOTE_CONNECT_TIMEOUT_MILLIS) { channel, line ->
       if (line.optString("type") != HostProtocol.REMOTE_PROMPT) return@call
-      ui.onPrompt(RemotePrompt.from(line), RemoteReply(channel, line.opt("id") ?: JSONObject.NULL))
+      ui.onPrompt(RemotePrompt.from(line), ChannelReply(channel, line.opt("id") ?: JSONObject.NULL))
     }
   }
 

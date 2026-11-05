@@ -26,6 +26,7 @@ import io.jeph.pipkin.git.CommitDiffState
 import io.jeph.pipkin.git.CommitTab
 import io.jeph.pipkin.ui.components.PipkinSheet
 import io.jeph.pipkin.ui.components.SheetRow
+import io.jeph.pipkin.ui.remote.AutoReconnect
 import io.jeph.pipkin.ui.remote.RemoteConnectDialogs
 import io.jeph.pipkin.ui.remote.rememberRemoteConnector
 import io.jeph.pipkin.ui.sidebar.rememberFolderNames
@@ -72,9 +73,9 @@ internal fun CommitScreen(commit: CommitTab, controls: PaneControls, modifier: M
     if (host != null && unreachable != null) remoteHosts.noteFailure(host.id, unreachable.code)
   }
   // A failed read is read again once the host is connected.
-  val connect = host?.let { shown ->
-    { connector.connect(shown.id, shown.name) { scope.launch { commit.load(hideWhitespace) } } }
-  }
+  val reload = { scope.launch { commit.load(hideWhitespace) } }
+  val connect = host?.let { shown -> { connector.connect(shown.id, shown.name) { reload() } } }
+  if (host != null) AutoReconnect(connector, host, unreachable?.code) { reload() }
 
   Column(modifier = modifier.fillMaxSize().background(pipkinColors.surface0)) {
     PaneHeader(title = commit.title, cwd = commit.cwd, controls = controls)

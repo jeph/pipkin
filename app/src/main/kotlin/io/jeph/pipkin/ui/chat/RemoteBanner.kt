@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.chat
 
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,43 +39,88 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.agent.AgentProcess
 import io.jeph.pipkin.agent.AgentProcessState
 import io.jeph.pipkin.appGraph
+import io.jeph.pipkin.host.HostRejected
 import io.jeph.pipkin.host.RemoteHost
+import io.jeph.pipkin.ui.components.DialogConfirm
 import io.jeph.pipkin.ui.components.LucideIcon
+import io.jeph.pipkin.ui.components.PipkinDialog
 import io.jeph.pipkin.ui.remote.RemoteConnectDialogs
 import io.jeph.pipkin.ui.remote.rememberRemoteConnector
 import io.jeph.pipkin.ui.sidebar.rememberFolderNames
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import java.io.IOException
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * The warning floating over a remote chat's stream while its host is lost: why, in the host's words, and Connect when
  * only the user can sign in or check the host's key. The chat checks the host while it's on screen
  * ([RemoteChecks]), so the warning comes up within seconds of the host going, before anyone sends a message, and goes
- * once it answers again; until then the composer won't send. A connect that works takes it down at once.
+ * once it answers again; until then the composer won't send. A connect that works takes it down at once. While Pipkin
+ * signs a host in again with its saved password, the warning says it's reconnecting; when the server refused the
+ * password, or the host's key changed so Pipkin didn't send it, it says so and offers to fix that.
  */
 @Composable
 internal fun RemoteBanner(process: AgentProcess, modifier: Modifier = Modifier) {
   RemoteChecks(process)
+  val remoteHosts = LocalContext.current.appGraph.remoteHosts
   val outage by process.remoteOutages.state.collectAsStateWithLifecycle()
+  val reconnecting by remoteHosts.reconnecting.collectAsStateWithLifecycle()
+  val savedPasswords by remoteHosts.savedPasswords.collectAsStateWithLifecycle()
+  val keyChanged by remoteHosts.hostKeyChanged.collectAsStateWithLifecycle()
   // Ahead of the banner, so a connect's failure stays up when a check takes the banner down meanwhile.
   val connector = rememberRemoteConnector()
   RemoteConnectDialogs(connector)
-  val shown = outage ?: return
+  var reviewing by remember { mutableStateOf(false) }
   // From the hosts as they are now: the outage may have come before the host list knew the chat's folder.
   val host = rememberFolderNames().remote(process.cwd)?.host
-  val name = host?.name ?: stringResource(R.string.remote_host_removed)
-  val failure = shown.failure
-  val text = when {
-    connector.connecting -> stringResource(R.string.remote_banner_reconnecting, name)
-    failure != null -> failure.text.localized()
-    else -> stringResource(R.string.remote_banner_disconnected, name)
+  if (reviewing && host != null) {
+    KeyChangedDialog(host, onDismiss = { reviewing = false }) {
+      reviewing = false
+      connector.connect(host.id, host.name, onConnected = process.remoteOutages::clear)
+    }
   }
+  val signingIn = connector.connecting || host?.id in reconnecting
+  if (outage == null && !signingIn) return
+  val name = host?.name ?: stringResource(R.string.remote_host_removed)
+  val failure = outage?.failure
+  val connect = { id: String -> connector.connect(id, name, onConnected = process.remoteOutages::clear) }
+  val shown = when {
+    signingIn -> Shown(R.drawable.ic_lucide_wifi_off, stringResource(R.string.remote_banner_reconnecting, name))
+
+    host != null && savedPasswords[host.id] == true ->
+      Shown(R.drawable.ic_lucide_key_round, stringResource(R.string.remote_banner_password_rejected, name)) {
+        BannerTextButton(stringResource(R.string.remote_enter_password)) { connect(host.id) }
+      }
+
+    host != null && host.id in keyChanged && host.id in savedPasswords ->
+      Shown(R.drawable.ic_lucide_triangle_alert, stringResource(R.string.remote_banner_key_changed_password, name)) {
+        BannerTextButton(stringResource(R.string.remote_review)) { reviewing = true }
+      }
+
+    failure != null -> Shown(R.drawable.ic_lucide_wifi_off, failure.text.localized()) {
+      if (host != null &&
+        failure.needsConnect
+      ) {
+        BannerTextButton(stringResource(R.string.remote_connect)) { connect(host.id) }
+      }
+    }
+
+    else -> Shown(R.drawable.ic_lucide_wifi_off, stringResource(R.string.remote_banner_disconnected, name))
+  }
+  BannerPill(shown, modifier)
+}
+
+/** What the banner shows: an [icon], the [text] and an optional [action] button at its end. */
+private class Shown(@DrawableRes val icon: Int, val text: String, val action: (@Composable () -> Unit)? = null)
+
+@Composable
+private fun BannerPill(shown: Shown, modifier: Modifier) {
   val colors = pipkinColors
-  val connectTo = host?.takeIf { failure?.needsConnect == true && !connector.connecting }
-  // The Connect button brings its own padding.
-  val end = if (connectTo == null) PipkinTokens.Spacing.s16 else PipkinTokens.Spacing.s4
+  // A button brings its own padding.
+  val end = if (shown.action == null) PipkinTokens.Spacing.s16 else PipkinTokens.Spacing.s4
   Row(
     modifier = modifier
       .widthIn(max = PipkinTokens.contentMaxWidth)
@@ -84,9 +134,9 @@ internal fun RemoteBanner(process: AgentProcess, modifier: Modifier = Modifier) 
     verticalAlignment = Alignment.CenterVertically,
     horizontalArrangement = Arrangement.spacedBy(10.dp),
   ) {
-    LucideIcon(icon = R.drawable.ic_lucide_wifi_off, contentDescription = null, tint = colors.dotWarning)
+    LucideIcon(icon = shown.icon, contentDescription = null, tint = colors.dotWarning)
     Text(
-      text = text,
+      text = shown.text,
       // Not filling: a short warning makes a short pill.
       modifier = Modifier.weight(1f, fill = false).padding(vertical = 10.dp),
       color = colors.dotWarning,
@@ -94,12 +144,41 @@ internal fun RemoteBanner(process: AgentProcess, modifier: Modifier = Modifier) 
       fontWeight = FontWeight.SemiBold,
       lineHeight = 19.sp,
     )
-    if (connectTo != null) {
-      BannerTextButton(stringResource(R.string.remote_connect)) {
-        connector.connect(connectTo.id, connectTo.name, onConnected = process.remoteOutages::clear)
-      }
-    }
+    shown.action?.invoke()
   }
+}
+
+/**
+ * Why Pipkin didn't send [host]'s saved password: its key isn't the one the user accepted. Forget host key, for a key
+ * the user knows changed, forgets it and runs [onForgotten], which connects and asks about the new key.
+ */
+@Composable
+private fun KeyChangedDialog(host: RemoteHost, onDismiss: () -> Unit, onForgotten: () -> Unit) {
+  val remoteHosts = LocalContext.current.appGraph.remoteHosts
+  val scope = rememberCoroutineScope()
+  PipkinDialog(
+    title = stringResource(R.string.remote_key_changed_title, host.name),
+    text = stringResource(R.string.remote_key_changed_warning, host.name),
+    icon = R.drawable.ic_lucide_triangle_alert,
+    confirm = DialogConfirm(
+      label = stringResource(R.string.remote_forget_key),
+      onClick = {
+        scope.launch {
+          try {
+            remoteHosts.forgetHostKey(host.id)
+          } catch (_: HostRejected) {
+            // The connect fails on the old key again and says why.
+          } catch (_: IOException) {
+            // Likewise.
+          }
+          onForgotten()
+        }
+      },
+      destructive = true,
+    ),
+    dismissLabel = stringResource(R.string.remote_cancel),
+    onDismiss = onDismiss,
+  )
 }
 
 /**

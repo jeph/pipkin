@@ -42,6 +42,11 @@
     <!-- %1$s: the host's name. -->
     <string name="remote_password_title">Password for <xliff:g id="host" example="devbox">%1$s</xliff:g></string>
     <string name="remote_password_hint">Password</string>
+    <!-- The checkbox under a password host's password field. -->
+    <string name="remote_remember_password">Remember password</string>
+    <string name="remote_remember_password_detail">You won\'t have to type it every time you connect.</string>
+    <!-- Shown in the password dialog when Pipkin asks because the server refused the saved password. -->
+    <string name="remote_password_rejected_text">The saved password didn\'t work, so Pipkin stopped trying it. Enter the current one.</string>
     <string name="remote_passphrase_title">Key passphrase</string>
     <string name="remote_passphrase_hint">Passphrase</string>
     <!-- Title over a question OpenSSH asks in its own words, shown under it. %1$s: the host's name. -->
@@ -58,6 +63,14 @@
     <string name="remote_banner_reconnecting">Lost connection to <xliff:g id="host" example="devbox">%1$s</xliff:g>. Reconnecting…</string>
     <!-- %1$s: the host's name. -->
     <string name="remote_banner_disconnected">Lost connection to <xliff:g id="host" example="devbox">%1$s</xliff:g>.</string>
+    <!-- The banner over a remote chat whose host refused the saved password. %1$s: the host's name. -->
+    <string name="remote_banner_password_rejected">The saved password for <xliff:g id="host" example="devbox">%1$s</xliff:g> didn\'t work.</string>
+    <!-- The banner's button that asks for the host's password. -->
+    <string name="remote_enter_password">Enter password</string>
+    <!-- The banner over a remote chat whose host's key changed, so Pipkin didn't reconnect with the saved password. %1$s: the host's name. -->
+    <string name="remote_banner_key_changed_password"><xliff:g id="host" example="devbox">%1$s</xliff:g>\'s key has changed, so Pipkin didn\'t send the password.</string>
+    <!-- The banner's button that shows what changed about the host's key. -->
+    <string name="remote_review">Review</string>
 
     <!-- Settings › Remote hosts -->
     <!-- The Settings section holding the Remote hosts row. -->
@@ -88,7 +101,19 @@
     <string name="remote_auth_key">Pipkin\'s key</string>
     <string name="remote_auth_key_detail">Add this line to <xliff:g id="file">~/.ssh/authorized_keys</xliff:g> on the host.</string>
     <string name="remote_auth_password">Password</string>
-    <string name="remote_auth_password_detail">Asked each time Pipkin connects.</string>
+    <string name="remote_auth_password_detail">You type it the first time you connect.</string>
+    <string name="remote_auth_password_saved_detail">You won\'t have to type it again unless it changes.</string>
+    <!-- Under Password in a host's editor, while its password is saved. -->
+    <string name="remote_password_saved">Saved on this phone</string>
+    <!-- Under Password in a host's editor, when the server refused the saved password. -->
+    <string name="remote_password_saved_rejected">Saved, but it didn\'t work last time</string>
+    <string name="remote_forget_password">Forget</string>
+    <!-- %1$s: the host's name. -->
+    <string name="remote_forget_password_title">Forget <xliff:g id="host" example="devbox">%1$s</xliff:g>\'s password?</string>
+    <!-- %1$s: the host's name. -->
+    <string name="remote_forget_password_text">Pipkin deletes it from this phone, and the next connect asks for it again. The password on <xliff:g id="host" example="devbox">%1$s</xliff:g> doesn\'t change.</string>
+    <!-- Under a host's address when the edit would forget its saved password. %1$s: the address the password was saved for. -->
+    <string name="remote_address_forgets_password">Saving forgets the saved password, since it was for <xliff:g id="address" example="me@devbox.lan">%1$s</xliff:g>. The next connect asks for it.</string>
     <string name="remote_auth_config">Use my <xliff:g id="file">~/.ssh/config</xliff:g></string>
     <string name="remote_auth_config_detail">For a host Termux already knows, with your own keys or jump hosts.</string>
     <string name="remote_copy_key">Copy public key</string>

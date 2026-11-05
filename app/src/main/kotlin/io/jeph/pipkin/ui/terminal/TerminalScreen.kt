@@ -50,6 +50,7 @@ import io.jeph.pipkin.terminal.TerminalSession
 import io.jeph.pipkin.terminal.TerminalState
 import io.jeph.pipkin.ui.components.PillButton
 import io.jeph.pipkin.ui.components.PillTone
+import io.jeph.pipkin.ui.remote.AutoReconnect
 import io.jeph.pipkin.ui.remote.RemoteConnectDialogs
 import io.jeph.pipkin.ui.remote.rememberRemoteConnector
 import io.jeph.pipkin.ui.sidebar.rememberFolderNames
@@ -218,6 +219,7 @@ private fun StatusBar(state: TerminalState, cwd: String, onRestart: () -> Unit) 
   val connector = rememberRemoteConnector()
   RemoteConnectDialogs(connector)
   val host = folder?.host?.takeIf { remote?.needsConnect == true }
+  if (host != null) AutoReconnect(connector, host, remote?.code, onConnected = onRestart)
   val colors = pipkinColors
   Row(
     modifier = Modifier

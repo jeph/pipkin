@@ -160,13 +160,16 @@ internal data class RemoteFailure(val code: String, val text: HostText) {
     /** Answering a prompt with null ends the connect with this code, which needs no message. */
     const val CONNECT_CANCELLED = "remote_connect_cancelled"
 
+    /** The server refused the password, Pipkin's key, or the key whose passphrase was given. */
+    const val AUTH_FAILED = "remote_auth_failed"
+
     private val CONNECT_CODES = setOf(NOT_CONNECTED, HOST_KEY_UNKNOWN)
 
     private val DISCONNECT_CODES = setOf(
       NOT_CONNECTED,
       HOST_KEY_UNKNOWN,
       HOST_KEY_CHANGED,
-      "remote_auth_failed",
+      AUTH_FAILED,
       "remote_unreachable",
     )
 
@@ -188,13 +191,19 @@ internal data class RemoteFailure(val code: String, val text: HostText) {
   }
 }
 
-/** One `pipkin_remote_prompt` of a `remote_connect`: what `ssh` asks, of [kind], in its own [text]. */
+/**
+ * One `pipkin_remote_prompt` of a `remote_connect`: what `ssh` asks, of [kind], in its own [text]. [savable] and
+ * [savedRejected] come from the app rather than the host: whether Pipkin offers to remember the answer, as for a password
+ * host's password, and whether it asks because the password it had saved was refused.
+ */
 internal data class RemotePrompt(
   val kind: Kind,
   val text: String,
   /** For [Kind.HostKey]: the key's type, such as `ED25519`, and its `SHA256:` fingerprint. */
   val keyType: String?,
   val fingerprint: String?,
+  val savable: Boolean = false,
+  val savedRejected: Boolean = false,
 ) {
   enum class Kind { HostKey, Password, Passphrase, Other }
 
@@ -221,13 +230,19 @@ internal fun interface RemoteConnectUi {
   fun onPrompt(prompt: RemotePrompt, reply: RemoteReply)
 }
 
-/** Answers exactly one prompt of a `remote_connect` over its channel. */
-internal class RemoteReply(private val channel: HostChannel, private val id: Any) {
+/** Answers exactly one prompt of a `remote_connect`. */
+internal interface RemoteReply {
   /**
-   * Sends [answer]; null cancels, which ends the connect. For a host key any text trusts it. False when the connect
-   * already ended; the connect call reports why.
+   * Sends [answer]; null cancels, which ends the connect. For a host key any text trusts it. [remember] asks to save
+   * the answer to a [RemotePrompt.savable] prompt once it signs in. False when the connect already ended; the connect
+   * call reports why.
    */
-  suspend fun answer(answer: String?): Boolean = try {
+  suspend fun answer(answer: String?, remember: Boolean = false): Boolean
+}
+
+/** A [RemoteReply] over the connect's channel, which carries the answer alone; remembering it is the app's. */
+internal class ChannelReply(private val channel: HostChannel, private val id: Any) : RemoteReply {
+  override suspend fun answer(answer: String?, remember: Boolean): Boolean = try {
     channel.send(
       JSONObject()
         .put("type", HostProtocol.REMOTE_ANSWER)
