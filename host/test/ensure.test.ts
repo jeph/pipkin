@@ -1,8 +1,8 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { isNpmNetworkError } from "../src/modes/ensure.js";
-import { type Dirs, installFakePi, makeDirs, PACKAGE_JSON, PI_VERSION, removeDirs, runMode, writeRuntimeManifest } from "./harness.js";
+import { type Dirs, installFakePi, makeDirs, PACKAGE_JSON, piDir, PI_VERSION, removeDirs, runMode, writeRuntimeManifest } from "./harness.js";
 
 describe("npm network errors", () => {
   it("recognizes npm's reports of an unreachable registry and nothing else", () => {
@@ -24,6 +24,21 @@ describe("ensure mode", () => {
   /** Runs ensure against the matching install from `beforeEach`, so it skips npm. */
   function ensure(pipkinExtensions: unknown[] = []): Promise<unknown> {
     return runMode("ensure", dirs, { packageJson: PACKAGE_JSON, packageLock: PACKAGE_LOCK, expectedVersion: PI_VERSION, pipkinExtensions });
+  }
+
+  /** Runs ensure with a stand-in `npm` first on its PATH, which records each run in `pi/npm-runs` and exits with [npmExit]. */
+  async function ensureWithNpm(params: { reinstall?: boolean } = {}, npmExit = 0): Promise<unknown> {
+    const bin = path.join(dirs.base, "bin");
+    await mkdir(bin, { recursive: true });
+    await writeFile(path.join(bin, "npm"), `#!/bin/sh\necho "$*" >> npm-runs\nexit ${npmExit}\n`, { mode: 0o755 });
+    const env = { PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` };
+    const request = { packageJson: PACKAGE_JSON, packageLock: PACKAGE_LOCK, expectedVersion: PI_VERSION, pipkinExtensions: [], ...params };
+    return runMode("ensure", dirs, request, env);
+  }
+
+  async function npmRuns(): Promise<number> {
+    const runs = await readFile(path.join(dirs.root, "pi/npm-runs"), "utf8").catch(() => "");
+    return runs.split("\n").filter((line) => line.startsWith("ci ")).length;
   }
 
   beforeEach(async () => {
@@ -102,6 +117,37 @@ describe("ensure mode", () => {
       await writeFile(path.join(ssh, "hosts.json"), "{not json");
 
       expect(await ensure()).toMatchObject({ ok: true, data: { piVersion: PI_VERSION } });
+    });
+  });
+
+  describe("installing the runtime", () => {
+    it("skips npm when the runtime is installed in full", async () => {
+      expect(await ensureWithNpm()).toMatchObject({ ok: true });
+      expect(await npmRuns()).toBe(0);
+    });
+
+    it.each([
+      ["Pi's CLI script is missing", (target: Dirs) => rm(path.join(piDir(target), "dist/bundle/cli.js"))],
+      ["an earlier install was cut off", (target: Dirs) => writeFile(path.join(target.root, "pi/.pipkin-installing"), "")],
+    ])("installs again when %s, though the manifests match", async (_, damage) => {
+      await damage(dirs);
+      expect(await ensureWithNpm()).toMatchObject({ ok: true });
+      expect(await npmRuns()).toBe(1);
+      await expect(readFile(path.join(dirs.root, "pi/.pipkin-installing"))).rejects.toMatchObject({ code: "ENOENT" });
+    });
+
+    it("installs a complete runtime again when asked to reinstall", async () => {
+      expect(await ensureWithNpm({ reinstall: true })).toMatchObject({ ok: true });
+      expect(await npmRuns()).toBe(1);
+    });
+
+    it("leaves a failed install marked unfinished, so the next one runs npm again", async () => {
+      await rm(path.join(dirs.root, "pi/package-lock.json"));
+      expect(await ensureWithNpm({}, 1)).toMatchObject({ ok: false, code: "npm_failed" });
+      expect(await readFile(path.join(dirs.root, "pi/package-lock.json"), "utf8")).toBe(PACKAGE_LOCK);
+
+      expect(await ensureWithNpm()).toMatchObject({ ok: true });
+      expect(await npmRuns()).toBe(2);
     });
   });
 });

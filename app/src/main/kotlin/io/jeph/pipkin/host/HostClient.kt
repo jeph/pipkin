@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
@@ -39,6 +41,7 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   private val helloState = MutableStateFlow<HostHello?>(null)
   private val failureState = MutableStateFlow<HostFailure?>(null)
   private val installingState = MutableStateFlow(false)
+  private val installLock = Mutex()
   private val utility = SharedHost(scope, UTILITY_IDLE_MILLIS, ::openUtility)
 
   init {
@@ -78,8 +81,12 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
   /** True while [ensure] runs. */
   val installing: StateFlow<Boolean> = installingState.asStateFlow()
 
-  /** Installs the pinned Pi runtime if needed, and every bundled extension, and returns the installed version. */
-  suspend fun ensure(onProgress: (String) -> Unit): String {
+  /**
+   * Installs the pinned Pi runtime if it isn't installed in full, or always when [reinstall] is true, and every bundled
+   * extension, and returns the installed version. One install runs at a time: two `npm ci` runs in the same folder
+   * would wreck each other's tree, and a call that waited finds the runtime installed and skips npm.
+   */
+  suspend fun ensure(reinstall: Boolean = false, onProgress: (String) -> Unit): String = installLock.withLock {
     installingState.value = true
     try {
       val params = withContext(Dispatchers.IO) {
@@ -95,13 +102,14 @@ internal class HostClient(context: Context, private val foreground: Flow<Boolean
           .put("packageLock", asset(PACKAGE_LOCK))
           .put("expectedVersion", expectedPiVersion)
           .put("pipkinExtensions", JSONArray(extensions))
+          .put("reinstall", reinstall)
       }
       val data = call("ensure", params, ENSURE_TIMEOUT_MILLIS, progress(onProgress))
       // The utility host keeps the Pi it imported first, which may be the one this install replaced.
       withContext(Dispatchers.Main.immediate) { utility.retire() }
       val version = data.getString("piVersion")
       helloState.update { it?.copy(piVersion = version) }
-      return version
+      version
     } finally {
       installingState.value = false
     }

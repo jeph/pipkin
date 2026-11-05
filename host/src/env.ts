@@ -65,6 +65,28 @@ export async function piEntry(root: string): Promise<string> {
   return join(dir, entry);
 }
 
+/**
+ * Present while `ensure` installs the runtime, from before it writes the runtime's manifests until `npm ci` succeeds, so
+ * an install that was cut off counts as unfinished even though the manifests already match.
+ */
+export function piInstallingMarker(root: string): string {
+  return join(root, "pi", ".pipkin-installing");
+}
+
+/** Whether the last install of the runtime finished and Pi's CLI script is still on disk. */
+export async function piInstallComplete(root: string): Promise<boolean> {
+  if (await exists(piInstallingMarker(root))) return false;
+  const entry = await piEntry(root).catch(() => null);
+  return entry !== null && (await exists(entry));
+}
+
+function exists(path: string): Promise<boolean> {
+  return access(path).then(
+    () => true,
+    () => false,
+  );
+}
+
 /** The installed Pi version, or null when Pipkin has not installed Pi yet. */
 export async function installedPiVersion(root: string): Promise<string | null> {
   try {

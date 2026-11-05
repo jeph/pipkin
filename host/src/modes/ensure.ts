@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Readable } from "node:stream";
-import { HostError, installedPiVersion } from "../env.js";
+import { HostError, installedPiVersion, piInstallComplete, piInstallingMarker } from "../env.js";
 import type { JsonObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { stringParam } from "../params.js";
@@ -69,6 +69,10 @@ async function npmCi(ctx: ModeContext, cwd: string): Promise<void> {
   throw commandFailed("npm_failed", "npm ci", code);
 }
 
+/**
+ * Installs the pinned runtime unless it's already installed in full, or always when `reinstall` is true, then
+ * Pipkin's extensions.
+ */
 export async function ensure(ctx: ModeContext): Promise<JsonObject> {
   const packageJson = stringParam(ctx.params, "packageJson");
   const packageLock = stringParam(ctx.params, "packageLock");
@@ -86,11 +90,18 @@ export async function ensure(ctx: ModeContext): Promise<JsonObject> {
   ]);
   // rpc refuses a package.json that differs from the app's, so both files must match to skip the install.
   const current =
-    (await installedPiVersion(ctx.env.root)) === expectedVersion && onDiskPackageJson === packageJson && onDiskLock === packageLock;
+    ctx.params.reinstall !== true &&
+    (await installedPiVersion(ctx.env.root)) === expectedVersion &&
+    onDiskPackageJson === packageJson &&
+    onDiskLock === packageLock &&
+    (await piInstallComplete(ctx.env.root));
   if (!current) {
+    const marker = piInstallingMarker(ctx.env.root);
+    await writeFile(marker, "");
     await writeFile(packageJsonPath, packageJson);
     await writeFile(lockPath, packageLock);
     await npmCi(ctx, piDir);
+    await rm(marker, { force: true });
   }
   await installPipkinExtensions(ctx.env.root, pipkinExtensions);
   // Remote hosts are secondary here: a hosts file that can't be read mustn't keep local chats from starting.

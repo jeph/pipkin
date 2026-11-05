@@ -15,6 +15,7 @@ import {
   installFakePi,
   makeDirs,
   PACKAGE_JSON,
+  piDir,
   PI_VERSION,
   removeDirs,
   runtimeManifest,
@@ -414,6 +415,18 @@ describe("rpc mode", () => {
     const packageJson = runtimeManifest(["linkedom"]);
     run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson, pipkinExtensions: [] } });
     expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "pi_version" });
+    expect(await run.next()).toBeUndefined();
+  });
+
+  it.each([
+    ["Pi's CLI script is missing", (target: Dirs) => rm(path.join(piDir(target), "dist/bundle/cli.js"))],
+    ["an install was cut off", (target: Dirs) => writeFile(path.join(target.root, "pi/.pipkin-installing"), "")],
+  ])("asks for a reinstall when %s, without starting Pi", async (_, damage) => {
+    await damage(dirs);
+    const { run } = await startHost("rpc", dirs);
+    await run.next();
+    run.send({ type: "pipkin_request", params: { cwd: dirs.home, sessionPath: null, expectedVersion: PI_VERSION, packageJson: PACKAGE_JSON, pipkinExtensions: [] } });
+    expect(await run.next()).toMatchObject({ type: "pipkin_result", ok: false, code: "pi_version", i18n: { key: "agent_install_incomplete" } });
     expect(await run.next()).toBeUndefined();
   });
 

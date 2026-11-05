@@ -55,7 +55,8 @@ internal fun AgentSection(graph: AppGraph, onOpenRunningAgents: () -> Unit, onOp
     // App scope: leaving Settings must not abort a half-finished npm install.
     graph.scope.launch {
       outcome = try {
-        val version = graph.keepAlive.acquire("Pi install").use { hostClient.ensure { line -> progressLine = line } }
+        val keepAlive = graph.keepAlive.acquire("Pi install")
+        val version = keepAlive.use { hostClient.ensure(reinstall = true) { line -> progressLine = line } }
         ReinstallOutcome.Installed(version)
       } catch (failure: IOException) {
         ReinstallOutcome.Failed(failure.message ?: failed)

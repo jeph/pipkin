@@ -11,7 +11,7 @@ import {
   HELLO_TOPIC,
   OutputMerger,
 } from "../channel.js";
-import { folderNotFound, HostError, installedPiVersion, loadPi, piEntry } from "../env.js";
+import { folderNotFound, HostError, installedPiVersion, loadPi, piEntry, piInstallComplete } from "../env.js";
 import { isObject } from "../framing.js";
 import type { ModeContext } from "../mode.js";
 import { nullableStringParam, stringParam } from "../params.js";
@@ -175,6 +175,10 @@ export async function rpc(ctx: ModeContext): Promise<void> {
   const installedPackageJson = await readFile(join(ctx.env.root, "pi", "package.json"), "utf8").catch(() => null);
   if (installedPackageJson !== packageJson) {
     fail(ctx, new HostError("pi_version", "The agent's packages are out of date", { key: "agent_packages_outdated" }));
+    return;
+  }
+  if (!(await piInstallComplete(ctx.env.root))) {
+    fail(ctx, new HostError("pi_version", "The agent's install is incomplete", { key: "agent_install_incomplete" }));
     return;
   }
   const extensionFiles = await installedPipkinExtensionFiles(ctx.env.root, pipkinExtensions);

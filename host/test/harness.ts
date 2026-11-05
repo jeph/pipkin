@@ -62,7 +62,7 @@ export async function holdConfigLock(dirs: Dirs): Promise<void> {
   await symlink(String(holder.pid), path.join(dirs.root, "config.lock"));
 }
 
-function piDir(dirs: Dirs): string {
+export function piDir(dirs: Dirs): string {
   return path.join(dirs.root, "pi/node_modules/@earendil-works/pi-coding-agent");
 }
 

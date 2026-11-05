@@ -114,6 +114,7 @@ private val templates: Map<String, Template> = mapOf(
   "agent_not_installed_needs" to Template.Text(R.string.host_agent_not_installed_needs, listOf("expected")),
   "agent_version_mismatch" to Template.Text(R.string.host_agent_version_mismatch, listOf("installed", "expected")),
   "agent_packages_outdated" to Template.Text(R.string.host_agent_packages_outdated),
+  "agent_install_incomplete" to Template.Text(R.string.host_agent_install_incomplete),
   "agent_extensions_outdated" to Template.Text(R.string.host_agent_extensions_outdated),
   "agent_download_offline" to Template.Text(R.string.host_agent_download_offline),
   "extensions_download_offline" to Template.Text(R.string.host_extensions_download_offline),
