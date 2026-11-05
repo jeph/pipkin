@@ -59,13 +59,19 @@ export async function npmCi(ctx: ModeContext, cwd: string, lock: InstallLock): P
   forwardLines(child.stderr, send);
   const { promise, resolve, reject } = Promise.withResolvers<number | null>();
   child.on("error", reject);
-  child.on("close", resolve);
+  // A cancelled npm's error comes before it has rolled back and exited; only `close` says it's gone.
+  const closed = Promise.withResolvers<void>();
+  child.on("close", (code: number | null) => {
+    resolve(code);
+    closed.resolve();
+  });
   // An npm the lock doesn't name must not outlive it, so when recording fails npm is stopped and waited for.
   const recorded = child.pid === undefined ? undefined : lock.recordNpm(child.pid);
   const [exit, record] = await Promise.allSettled([
     promise,
-    recorded?.catch((error: unknown) => {
-      child.kill();
+    recorded?.catch(async (error: unknown) => {
+      if (!child.killed) child.kill();
+      await closed.promise;
       throw error;
     }),
   ]);

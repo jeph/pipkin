@@ -201,7 +201,10 @@ describe("ensure mode", () => {
       expect(events[1]).toBe(events[0]?.replace("start", "end"));
     });
 
-    it("stops npm and waits for it to exit when it can't record it, so the lock isn't given up while npm runs", async () => {
+    it.each([
+      ["", false],
+      [", even when the install is cancelled at the same time", true],
+    ])("stops npm and waits for it to exit when it can't record it%s, so the lock isn't given up while npm runs", async (_, cancel) => {
       const { PATH } = await stubNpm(ROLLING_BACK_NPM);
       vi.stubEnv("PATH", PATH);
       vi.stubEnv("NPM_SECONDS", "30");
@@ -210,12 +213,14 @@ describe("ensure mode", () => {
       });
       const cwd = path.join(dirs.root, "pi");
       const runs = path.join(cwd, "npm-runs");
+      const app = new AbortController();
       // Only what npmCi uses: it reports progress and stops npm when the app goes away.
-      const ctx = { conn: { send: () => undefined }, signal: new AbortController().signal } as unknown as ModeContext;
+      const ctx = { conn: { send: () => undefined }, signal: app.signal } as unknown as ModeContext;
       const lock = {
         // Fails once npm is running, as a full disk or a changed folder would.
         async recordNpm(): Promise<void> {
           while (!(await readFile(runs, "utf8").catch(() => "")).includes("start")) await sleep(20);
+          if (cancel) app.abort();
           throw new Error("can't record npm");
         },
       };
