@@ -222,7 +222,7 @@ private fun SecretDialog(host: String, prompt: RemotePrompt, onAnswer: (String?,
   val secret = prompt.kind != RemotePrompt.Kind.Other
   var value by remember(prompt) { mutableStateOf(TextFieldValue()) }
   var shown by remember(prompt) { mutableStateOf(!secret) }
-  var remember by remember(prompt) { mutableStateOf(true) }
+  var rememberPassword by remember(prompt) { mutableStateOf(true) }
   val title = when (prompt.kind) {
     RemotePrompt.Kind.Password -> stringResource(R.string.remote_password_title, host)
     RemotePrompt.Kind.Passphrase -> stringResource(R.string.remote_passphrase_title)
@@ -246,7 +246,7 @@ private fun SecretDialog(host: String, prompt: RemotePrompt, onAnswer: (String?,
     text = text,
     confirm = DialogConfirm(
       label = stringResource(if (secret) R.string.remote_connect else R.string.remote_answer),
-      onClick = { onAnswer(value.text, prompt.savable && remember) },
+      onClick = { onAnswer(value.text, prompt.savable && rememberPassword) },
     ),
     dismissLabel = stringResource(R.string.remote_cancel),
     onDismiss = { onAnswer(null, false) },
@@ -266,7 +266,7 @@ private fun SecretDialog(host: String, prompt: RemotePrompt, onAnswer: (String?,
         null
       },
     )
-    if (prompt.savable) RememberRow(remember) { remember = it }
+    if (prompt.savable) RememberRow(rememberPassword) { rememberPassword = it }
   }
 }
 

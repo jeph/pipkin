@@ -2,6 +2,7 @@ package io.jeph.pipkin.data
 
 import io.jeph.pipkin.host.RemoteAuth
 import io.jeph.pipkin.host.RemoteHost
+import java.security.GeneralSecurityException
 import java.security.SecureRandom
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -93,6 +94,21 @@ class RemotePasswordsTest {
 
     val reset = RemotePasswords(file, SoftwareCipher())
     assertNull(reset.password(host))
+    assertEquals(emptyMap<String, Boolean>(), RemotePasswords(file, cipher).saved.value)
+  }
+
+  @Test
+  fun aPasswordTheKeystoreCannotSealIsNotSavedAndTheOldOneIsGone() {
+    RemotePasswords(file, cipher).save(host, prompt, "old")
+    val failing = object : PasswordCipher by cipher {
+      override fun seal(plaintext: ByteArray, associatedData: ByteArray): ByteArray =
+        throw GeneralSecurityException("Keystore busy")
+    }
+
+    val passwords = RemotePasswords(file, failing)
+    passwords.save(host, prompt, "new")
+
+    assertNull(passwords.password(host))
     assertEquals(emptyMap<String, Boolean>(), RemotePasswords(file, cipher).saved.value)
   }
 

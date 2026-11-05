@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.security.keystore.StrongBoxUnavailableException
 import android.util.Log
 import io.jeph.pipkin.host.DEFAULT_SSH_PORT
 import io.jeph.pipkin.host.RemoteAuth
@@ -14,6 +13,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.security.GeneralSecurityException
 import java.security.KeyStore
+import java.security.ProviderException
 import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
@@ -69,11 +69,19 @@ internal class RemotePasswords(private val file: File, private val cipher: Passw
     }
   }
 
-  /** Saves [password] for [host], replacing any other, as the answer to [prompt]. */
+  /**
+   * Saves [password] for [host], replacing any other, as the answer to [prompt]. When the Keystore can't seal it, the
+   * host has no saved password afterwards, so the next connect asks rather than sending an older one.
+   */
   fun save(host: RemoteHost, prompt: String, password: String) = synchronized(lock) {
     val destination = destination(host)
-    val sealed = cipher.seal(password.toByteArray(Charsets.UTF_8), binding(host.id, destination, prompt))
-    entries[host.id] = Entry(destination, prompt, sealed, rejected = false)
+    try {
+      val sealed = cipher.seal(password.toByteArray(Charsets.UTF_8), binding(host.id, destination, prompt))
+      entries[host.id] = Entry(destination, prompt, sealed, rejected = false)
+    } catch (error: GeneralSecurityException) {
+      Log.w(TAG, "Couldn't encrypt the password to save", error)
+      entries.remove(host.id)
+    }
     write()
   }
 
@@ -171,7 +179,10 @@ internal class RemotePasswords(private val file: File, private val cipher: Passw
   }
 }
 
-/** Authenticated encryption for [RemotePasswords]; [open] throws [GeneralSecurityException] for anything it didn't [seal]. */
+/**
+ * Authenticated encryption for [RemotePasswords]; [seal] and [open] throw [GeneralSecurityException] for any failure,
+ * and [open] for anything it didn't [seal].
+ */
 internal interface PasswordCipher {
   fun seal(plaintext: ByteArray, associatedData: ByteArray): ByteArray
 
@@ -185,19 +196,29 @@ internal interface PasswordCipher {
 private class KeystoreCipher(context: Context) : PasswordCipher {
   private val strongBox = context.packageManager.hasSystemFeature(PackageManager.FEATURE_STRONGBOX_KEYSTORE)
 
-  override fun seal(plaintext: ByteArray, associatedData: ByteArray): ByteArray {
+  override fun seal(plaintext: ByteArray, associatedData: ByteArray): ByteArray = keystore {
     val cipher = Cipher.getInstance(TRANSFORMATION)
     cipher.init(Cipher.ENCRYPT_MODE, key())
     cipher.updateAAD(associatedData)
-    return cipher.iv + cipher.doFinal(plaintext)
+    cipher.iv + cipher.doFinal(plaintext)
   }
 
-  override fun open(sealed: ByteArray, associatedData: ByteArray): ByteArray {
+  override fun open(sealed: ByteArray, associatedData: ByteArray): ByteArray = keystore {
     if (sealed.size <= IV_BYTES) throw GeneralSecurityException("Sealed password too short")
     val cipher = Cipher.getInstance(TRANSFORMATION)
     cipher.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(TAG_BITS, sealed, 0, IV_BYTES))
     cipher.updateAAD(associatedData)
-    return cipher.doFinal(sealed, IV_BYTES, sealed.size - IV_BYTES)
+    cipher.doFinal(sealed, IV_BYTES, sealed.size - IV_BYTES)
+  }
+
+  /**
+   * Runs a Keystore [operation]. Android's Keystore also fails with [ProviderException], unchecked, for example when
+   * its key operation fails or the secure hardware is busy; it's a [GeneralSecurityException] like the others here.
+   */
+  private inline fun <T> keystore(operation: () -> T): T = try {
+    operation()
+  } catch (error: ProviderException) {
+    throw GeneralSecurityException(error)
   }
 
   @Synchronized
@@ -207,8 +228,9 @@ private class KeystoreCipher(context: Context) : PasswordCipher {
     if (strongBox) {
       try {
         return generate(strongBox = true)
-      } catch (_: StrongBoxUnavailableException) {
-        // Advertised but not usable for this key; the Keystore's own hardware still keeps it.
+      } catch (_: ProviderException) {
+        // Advertised but not usable for this key, as StrongBoxUnavailableException or, on some phones, plain
+        // ProviderException; the Keystore's own hardware still keeps it.
       }
     }
     return generate(strongBox = false)
