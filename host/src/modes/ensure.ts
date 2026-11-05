@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { Readable } from "node:stream";
 import { HostError, installedPiVersion, piInstallComplete, piInstallingMarker } from "../env.js";
 import type { JsonObject } from "../framing.js";
+import { type InstallLock, withInstallLock } from "../install-lock.js";
 import type { ModeContext } from "../mode.js";
 import { stringParam } from "../params.js";
 import { installPipkinExtensions, pipkinExtensionsParam } from "../pipkin-extensions.js";
@@ -40,7 +41,7 @@ export function commandFailed(code: string, command: string, exit: number | null
   return new HostError(code, `${command} failed (exit ${exit})`, { key: "command_failed", args: { command, exit } });
 }
 
-async function npmCi(ctx: ModeContext, cwd: string): Promise<void> {
+export async function npmCi(ctx: ModeContext, cwd: string, lock: InstallLock): Promise<void> {
   let offline = false;
   const send = (line: string): void => {
     offline ||= isNpmNetworkError(line);
@@ -59,7 +60,18 @@ async function npmCi(ctx: ModeContext, cwd: string): Promise<void> {
   const { promise, resolve, reject } = Promise.withResolvers<number | null>();
   child.on("error", reject);
   child.on("close", resolve);
-  const code = await promise;
+  // An npm the lock doesn't name must not outlive it, so when recording fails npm is stopped and waited for.
+  const recorded = child.pid === undefined ? undefined : lock.recordNpm(child.pid);
+  const [exit, record] = await Promise.allSettled([
+    promise,
+    recorded?.catch((error: unknown) => {
+      child.kill();
+      throw error;
+    }),
+  ]);
+  if (record.status === "rejected") throw record.reason;
+  if (exit.status === "rejected") throw exit.reason;
+  const code = exit.value;
   if (code === 0) return;
   if (offline) {
     throw new HostError("npm_offline", "Couldn't download the agent. Check your internet connection, then retry.", {
@@ -82,27 +94,28 @@ export async function ensure(ctx: ModeContext): Promise<JsonObject> {
   await mkdir(piDir, { recursive: true });
   await mkdir(ctx.env.configDir, { recursive: true });
 
-  const packageJsonPath = join(piDir, "package.json");
-  const lockPath = join(piDir, "package-lock.json");
-  const [onDiskPackageJson, onDiskLock] = await Promise.all([
-    readFile(packageJsonPath, "utf8").catch(() => null),
-    readFile(lockPath, "utf8").catch(() => null),
-  ]);
-  // rpc refuses a package.json that differs from the app's, so both files must match to skip the install.
-  const current =
-    ctx.params.reinstall !== true &&
-    (await installedPiVersion(ctx.env.root)) === expectedVersion &&
-    onDiskPackageJson === packageJson &&
-    onDiskLock === packageLock &&
-    (await piInstallComplete(ctx.env.root));
-  if (!current) {
+  await withInstallLock(ctx.env.root, ctx.signal, async (lock) => {
+    const packageJsonPath = join(piDir, "package.json");
+    const lockPath = join(piDir, "package-lock.json");
+    const [onDiskPackageJson, onDiskLock] = await Promise.all([
+      readFile(packageJsonPath, "utf8").catch(() => null),
+      readFile(lockPath, "utf8").catch(() => null),
+    ]);
+    // rpc refuses a package.json that differs from the app's, so both files must match to skip the install.
+    const current =
+      ctx.params.reinstall !== true &&
+      (await installedPiVersion(ctx.env.root)) === expectedVersion &&
+      onDiskPackageJson === packageJson &&
+      onDiskLock === packageLock &&
+      (await piInstallComplete(ctx.env.root));
+    if (current) return;
     const marker = piInstallingMarker(ctx.env.root);
     await writeFile(marker, "");
     await writeFile(packageJsonPath, packageJson);
     await writeFile(lockPath, packageLock);
-    await npmCi(ctx, piDir);
+    await npmCi(ctx, piDir, lock);
     await rm(marker, { force: true });
-  }
+  });
   await installPipkinExtensions(ctx.env.root, pipkinExtensions);
   // Remote hosts are secondary here: a hosts file that can't be read mustn't keep local chats from starting.
   await refreshSshConfig(remotePaths(ctx.env.configDir, ctx.env.prefix, ctx.env.home)).catch((error: unknown) => {

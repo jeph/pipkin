@@ -1,8 +1,24 @@
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
+import { mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { isNpmNetworkError } from "../src/modes/ensure.js";
-import { type Dirs, installFakePi, makeDirs, PACKAGE_JSON, piDir, PI_VERSION, removeDirs, runMode, writeRuntimeManifest } from "./harness.js";
+import { setTimeout as sleep } from "node:timers/promises";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import type { JsonObject } from "../src/framing.js";
+import type { ModeContext } from "../src/mode.js";
+import { isNpmNetworkError, npmCi } from "../src/modes/ensure.js";
+import {
+  type Dirs,
+  installFakePi,
+  makeDirs,
+  PACKAGE_JSON,
+  piDir,
+  PI_VERSION,
+  removeDirs,
+  runMode,
+  startHost,
+  writeRuntimeManifest,
+} from "./harness.js";
 
 describe("npm network errors", () => {
   it("recognizes npm's reports of an unreachable registry and nothing else", () => {
@@ -18,6 +34,22 @@ describe("npm network errors", () => {
 
 const PACKAGE_LOCK = JSON.stringify({ name: "pipkin-pi-runtime", lockfileVersion: 3 });
 
+function installRequest(params: { reinstall?: boolean } = {}): JsonObject {
+  return { packageJson: PACKAGE_JSON, packageLock: PACKAGE_LOCK, expectedVersion: PI_VERSION, pipkinExtensions: [], ...params };
+}
+
+/**
+ * A stand-in `npm` that runs for `$NPM_SECONDS` and, like npm, takes a moment to roll back once it's told to stop. It
+ * logs its start only once it's ready to roll back.
+ */
+const ROLLING_BACK_NPM = [
+  'sleep "${NPM_SECONDS:-0}" >/dev/null 2>&1 & pause=$!',
+  'trap \'kill $pause; sleep 1; echo "end $$" >> npm-runs; exit 143\' TERM',
+  'echo "start $$" >> npm-runs',
+  "wait $pause",
+  'echo "end $$" >> npm-runs',
+].join("\n");
+
 describe("ensure mode", () => {
   let dirs: Dirs;
 
@@ -26,14 +58,17 @@ describe("ensure mode", () => {
     return runMode("ensure", dirs, { packageJson: PACKAGE_JSON, packageLock: PACKAGE_LOCK, expectedVersion: PI_VERSION, pipkinExtensions });
   }
 
-  /** Runs ensure with a stand-in `npm` first on its PATH, which records each run in `pi/npm-runs` and exits with [npmExit]. */
-  async function ensureWithNpm(params: { reinstall?: boolean } = {}, npmExit = 0): Promise<unknown> {
+  /** Puts a stand-in `npm` that runs [script] in `pi/` first on the host's PATH, and returns that PATH. */
+  async function stubNpm(script: string): Promise<{ PATH: string }> {
     const bin = path.join(dirs.base, "bin");
     await mkdir(bin, { recursive: true });
-    await writeFile(path.join(bin, "npm"), `#!/bin/sh\necho "$*" >> npm-runs\nexit ${npmExit}\n`, { mode: 0o755 });
-    const env = { PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` };
-    const request = { packageJson: PACKAGE_JSON, packageLock: PACKAGE_LOCK, expectedVersion: PI_VERSION, pipkinExtensions: [], ...params };
-    return runMode("ensure", dirs, request, env);
+    await writeFile(path.join(bin, "npm"), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+    return { PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` };
+  }
+
+  /** Runs ensure with a stand-in `npm` that records each run in `pi/npm-runs` and exits with [npmExit]. */
+  async function ensureWithNpm(params: { reinstall?: boolean } = {}, npmExit = 0): Promise<unknown> {
+    return runMode("ensure", dirs, installRequest(params), await stubNpm(`echo "$*" >> npm-runs\nexit ${npmExit}`));
   }
 
   async function npmRuns(): Promise<number> {
@@ -148,6 +183,82 @@ describe("ensure mode", () => {
 
       expect(await ensureWithNpm()).toMatchObject({ ok: true });
       expect(await npmRuns()).toBe(2);
+    });
+
+    it("starts an install only once the npm of a cancelled one has exited", async () => {
+      await writeFile(path.join(dirs.root, "pi/.pipkin-installing"), "");
+      const env = await stubNpm(ROLLING_BACK_NPM);
+      const runs = path.join(dirs.root, "pi/npm-runs");
+      const { run } = await startHost("ensure", dirs, { ...env, NPM_SECONDS: "30" });
+      await run.next();
+      run.send({ type: "pipkin_request", params: installRequest() });
+      while (!(await readFile(runs, "utf8").catch(() => "")).includes("start")) await sleep(50);
+      run.socket.destroy();
+
+      expect(await runMode("ensure", dirs, installRequest(), env)).toMatchObject({ ok: true });
+      const events = (await readFile(runs, "utf8")).trim().split("\n");
+      expect(events.map((line) => line.split(" ")[0])).toEqual(["start", "end", "start", "end"]);
+      expect(events[1]).toBe(events[0]?.replace("start", "end"));
+    });
+
+    it("stops npm and waits for it to exit when it can't record it, so the lock isn't given up while npm runs", async () => {
+      const { PATH } = await stubNpm(ROLLING_BACK_NPM);
+      vi.stubEnv("PATH", PATH);
+      vi.stubEnv("NPM_SECONDS", "30");
+      onTestFinished(() => {
+        vi.unstubAllEnvs();
+      });
+      const cwd = path.join(dirs.root, "pi");
+      const runs = path.join(cwd, "npm-runs");
+      // Only what npmCi uses: it reports progress and stops npm when the app goes away.
+      const ctx = { conn: { send: () => undefined }, signal: new AbortController().signal } as unknown as ModeContext;
+      const lock = {
+        // Fails once npm is running, as a full disk or a changed folder would.
+        async recordNpm(): Promise<void> {
+          while (!(await readFile(runs, "utf8").catch(() => "")).includes("start")) await sleep(20);
+          throw new Error("can't record npm");
+        },
+      };
+
+      await expect(npmCi(ctx, cwd, lock)).rejects.toThrow("can't record npm");
+      const events = (await readFile(runs, "utf8")).trim().split("\n");
+      expect(events.map((line) => line.split(" ")[0])).toEqual(["start", "end"]);
+    });
+
+    it("takes over an install lock whose holder and npm are gone", async () => {
+      const gone = spawn("true");
+      await once(gone, "exit");
+      await symlink(String(gone.pid), path.join(dirs.root, "install.lock"));
+      await symlink(String(gone.pid), path.join(dirs.root, "install.lock.npm"));
+
+      expect(await ensureWithNpm({ reinstall: true })).toMatchObject({ ok: true });
+      expect(await npmRuns()).toBe(1);
+      const left = await readdir(dirs.root);
+      expect(left).not.toContain("install.lock");
+      expect(left).not.toContain("install.lock.npm");
+    });
+
+    it("waits while a live host holds the install lock, though the npm it recorded has exited", async () => {
+      const gone = spawn("true");
+      await once(gone, "exit");
+      await symlink(String(gone.pid), path.join(dirs.root, "install.lock.npm"));
+      // A host whose npm has exited and that is still finishing its install, such as removing its marker.
+      const holder = spawn(process.execPath, ["-e", "setInterval(() => {}, 60_000)", "host.mjs"], { stdio: "ignore" });
+      await once(holder, "spawn");
+      onTestFinished(() => {
+        holder.kill();
+      });
+      await symlink(String(holder.pid), path.join(dirs.root, "install.lock"));
+
+      const install = ensureWithNpm({ reinstall: true });
+      // A real delay: the host under test is another process, polling the lock every 500 ms; three polls must pass
+      // without npm starting.
+      await sleep(1500);
+      expect(await npmRuns()).toBe(0);
+      holder.kill();
+      await once(holder, "exit");
+      expect(await install).toMatchObject({ ok: true });
+      expect(await npmRuns()).toBe(1);
     });
   });
 });
