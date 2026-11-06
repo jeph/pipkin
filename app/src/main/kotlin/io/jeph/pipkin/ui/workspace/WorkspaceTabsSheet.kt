@@ -95,7 +95,7 @@ internal fun WorkspaceTabsSheet(
   // A short window, such as a phone on its side, has no room for the tiles under the tabs without squeezing the tabs
   // out, so there the tiles scroll at the end of the list instead.
   val pinActions = LocalWindowInfo.current.containerDpSize.height >= PINNED_ACTIONS_MIN_HEIGHT
-  PipkinSheet(onDismissRequest = onDismiss, maxHeightFraction = 0.85f) { dismiss ->
+  PipkinSheet(onDismissRequest = onDismiss) { dismiss ->
     // A chat opens before the sheet closes, since a chat that can't open keeps it open with a notice. The sheet then
     // keeps showing what it showed, so the opened chat doesn't reorder the rows or swap the tiles as it slides away.
     val closeOnOpened = {
