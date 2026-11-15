@@ -1,4 +1,4 @@
-LiteRT-LM 0.19.0 (https://github.com/google-ai-edge/LiteRT-LM), Apache License 2.0. Runs local models in the LiteRT-LM format. Below are the third-party notices LiteRT-LM's Android library ships for the code built into its native library, liblitertlm_jni.so.
+LiteRT-LM 0.19.1 (https://github.com/google-ai-edge/LiteRT-LM), Apache License 2.0. Runs local models in the LiteRT-LM format. Below are the third-party notices LiteRT-LM's Android library ships for the code built into its native library, liblitertlm_jni.so.
 
 Abseil
 
