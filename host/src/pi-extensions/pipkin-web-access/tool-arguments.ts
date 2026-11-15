@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.47.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 // Some models send array arguments as a JSON string, for example
 // `queries: "[\"a\", \"b\"]"`, which fails schema validation before the tool
 // runs. Parse such strings back into arrays of strings, reject strings that start

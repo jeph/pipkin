@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.47.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { activityMonitor } from "./activity.ts";
 import { normalizeDomain } from "./domain-filter-normalization.ts";
 import { DuckDuckGoBotCheckError, DuckDuckGoRateLimit, type DuckDuckGoRateLimitOptions } from "./duckduckgo-rate-limit.ts";

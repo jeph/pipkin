@@ -1,9 +1,10 @@
-// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.47.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { chmodSync, closeSync, constants as fsConstants, existsSync, fstatSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { lstat as lstatAsync, open as openAsync, opendir as opendirAsync, readFile as readFileAsync, realpath as realpathAsync, rm as rmAsync, type FileHandle } from "node:fs/promises";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { basename, dirname, extname, join, resolve as resolvePath, sep as pathSep } from "node:path";
+import { tmpdir } from "node:os";
 import { activityMonitor } from "./activity.ts";
 import type { ExtractedContent } from "./extract.ts";
 import { checkGhAvailable, checkRepoSize, fetchViaApi, showGhHint } from "./github-api.ts";
@@ -114,7 +115,7 @@ function loadGitHubConfig(): GitHubCloneConfig {
 		enabled: true,
 		maxRepoSizeMB: 350,
 		cloneTimeoutSeconds: 30,
-		clonePath: "/tmp/pi-github-repos",
+		clonePath: join(tmpdir(), "pi-github-repos"),
 	};
 
 	if (!existsSync(CONFIG_PATH)) {
@@ -774,7 +775,7 @@ function readReadme(localPath: string): string | null {
 		if (existsSync(readmePath)) {
 			try {
 				const content = readFileSync(readmePath, "utf-8");
-				return content.length > 8192 ? content.slice(0, 8192) + "\n\n[README truncated at 8K chars]" : content;
+				return content.length > MAX_INLINE_FILE_CHARS ? `${content.slice(0, MAX_INLINE_FILE_CHARS)}\n\n[README truncated at 100K chars. Full file: ${readmePath}]` : content;
 			} catch {
 				continue;
 			}

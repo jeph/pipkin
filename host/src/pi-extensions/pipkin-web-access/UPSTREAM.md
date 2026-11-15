@@ -2,7 +2,7 @@
 
 This folder is [pi-web-access](https://github.com/nicobailon/pi-web-access) by Nico Bailon, MIT License (see `LICENSE`), copied into Pipkin so that Pipkin can fix it without waiting for upstream. Pipkin ships it as the extension `pipkin-web-access`.
 
-- Upstream version: 0.46.0, tag `v0.46.0`, commit `4af1a7f7757d450ba0afefe2d98737384dc9a9b4`.
+- Upstream version: 0.47.0, tag `v0.47.0`, commit `322e44fafc1aaa691779cdf2116584e67edd7645`.
 
 ## What differs from upstream
 

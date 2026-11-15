@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.47.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 // Asks a classifier model from Pi's catalog whether a search response addresses its query, for the
 // searchRouting "off-topic" fallback (#619). eval/offtopic-judge.mjs measured the thresholds.
 import type { ClassifierContext } from "@earendil-works/pi-ai";

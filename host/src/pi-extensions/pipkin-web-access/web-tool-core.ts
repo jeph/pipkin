@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.47.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 // Host-neutral execution core for web_search (non-curator path), fetch_content,
 // get_search_content, and source_check. The Pi extension (index.ts) and the MCP
 // server both run tools through createWebToolCore; everything that differs per
@@ -78,6 +78,10 @@ export interface WebSearchConfig {
 	cloudflareSearchProvider?: unknown;
 	searchapiApiKey?: unknown;
 	searchapiBaseUrl?: unknown;
+	outcrawlApiKey?: unknown;
+	outcrawlBaseUrl?: unknown;
+	sofyaApiKey?: unknown;
+	sofyaBaseUrl?: unknown;
 	tabstackBaseUrl?: unknown;
 	tabstackApiKey?: unknown;
 	tabstackResearchMode?: unknown;

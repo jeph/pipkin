@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.47.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { execFile } from "node:child_process";
 import type { ExtractedContent } from "./extract.ts";
 import type { GitHubUrlInfo } from "./github-extract.ts";
@@ -99,7 +99,7 @@ async function fetchReadmeViaApi(owner: string, repo: string, ref: string): Prom
 				}
 				try {
 					const decoded = Buffer.from(stdout.trim(), "base64").toString("utf-8");
-					resolve(decoded.length > 8192 ? decoded.slice(0, 8192) + "\n\n[README truncated at 8K chars]" : decoded);
+					resolve(decoded.length > MAX_INLINE_FILE_CHARS ? `${decoded.slice(0, MAX_INLINE_FILE_CHARS)}\n\n[README truncated at 100K chars]` : decoded);
 				} catch {
 					resolve(null);
 				}

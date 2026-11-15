@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.47.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 // MCP-only tool definitions: names, descriptions, and input schemas for the
 // standalone MCP server. Deliberately independent of the Pi tool schemas in
 // index.ts so MCP changes never touch Pi's provider-facing definitions.
@@ -35,7 +35,7 @@ function providerProblem(value: unknown): string | undefined {
 const recencySchema = stringEnum(["day", "week", "month", "year"]);
 const domainFilterSchema = Type.Array(Type.String(), { description: "Prefix - to exclude" });
 const numResultsSchema = Type.Integer({ minimum: 1, maximum: 20, description: "Default 5" });
-const proxySchema = Type.String({ description: "http(s) or socks proxy URL; \"\" forces direct" });
+const proxySchema = Type.String({ description: "Proxy URL; omit by default; \"\" forces direct" });
 // Page fetches write a page cache and clone GitHub URLs into a temp directory,
 // including the fetches behind includeContent and fetchContent.
 const fetchingAnnotations = { readOnlyHint: false, destructiveHint: false, openWorldHint: true };

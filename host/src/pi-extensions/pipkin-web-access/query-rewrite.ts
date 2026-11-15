@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.46.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.47.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import type { complete, Api, Model, ProviderHeaders } from "@earendil-works/pi-ai/compat";
 import { resolveThinkingLevel, type SummaryGenerationContext } from "./summary-review.ts";
 import { awaitWithAbort } from "./abortable.ts";
