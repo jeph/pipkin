@@ -47,6 +47,9 @@ export default defineConfig({
       ],
     }),
   ],
+  // The site's scoped styles were written for :where() selectors, which Starlight forced before 0.43; Astro's default
+  // attribute selectors would raise their specificity and stop scoped classes passed to child components applying.
+  scopedStyleStrategy: "where",
   build: {
     inlineStylesheets: "always",
   },
