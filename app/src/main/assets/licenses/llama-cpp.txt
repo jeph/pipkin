@@ -1,4 +1,4 @@
-llama.cpp v0.8.0 (https://github.com/ggml-org/llama.cpp), MIT License. The server and model runtime behind local models, with ggml.
+llama.cpp v1.0.0 (https://github.com/ggml-org/llama.cpp), MIT License. The server and model runtime behind local models, with ggml.
 
 MIT License
 

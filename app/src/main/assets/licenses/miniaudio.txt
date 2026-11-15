@@ -1,4 +1,4 @@
-miniaudio v0.11.25 (https://github.com/mackron/miniaudio), public domain or MIT No Attribution, as vendored by llama.cpp v0.8.0. Built into Pipkin's llama.cpp library for local models.
+miniaudio v0.11.26 (https://github.com/mackron/miniaudio), public domain or MIT No Attribution, as vendored by llama.cpp v1.0.0. Built into Pipkin's llama.cpp library for local models.
 
 This software is available as a choice of the following licenses. Choose
 whichever you prefer.

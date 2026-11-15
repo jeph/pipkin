@@ -388,14 +388,14 @@ val llamaSources = tasks.register<LlamaSources>("llamaSources") {
   description = "Fetches llama.cpp, the KleidiAI kernels and the OpenCL headers for the local models' native build."
   urls.set(
     mapOf(
-      "llama.cpp" to "https://github.com/ggml-org/llama.cpp/archive/refs/tags/v0.8.0.tar.gz",
+      "llama.cpp" to "https://github.com/ggml-org/llama.cpp/archive/refs/tags/v1.0.0.tar.gz",
       "kleidiai" to "https://github.com/ARM-software/kleidiai/releases/download/v1.32.0/kleidiai-v1.32.0-src.tar.gz",
       "opencl-headers" to "https://github.com/KhronosGroup/OpenCL-Headers/archive/refs/tags/v2026.05.29.tar.gz",
     ),
   )
   sha256s.set(
     mapOf(
-      "llama.cpp" to "51b1e025d7b12e83fa55736e65bc254acd9d23e49f546be7531368fef82210ee",
+      "llama.cpp" to "3f5f750e36326aea4d65c7623e7d597a33e395d65f4d76e5e0532171f252532b",
       "kleidiai" to "a48d373e7c5d721a0aecbf5ddaf0bdf245bc8064e6b84086f13db0e102b553a6",
       "opencl-headers" to "d9e6c48357de5002da11ce45de600e0c3ffe6ab4f628a3b9fe2b38603161658a",
     ),

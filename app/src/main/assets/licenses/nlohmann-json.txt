@@ -1,4 +1,4 @@
-JSON for Modern C++ 3.12.0 (https://github.com/nlohmann/json), MIT License, as vendored by llama.cpp v0.8.0. Built into Pipkin's llama.cpp library for local models.
+JSON for Modern C++ 3.12.0 (https://github.com/nlohmann/json), MIT License, as vendored by llama.cpp v1.0.0. Built into Pipkin's llama.cpp library for local models.
 
 MIT License
 

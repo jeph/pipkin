@@ -34,7 +34,7 @@ set(GGML_NATIVE OFF)
 # repository the sources are extracted inside.
 set(LLAMA_BUILD_IS_DEV OFF)
 set(LLAMA_BUILD_NUMBER 0)
-set(LLAMA_BUILD_COMMIT v0.8.0)
+set(LLAMA_BUILD_COMMIT v1.0.0)
 
 # CPU features on arm64. ggml's CPU backend picks its NEON kernels when it compiles, so a library built for one
 # feature level dies of SIGILL on a CPU without it. ggml's own answer, GGML_CPU_ALL_VARIANTS with GGML_BACKEND_DL,

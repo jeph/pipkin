@@ -1,4 +1,4 @@
-rotate-bits.h by William Casarin, MIT License, as vendored by llama.cpp v0.8.0 (vendor/hash/rotate-bits). Built into Pipkin's llama.cpp library for local models, in its SHA-256.
+rotate-bits.h by William Casarin, MIT License, as vendored by llama.cpp v1.0.0 (vendor/hash/rotate-bits). Built into Pipkin's llama.cpp library for local models, in its SHA-256.
 
 MIT License
 
