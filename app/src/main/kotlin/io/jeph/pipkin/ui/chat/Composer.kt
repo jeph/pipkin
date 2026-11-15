@@ -206,16 +206,16 @@ private fun ComposerToolbar(
 
 /**
  * Pi answers a prompt within moments by starting its run, so Stop shows from the press on, and stays while the chat
- * [works][io.jeph.pipkin.agent.AgentProcess.working], background tasks included. A photo-only steer greys out Send
- * rather than showing Stop, which a tap meant as sending would otherwise press. So does a draft whose send is
- * [blocked]: by Pi starting, which could not take the prompt or most built-in commands yet, or by a remote chat's host
- * being lost, as the banner over the stream says. Stop shows again once the draft is empty.
+ * [works][io.jeph.pipkin.agent.AgentProcess.working], background tasks included. A draft whose send is [blocked]
+ * greys out Send rather than showing Stop, which a tap meant as sending would otherwise press: blocked by Pi starting,
+ * which could not take the prompt or most built-in commands yet, or by a remote chat's host being lost, as the banner
+ * over the stream says. Stop shows again once the draft is empty.
  */
 private fun primaryAction(controller: ChatController, working: Boolean, blocked: Boolean): PrimaryAction = when {
   controller.sendingCommand -> PrimaryAction.Sending
   controller.sending -> PrimaryAction.Stop
   controller.canSend && !blocked -> PrimaryAction.Send
-  controller.canSend || controller.photosOnlySteer -> PrimaryAction.Idle
+  controller.canSend -> PrimaryAction.Idle
   working -> PrimaryAction.Stop
   else -> PrimaryAction.Idle
 }

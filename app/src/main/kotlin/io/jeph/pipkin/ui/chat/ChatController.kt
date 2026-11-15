@@ -72,17 +72,7 @@ internal class ChatController(
   /** Stop was pressed before Pi answered the prompt being sent, so the run that prompt starts is aborted. */
   private var stopRequested = false
 
-  val canSend: Boolean get() = (draft.text.isNotBlank() || attachments.isNotEmpty()) && !photosOnlySteer
-
-  /**
-   * Whether sending now would steer the run with photos and no text. Pi (1.1.0, still in 1.5.0) takes a delivered
-   * steer off the queue it reports only when the steer has text (`if (messageText)` in `AgentSession`'s
-   * `message_start` handling), so a photo-only steer would stay in the steering box after Pi delivered it.
-   * Revisit once Pi fixes that: remove this check when the pinned Pi clears steers with empty text.
-   */
-  val photosOnlySteer: Boolean
-    get() = process.busy.value && draft.text.isBlank() && attachments.isNotEmpty() &&
-      attachments.all { it is Attachment.Image }
+  val canSend: Boolean get() = draft.text.isNotBlank() || attachments.isNotEmpty()
 
   fun setDraftText(text: String) {
     draft.setTextAndPlaceCursorAtEnd(text)
