@@ -160,8 +160,8 @@ class SyntaxSource(val name: String, val url: String, val sha256: String)
 val syntaxSourcePins = listOf(
   SyntaxSource(
     "tree-sitter",
-    "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.27.1.tar.gz",
-    "982cd3d4d9eb7be18c243240a622423fd2e4ecb4bec2cd98832c2f3fa1f0f333",
+    "https://github.com/tree-sitter/tree-sitter/archive/refs/tags/v0.27.2.tar.gz",
+    "356528363bf7fbad12a2cfeb5a2678c0118ef886a4d69ad9a379db5fdef0735f",
   ),
   SyntaxSource(
     "bash",
@@ -195,8 +195,8 @@ val syntaxSourcePins = listOf(
   ),
   SyntaxSource(
     "dart",
-    "https://github.com/UserNobody14/tree-sitter-dart/archive/be07cf7118d3dba06236a3f19541685a68209934.tar.gz",
-    "b126efb8dfeeba8b71f0c6ae1f0cd09cf8b205560786b31d44cc16b283e782f2",
+    "https://github.com/UserNobody14/tree-sitter-dart/archive/0038280b774b65c1b89ba7fec50624d8baed9fe1.tar.gz",
+    "7d9f51b4ff20756a21935ce69a2386e6db1e2fda325835d41790e745270e0db8",
   ),
   SyntaxSource(
     "dockerfile",
@@ -250,8 +250,8 @@ val syntaxSourcePins = listOf(
   ),
   SyntaxSource(
     "perl",
-    "https://github.com/tree-sitter-perl/tree-sitter-perl/releases/download/v2.0.4/tree-sitter-perl.tar.gz",
-    "5a2b2ea7e5c3899d65337f1a893e32bf6e1d1aee7650e393df04dc0ca96bfe4c",
+    "https://github.com/tree-sitter-perl/tree-sitter-perl/releases/download/v2.0.6/tree-sitter-perl.tar.gz",
+    "93414503913ccb7e74b3bfb82bdb496559a5c6e663de5a35cbcdfe75ef8cb295",
   ),
   SyntaxSource(
     "php",
