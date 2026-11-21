@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type Dirs, installRealPi, makeDirs, removeDirs, runOp } from "./harness.js";
 
-/** A Kimi Code `/models` entry in the shape the real endpoint serves, for a model Pi 1.5.2 doesn't ship. */
+/** A Kimi Code `/models` entry in the shape the real endpoint serves, for a model Pi 1.6.0 doesn't ship. */
 const K3_2_PRO = {
   id: "k3.2-pro",
   object: "model",
@@ -74,7 +74,7 @@ describe("subscription_models", () => {
       ok: true,
       data: {
         models: [
-          expect.objectContaining({ id: "k3", name: "Kimi K3", contextWindow: 1_048_576, maxTokens: 131_072 }),
+          expect.objectContaining({ id: "k3", name: "Kimi K3", contextWindow: 1_048_576, maxTokens: 1_048_576 }),
           {
             id: "k3.2-pro",
             name: "K3.2 Pro",
