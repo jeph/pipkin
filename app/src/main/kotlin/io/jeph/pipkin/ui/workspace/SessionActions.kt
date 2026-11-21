@@ -1,5 +1,6 @@
 package io.jeph.pipkin.ui.workspace
 
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -11,8 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import io.jeph.pipkin.R
 import io.jeph.pipkin.host.SessionInfo
 import io.jeph.pipkin.ui.components.DialogConfirm
@@ -82,14 +81,12 @@ internal fun SessionActions(
  */
 @Composable
 internal fun RenameDialog(title: String, initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-  var name by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-    mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
-  }
+  val name = rememberTextFieldState(initial)
   PipkinDialog(
     title = title,
     confirm = DialogConfirm(
       label = stringResource(R.string.shell_rename_save),
-      onClick = { onConfirm(name.text.trim()) },
+      onClick = { onConfirm(name.text.trim().toString()) },
       enabled = name.text.isNotBlank(),
     ),
     dismissLabel = stringResource(R.string.shell_cancel),
@@ -99,8 +96,7 @@ internal fun RenameDialog(title: String, initial: String, onDismiss: () -> Unit,
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     DialogTextField(
-      value = name,
-      onValueChange = { name = it },
+      state = name,
       modifier = Modifier.focusRequester(focusRequester),
       placeholder = stringResource(R.string.shell_rename_label),
     )

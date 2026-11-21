@@ -16,8 +16,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicSecureTextField
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldDecorator
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.material3.BasicAlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,8 +39,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -193,16 +196,16 @@ fun PillButton(
 private const val DISABLED_ALPHA = 0.4f
 
 /**
- * A dialog's one-line field: an inset well under a cobalt ring while focused, with the [placeholder] while it's empty
- * and any [trailing] control, such as a password's Show, at its end.
+ * A dialog's one-line field for [state]: an inset well under a cobalt ring while focused, with the [placeholder] while
+ * it's empty and any [trailing] control, such as a password's Show, at its end. With an [obfuscation] mode it's a
+ * secret's field, masked as that mode says and kept off the clipboard.
  */
 @Composable
 fun DialogTextField(
-  value: TextFieldValue,
-  onValueChange: (TextFieldValue) -> Unit,
+  state: TextFieldState,
   modifier: Modifier = Modifier,
   placeholder: String? = null,
-  visualTransformation: VisualTransformation = VisualTransformation.None,
+  obfuscation: TextObfuscationMode? = null,
   keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
   trailing: (@Composable () -> Unit)? = null,
 ) {
@@ -213,35 +216,48 @@ fun DialogTextField(
   val style = LocalTextStyle.current.merge(
     TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.content),
   )
-  BasicTextField(
-    value = value,
-    onValueChange = onValueChange,
-    modifier = modifier.fillMaxWidth().padding(top = 14.dp),
-    textStyle = style,
-    singleLine = true,
-    cursorBrush = SolidColor(colors.accent),
-    visualTransformation = visualTransformation,
-    keyboardOptions = keyboardOptions,
-    interactionSource = interaction,
-    decorationBox = { field ->
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .clip(shape)
-          .background(colors.surface0)
-          .border(if (focused) 1.5.dp else 1.dp, if (focused) colors.accent else colors.border, shape)
-          .heightIn(min = 44.dp)
-          .padding(start = 14.dp, end = if (trailing == null) 14.dp else 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Box(modifier = Modifier.weight(1f).padding(vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
-          if (value.text.isEmpty() && placeholder != null) {
-            Text(text = placeholder, style = style, color = colors.foregroundMuted, maxLines = 1)
-          }
-          field()
+  val decorator = TextFieldDecorator { field ->
+    Row(
+      modifier = Modifier
+        .fillMaxWidth()
+        .clip(shape)
+        .background(colors.surface0)
+        .border(if (focused) 1.5.dp else 1.dp, if (focused) colors.accent else colors.border, shape)
+        .heightIn(min = 44.dp)
+        .padding(start = 14.dp, end = if (trailing == null) 14.dp else 4.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Box(modifier = Modifier.weight(1f).padding(vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
+        if (state.text.isEmpty() && placeholder != null) {
+          Text(text = placeholder, style = style, color = colors.foregroundMuted, maxLines = 1)
         }
-        trailing?.invoke()
+        field()
       }
-    },
-  )
+      trailing?.invoke()
+    }
+  }
+  val fieldModifier = modifier.fillMaxWidth().padding(top = 14.dp)
+  if (obfuscation == null) {
+    BasicTextField(
+      state = state,
+      modifier = fieldModifier,
+      textStyle = style,
+      keyboardOptions = keyboardOptions,
+      lineLimits = TextFieldLineLimits.SingleLine,
+      interactionSource = interaction,
+      cursorBrush = SolidColor(colors.accent),
+      decorator = decorator,
+    )
+  } else {
+    BasicSecureTextField(
+      state = state,
+      modifier = fieldModifier,
+      textStyle = style,
+      keyboardOptions = keyboardOptions,
+      interactionSource = interaction,
+      cursorBrush = SolidColor(colors.accent),
+      decorator = decorator,
+      textObfuscationMode = obfuscation,
+    )
+  }
 }

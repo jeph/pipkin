@@ -20,6 +20,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
@@ -115,7 +116,6 @@ internal fun FolderBrowserPane(
   Column(modifier = modifier) {
     SearchField(
       query = state.query,
-      onQueryChange = { state.query = it },
       placeholder = stringResource(R.string.shell_browse_search),
       keyboardOptions = PATH_KEYBOARD,
     )
@@ -126,7 +126,7 @@ internal fun FolderBrowserPane(
       onPick = graph.preferences::setPickerMachine,
       onAddHost = { onOpenHost(null) },
     )
-    val query = state.query.trim()
+    val query = state.query.text.trim().toString()
     val unreachable = state.unreachable
     if (host != null) AutoReconnect(connector, host, unreachable?.code, onConnected = state::reopen)
     when {
@@ -422,7 +422,7 @@ private class FolderBrowserState(
   /** A remote folder's stand-in is being made. */
   var adding by mutableStateOf(false)
     private set
-  var query by mutableStateOf("")
+  val query = TextFieldState()
 
   /** The latest search's answer, which may still be for an earlier [query]. */
   var found by mutableStateOf<FolderSearch?>(null)
@@ -496,7 +496,7 @@ private class FolderBrowserState(
    * query goes to the host too, which stops a search still running there.
    */
   suspend fun runSearches() {
-    snapshotFlow { browser to query.trim() }.collectLatest { (current, text) ->
+    snapshotFlow { browser to query.text.trim().toString() }.collectLatest { (current, text) ->
       if (current == null) return@collectLatest
       if (text.isNotEmpty()) delay(SEARCH_DEBOUNCE_MILLIS)
       found = try {

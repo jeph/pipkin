@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,9 +37,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -245,29 +245,37 @@ private fun PromptBlock(prompt: PendingPrompt, onAnswer: (String) -> Unit) {
 /** `text`, `secret` and `manual_code` prompts. */
 @Composable
 private fun TextPrompt(prompt: PendingPrompt, onAnswer: (String) -> Unit) {
-  var value by rememberSaveable(prompt.reply.id) { mutableStateOf("") }
-  val secret = prompt.type == "secret"
-  OutlinedTextField(
-    value = value,
-    onValueChange = { value = it },
-    modifier = Modifier.fillMaxWidth(),
-    shape = SettingsFieldShape,
-    colors = settingsFieldColors(),
-    placeholder = prompt.placeholder?.let { { Text(it) } },
-    supportingText =
-      if (prompt.type == "manual_code") {
-        { Text(stringResource(R.string.login_manual_code_helper)) }
-      } else {
-        null
-      },
-    visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
-    keyboardOptions = KeyboardOptions(keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text),
-    singleLine = true,
-  )
+  val answer = rememberSaveable(prompt.reply.id, saver = TextFieldState.Saver) { TextFieldState() }
+  val placeholder: (@Composable () -> Unit)? = prompt.placeholder?.let { { Text(it) } }
+  if (prompt.type == "secret") {
+    OutlinedSecureTextField(
+      state = answer,
+      modifier = Modifier.fillMaxWidth(),
+      placeholder = placeholder,
+      textObfuscationMode = TextObfuscationMode.Hidden,
+      shape = SettingsFieldShape,
+      colors = settingsFieldColors(),
+    )
+  } else {
+    OutlinedTextField(
+      state = answer,
+      modifier = Modifier.fillMaxWidth(),
+      placeholder = placeholder,
+      supportingText =
+        if (prompt.type == "manual_code") {
+          { Text(stringResource(R.string.login_manual_code_helper)) }
+        } else {
+          null
+        },
+      lineLimits = TextFieldLineLimits.SingleLine,
+      shape = SettingsFieldShape,
+      colors = settingsFieldColors(),
+    )
+  }
   PillButton(
     label = stringResource(R.string.login_continue),
-    onClick = { onAnswer(value.trim()) },
-    enabled = value.isNotBlank(),
+    onClick = { onAnswer(answer.text.trim().toString()) },
+    enabled = answer.text.isNotBlank(),
   )
 }
 

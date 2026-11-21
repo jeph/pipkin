@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -80,12 +81,13 @@ internal fun ArchiveScreen(actions: ShellActions, onBack: () -> Unit, onOpenChat
   val archived by graph.sessionArchive.archived.collectAsStateWithLifecycle()
   val names = rememberFolderNames()
   val page = rememberArchivePage(actions)
-  var query by rememberSaveable { mutableStateOf("") }
+  val search = rememberTextFieldState()
+  val query = search.text.trim().toString()
   // Folders may have come or gone since the list was read, which decides what can be restored.
   LaunchedEffect(Unit) { graph.sessionRepository.refresh() }
   LaunchedEffect(archived) { page.keepSelected(archived.map { it.session.path }.toSet()) }
   BackHandler(enabled = page.selected.isNotEmpty()) { page.selected = emptySet() }
-  val shown = remember(archived, query, names) { archived.filter { it.session.matches(query.trim(), names) } }
+  val shown = remember(archived, query, names) { archived.filter { it.session.matches(query, names) } }
   val selectedSessions = archived.map { it.session }.filter { it.path in page.selected }
   val restorable = selectedSessions.filter { it.cwdExists }
   Box(modifier = Modifier.fillMaxSize().background(pipkinColors.surface0)) {
@@ -97,8 +99,7 @@ internal fun ArchiveScreen(actions: ShellActions, onBack: () -> Unit, onOpenChat
         onSelectAll = { page.selected += shown.map { it.session.path } },
       )
       SearchField(
-        query = query,
-        onQueryChange = { query = it },
+        query = search,
         placeholder = stringResource(R.string.archive_search),
         modifier = Modifier.padding(vertical = PipkinTokens.Spacing.s8),
       )

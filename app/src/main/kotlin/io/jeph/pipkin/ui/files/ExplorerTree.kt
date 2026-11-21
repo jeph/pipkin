@@ -21,8 +21,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldDecorator
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
@@ -179,14 +181,14 @@ private fun EntryRow(
 @Composable
 private fun NewFolderRow(onCommit: (String) -> Unit, onCancel: () -> Unit) {
   val colors = pipkinColors
-  var name by remember { mutableStateOf("") }
+  val name = rememberTextFieldState()
   var settled by remember { mutableStateOf(false) }
   var focused by remember { mutableStateOf(false) }
   val focusRequester = remember { FocusRequester() }
   val commit = {
     if (!settled) {
       settled = true
-      val trimmed = name.trim()
+      val trimmed = name.text.trim().toString()
       if (trimmed.isEmpty()) onCancel() else onCommit(trimmed)
     }
   }
@@ -194,8 +196,7 @@ private fun NewFolderRow(onCommit: (String) -> Unit, onCancel: () -> Unit) {
   TreeRow(depth = 0) {
     Chevron(expanded = false)
     BasicTextField(
-      value = name,
-      onValueChange = { name = it },
+      state = name,
       modifier = Modifier
         .weight(1f)
         .focusRequester(focusRequester)
@@ -203,7 +204,7 @@ private fun NewFolderRow(onCommit: (String) -> Unit, onCancel: () -> Unit) {
           if (focused && !state.isFocused) commit()
           focused = state.isFocused
         },
-      singleLine = true,
+      lineLimits = TextFieldLineLimits.SingleLine,
       textStyle = LocalTextStyle.current.merge(
         TextStyle(color = colors.foreground, fontSize = PipkinTokens.FontSize.base),
       ),
@@ -213,10 +214,10 @@ private fun NewFolderRow(onCommit: (String) -> Unit, onCancel: () -> Unit) {
         autoCorrectEnabled = false,
         imeAction = ImeAction.Done,
       ),
-      keyboardActions = KeyboardActions(onDone = { commit() }),
-      decorationBox = { field ->
+      onKeyboardAction = { commit() },
+      decorator = TextFieldDecorator { field ->
         Box {
-          if (name.isEmpty()) {
+          if (name.text.isEmpty()) {
             Text(
               text = stringResource(R.string.files_folder_placeholder),
               color = colors.foregroundExtraMuted,

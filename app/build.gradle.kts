@@ -410,7 +410,7 @@ tasks.matching { it.name.startsWith("configureCMake") || it.name.startsWith("bui
 
 android {
   namespace = "io.jeph.pipkin"
-  compileSdk = 37
+  compileSdk { version = release(37) { minorApiLevel = 2 } }
 
   defaultConfig {
     applicationId = "io.jeph.pipkin"
@@ -535,7 +535,7 @@ tasks.named("check") {
 }
 
 dependencies {
-  implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+  implementation(platform("androidx.compose:compose-bom:2026.11.01"))
   implementation("androidx.activity:activity-compose:1.13.0")
   implementation("androidx.compose.material3:material3")
   implementation("androidx.core:core-ktx:1.19.1")

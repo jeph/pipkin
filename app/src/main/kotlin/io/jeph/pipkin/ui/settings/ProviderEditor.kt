@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedSecureTextField
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -25,8 +27,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
 import io.jeph.pipkin.data.AccountRepository
@@ -189,9 +189,8 @@ private fun ApiKeyField(form: ProviderForm) {
   var visible by remember { mutableStateOf(false) }
   Column(verticalArrangement = Arrangement.spacedBy(PipkinTokens.Spacing.s6)) {
     FieldLabel(stringResource(R.string.provider_api_key))
-    OutlinedTextField(
-      value = form.apiKey,
-      onValueChange = { form.apiKey = it },
+    OutlinedSecureTextField(
+      state = form.apiKey,
       modifier = Modifier.fillMaxWidth(),
       shape = SettingsFieldShape,
       colors = settingsFieldColors(),
@@ -201,9 +200,8 @@ private fun ApiKeyField(form: ProviderForm) {
           Text(stringResource(if (visible) R.string.provider_hide_key else R.string.provider_show_key))
         }
       },
-      visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
+      textObfuscationMode = if (visible) TextObfuscationMode.Visible else TextObfuscationMode.Hidden,
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
-      singleLine = true,
     )
   }
 }

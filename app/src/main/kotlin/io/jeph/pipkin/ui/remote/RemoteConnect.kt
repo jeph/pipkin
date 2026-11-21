@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Text
@@ -29,9 +31,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import io.jeph.pipkin.R
 import io.jeph.pipkin.appGraph
@@ -220,8 +219,8 @@ private fun HostKeyDialog(host: String, prompt: RemotePrompt, onAnswer: (String?
 @Composable
 private fun SecretDialog(host: String, prompt: RemotePrompt, onAnswer: (String?, Boolean) -> Unit) {
   val secret = prompt.kind != RemotePrompt.Kind.Other
-  var value by remember(prompt) { mutableStateOf(TextFieldValue()) }
-  var shown by remember(prompt) { mutableStateOf(!secret) }
+  val answer = remember(prompt) { TextFieldState() }
+  var shown by remember(prompt) { mutableStateOf(false) }
   var rememberPassword by remember(prompt) { mutableStateOf(true) }
   val title = when (prompt.kind) {
     RemotePrompt.Kind.Password -> stringResource(R.string.remote_password_title, host)
@@ -246,16 +245,19 @@ private fun SecretDialog(host: String, prompt: RemotePrompt, onAnswer: (String?,
     text = text,
     confirm = DialogConfirm(
       label = stringResource(if (secret) R.string.remote_connect else R.string.remote_answer),
-      onClick = { onAnswer(value.text, prompt.savable && rememberPassword) },
+      onClick = { onAnswer(answer.text.toString(), prompt.savable && rememberPassword) },
     ),
     dismissLabel = stringResource(R.string.remote_cancel),
     onDismiss = { onAnswer(null, false) },
   ) {
     DialogTextField(
-      value = value,
-      onValueChange = { value = it },
+      state = answer,
       placeholder = hint,
-      visualTransformation = if (shown) VisualTransformation.None else PasswordVisualTransformation(),
+      obfuscation = when {
+        !secret -> null
+        shown -> TextObfuscationMode.Visible
+        else -> TextObfuscationMode.Hidden
+      },
       keyboardOptions = KeyboardOptions(
         keyboardType = if (secret) KeyboardType.Password else KeyboardType.Text,
         autoCorrectEnabled = false,

@@ -18,7 +18,8 @@ import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -79,7 +80,7 @@ fun PipkinSheet(
   content: @Composable ColumnScope.(dismiss: (then: () -> Unit) -> Unit) -> Unit,
 ) {
   if (!keyboardClosedForSheet()) return
-  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+  val sheetState = rememberBottomSheetState(SheetValue.Hidden, setOf(SheetValue.Hidden, SheetValue.Expanded))
   val dismiss = rememberSheetDismiss(sheetState, onDismissRequest)
   val windowHeight = LocalWindowInfo.current.containerSize.height
   val sizing = when {

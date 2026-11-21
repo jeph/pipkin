@@ -1,10 +1,10 @@
 Android libraries, Apache License 2.0. The app's Android and Kotlin libraries, as resolved for the release build (app/build.gradle.kts):
 
 - AndroidX and Jetpack Compose (https://developer.android.com/jetpack/androidx): activity, annotation, arch.core,
-  autofill, collection, compose (animation, foundation, material ripple, material3, runtime, ui), concurrent-futures,
-  core, customview-poolingcontainer, emoji2, graphics-path, interpolator, lifecycle, navigationevent,
-  profileinstaller, savedstate, startup, tracing, versionedparcelable and window. Copyright The Android Open Source
-  Project.
+  autofill, collection, compose (animation, foundation, material ripple, material3, material3 ripple, runtime, ui),
+  concurrent-futures, core, customview-poolingcontainer, emoji2, graphics-path, graphics-shapes, interpolator,
+  lifecycle, navigationevent, profileinstaller, savedstate, startup, tracing, versionedparcelable and window. Copyright
+  The Android Open Source Project.
 - Kotlin standard library and Kotlin reflection (https://kotlinlang.org). Copyright JetBrains s.r.o. and Kotlin
   Programming Language contributors.
 - kotlinx.coroutines, kotlinx.serialization and kotlinx.collections.immutable (https://github.com/Kotlin). Copyright

@@ -1,18 +1,14 @@
 package io.jeph.pipkin.ui.chat
 
 import androidx.annotation.DrawableRes
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.components.DialogConfirm
 import io.jeph.pipkin.ui.components.DialogTextField
@@ -49,10 +45,10 @@ internal fun TextInputDialog(
   onConfirm: (String) -> Unit,
   onDismiss: () -> Unit,
 ) {
-  var value by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
+  val state = rememberTextFieldState(initial)
   PipkinDialog(
     title = title,
-    confirm = DialogConfirm(confirmLabel, { onConfirm(value.text) }, enabled = value.text.isNotBlank()),
+    confirm = DialogConfirm(confirmLabel, { onConfirm(state.text.toString()) }, enabled = state.text.isNotBlank()),
     dismissLabel = stringResource(R.string.chat_cancel),
     onDismiss = onDismiss,
   ) {
@@ -60,8 +56,7 @@ internal fun TextInputDialog(
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     DialogTextField(
-      value = value,
-      onValueChange = { value = it },
+      state = state,
       modifier = Modifier.focusRequester(focusRequester),
       placeholder = placeholder,
     )

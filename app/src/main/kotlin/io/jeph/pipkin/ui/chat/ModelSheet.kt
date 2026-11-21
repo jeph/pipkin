@@ -17,13 +17,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,7 +73,7 @@ internal fun ModelSheet(
   onDismiss: () -> Unit,
 ) {
   var models by remember { mutableStateOf<List<JSONObject>?>(null) }
-  var query by rememberSaveable { mutableStateOf(initialQuery) }
+  val search = rememberTextFieldState(initialQuery)
   var pick by remember { mutableStateOf<Pick?>(null) }
   val accounts = LocalContext.current.appGraph.accountRepository
   val status by accounts.status.collectAsStateWithLifecycle()
@@ -100,8 +100,9 @@ internal fun ModelSheet(
         pick = null
       }
     }
-    SearchField(query, onQueryChange = { query = it }, placeholder = stringResource(R.string.chat_model_search))
-    ModelList(scoped, query.trim(), pick?.model ?: model, Modifier.weight(1f, fill = false)) { selected ->
+    SearchField(search, placeholder = stringResource(R.string.chat_model_search))
+    val query = search.text.trim().toString()
+    ModelList(scoped, query, pick?.model ?: model, Modifier.weight(1f, fill = false)) { selected ->
       pickAndClose(Pick(model = selected)) {
         controller.setModel(selected.optString("provider"), selected.optString("id"))
       }

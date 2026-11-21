@@ -10,6 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldDecorator
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,19 +26,17 @@ import io.jeph.pipkin.R
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
 
-/** A single-line search field: a search icon and [placeholder] in a surface2 pill. */
+/** A single-line search field for [query]: a search icon and [placeholder] in a surface2 pill. */
 @Composable
 fun SearchField(
-  query: String,
-  onQueryChange: (String) -> Unit,
+  query: TextFieldState,
   placeholder: String,
   modifier: Modifier = Modifier,
   keyboardOptions: KeyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
 ) {
   val colors = pipkinColors
   BasicTextField(
-    value = query,
-    onValueChange = onQueryChange,
+    state = query,
     modifier = modifier.fillMaxWidth().padding(
       horizontal = PipkinTokens.Spacing.s16,
       vertical = PipkinTokens.Spacing.s4,
@@ -45,8 +46,8 @@ fun SearchField(
     ),
     cursorBrush = SolidColor(colors.accent),
     keyboardOptions = keyboardOptions,
-    singleLine = true,
-    decorationBox = { field ->
+    lineLimits = TextFieldLineLimits.SingleLine,
+    decorator = TextFieldDecorator { field ->
       Row(
         modifier =
           Modifier
@@ -59,7 +60,7 @@ fun SearchField(
       ) {
         LucideIcon(icon = R.drawable.ic_lucide_search, contentDescription = null, tint = colors.foregroundMuted)
         Box(modifier = Modifier.weight(1f)) {
-          if (query.isEmpty()) {
+          if (query.text.isEmpty()) {
             Text(text = placeholder, color = colors.foregroundMuted, fontSize = PipkinTokens.FontSize.base)
           }
           field()

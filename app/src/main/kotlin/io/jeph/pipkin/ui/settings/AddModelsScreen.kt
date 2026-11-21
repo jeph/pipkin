@@ -14,16 +14,15 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +40,7 @@ import io.jeph.pipkin.ui.components.SearchField
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 /**
@@ -53,7 +53,7 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
   val accounts = LocalContext.current.appGraph.accountRepository
   val scope = rememberCoroutineScope()
   val failed = stringResource(R.string.provider_failed)
-  var query by rememberSaveable { mutableStateOf("") }
+  val search = rememberTextFieldState()
   LaunchedEffect(draft) { draft.loadAvailable(accounts, failed) }
   // Derived, so typing in the search or toggling a model doesn't rebuild a list of hundreds.
   val models by remember(draft) {
@@ -63,23 +63,21 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
       draft.added.filter { it.id !in availableIds }.map(ModelForm::preview) + available
     }
   }
-  val shown by remember(draft) { derivedStateOf { models.filter { matches(it, query.trim()) } } }
+  val query by remember(search) { derivedStateOf { search.text.trim().toString() } }
+  val shown by remember(draft) { derivedStateOf { models.filter { matches(it, query) } } }
   val newId by remember(draft) {
-    derivedStateOf { query.trim().takeIf { id -> id.isNotEmpty() && models.none { it.id == id } } }
+    derivedStateOf { query.takeIf { id -> id.isNotEmpty() && models.none { it.id == id } } }
   }
   val listState = rememberLazyListState()
+  // The search stays put above the list, so a new one's first matches mustn't open scrolled past.
+  LaunchedEffect(search) { snapshotFlow { search.text.toString() }.drop(1).collect { listState.scrollToItem(0) } }
   LazySettingsPage(
     title = stringResource(R.string.provider_add_models),
     onBack = onBack,
     listState = listState,
     header = {
       SearchField(
-        query,
-        onQueryChange = {
-          query = it
-          // The search stays put above the list, so a new one's first matches mustn't open scrolled past.
-          scope.launch { listState.scrollToItem(0) }
-        },
+        search,
         placeholder = stringResource(R.string.models_search),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Search),
       )

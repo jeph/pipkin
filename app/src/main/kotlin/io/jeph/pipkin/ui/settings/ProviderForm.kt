@@ -1,5 +1,7 @@
 package io.jeph.pipkin.ui.settings
 
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -38,7 +40,7 @@ internal sealed interface ConnectionCheck {
 internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraft {
   var id by mutableStateOf(initialId)
   var baseUrl by mutableStateOf("")
-  var apiKey by mutableStateOf("")
+  val apiKey = TextFieldState()
   override var api by mutableStateOf(ProviderConfig.API_COMPLETIONS)
   private val models = mutableStateListOf<ModelForm>()
   var saving by mutableStateOf(false)
@@ -59,7 +61,7 @@ internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraf
     private set
   private var baseline = snapshot()
 
-  private val connection: Connection get() = Connection(baseUrl.trim(), apiKey.trim(), api)
+  private val connection: Connection get() = Connection(baseUrl.trim(), apiKey.text.trim().toString(), api)
 
   /** The last check, or [ConnectionCheck.Idle] once the URL, key or API type changed after it. */
   val check: ConnectionCheck
@@ -90,7 +92,7 @@ internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraf
     if (prefilled) return
     prefilled = true
     baseUrl = provider.baseUrl
-    apiKey = provider.apiKey
+    apiKey.setTextAndPlaceCursorAtEnd(provider.apiKey)
     api = provider.api.takeIf { it == ProviderConfig.API_RESPONSES } ?: ProviderConfig.API_COMPLETIONS
     models.clear()
     models.addAll(provider.models.map(::ModelForm))
@@ -148,7 +150,7 @@ internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraf
     val configs = models.mapNotNull { it.toConfig() }
     if (configs.size != models.size) return false
     return submit(fallbackError) {
-      accounts.saveProvider(ProviderConfig(id, baseUrl.trim(), api, apiKey.trim(), configs))
+      accounts.saveProvider(ProviderConfig(id, baseUrl.trim(), api, apiKey.text.trim().toString(), configs))
       baseline = snapshot()
     }
   }
@@ -157,7 +159,7 @@ internal class ProviderForm(val editing: Boolean, initialId: String) : ModelDraf
   suspend fun removeProvider(accounts: AccountRepository, fallbackError: String): Boolean =
     submit(fallbackError) { accounts.removeProvider(id) }
 
-  private fun snapshot(): List<Any?> = listOf(id, baseUrl, apiKey, api, models.map { it.snapshot() })
+  private fun snapshot(): List<Any?> = listOf(id, baseUrl, apiKey.text.toString(), api, models.map { it.snapshot() })
 
   private suspend fun submit(fallbackError: String, change: suspend () -> Unit): Boolean {
     saving = true
