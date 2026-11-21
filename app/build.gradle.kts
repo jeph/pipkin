@@ -180,8 +180,8 @@ val syntaxSourcePins = listOf(
   ),
   SyntaxSource(
     "c-sharp",
-    "https://github.com/tree-sitter/tree-sitter-c-sharp/releases/download/v0.23.5/tree-sitter-c-sharp.tar.gz",
-    "d7e9db699ad8ebd234cb6922d285efe128a408db3737d4fa0bab6c668e0fc5e6",
+    "https://github.com/tree-sitter/tree-sitter-c-sharp/releases/download/v0.24.0/tree-sitter-c-sharp.tar.gz",
+    "f916b4014ba2ae21c536177a95dde75b0553fd4740718c79dda7057e44fc5f58",
   ),
   SyntaxSource(
     "cpp",
@@ -255,8 +255,8 @@ val syntaxSourcePins = listOf(
   ),
   SyntaxSource(
     "php",
-    "https://github.com/tree-sitter/tree-sitter-php/releases/download/v0.25.1/tree-sitter-php.tar.gz",
-    "27857429849698a958824e6e5899cb2871f978f57e0523c7015ec454d5fbd5a7",
+    "https://github.com/tree-sitter/tree-sitter-php/releases/download/v0.25.2/tree-sitter-php.tar.gz",
+    "3a32f679a73955443df61e8b7955e14b822c6585ab948f5af8e5e0651229f4d8",
   ),
   SyntaxSource(
     "python",
