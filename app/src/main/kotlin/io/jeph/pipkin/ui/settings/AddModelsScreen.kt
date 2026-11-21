@@ -40,6 +40,7 @@ import io.jeph.pipkin.ui.components.SearchField
 import io.jeph.pipkin.ui.components.SimmeringPot
 import io.jeph.pipkin.ui.theme.PipkinTokens
 import io.jeph.pipkin.ui.theme.pipkinColors
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
@@ -69,8 +70,11 @@ internal fun AddModelsScreen(draft: ModelDraft, onBack: () -> Unit) {
     derivedStateOf { query.takeIf { id -> id.isNotEmpty() && models.none { it.id == id } } }
   }
   val listState = rememberLazyListState()
-  // The search stays put above the list, so a new one's first matches mustn't open scrolled past.
-  LaunchedEffect(search) { snapshotFlow { search.text.toString() }.drop(1).collect { listState.scrollToItem(0) } }
+  // The search stays put above the list, so a new one's first matches mustn't open scrolled past. Each scroll runs in
+  // its own coroutine, since a drag cancels the one that called scrollToItem.
+  LaunchedEffect(search) {
+    snapshotFlow { search.text.toString() }.drop(1).collectLatest { listState.scrollToItem(0) }
+  }
   LazySettingsPage(
     title = stringResource(R.string.provider_add_models),
     onBack = onBack,

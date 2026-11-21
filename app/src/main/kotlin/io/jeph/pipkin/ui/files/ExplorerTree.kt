@@ -24,7 +24,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldDecorator
 import androidx.compose.foundation.text.input.TextFieldLineLimits
-import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
@@ -181,7 +181,9 @@ private fun EntryRow(
 @Composable
 private fun NewFolderRow(onCommit: (String) -> Unit, onCancel: () -> Unit) {
   val colors = pipkinColors
-  val name = rememberTextFieldState()
+  // Not saved: the list keeps a removed row's saved state under its key, which every draft row shares, so the next
+  // draft would open with this one's name.
+  val name = remember { TextFieldState() }
   var settled by remember { mutableStateOf(false) }
   var focused by remember { mutableStateOf(false) }
   val focusRequester = remember { FocusRequester() }
