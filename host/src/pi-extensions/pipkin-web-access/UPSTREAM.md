@@ -2,7 +2,7 @@
 
 This folder is [pi-web-access](https://github.com/nicobailon/pi-web-access) by Nico Bailon, MIT License (see `LICENSE`), copied into Pipkin so that Pipkin can fix it without waiting for upstream. Pipkin ships it as the extension `pipkin-web-access`.
 
-- Upstream version: 0.47.0, tag `v0.47.0`, commit `322e44fafc1aaa691779cdf2116584e67edd7645`.
+- Upstream version: 0.48.0, tag `v0.48.0`, commit `896d75bec55e316726db287a870eb166c4e3f40c`.
 
 ## What differs from upstream
 
@@ -13,8 +13,8 @@ Everything below is a deliberate Pipkin change. Keep each one when folding in a 
 1. `tool-activation.ts`, `index.ts` and `gemini-search.ts` are the only files whose code differs. Search for `// Pipkin:`.
    - `tool-activation.ts`, upstream: `import { buildSessionContext, type ExtensionAPI, type ExtensionContext, type SessionContext } from "@earendil-works/pi-coding-agent";`
      Pipkin: `import type { ExtensionAPI, ExtensionContext, SessionContext } from "@earendil-works/pi-coding-agent";`
-   - `tool-activation.ts`, upstream: `const messages = buildSessionContext(ctx.sessionManager.getBranch()).messages;`
-     Pipkin: `const messages = ctx.sessionManager.buildSessionProjection().messages;`
+   - `tool-activation.ts`, upstream: `const messages = buildSessionContext(ctx.sessionManager.getBranch()).messages;` in `selectFromSession`, and `&& buildSessionContext(ctx.sessionManager.getBranch()).messages.length === 0) decide(ctx);` in the `model_select` handler.
+     Pipkin: `ctx.sessionManager.buildSessionProjection().messages` in both places.
    - Why: Node, not Pi's loader, resolves this extension's imports, so a value import from Pi loads a second, unbundled copy of Pi, about 1,200 modules, every time Pi starts. Type-only imports are fine. A new value import from `@earendil-works/pi-coding-agent` in an upstream release needs the same treatment.
    - `index.ts`, upstream: `import { showUpgradeNotice } from "./upgrade-notice.ts";`, and in the `session_start` handler `void showUpgradeNotice(ctx).catch((error) => console.error("Failed to show the pi-web-access upgrade notice:", error));`
      Pipkin: neither line, and a `// Pipkin:` comment where the call was.

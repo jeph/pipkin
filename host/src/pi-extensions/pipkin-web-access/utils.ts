@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.47.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.48.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import { AsyncLocalStorage } from "node:async_hooks";
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -258,6 +258,10 @@ export function isTimeoutError(err: unknown): boolean {
 export function trimErrorText(text: string): string {
 	return text.replace(/\s+/g, " ").trim().slice(0, 200);
 }
+
+// Fit frames in 2000×2000 like Pi's tool-result images, so answer mode, which sends frames to another
+// model without that resize, never uploads full 4K frames. Smaller frames are not enlarged.
+export const FRAME_SCALE_FILTER = "scale=w='min(2000,iw)':h='min(2000,ih)':force_original_aspect_ratio=decrease";
 
 export function mapFfmpegError(err: unknown): string {
 	const { code, stderr, message } = readExecError(err);

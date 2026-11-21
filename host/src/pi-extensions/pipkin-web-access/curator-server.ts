@@ -1,4 +1,4 @@
-// Vendored from pi-web-access 0.47.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
+// Vendored from pi-web-access 0.48.0 (https://github.com/nicobailon/pi-web-access), MIT License: see LICENSE and UPSTREAM.md.
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import { generateCuratorPage } from "./curator-page.ts";
 import type { ProviderAvailability } from "./gemini-search.ts";
@@ -320,6 +320,9 @@ export function startCuratorServer(
 		if (provider === "searchapi") return availableProviders.searchapi;
 		if (provider === "outcrawl") return availableProviders.outcrawl;
 		if (provider === "sofya") return availableProviders.sofya;
+		if (provider === "cloro") return availableProviders.cloro;
+		if (provider === "autom") return availableProviders.autom;
+		if (provider === "specstream") return availableProviders.specstream;
 		if (provider === "deepseek") return availableProviders.deepseek;
 		return false;
 	}
