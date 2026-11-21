@@ -539,8 +539,8 @@ dependencies {
   implementation("androidx.activity:activity-compose:1.13.0")
   implementation("androidx.compose.material3:material3")
   implementation("androidx.core:core-ktx:1.19.1")
-  implementation("androidx.lifecycle:lifecycle-process:2.11.0")
-  implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+  implementation("androidx.lifecycle:lifecycle-process:2.11.1")
+  implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.1")
   // Runs .litertlm models in the :inference process (localmodel/engine/litert).
   implementation("com.google.ai.edge.litertlm:litertlm-android:0.19.1")
   implementation("com.mikepenz:multiplatform-markdown-renderer-m3:0.46.0")
