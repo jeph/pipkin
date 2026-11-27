@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { type Dirs, installRealPi, makeDirs, removeDirs, runOp } from "./harness.js";
 
-/** A Kimi Code `/models` entry in the shape the real endpoint serves, for a model Pi 1.6.1 doesn't ship. */
+/** A Kimi Code `/models` entry in the shape the real endpoint serves, for a model Pi 1.7.0 doesn't ship. */
 const K3_2_PRO = {
   id: "k3.2-pro",
   object: "model",

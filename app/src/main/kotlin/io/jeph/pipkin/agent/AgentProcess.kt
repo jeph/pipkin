@@ -860,7 +860,7 @@ internal class AgentProcess(
     }
     (data.opt("sessionId") as? String)?.let { sessionIdState.value = it }
     sessionNameState.value = data.opt("sessionName") as? String
-    // With no usable model Pi (1.1.0, still in 1.6.1) reports a placeholder whose provider is "unknown" rather than
+    // With no usable model Pi (1.1.0, still in 1.7.0) reports a placeholder whose provider is "unknown" rather than
     // omitting it.
     timeline.setModel(data.optJSONObject("model")?.takeUnless { it.optString("provider") == "unknown" })
     timeline.setThinkingLevel(data.opt("thinkingLevel") as? String)

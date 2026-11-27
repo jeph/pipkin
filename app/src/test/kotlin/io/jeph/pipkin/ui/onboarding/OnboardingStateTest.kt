@@ -176,7 +176,7 @@ class OnboardingStateTest {
   )
 
   private companion object {
-    const val PI_VERSION = "1.6.1"
+    const val PI_VERSION = "1.7.0"
     val READY =
       HostHello(piVersion = PI_VERSION, nodeVersion = "22.19.0", configDir = "", home = "", sharedStorage = true)
   }
