@@ -1,4 +1,4 @@
-Pi 1.6.0 (https://github.com/earendil-works/pi), MIT License. The Pipkin remote extension, which runs a remote chat's tools over SSH, is adapted from Pi's SSH example extension (packages/coding-agent/examples/extensions/ssh.ts).
+Pi 1.6.1 (https://github.com/earendil-works/pi), MIT License. The Pipkin remote extension, which runs a remote chat's tools over SSH, is adapted from Pi's SSH example extension (packages/coding-agent/examples/extensions/ssh.ts).
 
 MIT License
 
