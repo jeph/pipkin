@@ -8,7 +8,7 @@ plugins {
   base
   id("org.jlleitschuh.gradle.ktlint") version "14.2.0"
   id("dev.detekt") version "2.0.0-alpha.6" apply false
-  id("com.android.application") version "9.5.2" apply false
+  id("com.android.application") version "9.5.3" apply false
   id("org.jetbrains.kotlin.plugin.compose") version "2.4.21" apply false
 }
 
