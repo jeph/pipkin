@@ -1,4 +1,4 @@
-cpp-httplib 0.66.0 (https://github.com/yhirose/cpp-httplib), MIT License, as vendored by llama.cpp v1.0.0. Built into Pipkin's llama.cpp library for local models. It serves the local models' HTTP API.
+cpp-httplib 0.67.0 (https://github.com/yhirose/cpp-httplib), MIT License, as vendored by llama.cpp v1.1.0. Built into Pipkin's llama.cpp library for local models. It serves the local models' HTTP API.
 
 The MIT License (MIT)
 

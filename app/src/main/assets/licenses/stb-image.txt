@@ -1,4 +1,4 @@
-stb_image v2.30 (https://github.com/nothings/stb), MIT License or public domain, as vendored by llama.cpp v1.0.0. Built into Pipkin's llama.cpp library for local models.
+stb_image v2.32 (https://github.com/nothings/stb), MIT License or public domain, as vendored by llama.cpp v1.1.0. Built into Pipkin's llama.cpp library for local models.
 
 This software is available under 2 licenses -- choose whichever you prefer.
 ------------------------------------------------------------------------------
