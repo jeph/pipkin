@@ -156,7 +156,8 @@ abstract class SyntaxSources : PinnedSources() {
 class SyntaxSource(val name: String, val url: String, val sha256: String)
 
 // Each project's latest release (Dart has none), plus the older JavaScript and C releases whose
-// highlight queries the TypeScript and C++ queries extend.
+// highlight queries the TypeScript and C++ queries extend. Swift 0.7.4 has no release archive, so
+// its sources come from the 0.7.4-with-generated-files tag, which carries the generated parser.
 val syntaxSourcePins = listOf(
   SyntaxSource(
     "tree-sitter",
@@ -250,8 +251,8 @@ val syntaxSourcePins = listOf(
   ),
   SyntaxSource(
     "perl",
-    "https://github.com/tree-sitter-perl/tree-sitter-perl/releases/download/v2.0.6/tree-sitter-perl.tar.gz",
-    "93414503913ccb7e74b3bfb82bdb496559a5c6e663de5a35cbcdfe75ef8cb295",
+    "https://github.com/tree-sitter-perl/tree-sitter-perl/releases/download/v2.1.2/tree-sitter-perl.tar.gz",
+    "dd9733b1c6345dcbc1f00d513667b6611ecf0ce48484c9d79135f66242abfb47",
   ),
   SyntaxSource(
     "php",
@@ -275,8 +276,8 @@ val syntaxSourcePins = listOf(
   ),
   SyntaxSource(
     "swift",
-    "https://github.com/alex-pinkus/tree-sitter-swift/releases/download/0.7.3/tree-sitter-swift.tar.gz",
-    "c595b41459b0816f246ec27f60e08392ff453135e12ef47a1852ed37fe6705fe",
+    "https://github.com/alex-pinkus/tree-sitter-swift/archive/refs/tags/0.7.4-with-generated-files.tar.gz",
+    "bf4d34383638f41cde398f4678dea72cdcda8442c7cfd13944f4bb63e9a96f70",
   ),
   SyntaxSource(
     "toml",
